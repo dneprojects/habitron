@@ -10,8 +10,8 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .coordinator import HbtnCoordinator
 from .const import DOMAIN, SMARTIP_COMMAND_STRINGS
+from .module import IfDescriptor
 
 
 async def async_setup_entry(
@@ -21,8 +21,7 @@ async def async_setup_entry(
 ) -> None:
     """Add lights for passed config_entry in HA."""
     hbtn_rt = hass.data[DOMAIN][entry.entry_id].router
-    hbtn_comm = hbtn_rt.comm
-    hbtn_cord = HbtnCoordinator(hass, hbtn_comm)
+    hbtn_cord = hbtn_rt.coord
 
     new_devices = []
     for hbt_module in hbtn_rt.modules:
@@ -40,6 +39,21 @@ async def async_setup_entry(
                             mod_output, hbt_module, hbtn_cord, len(new_devices)
                         )
                     )
+        for mod_led in hbt_module.leds:
+
+            loc_led = IfDescriptor(
+                mod_led.name, mod_led.nmbr, mod_led.type, mod_led.value
+            )
+
+            led_name = "LED red"
+            led_no = loc_led.nmbr + 1
+            if loc_led.name.strip() == "":
+                loc_led.name = f"{led_name} {led_no}"
+            else:
+                loc_led.name = f"{led_name} {led_no}: {loc_led.name}"
+            new_devices.append(
+                SwitchedLed(loc_led, hbt_module, hbtn_cord, len(new_devices))
+            )
 
     # Fetch initial data so we have data when entities subscribe
     #
@@ -104,6 +118,60 @@ class SwitchedOutput(CoordinatorEntity, LightEntity):
         """Send command patches module and output numbers"""
         cmd_str = cmd_str.replace("\xff", chr(self._module.mod_addr))
         cmd_str = cmd_str.replace("\xfe", chr(self._nmbr + 1))
+        await self._module.comm.async_send_command(cmd_str)
+
+
+class SwitchedLed(CoordinatorEntity, LightEntity):
+    """Module switch background LEDs"""
+
+    def __init__(self, led, module, coord, idx) -> None:
+        """Initialize an HbtnLED, pass coordinator to CoordinatorEntity."""
+        super().__init__(coord, context=idx)
+        self.idx = idx
+        self._led = led
+        self._module = module
+        self._name = led.name
+        self._nmbr = led.nmbr
+        self._state = None
+        self._brightness = None
+        self._attr_unique_id = f"{self._module.id}_led_{self.idx}"
+        self.icon.__init__("mdi:circle-outline")
+
+    # To link this entity to its device, this property must return an
+    # identifiers value matching that used in the module
+    @property
+    def device_info(self) -> None:
+        """Return information to link this entity with the correct device."""
+        return {"identifiers": {(DOMAIN, self._module.mod_id)}}
+
+    @property
+    def name(self) -> str:
+        """Return the display name of this light."""
+        return self._name
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self._attr_is_on = self._module.leds[self._nmbr].value == 1
+        self.async_write_ha_state()
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Instruct the light to turn on."""
+        await self.async_send_command(
+            SMARTIP_COMMAND_STRINGS["SET_OUTPUT_ON"]
+        )  # Update the data
+        await self.coordinator.async_request_refresh()
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Instruct the light to turn off."""
+        await self.async_send_command(SMARTIP_COMMAND_STRINGS["SET_OUTPUT_OFF"])
+        # Update the data
+        await self.coordinator.async_request_refresh()
+
+    async def async_send_command(self, cmd_str):
+        """Send command patches module and output numbers"""
+        cmd_str = cmd_str.replace("\xff", chr(self._module.mod_addr))
+        cmd_str = cmd_str.replace("\xfe", chr(self._nmbr + 18 + 1))
         await self._module.comm.async_send_command(cmd_str)
 
 
