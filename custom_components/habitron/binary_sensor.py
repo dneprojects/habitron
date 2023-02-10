@@ -9,7 +9,6 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .coordinator import HbtnCoordinator
 from .const import DOMAIN
 
 # from homeassistant.helpers.entity import Entity
@@ -22,8 +21,7 @@ async def async_setup_entry(
 ) -> None:
     """Add binary sensors for Habitron flgs and inputs."""
     hbtn_rt = hass.data[DOMAIN][entry.entry_id].router
-    hbtn_comm = hbtn_rt.comm
-    hbtn_cord = HbtnCoordinator(hass, hbtn_comm)
+    hbtn_cord = hbtn_rt.coord
 
     new_devices = []
     for hbt_module in hbtn_rt.modules:

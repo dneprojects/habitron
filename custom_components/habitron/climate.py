@@ -16,7 +16,6 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .coordinator import HbtnCoordinator
 from .const import DOMAIN, SMARTIP_COMMAND_STRINGS
 
 
@@ -27,8 +26,7 @@ async def async_setup_entry(
 ) -> None:
     """Add climate units for passed config_entry in HA."""
     hbtn_rt = hass.data[DOMAIN][entry.entry_id].router
-    hbtn_comm = hbtn_rt.comm
-    hbtn_cord = HbtnCoordinator(hass, hbtn_comm)
+    hbtn_cord = hbtn_rt.coord
 
     new_devices = []
     for hbt_module in hbtn_rt.modules:
@@ -94,7 +92,7 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
         self._attr_target_temperature = self._module.setvalues[0].value
         self.async_write_ha_state()
 
-    async def async_set_temperature(self, **kwargs):
+    async def async_set_temperature(self, **kwargs: Any) -> None:
         """Set new target temperature."""
         self._target_temperature = kwargs.get(ATTR_TEMPERATURE)
         cmd_str = SMARTIP_COMMAND_STRINGS["SET_SETPOINT_VALUE"]

@@ -22,9 +22,17 @@ class HbtnCoordinator(DataUpdateCoordinator):
             # Name of the data. For logging purposes.
             name="Habitron updates",
             # Polling interval. Will only be polled if there are subscribers.
-            update_interval=timedelta(seconds=5),
+            update_interval=timedelta(
+                seconds=hbtn_comm._config.data["update_interval"]
+            ),
         )
         self.comm = hbtn_comm
+        self.config = hbtn_comm._config
+
+    def set_update_interval(self):
+        """Updating interval for integration re-configuration"""
+        self.config.data = self.config.options
+        self.update_interval = timedelta(seconds=self.config.data["update_interval"])
 
     async def _async_update_data(self):
         """Fetch data from Habitron comm endpoint, preprocess and store for lookup."""
