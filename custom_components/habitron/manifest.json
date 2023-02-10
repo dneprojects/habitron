@@ -1,0 +1,16 @@
+{
+  "domain": "habitron",
+  "name": "Habitron",
+  "config_flow": true,
+  "documentation": "https://github.com/dneprojects/habitron",
+  "issue_tracker": "https://github.com/dneprojects/habitron/issues",
+  "version": "0.7.0",
+  "requirements": [],
+  "ssdp": [],
+  "zeroconf": [],
+  "homekit": {},
+  "dependencies": [],
+  "codeowners": ["@dneprojects"],
+  "iot_class": "local_polling",
+  "integrations": ["habitron"]
+}

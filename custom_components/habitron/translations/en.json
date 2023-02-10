@@ -1,0 +1,23 @@
+{
+    "config": {
+        "abort": {
+            "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
+        },
+        "error": {
+            "cannot_connect": "Cannot connect to SmartIP",
+            "host_not_found": "Host name not fount, try with IP",
+            "invalid_interval": "Invalid interval entry",
+            "interval_too_short": "Interval too short, enter min. 2 s",
+            "interval_too_long": "Interval too short, enter max. 60 s",
+            "unknown": "[%key:common::config_flow::error::unknown%]"
+        },
+        "step": {
+            "user": {
+                "data": {
+                    "habitron_host": "Host name or IP of SmartIP",
+                    "update_interval": "Update interval [s]"
+                }
+            }
+        }
+    }
+}

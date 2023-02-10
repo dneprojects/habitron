@@ -1,0 +1,23 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "data": {
+          "habitron_host": "[%key:common::config_flow::data::habitron_host%]",
+          "update_interval": "[%key:common::config_flow::data::update_interval%]"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
+      "host_not_found": "[%key:common::config_flow::error::host_not_found%]",
+      "invalid_interval": "[%key:common::config_flow::error::invalid_interval%]",
+      "interval_too_short": "[%key:common::config_flow::error::interval_too_short%]",
+      "interval_too_long": "[%key:common::config_flow::error::interval_too_long%]",
+      "unknown": "[%key:common::config_flow::error::unknown%]"
+    },
+    "abort": {
+      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
+    }
+  }
+}
