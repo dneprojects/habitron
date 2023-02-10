@@ -14,7 +14,6 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .coordinator import HbtnCoordinator
 from .const import DOMAIN, SMARTIP_COMMAND_STRINGS
 
 
@@ -25,8 +24,7 @@ async def async_setup_entry(
 ) -> None:
     """Add covers for passed config_entry in HA."""
     hbtn_rt = hass.data[DOMAIN][entry.entry_id].router
-    hbtn_comm = hbtn_rt.comm
-    hbtn_cord = HbtnCoordinator(hass, hbtn_comm)
+    hbtn_cord = hbtn_rt.coord
 
     new_devices = []
     for hbt_module in hbtn_rt.modules:
@@ -115,7 +113,7 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        self._attr_current_cover_position = 100 - self._module.covers[self._nmbr].value
+        self._position = 100 - self._module.covers[self._nmbr].value
         self._moving = 0
         if self._module.outputs[self._nmbr * 2].value > 0:
             if self._polarity:
@@ -218,8 +216,8 @@ class HbtnShutterTilt(HbtnShutter):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        self._attr_current_cover_position = 100 - self._module.covers[self._nmbr].value
-        self._attr_current_cover_tilt_position = self._module.covers[self._nmbr].tilt
+        self._position = 100 - self._module.covers[self._nmbr].value
+        self._tilt_position = self._module.covers[self._nmbr].tilt
         self._moving = 0
         if self._module.outputs[self._nmbr * 2].value > 0:
             if self._polarity:

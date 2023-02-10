@@ -18,15 +18,15 @@ from .const import DOMAIN, SMARTIP_COMMAND_STRINGS
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Add lights for passed config_entry in HA."""
-    smip = hass.data[DOMAIN][config_entry.entry_id]
-    router = smip.router
+    hbtn_rt = hass.data[DOMAIN][entry.entry_id].router
+    hbtn_cord = hbtn_rt.coord
 
     new_devices = []
-    for hbt_module in router.modules:
+    for hbt_module in hbtn_rt.modules:
         for mod_input in hbt_module.inputs:
             if mod_input.nmbr >= 0:  # not disabled
                 if mod_input.type == 1:  # switch
