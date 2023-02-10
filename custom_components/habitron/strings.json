@@ -1,23 +1,46 @@
 {
   "config": {
+    "abort": {
+      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to SmartIP",
+      "host_not_found": "Host name not fount, try with IP",
+      "invalid_interval": "Invalid interval entry",
+      "interval_too_short": "Interval too short, enter min. 3 s",
+      "interval_too_long": "Interval too short, enter max. 20 s",
+      "unknown": "[%key:common::config_flow::error::unknown%]"
+    },
     "step": {
       "user": {
+        "title": "Setup communication",
         "data": {
-          "habitron_host": "[%key:common::config_flow::data::habitron_host%]",
-          "update_interval": "[%key:common::config_flow::data::update_interval%]"
+          "habitron_host": "Host name or IP of SmartIP",
+          "update_interval": "Update interval [s]"
         }
       }
     },
-    "error": {
-      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
-      "host_not_found": "[%key:common::config_flow::error::host_not_found%]",
-      "invalid_interval": "[%key:common::config_flow::error::invalid_interval%]",
-      "interval_too_short": "[%key:common::config_flow::error::interval_too_short%]",
-      "interval_too_long": "[%key:common::config_flow::error::interval_too_long%]",
-      "unknown": "[%key:common::config_flow::error::unknown%]"
-    },
-    "abort": {
-      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
+    "options": {
+      "abort": {
+        "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
+      },
+      "error": {
+        "cannot_connect": "Cannot connect to SmartIP",
+        "host_not_found": "Host name not fount, try with IP",
+        "invalid_interval": "Invalid interval entry",
+        "interval_too_short": "Interval too short, enter min. 3 s",
+        "interval_too_long": "Interval too short, enter max. 20 s",
+        "unknown": "[%key:common::config_flow::error::unknown%]"
+      },
+      "step": {
+        "init": {
+          "title": "Setup communication",
+          "data": {
+            "habitron_host": "Host name or IP of SmartIP",
+            "update_interval": "Update interval [s]"
+          }
+        }
+      }
     }
   }
 }

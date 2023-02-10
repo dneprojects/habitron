@@ -12,9 +12,10 @@ import socket
 
 from pymodbus.utilities import computeCRC
 
+from homeassistant import exceptions
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
-from .const import DOMAIN
+from .const import DOMAIN, SMARTIP_COMMAND_STRINGS, MirrIdx
 
 
 class HbtnComm:
@@ -22,8 +23,8 @@ class HbtnComm:
 
     def __init__(self, hass: HomeAssistant, config: ConfigEntry) -> None:
         """Init CommTest for connection test."""
-        self._name = config.data.__getitem__("habitron_host")
-        self._host = socket.gethostbyname(self._name)
+        self._name = config.data["habitron_host"]
+        self._host = get_host_ip(self._name)
         self._port = 7777
         self._mac = "00:80:a3:d4:d1:4f"
         self._hass = hass
@@ -43,6 +44,12 @@ class HbtnComm:
     def com_mac(self) -> str:
         """Mac address for SmartIP."""
         return self._mac
+
+    def set_host(self):
+        """Updating host information for integration re-configuration"""
+        self._config.data = self._config.options
+        self._name = self._config.data["habitron_host"]
+        self._host = get_host_ip(self._name)
 
     async def async_send_command(self, cmd_string: str) -> bytes:
         """General function for communication via SmartIP"""
@@ -77,6 +84,27 @@ class HbtnComm:
         resp_bytes = await self.async_system_update()
         return resp_bytes
 
+    def get_mirror_status(self, mod_desc):
+        """Get common sys_status by separate calls to mirror"""
+        sys_status = b""
+        for desc in mod_desc:
+            cmd_str = SMARTIP_COMMAND_STRINGS["READ_MODULE_MIRR_STATUS"]
+            cmd_str = cmd_str.replace("\xff", chr(desc.addr))
+            resp = self.send_command(cmd_str)
+            status = (
+                resp[0 : MirrIdx.LED_I]
+                + resp[MirrIdx.IR_H : MirrIdx.ROLL_T]
+                + resp[MirrIdx.ROLL_POS : MirrIdx.BLAD_T]
+                + resp[MirrIdx.BLAD_POS : MirrIdx.T_SHORT]
+                + resp[MirrIdx.T_SETP_1 : MirrIdx.T_LIM]
+                + resp[MirrIdx.RAIN : MirrIdx.RAIN + 2]
+                + resp[MirrIdx.USER_CNT : MirrIdx.FINGER_CNT + 1]
+                + resp[MirrIdx.MODULE_STAT : MirrIdx.MODULE_STAT + 1]
+                + resp[MirrIdx.COUNTER : MirrIdx.END]
+            )
+            sys_status = sys_status + status
+        return sys_status
+
     def get_mac(self) -> str:
         """Get mac address of SmartIP."""
         sck = socket.socket()  # Create a socket object
@@ -89,11 +117,8 @@ class HbtnComm:
 
 async def test_connection(host_name) -> bool:
     """Test connectivity to SmartIP is OK."""
-    try:
-        host = socket.gethostbyname(host_name)
-    except socket.gaierror:
-        return "host_not_found"
     port = 7777
+    host = get_host_ip(host_name)
     sck = socket.socket()  # Create a socket object
     sck.connect((host, port))
     sck.settimeout(15)  # 15 seconds
@@ -102,6 +127,12 @@ async def test_connection(host_name) -> bool:
     sck.close()
     ver_string = resp_bytes.decode("iso8859-1")
     return bool(ver_string[0:2] == "\x01\x18")
+
+
+def get_host_ip(host_name: str) -> str:
+    """Get IP from DNS host name, error handling"""
+    host = socket.gethostbyname(host_name)
+    return host
 
 
 def send_receive(sck, cmd_str: str) -> bytes:
@@ -154,3 +185,7 @@ def wrap_command(cmd_string: str) -> str:
     crc_high = (cmd_crc - crc_low) >> 8
     cmd_postfix = chr(crc_high) + chr(crc_low) + cmd_postfix
     return full_string + cmd_postfix
+
+
+class HostNotFound(exceptions.HomeAssistantError):
+    """Error to indicate DNS name is not found."""
