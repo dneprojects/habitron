@@ -118,10 +118,11 @@ class HbtnRouter:
             sw_version=self.version,
             hw_version=self.version,
         )
+        self.comm.set_router(self)
         # Further initialization of module instances
         self.comm.send_command(SMARTIP_COMMAND_STRINGS["START_MIRROR"])
-        self.get_system_status()
         self.modules_desc = await self.get_modules(self.module_grp)
+        await self.comm.async_system_update()
 
         for mod_desc in self.modules_desc:
             if mod_desc.mtype == "Smart Controller":
@@ -236,47 +237,19 @@ class HbtnRouter:
                     ].name = entry_name  # counter
             resp = resp[line_len : len(resp)]
 
-    def get_system_status(self) -> bytes:
-        """Get current status of all modules from SmartIP"""
-        resp = self.comm.send_command(SMARTIP_COMMAND_STRINGS["GET_COMPACT_STATUS"])
-        new_status = self.sys_status != resp
-        if new_status:
-            self.sys_status = resp
-            self.status = self.get_status()
-            self.mode0 = int(self.status[RoutIdx.MODE0])
-            flags_state = int.from_bytes(
-                self.status[RoutIdx.FLAG_GLOB : RoutIdx.FLAG_GLOB + 2],
-                "little",
-            )
-            for flg in self.flags:
-                flg.value = int((flags_state & (0x01 << flg.nmbr - 1)) > 0)
-        return new_status
-
-    def get_mirror_status(self) -> bytes:
-        """Get mirror status of all modules from SmartIP"""
-        resp = self.comm.get_mirror_status(self.modules_desc)
-        new_status = self.sys_status != resp
-        if new_status:
-            self.sys_status = resp
-            self.status = self.get_status()
-            self.mode0 = int(self.status[RoutIdx.MODE0])
-            flags_state = int.from_bytes(
-                self.status[RoutIdx.FLAG_GLOB : RoutIdx.FLAG_GLOB + 2],
-                "little",
-            )
-            for flg in self.flags:
-                flg.value = int((flags_state & (0x01 << flg.nmbr - 1)) > 0)
-        return new_status
-
-    def update_system_status(self) -> None:
-        """Distribute mirror status to all modules"""
-        if self.coord.update_interval.seconds == 6:
-            new_status = self.get_mirror_status()
-        else:
-            new_status = self.get_system_status()
-        if new_status:
-            for module in self.modules:
-                module.update(self.sys_status)
+    async def update_system_status(self, sys_status) -> None:
+        """Distribute module status to all modules and update self status"""
+        self.sys_status = sys_status
+        self.status = self.get_status()
+        self.mode0 = int(self.status[RoutIdx.MODE0])
+        flags_state = int.from_bytes(
+            self.status[RoutIdx.FLAG_GLOB : RoutIdx.FLAG_GLOB + 2],
+            "little",
+        )
+        for flg in self.flags:
+            flg.value = int((flags_state & (0x01 << flg.nmbr - 1)) > 0)
+        for module in self.modules:
+            module.update(self.sys_status)
         return
 
     async def get_modules(self, mod_groups) -> list[ModuleDescriptor]:

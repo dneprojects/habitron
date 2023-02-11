@@ -121,60 +121,6 @@ class SwitchedOutput(CoordinatorEntity, LightEntity):
         await self._module.comm.async_send_command(cmd_str)
 
 
-class SwitchedLed(CoordinatorEntity, LightEntity):
-    """Module switch background LEDs"""
-
-    def __init__(self, led, module, coord, idx) -> None:
-        """Initialize an HbtnLED, pass coordinator to CoordinatorEntity."""
-        super().__init__(coord, context=idx)
-        self.idx = idx
-        self._led = led
-        self._module = module
-        self._name = led.name
-        self._nmbr = led.nmbr
-        self._state = None
-        self._brightness = None
-        self._attr_unique_id = f"{self._module.id}_led_{self.idx}"
-        self.icon.__init__("mdi:circle-outline")
-
-    # To link this entity to its device, this property must return an
-    # identifiers value matching that used in the module
-    @property
-    def device_info(self) -> None:
-        """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.mod_id)}}
-
-    @property
-    def name(self) -> str:
-        """Return the display name of this light."""
-        return self._name
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self._attr_is_on = self._module.leds[self._nmbr].value == 1
-        self.async_write_ha_state()
-
-    async def async_turn_on(self, **kwargs: Any) -> None:
-        """Instruct the light to turn on."""
-        await self.async_send_command(
-            SMARTIP_COMMAND_STRINGS["SET_OUTPUT_ON"]
-        )  # Update the data
-        await self.coordinator.async_request_refresh()
-
-    async def async_turn_off(self, **kwargs: Any) -> None:
-        """Instruct the light to turn off."""
-        await self.async_send_command(SMARTIP_COMMAND_STRINGS["SET_OUTPUT_OFF"])
-        # Update the data
-        await self.coordinator.async_request_refresh()
-
-    async def async_send_command(self, cmd_str):
-        """Send command patches module and output numbers"""
-        cmd_str = cmd_str.replace("\xff", chr(self._module.mod_addr))
-        cmd_str = cmd_str.replace("\xfe", chr(self._nmbr + 18 + 1))
-        await self._module.comm.async_send_command(cmd_str)
-
-
 class DimmedOutput(SwitchedOutput):
     """Representation of habitron light entities, dimmable."""
 
@@ -217,6 +163,60 @@ class DimmedOutput(SwitchedOutput):
         cmd_str = SMARTIP_COMMAND_STRINGS["SET_DIMMER_VALUE"]
         cmd_str = cmd_str[0:-1] + chr(int(self._brightness * 100.0 / 255))
         cmd_str = cmd_str.replace("\xfe", chr(self._nmbr - 10 + 1))
-        self.async_send_command(cmd_str)
+        await self.async_send_command(cmd_str)
         # Update the data
         await self.coordinator.async_request_refresh()
+
+
+class SwitchedLed(CoordinatorEntity, LightEntity):
+    """Module switch background LEDs"""
+
+    def __init__(self, led, module, coord, idx) -> None:
+        """Initialize an HbtnLED, pass coordinator to CoordinatorEntity."""
+        super().__init__(coord, context=idx)
+        self.idx = idx
+        self._led = led
+        self._module = module
+        self._name = led.name
+        self._nmbr = led.nmbr
+        self._state = None
+        self._brightness = None
+        self._attr_unique_id = f"{self._module.id}_led_{self.idx}"
+        self._attr_icon = "mdi:lightbulb-alert-outline"
+
+    # To link this entity to its device, this property must return an
+    # identifiers value matching that used in the module
+    @property
+    def device_info(self) -> None:
+        """Return information to link this entity with the correct device."""
+        return {"identifiers": {(DOMAIN, self._module.mod_id)}}
+
+    @property
+    def name(self) -> str:
+        """Return the display name of this light."""
+        return self._name
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self._attr_is_on = self._module.leds[self._nmbr].value == 1
+        self.async_write_ha_state()
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Instruct the light to turn on."""
+        await self.async_send_command(
+            SMARTIP_COMMAND_STRINGS["SET_OUTPUT_ON"]
+        )  # Update the data
+        await self.coordinator.async_request_refresh()
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Instruct the light to turn off."""
+        await self.async_send_command(SMARTIP_COMMAND_STRINGS["SET_OUTPUT_OFF"])
+        # Update the data
+        await self.coordinator.async_request_refresh()
+
+    async def async_send_command(self, cmd_str):
+        """Send command patches module and output numbers"""
+        cmd_str = cmd_str.replace("\xff", chr(self._module.mod_addr))
+        cmd_str = cmd_str.replace("\xfe", chr(self._nmbr + 18 + 1))
+        await self._module.comm.async_send_command(cmd_str)

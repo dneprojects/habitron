@@ -1,0 +1,13 @@
+# Describes the format for Habitron service
+mod_restart:
+  name: Module restart
+  description: Restart one or all Habitron modules
+  fields:
+    mod_nmbr:
+      name: Module number
+      description: Habitron's module address, default 0xFF for all modules
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 64

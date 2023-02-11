@@ -29,6 +29,8 @@ class HbtnComm:
         self._mac = "00:80:a3:d4:d1:4f"
         self._hass = hass
         self._config = config
+        self.crc = 0
+        self.router = []
 
     @property
     def com_ip(self) -> str:
@@ -51,15 +53,30 @@ class HbtnComm:
         self._name = self._config.data["habitron_host"]
         self._host = get_host_ip(self._name)
 
+    def set_router(self, rtr) -> None:
+        """Registers the router instance"""
+        self.router = rtr
+
     async def async_send_command(self, cmd_string: str) -> bytes:
         """General function for communication via SmartIP"""
         sck = socket.socket()  # Create a socket object
         sck.connect((self._host, self._port))
         sck.settimeout(30)  # 30 seconds
         full_string = wrap_command(cmd_string)
-        resp_bytes = await async_send_receive(sck, full_string)
+        res = await async_send_receive(sck, full_string)
         sck.close()
+        resp_bytes = res[0]
         return resp_bytes
+
+    async def async_send_command_crc(self, cmd_string: str) -> [bytes, int]:
+        """General function for communication via SmartIP, returns additional crc"""
+        sck = socket.socket()  # Create a socket object
+        sck.connect((self._host, self._port))
+        sck.settimeout(30)  # 30 seconds
+        full_string = wrap_command(cmd_string)
+        res = await async_send_receive(sck, full_string)
+        sck.close()
+        return res[0], res[1]
 
     def send_command(self, cmd_string: str) -> bytes:
         """General function for communication via SmartIP"""
@@ -71,26 +88,26 @@ class HbtnComm:
         sck.close()
         return resp_bytes
 
-    async def async_system_update(self) -> bytes:
+    async def async_system_update(self) -> None:
         """Trigger update of Habitron states"""
-        resp_bytes = self._hass.data[DOMAIN][
-            self._config.entry_id
-        ].router.update_system_status()
-        return resp_bytes
 
-    async def send_command_update(self, cmd_string: str) -> bytes:
-        """Send command and trigger update of Habitron states"""
-        resp_bytes = await self.async_send_command(cmd_string)
-        resp_bytes = await self.async_system_update()
-        return resp_bytes
+        if self.router.coord.update_interval.seconds == 6:
+            sys_status = await self.get_mirror_status(self.router.modules_desc)
+        else:
+            sys_status = await self.get_compact_status()
+        if sys_status == b"":
+            return
+        else:
+            await self.router.update_system_status(sys_status)
 
-    def get_mirror_status(self, mod_desc):
+    async def get_mirror_status(self, mod_desc) -> bytes:
         """Get common sys_status by separate calls to mirror"""
         sys_status = b""
+        sys_crc = 0
         for desc in mod_desc:
             cmd_str = SMARTIP_COMMAND_STRINGS["READ_MODULE_MIRR_STATUS"]
             cmd_str = cmd_str.replace("\xff", chr(desc.addr))
-            resp = self.send_command(cmd_str)
+            [resp, crc] = await self.async_send_command_crc(cmd_str)
             status = (
                 resp[0 : MirrIdx.LED_I]
                 + resp[MirrIdx.IR_H : MirrIdx.ROLL_T]
@@ -103,7 +120,22 @@ class HbtnComm:
                 + resp[MirrIdx.COUNTER : MirrIdx.END]
             )
             sys_status = sys_status + status
-        return sys_status
+            sys_crc += crc
+        if sys_crc == self.crc:
+            return b""
+        else:
+            self.crc = sys_crc
+            return sys_status
+
+    async def get_compact_status(self) -> bytes:
+        """Get compact status for all modules, if changed crc"""
+        cmd_string = SMARTIP_COMMAND_STRINGS["GET_COMPACT_STATUS"]
+        [resp_bytes, crc] = await self.async_send_command_crc(cmd_string)
+        if crc == self.crc:
+            return b""
+        else:
+            self.crc = crc
+            return resp_bytes
 
     def get_mac(self) -> str:
         """Get mac address of SmartIP."""
@@ -113,6 +145,13 @@ class HbtnComm:
         self.com_mac = hexlify(mac_res)
         sck.close()
         return self.com_mac
+
+    def module_restart(self, mod_nmbr: int) -> None:
+        """Restarts a single module or all with arg 0xFF"""
+        cmd_str = SMARTIP_COMMAND_STRINGS["REBOOT_MODULE"]
+        if mod_nmbr < 65:
+            cmd_str = cmd_str.replace("\xff", chr(mod_nmbr))
+        self.send_command(cmd_str)
 
 
 async def test_connection(host_name) -> bool:
@@ -167,10 +206,11 @@ async def async_send_receive(sck, cmd_str: str) -> bytes:
         while len(resp_bytes) < resp_len + 3:
             buffer = sck.recv(resp_len + 3)
             resp_bytes = resp_bytes + buffer
+        crc = resp_bytes[-2] * 256 + resp_bytes[-3]
         resp_bytes = resp_bytes[0:resp_len]
     except TimeoutError:
         resp_bytes = b"Timeout"
-    return resp_bytes
+    return resp_bytes, crc
 
 
 def wrap_command(cmd_string: str) -> str:

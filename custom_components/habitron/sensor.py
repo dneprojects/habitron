@@ -64,12 +64,6 @@ async def async_setup_entry(
                         hbt_module, mod_sensor.nmbr, hbtn_cord, len(new_devices)
                     )
                 )
-            elif mod_sensor.name == "Movement":
-                new_devices.append(
-                    MovementSensor(
-                        hbt_module, mod_sensor.nmbr, hbtn_cord, len(new_devices)
-                    )
-                )
             elif mod_sensor.name == "Airquality":
                 new_devices.append(
                     AirqualitySensor(
