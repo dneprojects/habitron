@@ -121,6 +121,59 @@ class SwitchedOutput(CoordinatorEntity, LightEntity):
         await self._module.comm.async_send_command(cmd_str)
 
 
+class DimmedOutput(SwitchedOutput):
+    """Representation of habitron light entities, dimmable."""
+
+    _attr_brightness = True
+
+    def __init__(self, output, module, coord, idx) -> None:
+        """Initialize a dimmable Habitron Light."""
+        super().__init__(output, module, coord, idx)
+        self._brightness = 0
+        self._color_mode = ColorMode.BRIGHTNESS
+        self._supported_color_modes = ColorMode.BRIGHTNESS
+        if module.mod_type == "Smart Controller":
+            self._out_offs = 10
+        else:
+            self._out_offs = 0
+
+    @property
+    def brightness(self) -> int:
+        """Return the brightness of the light."""
+        return self._brightness
+
+    @property
+    def color_mode(self) -> ColorMode:
+        return ColorMode.BRIGHTNESS
+
+    @property
+    def supported_color_modes(self) -> set[ColorMode] | set[str]:
+        """Flag supported color modes."""
+        color_modes: set[ColorMode | str] = set()
+        color_modes.add(ColorMode.BRIGHTNESS)
+        return color_modes
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self._attr_is_on = self._module.outputs[self._nmbr].value == 1
+        self._brightness = int(
+            self._module.dimmers[self._nmbr - self._out_offs].value * 2.55
+        )
+        self.async_write_ha_state()
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Instruct the light to turn on."""
+        await self.async_send_command(SMARTIP_COMMAND_STRINGS["SET_OUTPUT_ON"])
+        self._brightness = kwargs.get(ATTR_BRIGHTNESS, 255)
+        cmd_str = SMARTIP_COMMAND_STRINGS["SET_DIMMER_VALUE"]
+        cmd_str = cmd_str[0:-1] + chr(int(self._brightness * 100.0 / 255))
+        cmd_str = cmd_str.replace("\xfe", chr(self._nmbr - self._out_offs + 1))
+        await self.async_send_command(cmd_str)
+        # Update the data
+        await self.coordinator.async_request_refresh()
+
+
 class SwitchedLed(CoordinatorEntity, LightEntity):
     """Module switch background LEDs"""
 
@@ -135,7 +188,7 @@ class SwitchedLed(CoordinatorEntity, LightEntity):
         self._state = None
         self._brightness = None
         self._attr_unique_id = f"{self._module.id}_led_{self.idx}"
-        self.icon.__init__("mdi:circle-outline")
+        self._attr_icon = "mdi:lightbulb-alert-outline"
 
     # To link this entity to its device, this property must return an
     # identifiers value matching that used in the module
@@ -173,50 +226,3 @@ class SwitchedLed(CoordinatorEntity, LightEntity):
         cmd_str = cmd_str.replace("\xff", chr(self._module.mod_addr))
         cmd_str = cmd_str.replace("\xfe", chr(self._nmbr + 18 + 1))
         await self._module.comm.async_send_command(cmd_str)
-
-
-class DimmedOutput(SwitchedOutput):
-    """Representation of habitron light entities, dimmable."""
-
-    _attr_brightness = True
-
-    def __init__(self, output, module, coord, idx) -> None:
-        """Initialize a dimmable Habitron Light."""
-        super().__init__(output, module, coord, idx)
-        self._brightness = 0
-        self._color_mode = ColorMode.BRIGHTNESS
-        self._supported_color_modes = ColorMode.BRIGHTNESS
-
-    @property
-    def brightness(self) -> int:
-        """Return the brightness of the light."""
-        return self._brightness
-
-    @property
-    def color_mode(self) -> ColorMode:
-        return ColorMode.BRIGHTNESS
-
-    @property
-    def supported_color_modes(self) -> set[ColorMode] | set[str]:
-        """Flag supported color modes."""
-        color_modes: set[ColorMode | str] = set()
-        color_modes.add(ColorMode.BRIGHTNESS)
-        return color_modes
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self._attr_is_on = self._module.outputs[self._nmbr].value == 1
-        self._brightness = int(self._module.dimmers[self._nmbr - 10].value * 2.55)
-        self.async_write_ha_state()
-
-    async def async_turn_on(self, **kwargs: Any) -> None:
-        """Instruct the light to turn on."""
-        await self.async_send_command(SMARTIP_COMMAND_STRINGS["SET_OUTPUT_ON"])
-        self._brightness = kwargs.get(ATTR_BRIGHTNESS, 255)
-        cmd_str = SMARTIP_COMMAND_STRINGS["SET_DIMMER_VALUE"]
-        cmd_str = cmd_str[0:-1] + chr(int(self._brightness * 100.0 / 255))
-        cmd_str = cmd_str.replace("\xfe", chr(self._nmbr - 10 + 1))
-        self.async_send_command(cmd_str)
-        # Update the data
-        await self.coordinator.async_request_refresh()

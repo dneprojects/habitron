@@ -22,6 +22,8 @@ from .module import (
     SmartInput as hbtinm,
     SmartNature as hbtsnm,
     SmartOutput as hbtoutm,
+    SmartDimm as hbtdimm,
+    SmartUpM as hbtupm,
 )
 from .coordinator import HbtnCoordinator
 
@@ -45,7 +47,7 @@ class StateDescriptor:
 
 
 class DaytimeMode(Enum):
-    """Habitron dytime mode states"""
+    """Habitron daytime mode states"""
 
     Day = 1
     Night = 2
@@ -118,16 +120,21 @@ class HbtnRouter:
             sw_version=self.version,
             hw_version=self.version,
         )
+        self.comm.set_router(self)
         # Further initialization of module instances
         self.comm.send_command(SMARTIP_COMMAND_STRINGS["START_MIRROR"])
-        self.get_system_status()
         self.modules_desc = await self.get_modules(self.module_grp)
+        await self.comm.async_system_update()
 
         for mod_desc in self.modules_desc:
             if mod_desc.mtype == "Smart Controller":
                 self.modules.append(hbtscm(mod_desc, self.hass, self.config))
             elif mod_desc.mtype[0:9] == "Smart Out":
                 self.modules.append(hbtoutm(mod_desc, self.hass, self.config))
+            elif mod_desc.mtype[0:9] == "Smart Dimm":
+                self.modules.append(hbtdimm(mod_desc, self.hass, self.config))
+            elif mod_desc.mtype[0:9] == "Smart UpM":
+                self.modules.append(hbtupm(mod_desc, self.hass, self.config))
             elif mod_desc.mtype[0:8] == "Smart In":
                 self.modules.append(hbtinm(mod_desc, self.hass, self.config))
             elif mod_desc.mtype[0:12] == "Smart Detect":
@@ -236,47 +243,19 @@ class HbtnRouter:
                     ].name = entry_name  # counter
             resp = resp[line_len : len(resp)]
 
-    def get_system_status(self) -> bytes:
-        """Get current status of all modules from SmartIP"""
-        resp = self.comm.send_command(SMARTIP_COMMAND_STRINGS["GET_COMPACT_STATUS"])
-        new_status = self.sys_status != resp
-        if new_status:
-            self.sys_status = resp
-            self.status = self.get_status()
-            self.mode0 = int(self.status[RoutIdx.MODE0])
-            flags_state = int.from_bytes(
-                self.status[RoutIdx.FLAG_GLOB : RoutIdx.FLAG_GLOB + 2],
-                "little",
-            )
-            for flg in self.flags:
-                flg.value = int((flags_state & (0x01 << flg.nmbr - 1)) > 0)
-        return new_status
-
-    def get_mirror_status(self) -> bytes:
-        """Get mirror status of all modules from SmartIP"""
-        resp = self.comm.get_mirror_status(self.modules_desc)
-        new_status = self.sys_status != resp
-        if new_status:
-            self.sys_status = resp
-            self.status = self.get_status()
-            self.mode0 = int(self.status[RoutIdx.MODE0])
-            flags_state = int.from_bytes(
-                self.status[RoutIdx.FLAG_GLOB : RoutIdx.FLAG_GLOB + 2],
-                "little",
-            )
-            for flg in self.flags:
-                flg.value = int((flags_state & (0x01 << flg.nmbr - 1)) > 0)
-        return new_status
-
-    def update_system_status(self) -> None:
-        """Distribute mirror status to all modules"""
-        if self.coord.update_interval.seconds == 6:
-            new_status = self.get_mirror_status()
-        else:
-            new_status = self.get_system_status()
-        if new_status:
-            for module in self.modules:
-                module.update(self.sys_status)
+    async def update_system_status(self, sys_status) -> None:
+        """Distribute module status to all modules and update self status"""
+        self.sys_status = sys_status
+        self.status = self.get_status()
+        self.mode0 = int(self.status[RoutIdx.MODE0])
+        flags_state = int.from_bytes(
+            self.status[RoutIdx.FLAG_GLOB : RoutIdx.FLAG_GLOB + 2],
+            "little",
+        )
+        for flg in self.flags:
+            flg.value = int((flags_state & (0x01 << flg.nmbr - 1)) > 0)
+        for module in self.modules:
+            module.update(self.sys_status)
         return
 
     async def get_modules(self, mod_groups) -> list[ModuleDescriptor]:
@@ -302,3 +281,12 @@ class HbtnRouter:
             resp = resp[4 + name_len : len(resp)]
         self.mod_reg = addr_dict
         return desc
+
+    def get_comm_errors(self) -> bytes:
+        """Get current communication errors"""
+        resp = self.comm.send_command(SMARTIP_COMMAND_STRINGS["GET_CURRENT_ERROR"])
+        error_list = list()
+        err_cnt = resp[0]
+        for e_idx in range(err_cnt):
+            error_list.append({resp[2 * e_idx + 1], resp[2 * e_idx + 2]})
+        return error_list

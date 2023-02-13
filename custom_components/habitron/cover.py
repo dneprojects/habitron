@@ -30,11 +30,11 @@ async def async_setup_entry(
     for hbt_module in hbtn_rt.modules:
         for mod_cover in hbt_module.covers:
             if mod_cover.nmbr >= 0:  # not disabled
-                if mod_cover.type == 1:  # shutter
+                if abs(mod_cover.type) == 1:  # shutter
                     new_devices.append(
                         HbtnShutter(mod_cover, hbt_module, hbtn_cord, len(new_devices))
                     )
-                if mod_cover.type == 2:  # shutter with tilt
+                if abs(mod_cover.type) == 2:  # shutter with tilt
                     new_devices.append(
                         HbtnShutterTilt(
                             mod_cover, hbt_module, hbtn_cord, len(new_devices)
