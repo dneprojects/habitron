@@ -1,5 +1,5 @@
 <h2 align="center">
-  <a href="https://habitron.de"><img src="./logo.png" alt="Habitron logotype" width="200"></a>
+  <a href="https://habitron.de"><img src="./custom_components/habitron/logos/logo.png" alt="Habitron logotype" width="200"></a>
   <br>
   <i>Home Assistant Habitron custom integration</i>
   <br>
@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/github/v/release/dneprojects/habitron" alt="Current version">
 </p>
 
-The `habitron` implementation allows you to integrate your [Habitron](https://www.habitron,de/) devices in Home Assistant.
+The `habitron` implementation allows you to integrate your [Habitron](https://www.habitron.de/) devices in Home Assistant.
 
 ## Installation
 
@@ -37,125 +37,95 @@ $ mv habitron-master/custom_components/habitron <home-assistant-install-director
   5. Paste the repository URL (`https://github.com/dneprojects/habitron`) in the dialog box
   6. Select category `Integration`
   7. Click `Add`
-  8. Click `Install` on the Reolink IP camera box that has now appeared
+  8. Click `Install` on the Habitron integration box that has now appeared
   
 
 > :warning: **After executing one of the above installation methods, restart Home Assistant. Also clear your browser cache before proceeding to the next step, as the integration may not be visible otherwise.**
 
 
-In your Home Assistant installation go to: Configuration > Integrations, click the button Add Integration > Reolink IP camera
-Enter the details for your camera. The camera and other sensors will now be available as an entity. 
+In your Home Assistant installation go to: Configuration > Integrations, click the button Add Integration > Habitron
+Enter the details for your camera. The SMartIP, router and modules as devices. 
 
-For the motion detection to work, Home Assistant must be reachable via http from your local network. So when using https internally, motion detection will not work at this moment.
+## Configuration
 
-For the services and switch entities of this integration to work, you need a camera user of type "Administrator". Users of type "Guest" can only view the switch states but cannot change them and cannot call the services. Users are created and managed through the web interface of the camera (Device Settings / Cog icon -> User) or through the app (Device Settings / Cog icon -> Advanced -> User Management).
+For the habitron integration to work, the network interface SmartIP must be reachable via your local network. During configuration, the DNS hostname or the IP address has to given.
+A second parameter is used to control the polling update interval.
 
-### Troubleshooting
-* Make sure you have set up the `Internal URL` in Home Assistant to the correct IP address and port (do not use the mDNS name)
-* Make sure ONVIF is enabled on your camera/NVR. It might be disabled by default and can only be enabled when you have a screen connected to the NVR, not via webb or app clients. Be aware that this can be reset during a firmware upgrade.
+| Configuration parameter | Optional  | Description  |
+| :---------------------- | :-------- | :----------- |
+| `host name`             | no        | Either the DNS host name of the SmartIP or its IP address.
+| `update interval`       | no        | Polling update interval in seconds, must be between 3 and 20 seconds.
 
 ## Services
 
-The Reolink integration supports all default camera [services](https://www.home-assistant.io/integrations/camera/#services) and additionally provides the following services:
+The Habitron integration supports a few services for system administration:
 
-### Service `reolink_dev.set_sensitivity`
+### Service `habitron.restart_module`
 
-Set the motion detection sensitivity of the camera. Either all time schedule presets can be set at once, or a specific preset can be specified.
-
-| Service data attribute  | Optional  | Description  |
-| :---------------------- | :-------- | :----------- |
-| `entity_id`             | no        | The camera to control.
-| `sensitivity`           | no        | The sensitivity to set, a value between 1 (low sensitivity) and 50 (high sensitivity).
-| `preset`                | yes       | The time schedule preset to set. Presets can be found in the Web UI of the camera.
-
-### Service `reolink_dev.set_backlight`
-
-Optimizing brightness and contrast levels to compensate for differences between dark and bright objects using either BLC or WDR mode. 
-This may improve image clarity in high contrast situations, but it should be tested at different times of the day and night to ensure there is no negative effect.
+Restarts the module of the given address or restarts all modules if no argument is passed.
 
 | Service data attribute  | Optional  | Description  |
 | :---------------------- | :-------- | :----------- |
-| `entity_id`             | no        | The camera to control.
-| `mode`                  | no        | The backlight parameter supports the following values: `BACKLIGHTCONTROL`: use Backlight Control `DYNAMICRANGECONTROL`: use Dynamic Range Control `OFF`: no optimization
-### Service `reolink_dev.set_daynight`
+| `mod_nmbr`              | yes       | The address of the habitron module, which shall be restarted.
 
-Set the day and night mode parameter of the camera.  
+### Service `habitron.restart_router`
 
-| Service data attribute  | Optional  | Description  |
-| :---------------------- | :-------- | :----------- |
-| `entity_id`             | no        | The camera to control.
-| `mode`                  | no        | The day and night mode parameter supports the following values: `AUTO` Auto switch between black & white mode `COLOR` Always record videos in color mode `BLACKANDWHITE` Always record videos in black & white mode.
-
-### Service `reolink_dev.ptz_control`
-
-Control the PTZ (Pan Tilt Zoom) movement of the camera.
+Restarts the habitron router.
 
 | Service data attribute  | Optional  | Description  |
 | :---------------------- | :-------- | :----------- |
-| `entity_id`             | no        | The camera to control.
-| `command`               | no        | The command to execute. Possibe values are: `AUTO`, `DOWN`, `FOCUSDEC`, `FOCUSINC`, `LEFT`, `LEFTDOWN`, `LEFTUP`, `RIGHT`, `RIGHTDOWN`, `RIGHTUP`, `STOP`, `TOPOS`, `UP`, `ZOOMDEC` and `ZOOMINC`.
-| `preset`                | yes       | In case of the command `TOPOS`, pass the preset ID here. The possible presets are listed as attribute on the camera.
-| `speed`                 | yes       | The speed at which the camera moves. Not applicable for the commands: `STOP` and `AUTO`.
+| None                    | no        | No parameter needed.
 
-**The camera keeps moving until the `STOP` command is passed to the service.**
+##Entities
 
-## Camera
+According to the modules found, several entities will be created automatically.
 
-This integration creates a camera entity, providing a live-stream configurable from the integrations page. In the options menu, the following parameters can be configured:
+### Lights
 
-| Parameter               | Description                                                                                                 |
-| :-------------------    | :---------------------------------------------------------------------------------------------------------- |
-| Stream                  | Switch between Sub or Main camera stream.                                                                   |
-| Stream format           | Switch between h264 and h265 stream formats.                                                                |
-| Protocol                | Switch between the RTMP or RTSP streaming protocol.                                                         |
-| Channel                 | When using a single camera, choose stream 0. When using a NVR, switch between the different camera streams. |
+This integration creates light entities for all module outputs, dimmers. and LEDs. If covers are configured, the associated outputs will not appear as lights.
 
-## Binary Sensors
+### Covers
 
-When the camera supports motion detection events, a binary sensor is created for real-time motion detection. The time to switch motion detection off can be configured via the options menu, located at the integrations page. Please notice: for using the motion detection, your Homa Assistant should be reachable (within your local network) over http (not https).
+If output pairs are used to drive a cover, a cover entitiy is cerated. The output polarity (which one of the pair is used to open, which one to close) is configured automatically. If tilt times have been stored in the module, the cover has an additional tilt property.
 
-| Parameter               | Description                                                                                                 |
-| :-------------------    | :---------------------------------------------------------------------------------------------------------- |
-| Motion sensor off delay | Control how many seconds it takes (after the last motion detection) for the binary sensor to switch off.    |
+### Binary Sensors
 
-When the camera supports AI objects detection, a binary sensor is created for each type of object (person, vehicle, pet)
+For all module inputs, binary sensors are created. The integration detects wether an input is configured as push button or as a switch. The only distinction between these categories is a different icon.
 
-The cameras only support webhooks for motion start/stop, and not any of the AI detections (person/vehicle/pet).
-This may change in future firmware, but AI detections must be polled for now.
-Optionally configure camera to send an email via SMTP on AI detection, and receive it in this Home Assistant plugin.
-This allows event based start of AI detection start, but not stop.
-The AI detection will be cleared in the next poll update.
-Camera should be configured to email on person/vehicle detection (not motion), use Home Assistant's IP address, disable SSL/TLS, and select an arbitrary SMTP port.
-The SMTP port should be unique for each integration.
-Text, Text with Picture, and Text with Video will all work for email content, but there may be unnecessary delay with the picture or video options.
-Other email fields in the camera configuration don't matter.
-Tested on individual cameras, but not NVRs.
+In addition, habitron flags (Merker) are represented as binary sensors. These flags reflect global or module internal states.
 
-| Parameter               | Description                                                                                                 |
-| :-------------------    | :---------------------------------------------------------------------------------------------------------- |
-| SMTP port               | Optional port to listen for email event for AI detections. Default is 0 (disable).                          |
+For modules, which support motion detection, binary sensors are created, too.
 
-## Switches
+### Sensors
 
-Depending on the camera, the following switches are created:
+Depending on the module, a couple of sensors are created:
 
-| Switch               | Description |
+| Sensor               | Description |
 | :------------------- | :------------------------------------------------------------ |
-| Email                | Switch email alerts from the camera when motion is detected.  |
-| FTP                  | Switch FTP upload of photo and video when motion is detected. |
-| IR lights            | Switch the infrared lights to auto or off.                    |
-| Record audio         | Record auto or mute. This also implies the live-stream.       |
-| Push notifications   | Enable or disable push notifications to Android/IOS.          |
-| Recording            | Switch recording to the SD card.                              |
+| Temperature          | Temperature in the surrounding of the module.                 |
+| Humidity             | Air humidity in percent.                                      |
+| Luminance            | Luminace in lux.                                              |
+| Air qualitiy         | Index in percent.                                             |
 
-## Unsupported models
+### Buttons
 
-The following models are not to be supported:
+The habitron integration creates buttons for collective commands and visualization commands.
 
-- E1
-- E1 Pro
-- Battery-powered cameras
-- B800: Only with NVR
-- B400: Only with NVR
-- D400: Only with NVR
-- Lumus
+### Numbers
+
+For Smart Controller modules, an input number entitiy is created to control the temperature setpoint.
+
+### Select
+
+The habitron system offers modes for daylight, alarm, and other modes. These are associated with group of modules. For each Smart Controller module three select entities are created to give access to these values. User defined modes will be detected.
+
+
+## Unsupported modules
+
+The following modules are not supported:
+
+- Smart Key fingerprint sensor
+
+Not tested:
+- Smart Dimm
+- Unterputzmodul
