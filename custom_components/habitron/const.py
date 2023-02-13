@@ -9,6 +9,9 @@ CONF_DEFAULT_HOST = "SmartIP"  # default DNS name of SmartIP
 CONF_DEFAULT_INTERVAL = 10  # default update interval
 CONF_MIN_INTERVAL = 3  # min update interval
 CONF_MAX_INTERVAL = 20  # max update interval
+RESTART_RTR = 0
+RESTART_ALL = 0xFF
+RESTART_KEY_NMBR = "mod_nmbr"
 
 SMARTIP_COMMAND_STRINGS: Final[dict[str, str]] = {
     "GET_MODULES": "\x0a\1\2\1\0\0\0",
@@ -51,7 +54,7 @@ MODULE_CODES: Final[dict[str, str]] = {
     "\x0a\x01": "Smart Out 8/R",
     "\x0a\x02": "Smart Out 8/T",
     "\x0a\x14": "Smart Dimm",
-    "\x0a\x1e": "Smart UPM",  # Unterputzmodul
+    "\x0a\x1e": "Smart UpM",  # Unterputzmodul
     "\x0b\x1e": "Smart In 8/24V",
     "\x0b\x01": "Smart In 8/230V",
     "\x14\x01": "Smart Nature",

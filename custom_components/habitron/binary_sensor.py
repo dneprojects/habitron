@@ -41,6 +41,11 @@ async def async_setup_entry(
             new_devices.append(
                 HbtnFlag(mod_flg, hbt_module, hbtn_cord, len(new_devices))
             )
+        for mod_sensor in hbt_module.sensors:
+            if mod_sensor.name == "Movement":
+                new_devices.append(
+                    MotionSensor(mod_sensor, hbt_module, hbtn_cord, len(new_devices))
+                )
     for rt_flg in hbtn_rt.flags:
         new_devices.append(HbtnFlag(rt_flg, hbtn_rt, hbtn_cord, len(new_devices)))
 
@@ -89,6 +94,7 @@ class InputSwitch(CoordinatorEntity, BinarySensorEntity):
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
         self._attr_is_on = self._module.inputs[self._nmbr].value == 1
+        self._state = self._attr_is_on
         self.async_write_ha_state()
 
 
@@ -137,4 +143,48 @@ class HbtnFlag(CoordinatorEntity, BinarySensorEntity):
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
         self._attr_is_on = self._module.flags[self._idx].value == 1
+        self._state = self._attr_is_on
+        self.async_write_ha_state()
+
+
+class MotionSensor(CoordinatorEntity, BinarySensorEntity):
+    """Representation of habitron button switch input."""
+
+    def __init__(self, sensor, module, coord, idx) -> None:
+
+        super().__init__(coord, context=idx)
+        self.idx = idx
+        self._sensor = sensor
+        self._module = module
+        self._name = f"{self._module.name} Motion"
+        self._nmbr = sensor.nmbr
+        self._state = False
+        self._attr_unique_id = f"{self._module.id}_motion"
+        self._attr_name = f"{self._module.name} Motion"
+        self._attr_icon = "mdi:motion-sensor"
+
+    # To link this entity to its device, this property must return an
+    # identifiers value matching that used in the module
+    @property
+    def device_info(self) -> None:
+        """Return information to link this entity with the correct device."""
+        if isinstance(self._module.id, int):
+            return {"identifiers": {(DOMAIN, self._module.name)}}  # router
+        return {"identifiers": {(DOMAIN, self._module.mod_id)}}
+
+    @property
+    def available(self) -> bool:
+        """Return True if module and smip is available."""
+        return True
+
+    @property
+    def name(self) -> str:
+        """Return the display name of this flag."""
+        return self._name
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self._attr_is_on = self._module.sensors[self._nmbr].value > 0
+        self._state = self._attr_is_on
         self.async_write_ha_state()

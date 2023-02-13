@@ -247,7 +247,7 @@ class SmartController(HbtnModule):
                         )
             resp = resp[line_len : len(resp)]  # Strip processed line
         self.dimmers[0] = IfDescriptor(self.outputs[10].name, 0, 2, 0)
-        self.dimmers[1] = IfDescriptor(self.outputs[1].name, 1, 2, 0)
+        self.dimmers[1] = IfDescriptor(self.outputs[11].name, 1, 2, 0)
         self.outputs[10].type = 2
         self.outputs[11].type = 2
 
@@ -316,9 +316,17 @@ class SmartController(HbtnModule):
             self.leds[l_idx] = IfDescriptor(self.leds[l_idx].name, l_idx, 1, value)
 
         for c_idx in range(2, len(self.covers)):
-            shades_time = int(self.smg[17 + 2 * c_idx])
+            if (
+                int(self.smg[1 + 2 * c_idx]) - int(self.smg[0 + 2 * c_idx])
+            ) < 0:  # polarity
+                self.covers[c_idx].type = -1
+            else:
+                self.covers[c_idx].type = 1
+            shades_time = abs(
+                int(self.smg[17 + 2 * c_idx]) - int(self.smg[16 + 2 * c_idx])
+            )
             if shades_time > 0:
-                self.covers[c_idx].type = 2  # Roller with tiltable blades
+                self.covers[c_idx].type *= 2  # Roller with tiltable blades
             self.covers[c_idx].value = self.status[
                 MStatIdx.ROLL_POS + c_idx - 2
             ]  # Fehler in Doku, wo sind cov 0,1?
@@ -442,8 +450,238 @@ class SmartOutput(HbtnModule):
             self.outputs[o_idx].value = int((out_state & (0x01 << o_idx)) > 0)
 
         for cover in self.covers:
-            cover.value = self.status[MStatIdx.ROLL_POS + cover.nmbr - 1]
-            cover.tilt = self.status[MStatIdx.BLAD_POS + cover.nmbr - 1]
+            c_idx = cover.nmbr
+            if c_idx >= 0:
+                if (
+                    int(self.smg[5 + 2 * c_idx]) - int(self.smg[4 + 2 * c_idx])
+                ) < 0:  # polarity
+                    cover.type = -1
+                shades_time = abs(
+                    int(self.smg[21 + 2 * c_idx]) - int(self.smg[20 + 2 * c_idx])
+                )
+                if shades_time > 0:
+                    cover.type *= 2  # Roller with tiltable blades
+                cover.value = self.status[MStatIdx.ROLL_POS + cover.nmbr - 1]
+                cover.tilt = self.status[MStatIdx.BLAD_POS + cover.nmbr - 1]
+
+
+class SmartDimm(HbtnModule):
+    """Habitron SmartOutput module class."""
+
+    has_inputs = False
+    has_outputs = True
+    has_sensors = False
+
+    def __init__(
+        self,
+        mod_descriptor: ModuleDescriptor,
+        hass: HomeAssistant,
+        config: ConfigEntry,
+    ) -> None:
+        """Init Habitron SmartOutput module."""
+        super().__init__(mod_descriptor, hass, config)
+
+        self.messages: list[IfDescriptor] = []
+        self.commands: list[IfDescriptor] = []
+
+    async def initialize(self, sys_status) -> None:
+        await super().initialize(sys_status)
+        await self.get_smg()
+        await self.get_smc()
+        self.parse_smc()
+        self.parse_smg()
+        self.update(sys_status)
+
+    def parse_smc(self) -> None:
+        """Setting names"""
+        resp = self.smc
+        self.outputs = [IfDescriptor("", -1, 0, 0)] * 4
+        self.inputs = [IfDescriptor("", -1, 0, 0)] * 4
+        self.dimmers = [] * 4
+        no_lines = resp[3] + 256 * resp[4]
+        resp = resp[7 : len(resp)]  # Strip 4 header bytes
+        for _ in range(no_lines):
+            if resp == b"":
+                break
+            line_len = int(resp[5]) + 5
+            line = resp[0:line_len]
+            event_code = int(line[2])
+            if event_code == 235:  # Beschriftung
+                text = line[8:-1]
+                text = text.decode("iso8859-1")
+                text = text.strip()
+                arg_code = int(line[3])
+                if int(line[0]) == 253:
+                    # Beschriftungen Direktbefehle
+                    self.commands.append(IfDescriptor(text, arg_code, 0, 0))
+                elif int(line[0]) == 254:
+                    # Beschriftungen Meldungen
+                    self.messages.append(IfDescriptor(text, arg_code, 0, 0))
+                elif int(line[0]) == 255:
+                    if arg_code in range(10, 18):
+                        # Beschriftungen Modultaster
+                        self.inputs.append(IfDescriptor(text, arg_code - 10, 0, 0))
+                    elif arg_code in range(18, 26):
+                        # Beschriftungen LEDs
+                        self.leds.append(IfDescriptor(text, arg_code - 18, 0, 0))
+                    elif arg_code in range(40, 50):
+                        # Beschriftungen Inputs
+                        self.inputs.append(IfDescriptor(text, arg_code - 40, 0, 0))
+                    else:
+                        # Beschriftungen Outputs
+                        self.outputs[arg_code - 60] = IfDescriptor(
+                            text, arg_code - 60, 1, 0
+                        )
+            resp = resp[line_len : len(resp)]  # Strip processed line
+        self.dimmers[0] = IfDescriptor(self.outputs[0].name, 0, 2, 0)
+        self.dimmers[1] = IfDescriptor(self.outputs[1].name, 1, 2, 0)
+        self.dimmers[2] = IfDescriptor(self.outputs[2].name, 2, 2, 0)
+        self.dimmers[3] = IfDescriptor(self.outputs[3].name, 3, 2, 0)
+
+    def parse_smg(self) -> None:
+        """Get settings"""
+        resp = self.smg
+        self.hw_version = resp[83 : (83 + 17)].decode("iso8859-1").strip()
+        self.sw_version = resp[100 : (100 + 22)].decode("iso8859-1").strip()
+        roller_state = resp[132]
+        for c_idx in range(4):
+            if (roller_state & (0x01 << c_idx)) > 0:
+                cname = self.outputs[2 * c_idx].name.strip()
+                cname = cname.replace("auf", "")
+                cname = cname.replace("ab", "")
+                cname = cname.replace("auf", "")
+                cname = cname.replace("zu", "")
+                self.covers[c_idx] = IfDescriptorC(cname.strip(), c_idx, 1, 1, 0)
+                self.outputs[2 * c_idx].nmbr = -1  # disable light output
+                self.outputs[2 * c_idx].type = 0
+                self.outputs[2 * c_idx + 1].nmbr = -1
+                self.outputs[2 * c_idx + 1].type = 0
+
+    def update(self, sys_status) -> None:
+        """Module specific update method reads and parses status"""
+        super().update(sys_status)
+
+        inp_state = int(self.status[MStatIdx.INP_1_8])
+        for mod_inp in self.inputs:
+            i_idx = mod_inp.nmbr
+            mod_inp.value = int((inp_state & (0x01 << i_idx)) > 0)
+
+        out_state = int(self.status[MStatIdx.OUT_1_8])
+        for o_idx in range(8):
+            self.outputs[o_idx].value = int((out_state & (0x01 << o_idx)) > 0)
+        self.dimmers[0].value = int(self.status[MStatIdx.DIM_1])
+        self.dimmers[1].value = int(self.status[MStatIdx.DIM_2])
+        self.dimmers[2].value = int(self.status[MStatIdx.DIM_3])
+        self.dimmers[3].value = int(self.status[MStatIdx.DIM_4])
+
+
+class SmartUpM(HbtnModule):
+    """Habitron SmartOutput module class."""
+
+    has_inputs = False
+    has_outputs = True
+    has_sensors = False
+
+    def __init__(
+        self,
+        mod_descriptor: ModuleDescriptor,
+        hass: HomeAssistant,
+        config: ConfigEntry,
+    ) -> None:
+        """Init Habitron SmartOutput module."""
+        super().__init__(mod_descriptor, hass, config)
+
+        self.messages: list[IfDescriptor] = []
+        self.commands: list[IfDescriptor] = []
+
+    async def initialize(self, sys_status) -> None:
+        await super().initialize(sys_status)
+        await self.get_smg()
+        await self.get_smc()
+        self.parse_smc()
+        self.parse_smg()
+        self.update(sys_status)
+
+    def parse_smc(self) -> None:
+        """Setting names"""
+        resp = self.smc
+        self.outputs = [IfDescriptor("", -1, 0, 0)] * 2
+        self.inputs = [IfDescriptor("", -1, 0, 0)] * 2
+        self.covers = [IfDescriptorC("", -1, 0, 0, 0)] * 1
+        no_lines = resp[3] + 256 * resp[4]
+        resp = resp[7 : len(resp)]  # Strip 4 header bytes
+        for _ in range(no_lines):
+            if resp == b"":
+                break
+            line_len = int(resp[5]) + 5
+            line = resp[0:line_len]
+            event_code = int(line[2])
+            if event_code == 235:  # Beschriftung
+                text = line[8:-1]
+                text = text.decode("iso8859-1")
+                text = text.strip()
+                arg_code = int(line[3])
+                if int(line[0]) == 253:
+                    # Beschriftungen Direktbefehle
+                    self.commands.append(IfDescriptor(text, arg_code, 0, 0))
+                elif int(line[0]) == 254:
+                    # Beschriftungen Meldungen
+                    self.messages.append(IfDescriptor(text, arg_code, 0, 0))
+                elif int(line[0]) == 255:
+                    if arg_code in range(10, 18):
+                        # Beschriftungen Modultaster
+                        self.inputs.append(IfDescriptor(text, arg_code - 10, 0, 0))
+                    elif arg_code in range(40, 50):
+                        # Beschriftungen Inputs
+                        self.inputs.append(IfDescriptor(text, arg_code - 40, 0, 0))
+                    else:
+                        # Beschriftungen Outputs
+                        self.outputs[arg_code - 60] = IfDescriptor(
+                            text, arg_code - 60, 1, 0
+                        )
+            resp = resp[line_len : len(resp)]  # Strip processed line
+
+    def parse_smg(self) -> None:
+        """Get settings"""
+        resp = self.smg
+        self.hw_version = resp[83 : (83 + 17)].decode("iso8859-1").strip()
+        self.sw_version = resp[100 : (100 + 22)].decode("iso8859-1").strip()
+        roller_state = resp[132]
+        for c_idx in range(1):
+            if (roller_state & (0x01 << c_idx)) > 0:
+                cname = self.outputs[2 * c_idx].name.strip()
+                cname = cname.replace("auf", "")
+                cname = cname.replace("ab", "")
+                cname = cname.replace("auf", "")
+                cname = cname.replace("zu", "")
+                self.covers[c_idx] = IfDescriptorC(cname.strip(), c_idx, 1, 1, 0)
+                self.outputs[2 * c_idx].nmbr = -1  # disable light output
+                self.outputs[2 * c_idx].type = 0
+                self.outputs[2 * c_idx + 1].nmbr = -1
+                self.outputs[2 * c_idx + 1].type = 0
+
+    def update(self, sys_status) -> None:
+        """Module specific update method reads and parses status"""
+        super().update(sys_status)
+
+        inp_state = int(self.status[MStatIdx.INP_1_8])
+        for mod_inp in self.inputs:
+            i_idx = mod_inp.nmbr
+            mod_inp.value = int((inp_state & (0x01 << i_idx)) > 0)
+
+        out_state = int(self.status[MStatIdx.OUT_1_8])
+        for o_idx in range(2):
+            self.outputs[o_idx].value = int((out_state & (0x01 << o_idx)) > 0)
+
+        c_idx = self.covers[0].nmbr
+        if c_idx >= 0:
+            if (int(self.smg[5]) - int(self.smg[4])) < 0:  # polarity
+                self.covers[0] = -1
+            shades_time = abs(int(self.smg[21]) - int(self.smg[20]))
+            if shades_time > 0:
+                self.covers[0].type *= 2  # Roller with tiltable blades
+            self.covers[0].value = self.status[MStatIdx.ROLL_POS - 1]
+            self.covers[0].tilt = self.status[MStatIdx.BLAD_POS - 1]
 
 
 class SmartInput(HbtnModule):
