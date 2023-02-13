@@ -85,6 +85,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(self, user_input=None) -> FlowResult:
         """Handle the initial step."""
+        await self.async_set_unique_id("unique_habitron")
+        self._abort_if_unique_id_configured()
         if user_input is None:
             default_host = CONF_DEFAULT_HOST
             default_interval = CONF_DEFAULT_INTERVAL
