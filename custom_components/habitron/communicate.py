@@ -15,7 +15,7 @@ from pymodbus.utilities import computeCRC
 from homeassistant import exceptions
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
-from .const import DOMAIN, SMARTIP_COMMAND_STRINGS, MirrIdx
+from .const import SMARTIP_COMMAND_STRINGS, MirrIdx
 
 
 class HbtnComm:
@@ -147,10 +147,15 @@ class HbtnComm:
         return self.com_mac
 
     def module_restart(self, mod_nmbr: int) -> None:
-        """Restarts a single module or all with arg 0xFF"""
-        cmd_str = SMARTIP_COMMAND_STRINGS["REBOOT_MODULE"]
-        if mod_nmbr < 65:
-            cmd_str = cmd_str.replace("\xff", chr(mod_nmbr))
+        """Restarts a single module or all with arg 0xFF or router if arg 0"""
+        if mod_nmbr > 0:
+            # module restart
+            cmd_str = SMARTIP_COMMAND_STRINGS["REBOOT_MODULE"]
+            if mod_nmbr < 65:
+                cmd_str = cmd_str.replace("\xff", chr(mod_nmbr))
+            else:
+                # router restart
+                cmd_str = SMARTIP_COMMAND_STRINGS["REBOOT_ROUTER"]
         self.send_command(cmd_str)
 
 

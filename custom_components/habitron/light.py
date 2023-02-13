@@ -132,6 +132,10 @@ class DimmedOutput(SwitchedOutput):
         self._brightness = 0
         self._color_mode = ColorMode.BRIGHTNESS
         self._supported_color_modes = ColorMode.BRIGHTNESS
+        if module.mod_type == "Smart Controller":
+            self._out_offs = 10
+        else:
+            self._out_offs = 0
 
     @property
     def brightness(self) -> int:
@@ -153,7 +157,9 @@ class DimmedOutput(SwitchedOutput):
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
         self._attr_is_on = self._module.outputs[self._nmbr].value == 1
-        self._brightness = int(self._module.dimmers[self._nmbr - 10].value * 2.55)
+        self._brightness = int(
+            self._module.dimmers[self._nmbr - self._out_offs].value * 2.55
+        )
         self.async_write_ha_state()
 
     async def async_turn_on(self, **kwargs: Any) -> None:
@@ -162,7 +168,7 @@ class DimmedOutput(SwitchedOutput):
         self._brightness = kwargs.get(ATTR_BRIGHTNESS, 255)
         cmd_str = SMARTIP_COMMAND_STRINGS["SET_DIMMER_VALUE"]
         cmd_str = cmd_str[0:-1] + chr(int(self._brightness * 100.0 / 255))
-        cmd_str = cmd_str.replace("\xfe", chr(self._nmbr - 10 + 1))
+        cmd_str = cmd_str.replace("\xfe", chr(self._nmbr - self._out_offs + 1))
         await self.async_send_command(cmd_str)
         # Update the data
         await self.coordinator.async_request_refresh()

@@ -22,6 +22,8 @@ from .module import (
     SmartInput as hbtinm,
     SmartNature as hbtsnm,
     SmartOutput as hbtoutm,
+    SmartDimm as hbtdimm,
+    SmartUpM as hbtupm,
 )
 from .coordinator import HbtnCoordinator
 
@@ -45,7 +47,7 @@ class StateDescriptor:
 
 
 class DaytimeMode(Enum):
-    """Habitron dytime mode states"""
+    """Habitron daytime mode states"""
 
     Day = 1
     Night = 2
@@ -129,6 +131,10 @@ class HbtnRouter:
                 self.modules.append(hbtscm(mod_desc, self.hass, self.config))
             elif mod_desc.mtype[0:9] == "Smart Out":
                 self.modules.append(hbtoutm(mod_desc, self.hass, self.config))
+            elif mod_desc.mtype[0:9] == "Smart Dimm":
+                self.modules.append(hbtdimm(mod_desc, self.hass, self.config))
+            elif mod_desc.mtype[0:9] == "Smart UpM":
+                self.modules.append(hbtupm(mod_desc, self.hass, self.config))
             elif mod_desc.mtype[0:8] == "Smart In":
                 self.modules.append(hbtinm(mod_desc, self.hass, self.config))
             elif mod_desc.mtype[0:12] == "Smart Detect":
@@ -275,3 +281,12 @@ class HbtnRouter:
             resp = resp[4 + name_len : len(resp)]
         self.mod_reg = addr_dict
         return desc
+
+    def get_comm_errors(self) -> bytes:
+        """Get current communication errors"""
+        resp = self.comm.send_command(SMARTIP_COMMAND_STRINGS["GET_CURRENT_ERROR"])
+        error_list = list()
+        err_cnt = resp[0]
+        for e_idx in range(err_cnt):
+            error_list.append({resp[2 * e_idx + 1], resp[2 * e_idx + 2]})
+        return error_list

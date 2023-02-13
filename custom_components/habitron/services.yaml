@@ -11,3 +11,9 @@ mod_restart:
         number:
           min: 1
           max: 64
+rtr_restart:
+  name: Router restart
+  description: Restart the Habitron router
+comm_errors:
+  name: Get communication errors
+  description: List of modules and error codes

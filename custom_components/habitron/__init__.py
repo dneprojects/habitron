@@ -38,15 +38,29 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         mod_nmbr = call.data.get(RESTART_KEY_NMBR, RESTART_ALL)
         smip.comm.module_restart(mod_nmbr)
 
+    async def restart_router(call: ServiceCall):
+        """Handle the service call."""
+        smip.comm.module_restart(0)
+
+    async def get_comm_errors(call: ServiceCall):
+        """Handle the service call."""
+        res = smip.router.get_comm_errors()
+        print(res)
+        return res
+
     smip = SmartIP(hass, entry)
     await smip.initialize(hass, entry)
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = smip
 
     # Register update handler for runtime configuration of Habitron integration
     entry.async_on_unload(entry.add_update_listener(update_listener))
+
+    # Register services
     hass.services.async_register(
         DOMAIN, "mod_restart", restart_module, schema=SERVICE_MOD_RESTART_SCHEMA
     )
+    hass.services.async_register(DOMAIN, "rtr_restart", restart_router)
+    hass.services.async_register(DOMAIN, "comm_errors", get_comm_errors)
 
     # This creates each HA object for each platform your device requires.
     # It's done by calling the `async_setup_entry` function in each platform module.
