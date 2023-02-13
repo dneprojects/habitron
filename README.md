@@ -1,5 +1,5 @@
 <h2 align="center">
-  <a href="https://habitron.de"><img src="./custom_components/habitron/logos/logo.png" alt="Habitron logotype" width="200"></a>
+  <a href="https://habitron.de"><img src="./custom_components/habitron/logos/logo@2x.png" alt="Habitron logotype" width="300"></a>
   <br>
   <i>Home Assistant Habitron custom integration</i>
   <br>
@@ -56,28 +56,11 @@ A second parameter is used to control the polling update interval.
 | `host name`             | no        | Either the DNS host name of the SmartIP or its IP address.
 | `update interval`       | no        | Polling update interval in seconds, must be between 3 and 20 seconds.
 
-## Services
+These parameters can be changed after installation as well.
 
-The Habitron integration supports a few services for system administration:
+## Entities
 
-### Service `habitron.restart_module`
-
-Restarts the module of the given address or restarts all modules if no argument is passed.
-
-| Service data attribute  | Optional  | Description  |
-| :---------------------- | :-------- | :----------- |
-| `mod_nmbr`              | yes       | The address of the habitron module, which shall be restarted.
-
-### Service `habitron.restart_router`
-
-Restarts the habitron router.
-
-| Service data attribute  | Optional  | Description  |
-| :---------------------- | :-------- | :----------- |
-| None                    | no        | No parameter needed.
-
-##Entities
-
+For any module, a device is created. These will show up after the discovery phase and can be associated with Home Assistant rooms or zones.
 According to the modules found, several entities will be created automatically.
 
 ### Lights
@@ -119,6 +102,25 @@ For Smart Controller modules, an input number entitiy is created to control the 
 
 The habitron system offers modes for daylight, alarm, and other modes. These are associated with group of modules. For each Smart Controller module three select entities are created to give access to these values. User defined modes will be detected.
 
+## Services
+
+The Habitron integration supports a few services for system administration:
+
+### Service `habitron.restart_module`
+
+Restarts the module of the given address or restarts all modules if no argument is passed.
+
+| Service data attribute  | Optional  | Description  |
+| :---------------------- | :-------- | :----------- |
+| `mod_nmbr`              | yes       | The address of the habitron module, which shall be restarted.
+
+### Service `habitron.restart_router`
+
+Restarts the habitron router.
+
+| Service data attribute  | Optional  | Description  |
+| :---------------------- | :-------- | :----------- |
+| None                    | no        | No parameter needed.
 
 ## Unsupported modules
 
