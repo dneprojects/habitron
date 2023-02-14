@@ -223,7 +223,7 @@ class LogicSensor(HbtnSensor):
         self.nmbr = logic.nmbr
         self._attr_unique_id = f"{self._module.id}_logic_{logic.nmbr}"
         self._attr_name = f"{self._module.name} Cnt{logic.nmbr + 1} {logic.name}"
-
+        self._attr_icon = "mdi:counter"
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
