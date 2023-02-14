@@ -26,6 +26,7 @@ SERVICE_MOD_RESTART_SCHEMA = vol.Schema(
         vol.Optional(RESTART_KEY_NMBR): int,
     }
 )
+SERVICE_RTR_RESTART_SCHEMA = vol.Schema({})
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -59,7 +60,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.services.async_register(
         DOMAIN, "mod_restart", restart_module, schema=SERVICE_MOD_RESTART_SCHEMA
     )
-    hass.services.async_register(DOMAIN, "rtr_restart", restart_router)
+    hass.services.async_register(
+        DOMAIN, "rtr_restart", restart_router, schema=SERVICE_RTR_RESTART_SCHEMA
+    )
     hass.services.async_register(DOMAIN, "comm_errors", get_comm_errors)
 
     # This creates each HA object for each platform your device requires.

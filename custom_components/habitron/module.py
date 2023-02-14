@@ -259,18 +259,21 @@ class SmartController(HbtnModule):
         for c_idx in range(len(self.inputs)):
             if input_state & (0x01 << c_idx) > 0:
                 self.inputs[c_idx + 8].type = 1  # switch, skip 8 internal buttons
-        for c_idx in range(2, len(self.covers)):
+        for c_idx in range(2, len(self.covers) + 2):
+            cm_idx = c_idx
+            if cm_idx > 4:
+                cm_idx = cm_idx - 5
             if roller_state & (0x01 << (c_idx - 2)) > 0:
-                cname = self.outputs[2 * c_idx].name.strip()
+                cname = self.outputs[2 * cm_idx].name.strip()
                 cname = cname.replace("auf", "")
                 cname = cname.replace("ab", "")
                 cname = cname.replace("auf", "")
                 cname = cname.replace("zu", "")
-                self.covers[c_idx] = IfDescriptorC(cname.strip(), c_idx, 1, 1, 0)
-                self.outputs[2 * c_idx].nmbr = -1  # disable light output
-                self.outputs[2 * c_idx].type = 0
-                self.outputs[2 * c_idx + 1].nmbr = -1
-                self.outputs[2 * c_idx + 1].type = 0
+                self.covers[cm_idx] = IfDescriptorC(cname.strip(), cm_idx, 1, 1, 0)
+                self.outputs[2 * cm_idx].nmbr = -1  # disable light output
+                self.outputs[2 * cm_idx].type = 0
+                self.outputs[2 * cm_idx + 1].nmbr = -1
+                self.outputs[2 * cm_idx + 1].type = 0
 
     def update(self, sys_status) -> None:
         """Module specific update method reads and parses status"""
@@ -315,22 +318,25 @@ class SmartController(HbtnModule):
             value = int((led_state & (0x01 << l_idx)) > 0)
             self.leds[l_idx] = IfDescriptor(self.leds[l_idx].name, l_idx, 1, value)
 
-        for c_idx in range(2, len(self.covers)):
+        for c_idx in range(2, len(self.covers) + 2):
+            cm_idx = c_idx
+            if cm_idx > 4:
+                cm_idx = cm_idx - 5  # covers 4,5 -> 0,1
             if (
                 int(self.smg[1 + 2 * c_idx]) - int(self.smg[0 + 2 * c_idx])
             ) < 0:  # polarity
-                self.covers[c_idx].type = -1
+                self.covers[cm_idx].type = -1
             else:
-                self.covers[c_idx].type = 1
+                self.covers[cm_idx].type = 1
             shades_time = abs(
                 int(self.smg[17 + 2 * c_idx]) - int(self.smg[16 + 2 * c_idx])
             )
             if shades_time > 0:
-                self.covers[c_idx].type *= 2  # Roller with tiltable blades
-            self.covers[c_idx].value = self.status[
+                self.covers[cm_idx].type *= 2  # Roller with tiltable blades
+            self.covers[cm_idx].value = self.status[
                 MStatIdx.ROLL_POS + c_idx - 2
             ]  # Fehler in Doku, wo sind cov 0,1?
-            self.covers[c_idx].tilt = self.status[MStatIdx.BLAD_POS + c_idx - 2]
+            self.covers[cm_idx].tilt = self.status[MStatIdx.BLAD_POS + c_idx - 2]
 
         inp_state = int.from_bytes(
             self.status[MStatIdx.INP_1_8 : MStatIdx.INP_1_8 + 3],
