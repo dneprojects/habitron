@@ -1,10 +1,4 @@
 """Platform for sensor integration."""
-# This file shows the setup for the sensors associated with a module.
-# They are setup in the same way with the call to the async_setup_entry function
-# via HA from the module __init__. Each sensor has a device_class, this tells HA how
-# to display it in the UI (for know types). The unit_of_measurement property tells HA
-# what the unit is, so it can display the correct range. For predefined types (such as
-# battery), the unit_of_measurement should match what's expected.
 
 
 from homeassistant.components.sensor import SensorEntity, SensorDeviceClass
@@ -94,6 +88,8 @@ async def async_setup_entry(
 class HbtnSensor(CoordinatorEntity, SensorEntity):
     """Base representation of a Habitron sensor."""
 
+    state_class = "measurement"
+
     def __init__(self, module, nmbr, coord, idx) -> None:
         """Initialize a Habitron sensor, pass coordinator to CoordinatorEntity."""
         super().__init__(coord, context=idx)
@@ -121,6 +117,7 @@ class TemperatureSensor(HbtnSensor):
     """Representation of a Sensor."""
 
     device_class = SensorDeviceClass.TEMPERATURE
+    _attr_native_unit_of_measurement = "°C"
     _attr_unit_of_measurement = "°C"
 
     def __init__(self, module, nmbr, coord, idx):
@@ -134,6 +131,7 @@ class HumiditySensor(HbtnSensor):
     """Representation of a Sensor."""
 
     device_class = SensorDeviceClass.HUMIDITY
+    _attr_native_unit_of_measurement = "%"
     _attr_unit_of_measurement = "%"
 
     def __init__(self, module, nmbr, coord, idx):
@@ -147,6 +145,7 @@ class IlluminanceSensor(HbtnSensor):
     """Representation of an illuminance sensor."""
 
     device_class = SensorDeviceClass.ILLUMINANCE
+    _attr_native_unit_of_measurement = "lx"
     _attr_unit_of_measurement = "lx"
 
     def __init__(self, module, nmbr, coord, idx):
@@ -160,6 +159,7 @@ class WindSensor(HbtnSensor):
     """Representation of a wind sensor."""
 
     # device_class = SensorDeviceClass.WIND_SPEED
+    _attr_native_unit_of_measurement = "m/s"
     _attr_unit_of_measurement = "m/s"
 
     def __init__(self, module, nmbr, coord, idx):
@@ -173,6 +173,7 @@ class RainSensor(HbtnSensor):
     """Representation of a rain sensor."""
 
     # device_class = DEVICE_CLASS_BOOL
+    _attr_native_unit_of_measurement = ""
     _attr_unit_of_measurement = ""
 
     def __init__(self, module, nmbr, coord, idx):
@@ -186,6 +187,7 @@ class WindpeakSensor(HbtnSensor):
     """Representation of a wind sensor."""
 
     # device_class = SensorDeviceClass.WIND_SPEED
+    _attr_native_unit_of_measurement = "m/s"
     _attr_unit_of_measurement = "m/s"
 
     def __init__(self, module, nmbr, coord, idx):
@@ -195,23 +197,11 @@ class WindpeakSensor(HbtnSensor):
         self._attr_name = f"{self._module.name} Wind Peak"
 
 
-class MovementSensor(HbtnSensor):
-    """Representation of a movement sensor."""
-
-    # device_class = SensorDeviceClass.WIND_SPEED
-    _attr_unit_of_measurement = ""
-
-    def __init__(self, module, nmbr, coord, idx):
-        """Initialize the sensor."""
-        super().__init__(module, nmbr, coord, idx)
-        self._attr_unique_id = f"{self._module.id}_movement"
-        self._attr_name = f"{self._module.name} Movement"
-
-
 class AirqualitySensor(HbtnSensor):
     """Representation of a airquality sensor."""
 
     device_class = SensorDeviceClass.AQI
+    _attr_native_unit_of_measurement = ""
     _attr_unit_of_measurement = ""
 
     def __init__(self, module, nmbr, coord, idx):
@@ -222,9 +212,9 @@ class AirqualitySensor(HbtnSensor):
 
 
 class LogicSensor(HbtnSensor):
-    """Representation of a airquality sensor."""
+    """Representation of a logic state sensor."""
 
-    # device_class = SensorDeviceClass.AQI
+    _attr_native_unit_of_measurement = ""
     _attr_unit_of_measurement = ""
 
     def __init__(self, module, logic, coord, idx):
