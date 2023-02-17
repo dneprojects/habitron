@@ -6,6 +6,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.components.select import SelectEntity
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, SMARTIP_COMMAND_STRINGS
@@ -76,12 +77,12 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
     # To link this entity to its device, this property must return an
     # identifiers value matching that used in the module
     @property
-    def device_info(self):
+    def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
         return {"identifiers": {(DOMAIN, self._module.mod_id)}}
 
     @property
-    def options(self):
+    def options(self) -> list[str]:
         """Return all mode names of enumeration type"""
         all_modes = []
         for mode in self._enum:
@@ -89,7 +90,7 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
         return all_modes
 
     @property
-    def current_option(self):
+    def current_option(self) -> str:
         """Return the current mode name"""
         return self._current_option
 
