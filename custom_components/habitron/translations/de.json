@@ -1,16 +1,5 @@
 {
     "config": {
-        "abort": {
-            "already_configured": "Habitron Integration bereits installiert"
-        },
-        "error": {
-            "cannot_connect": "Keine Verbindung zum SmartIP",
-            "host_not_found": "Hostname nicht gefunden, evtl. IP eingeben",
-            "invalid_interval": "Intervall Eingabe ungültig",
-            "interval_too_short": "Intervall zu kurz, mind. 3 s",
-            "interval_too_long": "Intervall zu lang, max. 20 s",
-            "unknown": "Unbekannter Fehler"
-        },
         "step": {
             "user": {
                 "title": "Einstellungen zur Kommunikation",
@@ -19,11 +8,6 @@
                     "update_interval": "Update Intervall [s]"
                 }
             }
-        }
-    },
-    "options": {
-        "abort": {
-            "already_configured": "Habitron Integration bereits installiert"
         },
         "error": {
             "cannot_connect": "Keine Verbindung zum SmartIP",
@@ -33,6 +17,11 @@
             "interval_too_long": "Intervall zu lang, max. 20 s",
             "unknown": "Unbekannter Fehler"
         },
+        "abort": {
+            "already_configured": "Habitron Integration bereits installiert"
+        }
+    },
+    "options": {
         "step": {
             "init": {
                 "title": "Einstellungen zur Kommunikation",
@@ -41,6 +30,17 @@
                     "update_interval": "Update Intervall [s]"
                 }
             }
+        },
+        "error": {
+            "cannot_connect": "Keine Verbindung zum SmartIP",
+            "host_not_found": "Hostname nicht gefunden, evtl. IP eingeben",
+            "invalid_interval": "Intervall Eingabe ungültig",
+            "interval_too_short": "Intervall zu kurz, mind. 3 s",
+            "interval_too_long": "Intervall zu lang, max. 20 s",
+            "unknown": "Unbekannter Fehler"
+        },
+        "abort": {
+            "already_configured": "Habitron Integration bereits installiert"
         }
     }
 }

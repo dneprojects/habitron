@@ -36,9 +36,7 @@ async def async_setup_entry(
                     )
                 if abs(mod_cover.type) == 2:  # shutter with tilt
                     new_devices.append(
-                        HbtnShutterTilt(
-                            mod_cover, hbt_module, hbtn_cord, len(new_devices)
-                        )
+                        HbtnBlind(mod_cover, hbt_module, hbtn_cord, len(new_devices))
                     )
 
     # Fetch initial data so we have data when entities subscribe
@@ -192,7 +190,7 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
         await self.coordinator.async_request_refresh()
 
 
-class HbtnShutterTilt(HbtnShutter):
+class HbtnBlind(HbtnShutter):
     """Representation of a shutter cover with tilt control."""
 
     supported_features = (
@@ -202,11 +200,13 @@ class HbtnShutterTilt(HbtnShutter):
         | CoverEntityFeature.STOP
         | CoverEntityFeature.SET_TILT_POSITION
     )
+    device_class = "blind"
 
     def __init__(self, cover, module, coord, idx) -> None:
         """Initialize an HbtnShutterTilt."""
         super().__init__(cover, module, coord, idx)
         self._tilt_position = 0
+        self._attr_name = "Blind " + chr(48 + cover.nmbr) + " " + self._name
 
     @property
     def current_cover_tilt_position(self) -> int:

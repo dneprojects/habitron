@@ -68,7 +68,7 @@ class HbtnComm:
         resp_bytes = res[0]
         return resp_bytes
 
-    async def async_send_command_crc(self, cmd_string: str) -> [bytes, int]:
+    async def async_send_command_crc(self, cmd_string: str):
         """General function for communication via SmartIP, returns additional crc"""
         sck = socket.socket()  # Create a socket object
         sck.connect((self._host, self._port))
@@ -153,9 +153,9 @@ class HbtnComm:
             cmd_str = SMARTIP_COMMAND_STRINGS["REBOOT_MODULE"]
             if mod_nmbr < 65:
                 cmd_str = cmd_str.replace("\xff", chr(mod_nmbr))
-            else:
-                # router restart
-                cmd_str = SMARTIP_COMMAND_STRINGS["REBOOT_ROUTER"]
+        else:
+            # router restart
+            cmd_str = SMARTIP_COMMAND_STRINGS["REBOOT_ROUTER"]
         self.send_command(cmd_str)
 
 
