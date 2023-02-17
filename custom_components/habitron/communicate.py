@@ -205,7 +205,7 @@ async def async_send_receive(sck, cmd_str: str) -> bytes:
 
         resp_bytes = sck.recv(30)
         if len(resp_bytes) < 30:
-            return b"OK"
+            return b"OK", 0
         resp_len = resp_bytes[29] * 256 + resp_bytes[28]
         resp_bytes = b""
         while len(resp_bytes) < resp_len + 3:
@@ -214,7 +214,7 @@ async def async_send_receive(sck, cmd_str: str) -> bytes:
         crc = resp_bytes[-2] * 256 + resp_bytes[-3]
         resp_bytes = resp_bytes[0:resp_len]
     except TimeoutError:
-        resp_bytes = b"Timeout"
+        return b"Timeout", 0
     return resp_bytes, crc
 
 

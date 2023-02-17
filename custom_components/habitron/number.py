@@ -4,6 +4,7 @@ from __future__ import annotations
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.components.number import NumberDeviceClass, NumberEntity
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -55,13 +56,12 @@ class HbtnNumber(CoordinatorEntity, NumberEntity):
         self._module = module
         self._name = setval.name
         self._nmbr = setval.nmbr
-        self._value = setval.value
-        self._moving = 0
+        self._native_value = setval.value
         self._attr_unique_id = f"{self._module.id}_number_{48+setval.nmbr}"
         self._attr_name = f"{self._module.id} {self._name}"
 
     @property
-    def device_info(self):
+    def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
         return {"identifiers": {(DOMAIN, self._module.mod_id)}}
 
@@ -75,7 +75,7 @@ class HbtnNumber(CoordinatorEntity, NumberEntity):
         """Set the new value."""
         self._value = value
         cmd_str = SMARTIP_COMMAND_STRINGS["SET_SETPOINT_VALUE"]
-        int_val = int(self._value * 10)
+        int_val = int(self._native_value * 10)
         hi_val = max(int_val - 255, 0)
         lo_val = int_val - 256 * hi_val
         cmd_str = cmd_str.replace("\xfc", chr(hi_val))
