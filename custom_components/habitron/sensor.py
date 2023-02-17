@@ -213,8 +213,6 @@ class AirqualitySensor(HbtnSensor):
     """Representation of a airquality sensor."""
 
     device_class = SensorDeviceClass.AQI
-    _attr_native_unit_of_measurement = ""
-    _attr_unit_of_measurement = ""
 
     def __init__(self, module, nmbr, coord, idx) -> None:
         """Initialize the sensor."""

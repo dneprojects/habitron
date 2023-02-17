@@ -12,6 +12,7 @@ from homeassistant.components.cover import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, SMARTIP_COMMAND_STRINGS
@@ -84,7 +85,7 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
     # To link this entity to its device, this property must return an
     # identifiers value matching that used in the module
     @property
-    def device_info(self) -> None:
+    def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
         return {"identifiers": {(DOMAIN, self._module.mod_id)}}
 
