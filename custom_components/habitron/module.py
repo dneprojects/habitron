@@ -442,7 +442,7 @@ class SmartOutput(HbtnModule):
                 cname = cname.replace("ab", "")
                 cname = cname.replace("auf", "")
                 cname = cname.replace("zu", "")
-                self.covers[c_idx] = IfDescriptorC(cname.strip(), c_idx, 1, 1, 0)
+                self.covers[c_idx] = IfDescriptorC(cname.strip(), c_idx, 1, 0, 0)
                 self.outputs[2 * c_idx].nmbr = -1  # disable light output
                 self.outputs[2 * c_idx].type = 0
                 self.outputs[2 * c_idx + 1].nmbr = -1
@@ -462,13 +462,15 @@ class SmartOutput(HbtnModule):
                     int(self.smg[5 + 2 * c_idx]) - int(self.smg[4 + 2 * c_idx])
                 ) < 0:  # polarity
                     cover.type = -1
+                else:
+                    cover.type = 1
                 shades_time = abs(
                     int(self.smg[21 + 2 * c_idx]) - int(self.smg[20 + 2 * c_idx])
                 )
                 if shades_time > 0:
                     cover.type *= 2  # Roller with tiltable blades
-                cover.value = self.status[MStatIdx.ROLL_POS + cover.nmbr - 1]
-                cover.tilt = self.status[MStatIdx.BLAD_POS + cover.nmbr - 1]
+                cover.value = self.status[MStatIdx.ROLL_POS + cover.nmbr]
+                cover.tilt = self.status[MStatIdx.BLAD_POS + cover.nmbr]
 
 
 class SmartDimm(HbtnModule):
@@ -549,19 +551,6 @@ class SmartDimm(HbtnModule):
         resp = self.smg
         self.hw_version = resp[83 : (83 + 17)].decode("iso8859-1").strip()
         self.sw_version = resp[100 : (100 + 22)].decode("iso8859-1").strip()
-        roller_state = resp[132]
-        for c_idx in range(4):
-            if (roller_state & (0x01 << c_idx)) > 0:
-                cname = self.outputs[2 * c_idx].name.strip()
-                cname = cname.replace("auf", "")
-                cname = cname.replace("ab", "")
-                cname = cname.replace("auf", "")
-                cname = cname.replace("zu", "")
-                self.covers[c_idx] = IfDescriptorC(cname.strip(), c_idx, 1, 1, 0)
-                self.outputs[2 * c_idx].nmbr = -1  # disable light output
-                self.outputs[2 * c_idx].type = 0
-                self.outputs[2 * c_idx + 1].nmbr = -1
-                self.outputs[2 * c_idx + 1].type = 0
 
     def update(self, sys_status) -> None:
         """Module specific update method reads and parses status"""
