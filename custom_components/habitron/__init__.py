@@ -19,7 +19,6 @@ PLATFORMS: list[str] = [
     "button",
     "binary_sensor",
     "select",
-    # "climate",
 ]
 SERVICE_MOD_RESTART_SCHEMA = vol.Schema(
     {
