@@ -4,6 +4,7 @@
 from homeassistant.components.sensor import SensorEntity, SensorDeviceClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -68,6 +69,17 @@ async def async_setup_entry(
             new_devices.append(
                 LogicSensor(hbt_module, mod_logic, hbtn_cord, len(new_devices))
             )
+        for mod_diag in hbt_module.diags:
+            if mod_diag.name == "Status":
+                new_devices.append(
+                    StatusSensor(hbt_module, mod_diag.nmbr, hbtn_cord, len(new_devices))
+                )
+            elif mod_diag.name == "PowerTemp":
+                new_devices.append(
+                    TemperatureDSensor(
+                        hbt_module, mod_diag.nmbr, hbtn_cord, len(new_devices)
+                    )
+                )
 
     # Fetch initial data so we have data when entities subscribe
     #
@@ -102,7 +114,7 @@ class HbtnSensor(CoordinatorEntity, SensorEntity):
     # To link this entity to its device, this property must return an
     # identifiers value matching that used in the module
     @property
-    def device_info(self):
+    def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
         return {"identifiers": {(DOMAIN, self._module.mod_id)}}
 
@@ -120,7 +132,7 @@ class TemperatureSensor(HbtnSensor):
     _attr_native_unit_of_measurement = "°C"
     _attr_unit_of_measurement = "°C"
 
-    def __init__(self, module, nmbr, coord, idx):
+    def __init__(self, module, nmbr, coord, idx) -> None:
         """Initialize the sensor."""
         super().__init__(module, nmbr, coord, idx)
         self._attr_unique_id = f"{self._module.id}_temperature"
@@ -134,7 +146,7 @@ class HumiditySensor(HbtnSensor):
     _attr_native_unit_of_measurement = "%"
     _attr_unit_of_measurement = "%"
 
-    def __init__(self, module, nmbr, coord, idx):
+    def __init__(self, module, nmbr, coord, idx) -> None:
         """Initialize the sensor."""
         super().__init__(module, nmbr, coord, idx)
         self._attr_unique_id = f"{self._module.id}_humidity"
@@ -148,7 +160,7 @@ class IlluminanceSensor(HbtnSensor):
     _attr_native_unit_of_measurement = "lx"
     _attr_unit_of_measurement = "lx"
 
-    def __init__(self, module, nmbr, coord, idx):
+    def __init__(self, module, nmbr, coord, idx) -> None:
         """Initialize the sensor."""
         super().__init__(module, nmbr, coord, idx)
         self._attr_unique_id = f"{self._module.id}_illuminance"
@@ -162,7 +174,7 @@ class WindSensor(HbtnSensor):
     _attr_native_unit_of_measurement = "m/s"
     _attr_unit_of_measurement = "m/s"
 
-    def __init__(self, module, nmbr, coord, idx):
+    def __init__(self, module, nmbr, coord, idx) -> None:
         """Initialize the sensor."""
         super().__init__(module, nmbr, coord, idx)
         self._attr_unique_id = f"{self._module.id}_wind"
@@ -176,7 +188,7 @@ class RainSensor(HbtnSensor):
     _attr_native_unit_of_measurement = ""
     _attr_unit_of_measurement = ""
 
-    def __init__(self, module, nmbr, coord, idx):
+    def __init__(self, module, nmbr, coord, idx) -> None:
         """Initialize the sensor."""
         super().__init__(module, nmbr, coord, idx)
         self._attr_unique_id = f"{self._module.id}_rain"
@@ -190,7 +202,7 @@ class WindpeakSensor(HbtnSensor):
     _attr_native_unit_of_measurement = "m/s"
     _attr_unit_of_measurement = "m/s"
 
-    def __init__(self, module, nmbr, coord, idx):
+    def __init__(self, module, nmbr, coord, idx) -> None:
         """Initialize the sensor."""
         super().__init__(module, nmbr, coord, idx)
         self._attr_unique_id = f"{self._module.id}_windpeak"
@@ -204,11 +216,73 @@ class AirqualitySensor(HbtnSensor):
     _attr_native_unit_of_measurement = ""
     _attr_unit_of_measurement = ""
 
-    def __init__(self, module, nmbr, coord, idx):
+    def __init__(self, module, nmbr, coord, idx) -> None:
         """Initialize the sensor."""
         super().__init__(module, nmbr, coord, idx)
         self._attr_unique_id = f"{self._module.id}_airquality"
         self._attr_name = f"{self._module.name} Airquality"
+
+
+class HbtnDiagSensor(CoordinatorEntity, SensorEntity):
+    """Base representation of a Habitron sensor."""
+
+    def __init__(self, module, nmbr, coord, idx) -> None:
+        """Initialize a Habitron sensor, pass coordinator to CoordinatorEntity."""
+        super().__init__(coord, context=idx)
+        self.idx = idx
+        self._module = module
+        self._diag_idx = nmbr
+        self._attr_state = 0
+        self._value = 0
+
+    # To link this entity to its device, this property must return an
+    # identifiers value matching that used in the module
+    @property
+    def device_info(self) -> DeviceInfo | None:
+        """Return information to link this entity with the correct device."""
+        return {"identifiers": {(DOMAIN, self._module.mod_id)}}
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self._attr_native_value = self._module.diags[self._diag_idx].value
+        self.async_write_ha_state()
+
+
+class TemperatureDSensor(HbtnDiagSensor):
+    """Representation of a Sensor."""
+
+    device_class = SensorDeviceClass.TEMPERATURE
+    state_class = "measurement"
+
+    _attr_native_unit_of_measurement = "°C"
+    _attr_unit_of_measurement = "°C"
+
+    def __init__(self, module, nmbr, coord, idx) -> None:
+        """Initialize the sensor."""
+        super().__init__(module, nmbr, coord, idx)
+        self._attr_unique_id = f"{self._module.id}_powtemperature"
+        self._attr_name = f"{self._module.name} Power Unit Temperature"
+
+
+class StatusSensor(HbtnDiagSensor):
+    """Representation of a Sensor."""
+
+    def __init__(self, module, nmbr, coord, idx) -> None:
+        """Initialize the sensor."""
+        super().__init__(module, nmbr, coord, idx)
+        self._attr_unique_id = f"{self._module.id}_module_status"
+        self._attr_name = f"{self._module.name} Module Status"
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self._attr_native_value = self._module.diags[self._diag_idx].value
+        self.async_write_ha_state()
+        if self._attr_native_value:
+            self._attr_icon = "mdi:lan-disconnect"
+        else:
+            self._attr_icon = "mdi:lan-check"
 
 
 class LogicSensor(HbtnSensor):
@@ -217,13 +291,14 @@ class LogicSensor(HbtnSensor):
     _attr_native_unit_of_measurement = ""
     _attr_unit_of_measurement = ""
 
-    def __init__(self, module, logic, coord, idx):
+    def __init__(self, module, logic, coord, idx) -> None:
         """Initialize the sensor."""
         super().__init__(module, logic.nmbr, coord, idx)
         self.nmbr = logic.nmbr
         self._attr_unique_id = f"{self._module.id}_logic_{logic.nmbr}"
         self._attr_name = f"{self._module.name} Cnt{logic.nmbr + 1} {logic.name}"
         self._attr_icon = "mdi:counter"
+
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""

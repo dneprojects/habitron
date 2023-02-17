@@ -17,7 +17,7 @@ from .const import DOMAIN, SMARTIP_COMMAND_STRINGS, MStatIdx
 class ModuleDescriptor:
     """Habitron modules descriptor."""
 
-    def __init__(self, addr, mtype, name, group):
+    def __init__(self, addr, mtype, name, group) -> None:
         self.addr: int = addr
         self.mtype: str = mtype
         self.name: str = name
@@ -27,7 +27,7 @@ class ModuleDescriptor:
 class IfDescriptor:
     """Habitron interface descriptor."""
 
-    def __init__(self, iname, inmbr, itype, ivalue):
+    def __init__(self, iname, inmbr, itype, ivalue) -> None:
         self.name: str = iname
         self.nmbr: int = inmbr
         self.type: int = itype
@@ -37,7 +37,7 @@ class IfDescriptor:
 class IfDescriptorC:
     """Habitron interface descriptor."""
 
-    def __init__(self, iname, inmbr, itype, ivalue, itilt):
+    def __init__(self, iname, inmbr, itype, ivalue, itilt) -> None:
         self.name: str = iname
         self.nmbr: int = inmbr
         self.type: int = itype
@@ -88,6 +88,7 @@ class HbtnModule:
         self.commands: list[IfDescriptor] = []
         self.flags: list[IfDescriptor] = []
         self.logic: list[IfDescriptor] = []
+        self.diags = [IfDescriptorC("", -1, 0, 0, 0)]
 
     @property
     def mod_id(self) -> str:
@@ -181,6 +182,7 @@ class SmartController(HbtnModule):
         super().__init__(mod_descriptor, hass, config)
         self.messages: list[IfDescriptor] = []
         self.commands: list[IfDescriptor] = []
+        self.diags = [IfDescriptorC("", -1, 0, 0, 0)] * 2
         self.setvalues = [IfDescriptor("Set temperature", 0, 2, 20.0)]
 
         self.sensors.append(IfDescriptor("Movement", 0, 2, 0))
@@ -360,6 +362,18 @@ class SmartController(HbtnModule):
         for flg in self.flags:
             flg.value = int((flags_state & (0x01 << flg.nmbr - 1)) > 0)
 
+        self.diags[0] = IfDescriptor("Status", 0, 1, self.status[MStatIdx.MODULE_STAT])
+        self.diags[1] = IfDescriptor(
+            "PowerTemp",
+            1,
+            1,
+            int.from_bytes(
+                self.status[MStatIdx.TEMP_PWR : MStatIdx.TEMP_PWR + 2],
+                "little",
+            )
+            / 10,
+        )
+
 
 class SmartOutput(HbtnModule):
     """Habitron SmartOutput module class."""
@@ -379,6 +393,7 @@ class SmartOutput(HbtnModule):
 
         self.messages: list[IfDescriptor] = []
         self.commands: list[IfDescriptor] = []
+        self.diags = [IfDescriptorC("", -1, 0, 0, 0)]
 
     async def initialize(self, sys_status) -> None:
         await super().initialize(sys_status)
@@ -472,6 +487,8 @@ class SmartOutput(HbtnModule):
                 cover.value = self.status[MStatIdx.ROLL_POS + cover.nmbr]
                 cover.tilt = self.status[MStatIdx.BLAD_POS + cover.nmbr]
 
+        self.diags[0] = IfDescriptor("Status", 0, 1, self.status[MStatIdx.MODULE_STAT])
+
 
 class SmartDimm(HbtnModule):
     """Habitron SmartOutput module class."""
@@ -491,6 +508,7 @@ class SmartDimm(HbtnModule):
 
         self.messages: list[IfDescriptor] = []
         self.commands: list[IfDescriptor] = []
+        self.diags = [IfDescriptorC("", -1, 0, 0, 0)] * 2
 
     async def initialize(self, sys_status) -> None:
         await super().initialize(sys_status)
@@ -568,6 +586,18 @@ class SmartDimm(HbtnModule):
         self.dimmers[1].value = int(self.status[MStatIdx.DIM_2])
         self.dimmers[2].value = int(self.status[MStatIdx.DIM_3])
         self.dimmers[3].value = int(self.status[MStatIdx.DIM_4])
+
+        self.diags[0] = IfDescriptor("Status", 0, 1, self.status[MStatIdx.MODULE_STAT])
+        self.diags[1] = IfDescriptor(
+            "PowerTemp",
+            1,
+            1,
+            int.from_bytes(
+                self.status[MStatIdx.TEMP_PWR : MStatIdx.TEMP_PWR + 2],
+                "little",
+            )
+            / 10,
+        )
 
 
 class SmartUpM(HbtnModule):
@@ -677,6 +707,7 @@ class SmartUpM(HbtnModule):
                 self.covers[0].type *= 2  # Roller with tiltable blades
             self.covers[0].value = self.status[MStatIdx.ROLL_POS - 1]
             self.covers[0].tilt = self.status[MStatIdx.BLAD_POS - 1]
+        self.diags[0] = IfDescriptor("Status", 0, 1, self.status[MStatIdx.MODULE_STAT])
 
 
 class SmartInput(HbtnModule):
@@ -735,6 +766,7 @@ class SmartInput(HbtnModule):
             i_idx = mod_inp.nmbr
             mod_inp.value = int((inp_state & (0x01 << i_idx)) > 0)
         #     mod_inp.type = int((inp_type & (0x01 << i_idx)) > 0)
+        self.diags[0] = IfDescriptor("Status", 0, 1, self.status[MStatIdx.MODULE_STAT])
 
 
 class SmartDetect(HbtnModule):
@@ -759,6 +791,7 @@ class SmartDetect(HbtnModule):
         super().update(sys_status)
         self.sensors[0].value = int(self.status[MStatIdx.MOV])  # movement
         self.sensors[1].value = int(self.status[MStatIdx.LUM]) * 10  # illuminance
+        self.diags[0] = IfDescriptor("Status", 0, 1, self.status[MStatIdx.MODULE_STAT])
 
 
 class SmartNature(HbtnModule):
@@ -794,12 +827,13 @@ class SmartNature(HbtnModule):
             / 10
         )  # current temperature
         # self.sensors[2].value = int(
-        #     self.status[22] * 256 + self.status[21]) / 10  # other temperature?
-        self.sensors[1].value = int(self.status[MStatIdx.HUM])  # current humidity?
+        #     self.status[22] * 256 + self.status[21]) / 10  # other temperature
+        self.sensors[1].value = int(self.status[MStatIdx.HUM])  # current humidity
         self.sensors[2].value = int.from_bytes(
             self.status[MStatIdx.LUM : MStatIdx.LUM + 2],
             "little",
         )  # illuminance
-        self.sensors[3].value = int(self.status[MStatIdx.WINDP])  # wind??
-        self.sensors[4].value = int(self.status[MStatIdx.RAIN])  # rain??
-        self.sensors[5].value = int(self.status[MStatIdx.WINDP])  # wind peak??
+        self.sensors[3].value = int(self.status[MStatIdx.WINDP])  # wind
+        self.sensors[4].value = int(self.status[MStatIdx.RAIN])  # rain
+        self.sensors[5].value = int(self.status[MStatIdx.WINDP])  # wind peak
+        self.diags[0] = IfDescriptor("Status", 0, 1, self.status[MStatIdx.MODULE_STAT])
