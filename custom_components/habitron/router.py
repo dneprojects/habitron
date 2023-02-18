@@ -9,11 +9,8 @@ from homeassistant.helpers import device_registry as dr
 from .const import RoutIdx
 from .communicate import HbtnComm as hbtn_com
 
-# In a real implementation, this would be in an external library that's on PyPI.
-# The PyPI package needs to be included in the `requirements` section of manifest.json
-# See https://developers.home-assistant.io/docs/creating_integration_manifest
 # for more information.
-from .const import DOMAIN, SMARTIP_COMMAND_STRINGS, MODULE_CODES
+from .const import DOMAIN, SMARTIP_COMMAND_STRINGS, MODULE_CODES, MStatIdx
 from .module import ModuleDescriptor
 from .module import (
     HbtnModule as hbtm,
@@ -31,7 +28,7 @@ from .coordinator import HbtnCoordinator
 class CmdDescriptor:
     """Habitron interface descriptor."""
 
-    def __init__(self, cname, cnmbr):
+    def __init__(self, cname, cnmbr) -> None:
         self.name: str = cname
         self.nmbr: int = cnmbr
 
@@ -39,7 +36,7 @@ class CmdDescriptor:
 class StateDescriptor:
     """Descriptor for modes and flags"""
 
-    def __init__(self, sname, sidx, snmbr, svalue):
+    def __init__(self, sname, sidx, snmbr, svalue) -> None:
         self.name: str = sname
         self.idx: int = sidx
         self.nmbr: int = snmbr
@@ -254,8 +251,12 @@ class HbtnRouter:
         )
         for flg in self.flags:
             flg.value = int((flags_state & (0x01 << flg.nmbr - 1)) > 0)
-        for module in self.modules:
-            module.update(self.sys_status)
+        for m_idx in range(len(self.modules)):
+            mod_status = self.sys_status[
+                m_idx * MStatIdx.END : (m_idx + 1) * MStatIdx.END
+            ]
+            mod_addr = mod_status[MStatIdx.ADDR]
+            self.modules[self.mod_reg[mod_addr]].update(mod_status)
         return
 
     async def get_modules(self, mod_groups) -> list[ModuleDescriptor]:
