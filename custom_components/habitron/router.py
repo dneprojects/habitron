@@ -171,7 +171,7 @@ class HbtnRouter:
         for ch_i in range(4):
             count = self.smr[ptr]
             self.chan_list.append(sorted(list(self.smr[ptr + 1 : ptr + count + 1])))
-            max_mod_no = max(max_mod_no, max(self.chan_list[ch_i]))
+            max_mod_no = max(max_mod_no, self.chan_list[ch_i])
             ptr += 1 + count
         ptr += 2
         self.max_group = max(list(self.smr[ptr : ptr + 64]))
