@@ -278,9 +278,9 @@ class SmartController(HbtnModule):
                 self.outputs[2 * cm_idx + 1].nmbr = -1
                 self.outputs[2 * cm_idx + 1].type = 0
 
-    def update(self, sys_status) -> None:
+    def update(self, mod_status) -> None:
         """Module specific update method reads and parses status"""
-        super().update(sys_status)
+        super().update(mod_status)
         self.sensors[0].value = int(self.status[MStatIdx.MOV])  # movement?
         self.sensors[1].value = (
             int.from_bytes(
@@ -464,9 +464,9 @@ class SmartOutput(HbtnModule):
                 self.outputs[2 * c_idx + 1].nmbr = -1
                 self.outputs[2 * c_idx + 1].type = 0
 
-    def update(self, sys_status) -> None:
+    def update(self, mod_status) -> None:
         """Module specific update method reads and parses status"""
-        super().update(sys_status)
+        super().update(mod_status)
         out_state = int(self.status[MStatIdx.OUT_1_8])
         for o_idx in range(8):
             self.outputs[o_idx].value = int((out_state & (0x01 << o_idx)) > 0)
@@ -571,9 +571,9 @@ class SmartDimm(HbtnModule):
         self.hw_version = resp[83 : (83 + 17)].decode("iso8859-1").strip()
         self.sw_version = resp[100 : (100 + 22)].decode("iso8859-1").strip()
 
-    def update(self, sys_status) -> None:
+    def update(self, mod_status) -> None:
         """Module specific update method reads and parses status"""
-        super().update(sys_status)
+        super().update(mod_status)
 
         inp_state = int(self.status[MStatIdx.INP_1_8])
         for mod_inp in self.inputs:
@@ -686,9 +686,9 @@ class SmartUpM(HbtnModule):
                 self.outputs[2 * c_idx + 1].nmbr = -1
                 self.outputs[2 * c_idx + 1].type = 0
 
-    def update(self, sys_status) -> None:
+    def update(self, mod_status) -> None:
         """Module specific update method reads and parses status"""
-        super().update(sys_status)
+        super().update(mod_status)
 
         inp_state = int(self.status[MStatIdx.INP_1_8])
         for mod_inp in self.inputs:
@@ -758,9 +758,9 @@ class SmartInput(HbtnModule):
                 count = count + 1
             resp = resp[line_len : len(resp)]  # Strip processed line
 
-    def update(self, sys_status) -> None:
+    def update(self, mod_status) -> None:
         """Module specific update method reads and parses status"""
-        super().update(sys_status)
+        super().update(mod_status)
         inp_state = int(self.status[MStatIdx.INP_1_8])
         # inp_type = int(self.status[MStatIdx.SWMOD_1_8])
         for mod_inp in self.inputs:
