@@ -111,6 +111,7 @@ class HbtnModule:
         self.hw_version = self.smg[83 : (83 + 17)].decode("iso8859-1").strip()
         self.sw_version = self.smg[100 : (100 + 22)].decode("iso8859-1").strip()
         device_registry = dr.async_get(self._hass)
+        self.status = self.extract_status(sys_status)
         device_registry.async_get_or_create(
             config_entry_id=self._config.entry_id,
             identifiers={(DOMAIN, self.id)},
@@ -148,9 +149,9 @@ class HbtnModule:
         self.smg = resp
         return True
 
-    def update(self, sys_status):
+    def update(self, mod_status):
         """General update for Habitron modules."""
-        self.status = self.extract_status(sys_status)
+        self.status = mod_status
         self.mode = self.status[MStatIdx.MODE]
         return
 
@@ -197,7 +198,7 @@ class SmartController(HbtnModule):
         await self.get_smc()
         self.parse_smc()
         self.parse_smg()
-        self.update(sys_status)
+        self.update(self.status)
 
     def parse_smc(self) -> None:
         """Get names"""
@@ -401,7 +402,7 @@ class SmartOutput(HbtnModule):
         await self.get_smc()
         self.parse_smc()
         self.parse_smg()
-        self.update(sys_status)
+        self.update(self.status)
 
     def parse_smc(self) -> None:
         """Setting names"""
@@ -516,7 +517,7 @@ class SmartDimm(HbtnModule):
         await self.get_smc()
         self.parse_smc()
         self.parse_smg()
-        self.update(sys_status)
+        self.update(self.status)
 
     def parse_smc(self) -> None:
         """Setting names"""
@@ -625,7 +626,7 @@ class SmartUpM(HbtnModule):
         await self.get_smc()
         self.parse_smc()
         self.parse_smg()
-        self.update(sys_status)
+        self.update(self.status)
 
     def parse_smc(self) -> None:
         """Setting names"""
@@ -733,7 +734,7 @@ class SmartInput(HbtnModule):
         await super().initialize(sys_status)
         await self.get_smg()
         # self.parse_smg()
-        self.update(sys_status)
+        self.update(self.status)
 
     def parse_smc(self) -> None:
         """Setting names"""
@@ -784,11 +785,11 @@ class SmartDetect(HbtnModule):
 
         self.sensors.append(IfDescriptor("Movement", 0, 2, 0))
         self.sensors.append(IfDescriptor("Illuminance", 1, 2, 0))
-        self.update(sys_status)
+        self.update(self.status)
 
-    def update(self, sys_status) -> None:
+    def update(self, mod_status) -> None:
         """Module specific update method reads and parses status"""
-        super().update(sys_status)
+        super().update(mod_status)
         self.sensors[0].value = int(self.status[MStatIdx.MOV])  # movement
         self.sensors[1].value = int(self.status[MStatIdx.LUM]) * 10  # illuminance
         self.diags[0] = IfDescriptor("Status", 0, 1, self.status[MStatIdx.MODULE_STAT])
@@ -811,14 +812,14 @@ class SmartNature(HbtnModule):
         self.sensors.append(IfDescriptor("Rain", 4, 0, 0))
         self.sensors.append(IfDescriptor("Windpeak", 5, 2, 0))
 
-        self.update(sys_status)
+        self.update(self.status)
 
         self.messages: list[IfDescriptor] = []
         self.commands: list[IfDescriptor] = []
 
-    def update(self, sys_status) -> None:
+    def update(self, mod_status) -> None:
         """Module specific update method reads and parses status"""
-        super().update(sys_status)
+        super().update(mod_status)
         self.sensors[0].value = (
             int.from_bytes(
                 self.status[5 : 5 + 2],
