@@ -56,7 +56,7 @@ class HbtnNumber(CoordinatorEntity, NumberEntity):
         self._module = module
         self._name = setval.name
         self._nmbr = setval.nmbr
-        self._native_value = setval.value
+        self._attr_native_value = setval.value
         self._attr_unique_id = f"{self._module.id}_number_{48+setval.nmbr}"
         self._attr_name = f"{self._module.id} {self._name}"
 
@@ -68,14 +68,14 @@ class HbtnNumber(CoordinatorEntity, NumberEntity):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        self._attr_value = self._setval.value
+        self._attr_native_value = self._setval.value
         self.async_write_ha_state()
 
     async def async_set_native_value(self, value: float) -> None:
         """Set the new value."""
-        self._value = value
+        self._attr_native_value = value
         cmd_str = SMARTIP_COMMAND_STRINGS["SET_SETPOINT_VALUE"]
-        int_val = int(self._native_value * 10)
+        int_val = int(self._attr_native_value * 10)
         hi_val = max(int_val - 255, 0)
         lo_val = int_val - 256 * hi_val
         cmd_str = cmd_str.replace("\xfc", chr(hi_val))
