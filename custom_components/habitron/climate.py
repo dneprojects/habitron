@@ -9,14 +9,14 @@ from homeassistant.components.climate import (
     ClimateEntityFeature,
     HVACMode,
     ATTR_TEMPERATURE,
-    TEMP_CELSIUS,
+    UnitOfTemperature,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, SMARTIP_COMMAND_STRINGS
+from .const import DOMAIN
 
 
 async def async_setup_entry(
@@ -48,21 +48,24 @@ async def async_setup_entry(
 class HbtnClimate(CoordinatorEntity, ClimateEntity):
     """Representation of habitron climate entities."""
 
-    supported_features = ClimateEntityFeature.TARGET_TEMPERATURE
-    device_class = "shutter"
+    _attr_supported_features = ClimateEntityFeature.TARGET_TEMPERATURE
+    _attr_temperature_unit = UnitOfTemperature.CELSIUS
 
     def __init__(self, module, coord, idx) -> None:
         """Initialize an HbtnLight, pass coordinator to CoordinatorEntity."""
         super().__init__(coord, context=idx)
         self.idx = idx
         self._module = module
-        self._name = f"{self._module.id} climate"
+        self._attr_name = f"{self._module.name}: Climate"
+        self._attr_unique_id = f"{self._module.id}_climate"
         self._state = None
+        self._curr_hvac_mode = HVACMode.OFF
         self._curr_temperature = module.sensors[1].value
+        self._curr_humidity = module.sensors[2].value
         self._target_temperature = module.setvalues[0].value
-        self._attr_unique_id = f"{self._module.id}_{self._name}"
+        self._attr_unique_id = f"{self._module.id}_{self._attr_name}"
         self._attr_hvac_modes = HVACMode.HEAT
-        self._attr_temperature_unit = TEMP_CELSIUS
+        self._attr_temperature_unit = UnitOfTemperature.CELSIUS
         self._attr_target_temperature_high = 25
         self._attr_target_temperature_low = 15
         self._attr_target_temperature_step = 0.5
@@ -78,31 +81,67 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
     @property
     def name(self) -> str:
         """Return the display name of this climate unit."""
-        return self._name
+        return self._attr_name
 
-    # @property
-    # def target_temperature(self) -> float:
-    #     return self._target_temperature
+    @property
+    def min_temp(self) -> float:
+        """Return the minimum temperature."""
+        return 12.5
+
+    @property
+    def max_temp(self) -> float:
+        """Return the maximum temperature."""
+        return 27.5
+
+    @property
+    def target_temperature_step(self) -> float:
+        """Return the supported step of target temperature."""
+        return 0.5
+
+    @property
+    def hvac_modes(self) -> list[HVACMode]:
+        """Return the list of available hvac operation modes."""
+        return [HVACMode.HEAT, HVACMode.OFF]
+
+    @property
+    def current_temperature(self) -> float:
+        """Return the current temperature."""
+        return self._curr_temperature
+
+    @property
+    def current_humidity(self) -> int:
+        """Return the current humidity."""
+        return self._curr_humidity
+
+    @property
+    def target_temperature(self) -> float:
+        return self._target_temperature
+
+    @property
+    def hvac_mode(self) -> HVACMode:
+        """Return hvac operation ie. heat, cool mode."""
+        if self._target_temperature <= self._curr_temperature + 0.5:
+            self._curr_hvac_mode = HVACMode.OFF
+            return HVACMode.OFF
+        self._curr_hvac_mode = HVACMode.HEAT
+        return HVACMode.HEAT
 
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        self._attr_current_temperature = self._module.sensors[1].value
-        self._attr_current_humidity = self._module.sensors[2].value
-        self._attr_target_temperature = self._module.setvalues[0].value
+        self._curr_temperature = self._module.sensors[1].value
+        self._curr_humidity = self._module.sensors[2].value
+        self._target_temperature = self._module.setvalues[0].value
         self.async_write_ha_state()
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
         """Set new target temperature."""
         self._target_temperature = kwargs.get(ATTR_TEMPERATURE)
-        cmd_str = SMARTIP_COMMAND_STRINGS["SET_SETPOINT_VALUE"]
         int_val = int(self._target_temperature * 10)
-        hi_val = max(int_val - 255, 0)
-        lo_val = int_val - 256 * hi_val
-        cmd_str = cmd_str.replace("\xfc", chr(hi_val))
-        cmd_str = cmd_str.replace("\xfd", chr(lo_val))
-        cmd_str = cmd_str.replace("\xff", chr(self._module.mod_addr))
-        cmd_str = cmd_str.replace("\xfe", chr(1))
-        await self._module.comm.async_send_command(cmd_str)
+        await self._module.comm.async_set_setpoint(self._module.mod_addr, 1, int_val)
         # Update the data
-        await self.coordinator.async_request_refresh()
+        # await self.coordinator.async_request_refresh()
+
+    async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
+        """Set new target hvac mode."""
+        self._curr_hvac_mode = hvac_mode

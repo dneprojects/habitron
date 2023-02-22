@@ -15,7 +15,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, SMARTIP_COMMAND_STRINGS
+from .const import DOMAIN
 
 
 async def async_setup_entry(
@@ -80,7 +80,7 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
         self._moving = 0
         self._attr_unique_id = f"{self._module.id}_cover_{48+cover.nmbr}"
 
-        self._attr_name = "Shutter " + chr(48 + cover.nmbr) + " " + self._name
+        self._attr_name = self._name
 
     # To link this entity to its device, this property must return an
     # identifiers value matching that used in the module
@@ -126,69 +126,52 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
                 self._moving = 1
         self.async_write_ha_state()
 
-    async def async_send_command(self, cmd_str):
-        """Send command patches module and output numbers"""
-        cmd_str = cmd_str.replace("\xff", chr(self._module.mod_addr))
-        if self._module.has_sensors:  # SmartController counts 2..4
-            cmd_str = cmd_str.replace("\xfe", chr(self._nmbr - 1))
-        else:
-            cmd_str = cmd_str.replace("\xfe", chr(self._nmbr + 1))
-        await self._module.comm.async_send_command(cmd_str)
-
-    async def async_send_stop_command(self, cmd_str):
-        """Send command patches module and output numbers"""
-        cmd_str = cmd_str.replace("\xff", chr(self._module.mod_addr))
-        cmd_str1 = cmd_str.replace("\xfe", chr(self._nmbr * 2 + 1))
-        cmd_str2 = cmd_str.replace("\xfe", chr(self._nmbr * 2 + 2))
-        await self._module.comm.async_send_command(cmd_str1)
-        await self._module.comm.async_send_command(cmd_str2)
-
-    async def async_send_up_command(self, cmd_str):
-        """Send command patches module and output numbers"""
-        cmd_str = cmd_str.replace("\xff", chr(self._module.mod_addr))
-        if self._polarity:
-            cmd_str = cmd_str.replace("\xfe", chr(self._nmbr * 2 + 1))
-        else:
-            cmd_str = cmd_str.replace("\xfe", chr(self._nmbr * 2 + 2))
-        await self._module.comm.async_send_command(cmd_str)
-
-    async def async_send_down_command(self, cmd_str):
-        """Send command patches module and output numbers"""
-        cmd_str = cmd_str.replace("\xff", chr(self._module.mod_addr))
-        if self._polarity:
-            cmd_str = cmd_str.replace("\xfe", chr(self._nmbr * 2 + 2))
-        else:
-            cmd_str = cmd_str.replace("\xfe", chr(self._nmbr * 2 + 1))
-        await self._module.comm.async_send_command(cmd_str)
-
     # These methods allow HA to tell the actual device what to do. In this case, move
     # the cover to the desired position, or open and close it all the way.
     async def async_stop_cover(self, **kwargs: Any) -> None:
         """Stop the cover."""
-        await self.async_send_stop_command(SMARTIP_COMMAND_STRINGS["SET_OUTPUT_OFF"])
-        # Update the data
-        await self.coordinator.async_request_refresh()
+        await self._module.comm.async_set_output(
+            self._module.mod_addr, self._nmbr * 2 + 1, 0
+        )
+        await self._module.comm.async_set_output(
+            self._module.mod_addr, self._nmbr * 2 + 2, 0
+        )
 
     async def async_open_cover(self, **kwargs: Any) -> None:
         """Open the cover."""
-        await self.async_send_up_command(SMARTIP_COMMAND_STRINGS["SET_OUTPUT_ON"])
-        # Update the data
-        await self.coordinator.async_request_refresh()
+        if self._polarity:
+            await self._module.comm.async_set_output(
+                self._module.mod_addr, self._nmbr * 2 + 1, 1
+            )
+        else:
+            await self._module.comm.async_set_output(
+                self._module.mod_addr, self._nmbr * 2 + 2, 1
+            )
 
     async def async_close_cover(self, **kwargs: Any) -> None:
         """Close the cover."""
-        await self.async_send_down_command(SMARTIP_COMMAND_STRINGS["SET_OUTPUT_ON"])
-        # Update the data
-        await self.coordinator.async_request_refresh()
+        if self._polarity:
+            await self._module.comm.async_set_output(
+                self._module.mod_addr, self._nmbr * 2 + 2, 1
+            )
+        else:
+            await self._module.comm.async_set_output(
+                self._module.mod_addr, self._nmbr * 2 + 1, 1
+            )
 
     async def async_set_cover_position(self, **kwargs: Any) -> None:
         """Move the cover to position."""
         self._position = kwargs.get(ATTR_POSITION)
-        cmd_str = SMARTIP_COMMAND_STRINGS["SET_ROLLER_POSITION"]
-        cmd_str = cmd_str[0:-1] + chr(100 - self._position)
-        await self.async_send_command(cmd_str)
-        # Update the data
-        await self.coordinator.async_request_refresh()
+        sh_nmbr = self._nmbr + 1
+        if self._module.mod_type == "Smart Controller":
+            sh_nmbr -= 2  # map #3..5 to 1..3
+            if sh_nmbr < 1:
+                sh_nmbr += 5  # ...and 1..2 to 4..5
+        await self._module.comm.async_set_shutterpos(
+            self._module.mod_addr,
+            sh_nmbr,
+            100 - self._position,
+        )
 
 
 class HbtnBlind(HbtnShutter):
@@ -207,7 +190,7 @@ class HbtnBlind(HbtnShutter):
         """Initialize an HbtnShutterTilt."""
         super().__init__(cover, module, coord, idx)
         self._tilt_position = 0
-        self._attr_name = "Blind " + chr(48 + cover.nmbr) + " " + self._name
+        self._attr_name = self._name
 
     @property
     def current_cover_tilt_position(self) -> int:
@@ -218,7 +201,7 @@ class HbtnBlind(HbtnShutter):
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
         self._position = 100 - self._module.covers[self._nmbr].value
-        self._tilt_position = self._module.covers[self._nmbr].tilt
+        self._tilt_position = 100 - self._module.covers[self._nmbr].tilt
         self._moving = 0
         if self._module.outputs[self._nmbr * 2].value > 0:
             if self._polarity:
@@ -233,10 +216,15 @@ class HbtnBlind(HbtnShutter):
         self.async_write_ha_state()
 
     async def async_set_cover_tilt_position(self, **kwargs: Any) -> None:
-        """Close the cover."""
+        """Set the tilt angle."""
         self._tilt_position = kwargs.get(ATTR_TILT_POSITION)
-        cmd_str = SMARTIP_COMMAND_STRINGS["SET_ROLLER_TILT_POSITION"]
-        cmd_str = cmd_str[0:-1] + chr(self._tilt_position)
-        await self.async_send_command(cmd_str)
-        # Update the data
-        await self.coordinator.async_request_refresh()
+        sh_nmbr = self._nmbr + 1
+        if self._module.mod_type == "Smart Controller":
+            sh_nmbr -= 2  # map #3..5 to 1..3
+            if sh_nmbr < 1:
+                sh_nmbr += 5  # ...and 1..2 to 4..5
+        await self._module.comm.async_set_blindtilt(
+            self._module.mod_addr,
+            sh_nmbr,
+            100 - self._tilt_position,
+        )

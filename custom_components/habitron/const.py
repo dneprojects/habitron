@@ -5,49 +5,13 @@ from typing import Final
 
 
 DOMAIN = "habitron"  # This is the internal name of the integration, it should also match the directory
-CONF_DEFAULT_HOST = "SmartIP"  # default DNS name of SmartIP
+CONF_DEFAULT_HOST = "192.168.178.51"  # default DNS name of SmartIP
 CONF_DEFAULT_INTERVAL = 10  # default update interval
 CONF_MIN_INTERVAL = 3  # min update interval
 CONF_MAX_INTERVAL = 20  # max update interval
 RESTART_RTR = 0
 RESTART_ALL = 0xFF
 RESTART_KEY_NMBR = "mod_nmbr"
-
-SMARTIP_COMMAND_STRINGS: Final[dict[str, str]] = {
-    "GET_MODULES": "\x0a\1\2\1\0\0\0",
-    "GET_MODULE_SMG": "\x0a\2\7\1\xff\0\0",
-    "GET_MODULE_SMC": "\x0a\3\7\1\xff\0\0",
-    "GET_ROUTER_SMR": "\x0a\4\3\1\0\0\0",
-    "GET_ROUTER_STATUS": "\x0a\4\4\1\0\0\0",
-    "GET_MODULE_STATUS": "\x0a\5\1\x01\xff\0\0",
-    "GET_COMPACT_STATUS": "\x0a\5\2\1\xff\0\0",  # compact status of all modules (0xFF)
-    "GET_SMIP_BOOT_STATUS": "\x0a\6\1\0\0\0\0",
-    "GET_GLOBAL_DESCRIPTIONS": "\x0a\7\1\1\0\0\0",  # Flags, Command collections
-    "GET_SMARTIP_STATUS": "\x14\0\0\0\0\0\0",
-    "GET_SMARTIP_FIRMWARE": "\x14\x1e\0\0\0\0\0",
-    "GET_GROUP_MODE": "\x14\2\1\x01\xff\0\0",  # <Group 0..>
-    "GET_GROUP_MODE0": "\x14\2\1\x01\0\0\0",
-    "SET_GROUP_MODE": "\x14\2\2\x01\xff\3\0\1\xff\xfe",  # <Group 0..><Mode>
-    "GET_ROUTER_MODES": "\x14\2\3\x01\xff\3\0\1\xff\0",
-    "START_MIRROR": "\x14\x28\1\0\0\0\0",
-    "STOP_MIRROR": "\x14\x28\2\0\0\0\0",
-    "CHECK_COMM_STATUS": "\x14\x64\0\0\0\0\0",
-    "SET_OUTPUT_ON": "\x1e\1\1\x01\xff\3\0\1\xff\xfe",
-    "SET_OUTPUT_OFF": "\x1e\1\2\x01\xff\3\0\1\xff\xfe",
-    "SET_DIMMER_VALUE": "\x1e\1\3\x01\xff\4\0\1\xff\xfe\xfd",  # <Module><DimNo><DimVal>
-    "SET_ROLLER_POSITION": "\x1e\1\4\x01\0\5\0\1\xff\1\xfe\xfd",  # <Module><RollNo><RolVal>
-    "SET_ROLLER_TILT_POSITION": "\x1e\1\4\x01\0\5\0\1\xff\2\xfe\xfd",
-    "SET_SETPOINT_VALUE": "\x1e\2\1\x01\0\5\0\1\xff\xfe\xfd\xfc",  # <Module><ValNo><ValL><ValH>
-    "CALL_VIS_COMMAND": "\x1e\3\1\0\0\4\0\1\xff\xfd\xfc",  # <Module><VisNoL><VisNoH> not tested
-    "CALL_COLL_COMMAND": "\x1e\4\1\1\xfd\0\0",  # <CmdNo>
-    "GET_LAST_IR_CODE": "\x32\2\1\x01\xff\0\0",
-    "RESTART_FORWARD_TABLE": "\x3c\1\1\x01\0\0\0",  # Weiterleitungstabelle löschen und -automatik starten
-    "GET_CURRENT_ERROR": "\x3c\1\2\x01\0\0\0",
-    "GET_LAST_ERROR": "\x3c\1\3\x01\0\0\0",
-    "REBOOT_ROUTER": "\x3c\1\4\x01\0\0\0",  #
-    "REBOOT_MODULE": "\x3c\3\1\x01\xff\0\0",  # <Module> or 0xFF for all modules
-    "READ_MODULE_MIRR_STATUS": "\x64\1\5\1\xff\0\0",  # <Module>
-}
 
 MODULE_CODES: Final[dict[str, str]] = {
     "\x01\x02": "Smart Controller",
@@ -71,6 +35,19 @@ class RoutIdx:
 
     MODE0 = 2
     FLAG_GLOB = 38  # 1..8
+
+
+class MSetIdx:
+    """Definition of module settings index values"""
+
+    SHUTTER_TIMES = 4
+    TILT_TIMES = 20
+    INP_STATE = 39  # 3 bytes
+    HW_VERS = 83
+    HW_VERS_ = 100
+    SW_VERS = 100
+    SW_VERS_ = 122
+    SHUTTER_STAT = 132
 
 
 class MStatIdx:
