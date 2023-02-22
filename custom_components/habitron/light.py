@@ -11,7 +11,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, SMARTIP_COMMAND_STRINGS
+from .const import DOMAIN
 from .module import IfDescriptor
 
 
@@ -27,19 +27,15 @@ async def async_setup_entry(
     new_devices = []
     for hbt_module in hbtn_rt.modules:
         for mod_output in hbt_module.outputs:
-            if mod_output.nmbr >= 0:  # not disabled
-                if mod_output.type == 1:  # standard
-                    new_devices.append(
-                        SwitchedOutput(
-                            mod_output, hbt_module, hbtn_cord, len(new_devices)
-                        )
-                    )
-                if mod_output.type == 2:  # dimmer
-                    new_devices.append(
-                        DimmedOutput(
-                            mod_output, hbt_module, hbtn_cord, len(new_devices)
-                        )
-                    )
+            # other type numbers disable output
+            if abs(mod_output.type) == 1:  # standard
+                new_devices.append(
+                    SwitchedOutput(mod_output, hbt_module, hbtn_cord, len(new_devices))
+                )
+            if abs(mod_output.type) == 2:  # dimmer
+                new_devices.append(
+                    DimmedOutput(mod_output, hbt_module, hbtn_cord, len(new_devices))
+                )
         for mod_led in hbt_module.leds:
             loc_led = IfDescriptor(
                 mod_led.name, mod_led.nmbr, mod_led.type, mod_led.value
@@ -82,6 +78,9 @@ class SwitchedOutput(CoordinatorEntity, LightEntity):
         self._state = None
         self._brightness = None
         self._attr_unique_id = f"{self._module.id}_{self._name}"
+        if output.type < 0:
+            # Entity will not show up
+            self._attr_entity_registry_enabled_default = False
 
     # To link this entity to its device, this property must return an
     # identifiers value matching that used in the module
@@ -103,22 +102,19 @@ class SwitchedOutput(CoordinatorEntity, LightEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Instruct the light to turn on."""
-        await self.async_send_command(
-            SMARTIP_COMMAND_STRINGS["SET_OUTPUT_ON"]
-        )  # Update the data
+        await self._module.comm.async_set_output(
+            self._module.mod_addr, self._nmbr + 1, 1
+        )
+        # Update the data
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Instruct the light to turn off."""
-        await self.async_send_command(SMARTIP_COMMAND_STRINGS["SET_OUTPUT_OFF"])
+        await self._module.comm.async_set_output(
+            self._module.mod_addr, self._nmbr + 1, 0
+        )
         # Update the data
-        await self.coordinator.async_request_refresh()
-
-    async def async_send_command(self, cmd_str):
-        """Send command patches module and output numbers"""
-        cmd_str = cmd_str.replace("\xff", chr(self._module.mod_addr))
-        cmd_str = cmd_str.replace("\xfe", chr(self._nmbr + 1))
-        await self._module.comm.async_send_command(cmd_str)
+        # await self.coordinator.async_request_refresh()
 
 
 class DimmedOutput(SwitchedOutput):
@@ -129,7 +125,7 @@ class DimmedOutput(SwitchedOutput):
     def __init__(self, output, module, coord, idx) -> None:
         """Initialize a dimmable Habitron Light."""
         super().__init__(output, module, coord, idx)
-        self._brightness = 0
+        self._brightness = 255
         self._color_mode = ColorMode.BRIGHTNESS
         self._supported_color_modes = ColorMode.BRIGHTNESS
         if module.mod_type == "Smart Controller":
@@ -164,14 +160,17 @@ class DimmedOutput(SwitchedOutput):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Instruct the light to turn on."""
-        await self.async_send_command(SMARTIP_COMMAND_STRINGS["SET_OUTPUT_ON"])
-        self._brightness = kwargs.get(ATTR_BRIGHTNESS, 255)
-        cmd_str = SMARTIP_COMMAND_STRINGS["SET_DIMMER_VALUE"]
-        cmd_str = cmd_str[0:-1] + chr(int(self._brightness * 100.0 / 255))
-        cmd_str = cmd_str.replace("\xfe", chr(self._nmbr - self._out_offs + 1))
-        await self.async_send_command(cmd_str)
+        await self._module.comm.async_set_output(
+            self._module.mod_addr, self._nmbr + 1, 1
+        )
+        self._brightness = kwargs.get(ATTR_BRIGHTNESS, self._brightness)
+        await self._module.comm.async_set_dimmval(
+            self._module.mod_addr,
+            self._nmbr + 1,
+            int(self._brightness * 100.0 / 255),
+        )
         # Update the data
-        await self.coordinator.async_request_refresh()
+        # await self.coordinator.async_request_refresh()
 
 
 class SwitchedLed(CoordinatorEntity, LightEntity):
@@ -189,6 +188,7 @@ class SwitchedLed(CoordinatorEntity, LightEntity):
         self._brightness = None
         self._attr_unique_id = f"{self._module.id}_led_{self.idx}"
         self._attr_icon = "mdi:lightbulb-alert-outline"
+        self._attr_name = f"{self._module.name}: {self._name}"
 
     # To link this entity to its device, this property must return an
     # identifiers value matching that used in the module
@@ -200,7 +200,7 @@ class SwitchedLed(CoordinatorEntity, LightEntity):
     @property
     def name(self) -> str:
         """Return the display name of this light."""
-        return self._name
+        return self._attr_name
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -209,20 +209,17 @@ class SwitchedLed(CoordinatorEntity, LightEntity):
         self.async_write_ha_state()
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        """Instruct the light to turn on."""
-        await self.async_send_command(
-            SMARTIP_COMMAND_STRINGS["SET_OUTPUT_ON"]
-        )  # Update the data
-        await self.coordinator.async_request_refresh()
+        """Instruct the led to turn on."""
+        await self._module.comm.async_set_output(
+            self._module.mod_addr, self._nmbr + 16 + 1, 1
+        )
+        # Update the data
+        # await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        """Instruct the light to turn off."""
-        await self.async_send_command(SMARTIP_COMMAND_STRINGS["SET_OUTPUT_OFF"])
+        """Instruct the led to turn off."""
+        await self._module.comm.async_set_output(
+            self._module.mod_addr, self._nmbr + 16 + 1, 0
+        )
         # Update the data
-        await self.coordinator.async_request_refresh()
-
-    async def async_send_command(self, cmd_str):
-        """Send command patches module and output numbers"""
-        cmd_str = cmd_str.replace("\xff", chr(self._module.mod_addr))
-        cmd_str = cmd_str.replace("\xfe", chr(self._nmbr + 18 + 1))
-        await self._module.comm.async_send_command(cmd_str)
+        # await self.coordinator.async_request_refresh()
