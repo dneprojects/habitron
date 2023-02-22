@@ -5,6 +5,7 @@ import logging
 
 import async_timeout
 
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 
@@ -14,7 +15,7 @@ _LOGGER = logging.getLogger(__name__)
 class HbtnCoordinator(DataUpdateCoordinator):
     """Habitron data update coordinator."""
 
-    def __init__(self, hass, hbtn_comm):
+    def __init__(self, hass: HomeAssistant, hbtn_comm) -> None:
         """Initialize Habitron update coordinator."""
         super().__init__(
             hass,
@@ -28,11 +29,11 @@ class HbtnCoordinator(DataUpdateCoordinator):
         )
         self.comm = hbtn_comm
         self.config = hbtn_comm._config
+        self.rtr_id = 1
 
-    def set_update_interval(self):
+    def set_update_interval(self, interval: int):
         """Updating interval for integration re-configuration"""
-        self.config.data = self.config.options
-        self.update_interval = timedelta(seconds=self.config.data["update_interval"])
+        self.update_interval = timedelta(seconds=interval)
 
     async def _async_update_data(self):
         """Fetch data from Habitron comm endpoint, preprocess and store for lookup."""

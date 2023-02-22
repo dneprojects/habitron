@@ -9,7 +9,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, SMARTIP_COMMAND_STRINGS
+from .const import DOMAIN
 from .router import DaytimeMode, AlarmMode
 
 
@@ -109,13 +109,9 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
         mode_val = self._enum[option].value
         self._mode = (self._module.mode & (0xFF - self._mask)) + mode_val
         self._module.mode = self._mode
-        await self.async_send_command(SMARTIP_COMMAND_STRINGS["SET_GROUP_MODE"])
-
-    async def async_send_command(self, cmd_str) -> None:
-        """Send command patches module and output selects"""
-        cmd_str = cmd_str.replace("\xff", chr(self._module.group))
-        cmd_str = cmd_str.replace("\xfe", chr(self._mode))
-        await self._module.comm.async_send_command(cmd_str)
+        await self._module.comm.async_set_group_mode(
+            self._module.mod_addr, self._module.group, self._mode
+        )
 
 
 class HbtnSelectDaytimeMode(HbtnMode):

@@ -26,17 +26,16 @@ async def async_setup_entry(
     new_devices = []
     for hbt_module in hbtn_rt.modules:
         for mod_input in hbt_module.inputs:
-            if mod_input.type >= 0:  # not disabled
-                if mod_input.type == 1:  # switch
-                    new_devices.append(
-                        InputSwitch(mod_input, hbt_module, hbtn_cord, len(new_devices))
-                    )
-                if mod_input.type == 0:  # pulse switch
-                    new_devices.append(
-                        InputButton(mod_input, hbt_module, hbtn_cord, len(new_devices))
-                    )
-                    # new_devices.append(InputPressShort(mod_input, hbt_module))
-                    # new_devices.append(InputPressLong(mod_input, hbt_module))
+            if abs(mod_input.type) == 2:  # switch
+                new_devices.append(
+                    InputSwitch(mod_input, hbt_module, hbtn_cord, len(new_devices))
+                )
+            if abs(mod_input.type) == 1:  # pulse switch
+                new_devices.append(
+                    InputButton(mod_input, hbt_module, hbtn_cord, len(new_devices))
+                )
+                # new_devices.append(InputPressShort(mod_input, hbt_module))
+                # new_devices.append(InputPressLong(mod_input, hbt_module))
         for mod_flg in hbt_module.flags:
             new_devices.append(
                 HbtnFlag(mod_flg, hbt_module, hbtn_cord, len(new_devices))
@@ -76,7 +75,10 @@ class InputSwitch(CoordinatorEntity, BinarySensorEntity):
         self._name = inpt.name
         self._nmbr = inpt.nmbr
         self._state = False
-        self._attr_unique_id = f"{self._module.id}_{self._nmbr}"
+        self._attr_unique_id = f"{self._module.id}_In{self._nmbr}"
+        if inpt.type < 0:
+            # Entity will not show up
+            self._attr_entity_registry_enabled_default = False
 
     # To link this entity to its device, this property must return an
     # identifiers value matching that used in the module
@@ -118,7 +120,7 @@ class HbtnFlag(CoordinatorEntity, BinarySensorEntity):
         self._nmbr = flag.nmbr
         self._state = False
         self._attr_unique_id = f"{self._module.id}_flag_{flag.nmbr}"
-        self._attr_name = f"{self._module.name} Flag {flag.nmbr} {flag.name}"
+        self._attr_name = f"{self._module.name}: Flag {flag.nmbr} {flag.name}"
 
     # To link this entity to its device, this property must return an
     # identifiers value matching that used in the module
@@ -151,16 +153,15 @@ class MotionSensor(CoordinatorEntity, BinarySensorEntity):
     """Representation of habitron button switch input."""
 
     def __init__(self, sensor, module, coord, idx) -> None:
-
         super().__init__(coord, context=idx)
         self.idx = idx
         self._sensor = sensor
         self._module = module
-        self._name = f"{self._module.name} Motion"
+        self._name = f"{self._module.name}: Motion"
         self._nmbr = sensor.nmbr
         self._state = False
         self._attr_unique_id = f"{self._module.id}_motion"
-        self._attr_name = f"{self._module.name} Motion"
+        self._attr_name = f"{self._module.name}: Motion"
         self._attr_icon = "mdi:motion-sensor"
 
     # To link this entity to its device, this property must return an

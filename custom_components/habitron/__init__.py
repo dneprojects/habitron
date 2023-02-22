@@ -19,6 +19,7 @@ PLATFORMS: list[str] = [
     "button",
     "binary_sensor",
     "select",
+    "climate",
 ]
 SERVICE_MOD_RESTART_SCHEMA = vol.Schema(
     {
@@ -36,11 +37,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     async def restart_module(call: ServiceCall):
         """Handle the service call."""
         mod_nmbr = call.data.get(RESTART_KEY_NMBR, RESTART_ALL)
-        smip.comm.module_restart(mod_nmbr)
+        await smip.comm.module_restart(mod_nmbr)
 
     async def restart_router(call: ServiceCall):
         """Handle the service call."""
-        smip.comm.module_restart(0)
+        await smip.comm.module_restart(0)
 
     async def get_comm_errors(call: ServiceCall):
         """Handle the service call."""
@@ -86,5 +87,5 @@ async def update_listener(hass: HomeAssistant, entry: ConfigEntry):
     """Handle options update."""
     hbtn_comm = hass.data[DOMAIN][entry.entry_id].router.comm
     hbtn_cord = hass.data[DOMAIN][entry.entry_id].router.coord
-    hbtn_comm.set_host()
-    hbtn_cord.set_update_interval()
+    hbtn_comm.set_host(entry.options["habitron_host"])
+    hbtn_cord.set_update_interval(entry.options["update_interval"])

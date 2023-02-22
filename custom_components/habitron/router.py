@@ -10,7 +10,7 @@ from .const import RoutIdx
 from .communicate import HbtnComm as hbtn_com
 
 # for more information.
-from .const import DOMAIN, SMARTIP_COMMAND_STRINGS, MODULE_CODES, MStatIdx
+from .const import DOMAIN, MODULE_CODES, MStatIdx
 from .module import ModuleDescriptor
 from .module import (
     HbtnModule as hbtm,
@@ -75,7 +75,7 @@ class HbtnRouter:
 
     def __init__(self, hass: HomeAssistant, config: ConfigEntry) -> None:
         """Init habitron router."""
-        self.id = 1
+        self.id = 100
         self.hass = hass
         self.config = config
         self.comm = hbtn_com(hass, config)
@@ -90,7 +90,6 @@ class HbtnRouter:
         self.modules_desc = []
         self.modules = []
         self.coll_commands: list[CmdDescriptor] = []
-        self.vis_commands: list[CmdDescriptor] = []
         self.flags: list[CmdDescriptor] = []
         self.user1_name = "user1"
         self.user2_name = "user2"
@@ -101,10 +100,8 @@ class HbtnRouter:
     async def initialize(self) -> bool:
         """Initialize router instance"""
 
-        self.status = self.get_status()
-        self.smr = await self.get_smr()
-        self.version = self.smr[-22 : len(self.smr)].decode("iso8859-1")
-        self.parse_smr()
+        self.comm.set_router(self)
+        await self.get_definitions()
 
         device_registry = dr.async_get(self.hass)
         device_registry.async_get_or_create(
@@ -117,9 +114,8 @@ class HbtnRouter:
             sw_version=self.version,
             hw_version=self.version,
         )
-        self.comm.set_router(self)
         # Further initialization of module instances
-        self.comm.send_command(SMARTIP_COMMAND_STRINGS["START_MIRROR"])
+        await self.comm.async_start_mirror(self.id)
         self.modules_desc = await self.get_modules(self.module_grp)
         await self.comm.async_system_update()
 
@@ -142,36 +138,22 @@ class HbtnRouter:
                 self.modules.append(hbtm(mod_desc, self.hass, self.config))
             await self.modules[-1].initialize(self.sys_status)
 
-        await self.get_descriptions()
+        await self.get_descriptions()  # Some descriptions for modules, too
         return True
 
-    def get_status(self) -> bool:
-        """Get router status."""
-        resp = self.comm.send_command(SMARTIP_COMMAND_STRINGS["GET_ROUTER_STATUS"])
-        router_string = resp.decode("iso8859-1")
-        if router_string[0:5] == "Error":
-            return "Error"
-        return resp
-
-    async def get_smr(self) -> bool:
-        """Get router smr."""
-        resp = await self.comm.async_send_command(
-            SMARTIP_COMMAND_STRINGS["GET_ROUTER_SMR"]
-        )
-        router_string = resp.decode("iso8859-1")
-        if router_string[0:5] == "Error":
-            return "Error"
-        return resp
-
-    def parse_smr(self) -> None:
+    async def get_definitions(self) -> None:
         """Parse router smr info and set values"""
+        self.status = await self.comm.async_get_router_status(self.id)
+        self.smr = await self.comm.get_smr(self.id)
+        self.version = self.smr[-22 : len(self.smr)].decode("iso8859-1")
         # self.group_list = []
         ptr = 1
         max_mod_no = 0
         for ch_i in range(4):
             count = self.smr[ptr]
             self.chan_list.append(sorted(list(self.smr[ptr + 1 : ptr + count + 1])))
-            max_mod_no = max(max_mod_no, self.chan_list[ch_i])
+            # pylint: disable-next=nested-min-max
+            max_mod_no = max(max_mod_no, max(self.chan_list[ch_i]))
             ptr += 1 + count
         ptr += 2
         self.max_group = max(list(self.smr[ptr : ptr + 64]))
@@ -194,10 +176,28 @@ class HbtnRouter:
         )
         ptr += str_len + 1
 
+    async def get_modules(self, mod_groups) -> list[ModuleDescriptor]:
+        """Get summary of all Habitron modules."""
+        desc: list[ModuleDescriptor] = []
+        addr_dict = dict()
+        resp = await self.comm.async_get_router_modules(self.id)
+        mod_string = resp.decode("iso8859-1")
+        while len(resp) > 0:
+            mod_addr = int(self.id + resp[0])
+            mod_type = MODULE_CODES.get(mod_string[1:3], "Unknown Controller")
+            name_len = int(resp[3])
+            mod_name = mod_string[4 : 4 + name_len]
+            mod_group = mod_groups[resp[0] - 1]
+            desc.append(ModuleDescriptor(mod_addr, mod_type, mod_name, mod_group))
+            addr_dict[mod_addr] = len(desc) - 1
+            mod_string = mod_string[4 + name_len : len(resp)]
+            resp = resp[4 + name_len : len(resp)]
+        self.mod_reg = addr_dict
+        return desc
+
     async def get_descriptions(self) -> str | None:
-        """Get descriptions of commands etc"""
-        cmd_str = SMARTIP_COMMAND_STRINGS["GET_GLOBAL_DESCRIPTIONS"]
-        resp = await self.comm.async_send_command(cmd_str)
+        """Get descriptions of commands, etc."""
+        resp = await self.comm.get_global_descriptions(self.id)
 
         no_lines = int.from_bytes(resp[0:2], "little")
         resp = resp[4 : len(resp)]  # Strip 4 header bytes
@@ -216,7 +216,7 @@ class HbtnRouter:
             elif content_code == 1023:  # FF 03: collective commands (Sammelbefehle)
                 self.coll_commands.append(CmdDescriptor(entry_name, entry_no))
             else:
-                mod_addr = int(line[1])
+                mod_addr = int(line[1]) + self.id
                 if int(line[2]) == 1:
                     # local flag (Merker)
                     self.modules[self.mod_reg[mod_addr]].flags.append(
@@ -226,24 +226,37 @@ class HbtnRouter:
                             entry_no,
                             0,
                         )
-                    )  # vis command
+                    )
+                # elif int(line[2]) == 2:
+                # global flag (Merker)
                 elif int(line[2]) == 4:
-                    # local visualization event
+                    # local visualization command
                     entry_no = int.from_bytes(resp[3:5], "little")
-                    self.modules[self.mod_reg[mod_addr]].commands.append(
+                    self.modules[self.mod_reg[mod_addr]].vis_commands.append(
                         CmdDescriptor(entry_name, entry_no)
-                    )  # vis command
+                    )
                 elif int(line[2]) == 5:
                     # logic element
                     self.modules[self.mod_reg[mod_addr]].logic[
                         entry_no - 1
                     ].name = entry_name  # counter
+                # elif int(line[2]) == 7:
+                # Group name
             resp = resp[line_len : len(resp)]
+
+    async def get_comm_errors(self) -> bytes:
+        """Get current communication errors"""
+        resp = await self.comm.async_get_error_status(self.id)
+        error_list = list()
+        err_cnt = resp[0]
+        for e_idx in range(err_cnt):
+            error_list.append({resp[2 * e_idx + 1], resp[2 * e_idx + 2]})
+        return error_list
 
     async def update_system_status(self, sys_status) -> None:
         """Distribute module status to all modules and update self status"""
         self.sys_status = sys_status
-        self.status = self.get_status()
+        self.status = await self.comm.async_get_router_status(self.id)
         self.mode0 = int(self.status[RoutIdx.MODE0])
         flags_state = int.from_bytes(
             self.status[RoutIdx.FLAG_GLOB : RoutIdx.FLAG_GLOB + 2],
@@ -255,39 +268,6 @@ class HbtnRouter:
             mod_status = self.sys_status[
                 m_idx * MStatIdx.END : (m_idx + 1) * MStatIdx.END
             ]
-            mod_addr = mod_status[MStatIdx.ADDR]
+            mod_addr = mod_status[MStatIdx.ADDR] + self.id
             self.modules[self.mod_reg[mod_addr]].update(mod_status)
         return
-
-    async def get_modules(self, mod_groups) -> list[ModuleDescriptor]:
-        """Get summary of all Habitron modules."""
-
-        desc: list[ModuleDescriptor] = []
-        addr_dict = dict()
-        resp = await self.comm.async_send_command(
-            SMARTIP_COMMAND_STRINGS["GET_MODULES"]
-        )
-        mod_string = resp.decode("iso8859-1")
-        if mod_string[0:5] == "Error":
-            return False
-        while len(resp) > 0:
-            mod_addr = int(resp[0])
-            mod_type = MODULE_CODES.get(mod_string[1:3], "Unknown Controller")
-            name_len = int(resp[3])
-            mod_name = mod_string[4 : 4 + name_len]
-            mod_group = mod_groups[mod_addr - 1]
-            desc.append(ModuleDescriptor(mod_addr, mod_type, mod_name, mod_group))
-            addr_dict[mod_addr] = len(desc) - 1
-            mod_string = mod_string[4 + name_len : len(resp)]
-            resp = resp[4 + name_len : len(resp)]
-        self.mod_reg = addr_dict
-        return desc
-
-    def get_comm_errors(self) -> bytes:
-        """Get current communication errors"""
-        resp = self.comm.send_command(SMARTIP_COMMAND_STRINGS["GET_CURRENT_ERROR"])
-        error_list = list()
-        err_cnt = resp[0]
-        for e_idx in range(err_cnt):
-            error_list.append({resp[2 * e_idx + 1], resp[2 * e_idx + 2]})
-        return error_list
