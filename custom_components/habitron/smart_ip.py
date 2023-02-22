@@ -12,7 +12,7 @@ from .communicate import HbtnComm as hbtn_com
 # See https://developers.home-assistant.io/docs/creating_integration_manifest
 # for more information.
 # This dummy smip always returns 3 rollers.
-from .const import DOMAIN, SMARTIP_COMMAND_STRINGS
+from .const import DOMAIN
 from .router import HbtnRouter as hbtr
 
 
@@ -54,9 +54,7 @@ class SmartIP:
 
     async def get_version(self) -> str:
         """Test connectivity to SmartIP is OK."""
-        resp = await self.comm.async_send_command(
-            SMARTIP_COMMAND_STRINGS["GET_SMARTIP_FIRMWARE"]
-        )
+        resp = await self.comm.get_smip_version()
         ver_string = resp.decode("iso8859-1")
         if ver_string[0:7] == "SmartIP":
             return ver_string[9 : len(ver_string)]
