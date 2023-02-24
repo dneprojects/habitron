@@ -6,11 +6,11 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.components.select import SelectEntity
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .router import DaytimeMode, AlarmMode
+from .router import DaytimeMode, AlarmMode, ConfigMode
 
 
 async def async_setup_entry(
@@ -35,6 +35,10 @@ async def async_setup_entry(
             new_devices.append(
                 HbtnSelectGroupMode(hbt_module, hbtn_rt, hbtn_cord, len(new_devices))
             )
+    new_devices.append(HbtnSelectDaytimeMode(0, hbtn_rt, hbtn_cord, len(new_devices)))
+    new_devices.append(HbtnSelectAlarmMode(0, hbtn_rt, hbtn_cord, len(new_devices)))
+    new_devices.append(HbtnSelectGroupMode(0, hbtn_rt, hbtn_cord, len(new_devices)))
+    new_devices.append(HbtnSelectConfigMode(0, hbtn_rt, hbtn_cord, len(new_devices)))
 
     # Fetch initial data so we have data when entities subscribe
     #
@@ -56,8 +60,11 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
         """Initialize a Habitron mode, pass coordinator to CoordinatorEntity."""
         super().__init__(coord, context=idx)
         self.idx = idx
-        self._mode = module.mode
         self._module = module
+        if isinstance(module, int):
+            self._mode = hbtnr.mode0
+        else:
+            self._mode = module.mode
         self._mask = 0x03
         self._value = self._mode & self._mask
         self._current_option = ""
@@ -79,7 +86,9 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.mod_id)}}
+        if isinstance(self._module, int):
+            return {"identifiers": {(DOMAIN, self.hbtnr.uid)}}
+        return {"identifiers": {(DOMAIN, self._module.uid)}}
 
     @property
     def options(self) -> list[str]:
@@ -97,7 +106,10 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator, get current module mode"""
-        self._mode = self._module.mode
+        if isinstance(self._module, int):
+            self._mode = self.hbtnr.mode0
+        else:
+            self._mode = self._module.mode
         self._value = self._mode & self._mask
         if self._value == 0:
             self._value = self.hbtnr.mode0 & self._mask
@@ -126,8 +138,16 @@ class HbtnSelectDaytimeMode(HbtnMode):
             self._value = self.hbtnr.mode0 & self._mask
         self._enum = DaytimeMode
         self._current_option = self._enum(self._value).name
-        self._attr_name = f"Group {self._module.group} daytime: "
-        self._attr_unique_id = f"{self._module.id}_daytime_mode"
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC
+        if isinstance(self._module, int):
+            self._attr_name = "Group 0 daytime: "
+            self._attr_unique_id = "group_0_daytime_mode"
+        else:
+            self._attr_name = f"Group {self._module.group} daytime: "
+            self._attr_unique_id = f"{self._module.id}_daytime_mode"
+            self._attr_entity_registry_enabled_default = (
+                False  # Entity will initally be disabled
+            )
 
 
 class HbtnSelectAlarmMode(HbtnMode):
@@ -142,8 +162,12 @@ class HbtnSelectAlarmMode(HbtnMode):
             self._value = self.hbtnr.mode0 & self._mask
         self._enum = AlarmMode
         self._current_option = self._enum(self._value).name
-        self._attr_name = f"Group {self._module.group} alarm: "
-        self._attr_unique_id = f"{self._module.id}_alarm_mode"
+        if isinstance(self._module, int):
+            self._attr_name = "Group 0 alarm: "
+            self._attr_unique_id = "group_0_alarm_mode"
+        else:
+            self._attr_name = f"Group {self._module.group} alarm: "
+            self._attr_unique_id = f"{self._module.id}_alarm_mode"
 
 
 class HbtnSelectGroupMode(HbtnMode):
@@ -170,5 +194,24 @@ class HbtnSelectGroupMode(HbtnMode):
         )
         self._enum = group_enum
         self._current_option = self._enum(self._value).name
-        self._attr_name = f"Group {self._module.group} mode: "
-        self._attr_unique_id = f"{self._module.id}_group_mode"
+        if isinstance(self._module, int):
+            self._attr_name = "Group 0 mode: "
+            self._attr_unique_id = "group_0_mode"
+        else:
+            self._attr_name = f"Group {self._module.group} mode: "
+            self._attr_unique_id = f"{self._module.id}_group_mode"
+
+
+class HbtnSelectConfigMode(HbtnMode):
+    """Config mode object"""
+
+    def __init__(self, module, hbtnr, coord, idx) -> None:
+        """Initialize alarm mode selector."""
+        super().__init__(module, hbtnr, coord, idx)
+        self._mask = 0x08
+        self._value = self._mode & self._mask
+        self._enum = ConfigMode
+        self._current_option = self._enum(self._value).name
+        self._attr_name = f"Router {self.hbtnr.name} config: "
+        self._attr_unique_id = f"{self.hbtnr.uid}_config_mode"
+        self._attr_entity_category = EntityCategory.CONFIG

@@ -85,7 +85,7 @@ class InputSwitch(CoordinatorEntity, BinarySensorEntity):
     @property
     def device_info(self) -> None:
         """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.mod_id)}}
+        return {"identifiers": {(DOMAIN, self._module.uid)}}
 
     @property
     def name(self) -> str:
@@ -128,8 +128,8 @@ class HbtnFlag(CoordinatorEntity, BinarySensorEntity):
     def device_info(self) -> None:
         """Return information to link this entity with the correct device."""
         if isinstance(self._module.id, int):
-            return {"identifiers": {(DOMAIN, self._module.name)}}  # router
-        return {"identifiers": {(DOMAIN, self._module.mod_id)}}
+            return {"identifiers": {(DOMAIN, self._module.uid)}}  # router
+        return {"identifiers": {(DOMAIN, self._module.uid)}}
 
     @property
     def available(self) -> bool:
@@ -170,8 +170,8 @@ class MotionSensor(CoordinatorEntity, BinarySensorEntity):
     def device_info(self) -> None:
         """Return information to link this entity with the correct device."""
         if isinstance(self._module.id, int):
-            return {"identifiers": {(DOMAIN, self._module.name)}}  # router
-        return {"identifiers": {(DOMAIN, self._module.mod_id)}}
+            return {"identifiers": {(DOMAIN, self._module.uid)}}  # router
+        return {"identifiers": {(DOMAIN, self._module.uid)}}
 
     @property
     def available(self) -> bool:

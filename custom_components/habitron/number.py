@@ -63,7 +63,7 @@ class HbtnNumber(CoordinatorEntity, NumberEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.mod_id)}}
+        return {"identifiers": {(DOMAIN, self._module.uid)}}
 
     @callback
     def _handle_coordinator_update(self) -> None:

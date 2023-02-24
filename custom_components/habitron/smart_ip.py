@@ -23,22 +23,24 @@ class SmartIP:
 
     def __init__(self, hass: HomeAssistant, config: ConfigEntry) -> None:
         """Init Smart IP."""
+        self.uid = 0
         self._hass = hass
         self.config: config
-        self._name = config.data.__getitem__("habitron_host")
+        self._name = "SmartIP"
         self.comm = hbtn_com(hass, config)
         self.online = True
-        self._host = self.comm.com_ip
-        self._port = self.comm.com_port
         self._mac = ""  # self.comm.com_mac
         self._version = ""
         self.router = []
+
+        self._host = self.comm.com_ip
+        self._port = self.comm.com_port
 
         device_registry = dr.async_get(hass)
         device_registry.async_get_or_create(
             config_entry_id=config.entry_id,
             connections={(dr.CONNECTION_NETWORK_MAC, self._mac)},
-            identifiers={(DOMAIN, self._name)},
+            identifiers={(DOMAIN, self.uid)},
             manufacturer="Habitron GmbH",
             suggested_area="House",
             name=self._name,
@@ -64,5 +66,5 @@ class SmartIP:
         """Initialization of SmartIP instance"""
         self._version = await self.get_version()
         # self._mac = self.comm.get_mac()
-        self.router = hbtr(hass, config)
+        self.router = hbtr(hass, config, self.comm)
         await self.router.initialize()
