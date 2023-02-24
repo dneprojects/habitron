@@ -7,7 +7,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
 from .const import RoutIdx
-from .communicate import HbtnComm as hbtn_com
+from .communicate import HbtnComm
 
 # for more information.
 from .const import DOMAIN, MODULE_CODES, MStatIdx
@@ -68,17 +68,27 @@ class GroupMode(Enum):
     User2 = 112
 
 
+class ConfigMode(Enum):
+    """Habitron alarm mode states"""
+
+    Off = 0
+    On = 8
+
+
 class HbtnRouter:
     """Habitron Router class."""
 
     manufacturer = "Habitron GmbH"
 
-    def __init__(self, hass: HomeAssistant, config: ConfigEntry) -> None:
+    def __init__(
+        self, hass: HomeAssistant, config: ConfigEntry, comm: HbtnComm
+    ) -> None:
         """Init habitron router."""
-        self.id = 100
+        self.id = 100  # to be adapted for more routers
+        self.uid = self.id
         self.hass = hass
         self.config = config
-        self.comm = hbtn_com(hass, config)
+        self.comm = comm
         self.coord = HbtnCoordinator(hass, self.comm)
         self.name = "Router"
         self.version = "0.0.0"
@@ -106,13 +116,14 @@ class HbtnRouter:
         device_registry = dr.async_get(self.hass)
         device_registry.async_get_or_create(
             config_entry_id=self.config.entry_id,
-            identifiers={(DOMAIN, self.name)},
+            identifiers={(DOMAIN, self.uid)},
             manufacturer="Habitron GmbH",
             suggested_area="House",
             name=self.name,
             model="Smart Router",
             sw_version=self.version,
             hw_version=self.version,
+            via_device=(DOMAIN, 0),
         )
         # Further initialization of module instances
         await self.comm.async_start_mirror(self.id)
@@ -121,21 +132,25 @@ class HbtnRouter:
 
         for mod_desc in self.modules_desc:
             if mod_desc.mtype == "Smart Controller":
-                self.modules.append(hbtscm(mod_desc, self.hass, self.config))
+                self.modules.append(hbtscm(mod_desc, self.hass, self.config, self.comm))
             elif mod_desc.mtype[0:9] == "Smart Out":
-                self.modules.append(hbtoutm(mod_desc, self.hass, self.config))
+                self.modules.append(
+                    hbtoutm(mod_desc, self.hass, self.config, self.comm)
+                )
             elif mod_desc.mtype[0:9] == "Smart Dimm":
-                self.modules.append(hbtdimm(mod_desc, self.hass, self.config))
+                self.modules.append(
+                    hbtdimm(mod_desc, self.hass, self.config, self.comm)
+                )
             elif mod_desc.mtype[0:9] == "Smart UpM":
-                self.modules.append(hbtupm(mod_desc, self.hass, self.config))
+                self.modules.append(hbtupm(mod_desc, self.hass, self.config, self.comm))
             elif mod_desc.mtype[0:8] == "Smart In":
-                self.modules.append(hbtinm(mod_desc, self.hass, self.config))
+                self.modules.append(hbtinm(mod_desc, self.hass, self.config, self.comm))
             elif mod_desc.mtype[0:12] == "Smart Detect":
-                self.modules.append(hbtsdm(mod_desc, self.hass, self.config))
+                self.modules.append(hbtsdm(mod_desc, self.hass, self.config, self.comm))
             elif mod_desc.mtype == "Smart Nature":
-                self.modules.append(hbtsnm(mod_desc, self.hass, self.config))
+                self.modules.append(hbtsnm(mod_desc, self.hass, self.config, self.comm))
             else:
-                self.modules.append(hbtm(mod_desc, self.hass, self.config))
+                self.modules.append(hbtm(mod_desc, self.hass, self.config, self.comm))
             await self.modules[-1].initialize(self.sys_status)
 
         await self.get_descriptions()  # Some descriptions for modules, too
@@ -183,13 +198,13 @@ class HbtnRouter:
         resp = await self.comm.async_get_router_modules(self.id)
         mod_string = resp.decode("iso8859-1")
         while len(resp) > 0:
-            mod_addr = int(self.id + resp[0])
+            mod_uid = int(self.uid + resp[0])
             mod_type = MODULE_CODES.get(mod_string[1:3], "Unknown Controller")
             name_len = int(resp[3])
             mod_name = mod_string[4 : 4 + name_len]
             mod_group = mod_groups[resp[0] - 1]
-            desc.append(ModuleDescriptor(mod_addr, mod_type, mod_name, mod_group))
-            addr_dict[mod_addr] = len(desc) - 1
+            desc.append(ModuleDescriptor(mod_uid, mod_type, mod_name, mod_group))
+            addr_dict[mod_uid] = len(desc) - 1
             mod_string = mod_string[4 + name_len : len(resp)]
             resp = resp[4 + name_len : len(resp)]
         self.mod_reg = addr_dict
@@ -271,3 +286,11 @@ class HbtnRouter:
             mod_addr = mod_status[MStatIdx.ADDR] + self.id
             self.modules[self.mod_reg[mod_addr]].update(mod_status)
         return
+
+    async def async_reset(self) -> None:
+        """Call reset command for self"""
+        self.comm.module_restart(0)
+
+    async def async_reset_all_modules(self) -> None:
+        """Call reset command for all modules"""
+        self.comm.module_restart(0xFF)

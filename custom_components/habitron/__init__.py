@@ -1,14 +1,16 @@
 """The Habitron integration."""
 from __future__ import annotations
 
-import socket
+import asyncio
 import voluptuous as vol
 
+from homeassistant import exceptions
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 
 from .const import DOMAIN, RESTART_KEY_NMBR, RESTART_ALL
 from .smart_ip import SmartIP
+from .communicate import TimeoutException
 
 # List of platforms to support. There should be a matching .py file for each
 PLATFORMS: list[str] = [
@@ -50,7 +52,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         return res
 
     smip = SmartIP(hass, entry)
-    await smip.initialize(hass, entry)
+    try:
+        await smip.initialize(hass, entry)
+    except (asyncio.TimeoutError, TimeoutException) as ex:
+        raise ConfigEntryNotReady("Timeout while connecting to SmartIP") from ex
+
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = smip
 
     # Register update handler for runtime configuration of Habitron integration
@@ -87,5 +93,9 @@ async def update_listener(hass: HomeAssistant, entry: ConfigEntry):
     """Handle options update."""
     hbtn_comm = hass.data[DOMAIN][entry.entry_id].router.comm
     hbtn_cord = hass.data[DOMAIN][entry.entry_id].router.coord
-    hbtn_comm.set_host(entry.options["habitron_host"])
+    await hbtn_comm.set_host(entry.options["habitron_host"])
     hbtn_cord.set_update_interval(entry.options["update_interval"])
+
+
+class ConfigEntryNotReady(exceptions.HomeAssistantError):
+    """Error to indicate timeout or other error during setup."""

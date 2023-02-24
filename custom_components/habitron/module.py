@@ -5,7 +5,6 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
-from .communicate import HbtnComm as hbtn_com
 from .const import DOMAIN, MStatIdx, MSetIdx
 
 # In a real implementation, this would be in an external library that's on PyPI.
@@ -17,8 +16,8 @@ from .const import DOMAIN, MStatIdx, MSetIdx
 class ModuleDescriptor:
     """Habitron modules descriptor."""
 
-    def __init__(self, addr, mtype, name, group) -> None:
-        self.addr: int = addr
+    def __init__(self, uid, mtype, name, group) -> None:
+        self.uid: int = uid
         self.mtype: str = mtype
         self.name: str = name
         self.group: int = group
@@ -55,21 +54,24 @@ class HbtnModule:
         mod_descriptor: ModuleDescriptor,
         hass: HomeAssistant,
         config: ConfigEntry,
+        comm,
     ) -> None:
         """Init Habitron module."""
         self._hass = hass
         self._config = config
         self.name = mod_descriptor.name
-        self.comm = hbtn_com(hass, config)
+        self.comm = comm
         self.sw_version = ""
         self.hw_version = ""
-        self._addr = mod_descriptor.addr
+        self.uid = mod_descriptor.uid
+        self._addr = mod_descriptor.uid
+        self.raddr = self._addr - int(self.uid / 100)
         self._type = mod_descriptor.mtype
         self.smc = ""
         self.status = ""
         self.mstatus = ""
         self.shutter_state = list()
-        self.id = "Mod_" + f"{mod_descriptor.addr}"
+        self.id = "Mod_" + f"{mod_descriptor.uid}"
         self.group = mod_descriptor.group
         self.mode = 1
 
@@ -110,13 +112,14 @@ class HbtnModule:
         self.status = self.extract_status(sys_status)
         device_registry.async_get_or_create(
             config_entry_id=self._config.entry_id,
-            identifiers={(DOMAIN, self.id)},
+            identifiers={(DOMAIN, self.uid)},
             manufacturer="Habitron GmbH",
             suggested_area="House",
             name=self.name,
             model=self._type,
             sw_version=self.sw_version,
             hw_version=self.hw_version,
+            via_device=(DOMAIN, self.comm.router.uid),
         )
         self.update(self.status)
 
@@ -265,6 +268,10 @@ class HbtnModule:
                     f"{self.id} {def_name}{e_idx+1}", e_idx, -1 * e_type, 0
                 )
 
+    async def async_reset(self) -> None:
+        """Call reset command for self"""
+        self.comm.module_restart(self._addr)
+
 
 class SmartController(HbtnModule):
     """Habitron SmartController module class."""
@@ -274,9 +281,10 @@ class SmartController(HbtnModule):
         mod_descriptor: ModuleDescriptor,
         hass: HomeAssistant,
         config: ConfigEntry,
+        comm,
     ) -> None:
         """Init Habitron SmartController module."""
-        super().__init__(mod_descriptor, hass, config)
+        super().__init__(mod_descriptor, hass, config, comm)
 
         self.inputs = [IfDescriptor("", i, 1, 0) for i in range(18)]
         self.outputs = [IfDescriptor("", i, 1, 0) for i in range(15)]
@@ -388,9 +396,10 @@ class SmartOutput(HbtnModule):
         mod_descriptor: ModuleDescriptor,
         hass: HomeAssistant,
         config: ConfigEntry,
+        comm,
     ) -> None:
         """Init Habitron SmartOutput module."""
-        super().__init__(mod_descriptor, hass, config)
+        super().__init__(mod_descriptor, hass, config, comm)
 
         self.outputs = [IfDescriptor("", i, 1, 0) for i in range(8)]
         self.covers = [IfDescriptorC("", -1, 0, 0, 0) for i in range(4)]
@@ -420,9 +429,10 @@ class SmartDimm(HbtnModule):
         mod_descriptor: ModuleDescriptor,
         hass: HomeAssistant,
         config: ConfigEntry,
+        comm,
     ) -> None:
         """Init Habitron SmartOutput module."""
-        super().__init__(mod_descriptor, hass, config)
+        super().__init__(mod_descriptor, hass, config, comm)
 
         self.outputs = [IfDescriptor("", i, 2, 0) for i in range(4)]
         self.dimmers = [IfDescriptor("", i, 1, 0) for i in range(4)]
@@ -468,9 +478,10 @@ class SmartUpM(HbtnModule):
         mod_descriptor: ModuleDescriptor,
         hass: HomeAssistant,
         config: ConfigEntry,
+        comm,
     ) -> None:
         """Init Habitron SmartOutput module."""
-        super().__init__(mod_descriptor, hass, config)
+        super().__init__(mod_descriptor, hass, config, comm)
 
         self.outputs = [IfDescriptor("", i, 1, 0) for i in range(2)]
         self.inputs = [IfDescriptor("", i, 1, 0) for i in range(2)]
@@ -505,9 +516,10 @@ class SmartInput(HbtnModule):
         mod_descriptor: ModuleDescriptor,
         hass: HomeAssistant,
         config: ConfigEntry,
+        comm,
     ) -> None:
         """Init Habitron SmartInput module."""
-        super().__init__(mod_descriptor, hass, config)
+        super().__init__(mod_descriptor, hass, config, comm)
 
         self.inputs = [IfDescriptor("", i, 1, 0) for i in range(8)]
 
@@ -530,9 +542,10 @@ class SmartDetect(HbtnModule):
         mod_descriptor: ModuleDescriptor,
         hass: HomeAssistant,
         config: ConfigEntry,
+        comm,
     ) -> None:
         """Init Habitron SmartDetect module."""
-        super().__init__(mod_descriptor, hass, config)
+        super().__init__(mod_descriptor, hass, config, comm)
 
         self.sensors.append(IfDescriptor("Movement", 0, 2, 0))
         self.sensors.append(IfDescriptor("Illuminance", 1, 2, 0))
@@ -543,13 +556,14 @@ class SmartDetect(HbtnModule):
         self.status = self.extract_status(sys_status)
         device_registry.async_get_or_create(
             config_entry_id=self._config.entry_id,
-            identifiers={(DOMAIN, self.id)},
+            identifiers={(DOMAIN, self.uid)},
             manufacturer="Habitron GmbH",
             suggested_area="House",
             name=self.name,
             model=self._type,
             sw_version=self.sw_version,
             hw_version=self.hw_version,
+            via_device=(DOMAIN, self.comm.router.uid),
         )
         self.update(self.status)
         return
@@ -570,9 +584,10 @@ class SmartNature(HbtnModule):
         mod_descriptor: ModuleDescriptor,
         hass: HomeAssistant,
         config: ConfigEntry,
+        comm,
     ) -> None:
         """Init Habitron SmartNature module."""
-        super().__init__(mod_descriptor, hass, config)
+        super().__init__(mod_descriptor, hass, config, comm)
 
         self.sensors.append(IfDescriptor("Temperature", 0, 2, 0))
         self.sensors.append(IfDescriptor("Humidity", 1, 2, 0))
@@ -587,13 +602,14 @@ class SmartNature(HbtnModule):
         self.status = self.extract_status(sys_status)
         device_registry.async_get_or_create(
             config_entry_id=self._config.entry_id,
-            identifiers={(DOMAIN, self.id)},
+            identifiers={(DOMAIN, self.uid)},
             manufacturer="Habitron GmbH",
             suggested_area="House",
             name=self.name,
             model=self._type,
             sw_version=self.sw_version,
             hw_version=self.hw_version,
+            via_device=(DOMAIN, self.comm.router.uid),
         )
         self.update(self.status)
         return
