@@ -16,6 +16,7 @@ from pymodbus.utilities import computeCRC
 from homeassistant import exceptions
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
+
 from .const import MirrIdx
 
 SMIP_COMMANDS: Final[dict[str, str]] = {
@@ -60,8 +61,9 @@ class HbtnComm:
 
     def __init__(self, hass: HomeAssistant, config: ConfigEntry) -> None:
         """Init CommTest for connection test."""
-        self._name = config.data["habitron_host"]
-        self._host = get_host_ip(self._name)
+        self._name = "HbtnComm"
+        self._host_conf = config.data.__getitem__("habitron_host")
+        self._host = get_host_ip(self._host_conf)
         self._port = 7777
         self._mac = "00:80:a3:d4:d1:4f"
         self._hass = hass
@@ -84,11 +86,12 @@ class HbtnComm:
         """Mac address for SmartIP."""
         return self._mac
 
-    def set_host(self, host: str):
+    async def set_host(self, host: str):
         """Updating host information for integration re-configuration"""
         self._config.data = self._config.options
         self._name = host
         self._host = get_host_ip(self._name)
+        await self._hass.config_entries.async_reload(self._config.entry_id)
 
     def get_mac(self) -> str:
         """Get mac address of SmartIP."""
@@ -332,9 +335,15 @@ class HbtnComm:
 async def test_connection(host_name) -> bool:
     """Test connectivity to SmartIP is OK."""
     port = 7777
-    host = get_host_ip(host_name)
+    try:
+        host = get_host_ip(host_name)
+    except socket.gaierror as exc:
+        raise socket.gaierror from exc
     sck = socket.socket()  # Create a socket object
-    sck.connect((host, port))
+    try:
+        sck.connect((host, port))
+    except ConnectionRefusedError as exc:
+        raise ConnectionRefusedError from exc
     sck.settimeout(15)  # 15 seconds
     full_string = "¨!\0\x0bSmartConfig\x05michlS\x05\n\x04\x04\x01\0\0\0\x5f\xbe?"
     resp_bytes = send_receive(sck, full_string)
@@ -363,8 +372,8 @@ def send_receive(sck, cmd_str: str) -> bytes:
             buffer = sck.recv(resp_len + 3)
             resp_bytes = resp_bytes + buffer
         resp_bytes = resp_bytes[0:resp_len]
-    except TimeoutError:
-        resp_bytes = b"Timeout"
+    except TimeoutError as exc:
+        raise TimeoutException from exc
     return resp_bytes
 
 
@@ -383,8 +392,8 @@ async def async_send_receive(sck, cmd_str: str) -> bytes:
             resp_bytes = resp_bytes + buffer
         crc = resp_bytes[-2] * 256 + resp_bytes[-3]
         resp_bytes = resp_bytes[0:resp_len]
-    except TimeoutError:
-        return b"Timeout", 0
+    except TimeoutError as exc:
+        raise TimeoutException from exc
     return resp_bytes, crc
 
 
@@ -402,5 +411,5 @@ def wrap_command(cmd_string: str) -> str:
     return full_string + cmd_postfix
 
 
-class HostNotFound(exceptions.HomeAssistantError):
-    """Error to indicate DNS name is not found."""
+class TimeoutException(exceptions.HomeAssistantError):
+    """Error to indicate timeout."""

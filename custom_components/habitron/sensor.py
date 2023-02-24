@@ -4,7 +4,7 @@
 from homeassistant.components.sensor import SensorEntity, SensorDeviceClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -116,7 +116,7 @@ class HbtnSensor(CoordinatorEntity, SensorEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.mod_id)}}
+        return {"identifiers": {(DOMAIN, self._module.uid)}}
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -232,14 +232,17 @@ class HbtnDiagSensor(CoordinatorEntity, SensorEntity):
         self._diag_idx = nmbr
         self._attr_state = 0
         self._value = 0
-        self._attr_entity_registry_enabled_default = False  # Entity will not show up
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC
+        self._attr_entity_registry_enabled_default = (
+            False  # Entity will initally be disabled
+        )
 
     # To link this entity to its device, this property must return an
     # identifiers value matching that used in the module
     @property
     def device_info(self) -> DeviceInfo | None:
         """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.mod_id)}}
+        return {"identifiers": {(DOMAIN, self._module.uid)}}
 
     @callback
     def _handle_coordinator_update(self) -> None:
