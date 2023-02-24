@@ -87,7 +87,7 @@ class SwitchedOutput(CoordinatorEntity, LightEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.mod_id)}}
+        return {"identifiers": {(DOMAIN, self._module.uid)}}
 
     @property
     def name(self) -> str:
@@ -195,7 +195,7 @@ class SwitchedLed(CoordinatorEntity, LightEntity):
     @property
     def device_info(self) -> None:
         """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.mod_id)}}
+        return {"identifiers": {(DOMAIN, self._module.uid)}}
 
     @property
     def name(self) -> str:

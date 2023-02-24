@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import socket
 from typing import Any
 
 import voluptuous as vol
@@ -50,9 +51,12 @@ async def validate_input(hass: HomeAssistant, data: dict) -> dict[str, Any]:
 
     # The dummy smip provides a `test_connection` method to ensure it's working
     # as expected
-    result = await test_connection(data["habitron_host"])
-    if result == "host_not_found":
-        raise HostNotFound
+    try:
+        result = await test_connection(data["habitron_host"])
+    except socket.gaierror as exc:
+        raise socket.gaierror from exc
+    except ConnectionRefusedError as exc:
+        raise InvalidHost from exc
     if not result:
         # If there is an error, raise an exception to notify HA that there was a
         # problem. The UI will also show there was a problem
@@ -117,13 +121,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return self.async_create_entry(title=info["title"], data=user_input)
             except CannotConnect:
                 errors["base"] = "cannot_connect"
-            except HostNotFound:
+            except socket.gaierror:
                 errors["base"] = "host_not_found"
             except InvalidHost:
-                # The error string is set here, and should be translated.
-                # This example does not currently cover translations, see the
-                # comments on `DATA_SCHEMA` for further details.
-                # Set the error on the `host` field, not the entire form.
                 errors["base"] = "cannot_connect"
             except InvalidInterval:
                 errors["base"] = "invalid_interval"
@@ -177,13 +177,9 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 return self.async_create_entry(title=info["title"], data=user_input)
             except CannotConnect:
                 errors["base"] = "cannot_connect"
-            except HostNotFound:
+            except socket.gaierror:
                 errors["base"] = "host_not_found"
             except InvalidHost:
-                # The error string is set here, and should be translated.
-                # This example does not currently cover translations, see the
-                # comments on `DATA_SCHEMA` for further details.
-                # Set the error on the `host` field, not the entire form.
                 errors["base"] = "cannot_connect"
             except InvalidInterval:
                 errors["base"] = "invalid_interval"
