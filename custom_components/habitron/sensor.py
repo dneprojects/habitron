@@ -100,6 +100,7 @@ async def async_setup_entry(
 class HbtnSensor(CoordinatorEntity, SensorEntity):
     """Base representation of a Habitron sensor."""
 
+    _attr_has_entity_name = True
     state_class = "measurement"
 
     def __init__(self, module, nmbr, coord, idx) -> None:
@@ -117,6 +118,11 @@ class HbtnSensor(CoordinatorEntity, SensorEntity):
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
         return {"identifiers": {(DOMAIN, self._module.uid)}}
+
+    @property
+    def name(self) -> str:
+        """Return the display name of this sensor."""
+        return self._attr_name
 
     @callback
     def _handle_coordinator_update(self) -> None:

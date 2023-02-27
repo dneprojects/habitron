@@ -20,39 +20,39 @@ from homeassistant.config_entries import ConfigEntry
 from .const import MirrIdx
 
 SMIP_COMMANDS: Final[dict[str, str]] = {
-    "GET_MODULES": "\x0a\1\2\1\0\0\0",
-    "GET_MODULE_SMG": "\x0a\2\7\1\xff\0\0",
-    "GET_MODULE_SMC": "\x0a\3\7\1\xff\0\0",
-    "GET_ROUTER_SMR": "\x0a\4\3\1\0\0\0",
-    "GET_ROUTER_STATUS": "\x0a\4\4\1\0\0\0",
-    "GET_MODULE_STATUS": "\x0a\5\1\x01\xff\0\0",
-    "GET_COMPACT_STATUS": "\x0a\5\2\1\xff\0\0",  # compact status of all modules (0xFF)
+    "GET_MODULES": "\x0a\1\2<rtr>\0\0\0",
+    "GET_MODULE_SMG": "\x0a\2\7<rtr><mod>\0\0",
+    "GET_MODULE_SMC": "\x0a\3\7<rtr><mod>\0\0",
+    "GET_ROUTER_SMR": "\x0a\4\3<rtr>\0\0\0",
+    "GET_ROUTER_STATUS": "\x0a\4\4<rtr>\0\0\0",
+    "GET_MODULE_STATUS": "\x0a\5\1<rtr><mod>\0\0",
+    "GET_COMPACT_STATUS": "\x0a\5\2<rtr>\xff\0\0",  # compact status of all modules (0xFF)
     "GET_SMIP_BOOT_STATUS": "\x0a\6\1\0\0\0\0",
-    "GET_GLOBAL_DESCRIPTIONS": "\x0a\7\1\1\0\0\0",  # Flags, Command collections
+    "GET_GLOBAL_DESCRIPTIONS": "\x0a\7\1<rtr>\0\0\0",  # Flags, Command collections
     "GET_SMIP_STATUS": "\x14\0\0\0\0\0\0",
     "GET_SMIP_FIRMWARE": "\x14\x1e\0\0\0\0\0",
-    "GET_GROUP_MODE": "\x14\2\1\x01\xff\0\0",  # <Group 0..>
-    "GET_GROUP_MODE0": "\x14\2\1\x01\0\0\0",
-    "SET_GROUP_MODE": "\x14\2\2\x01\xff\3\0\1\xff\xfe",  # <Group 0..><Mode>
-    "GET_ROUTER_MODES": "\x14\2\3\x01\xff\3\0\1\xff\0",
+    "GET_GROUP_MODE": "\x14\2\1<rtr><mod>\0\0",  # <Group 0..>
+    "GET_GROUP_MODE0": "\x14\2\1<rtr>\0\0\0",
+    "SET_GROUP_MODE": "\x14\2\2<rtr><mod>\3\0<rtr><mod><arg1>",  # <Group 0..><Mode>
+    "GET_ROUTER_MODES": "\x14\2\3<rtr><mod>\3\0<rtr><mod>\0",
     "START_MIRROR": "\x14\x28\1\0\0\0\0",
     "STOP_MIRROR": "\x14\x28\2\0\0\0\0",
     "CHECK_COMM_STATUS": "\x14\x64\0\0\0\0\0",
-    "SET_OUTPUT_ON": "\x1e\1\1\x01\xff\3\0\1\xff\xfe",
-    "SET_OUTPUT_OFF": "\x1e\1\2\x01\xff\3\0\1\xff\xfe",
-    "SET_DIMMER_VALUE": "\x1e\1\3\x01\xff\4\0\1\xff\xfe\xfd",  # <Module><DimNo><DimVal>
-    "SET_SHUTTER_POSITION": "\x1e\1\4\x01\0\5\0\1\xff\1\xfe\xfd",  # <Module><RollNo><RolVal>
-    "SET_BLIND_TILT": "\x1e\1\4\x01\0\5\0\1\xff\2\xfe\xfd",
-    "SET_SETPOINT_VALUE": "\x1e\2\1\x01\0\5\0\1\xff\xfe\xfd\xfc",  # <Module><ValNo><ValL><ValH>
-    "CALL_VIS_COMMAND": "\x1e\3\1\0\0\4\0\1\xff\xfd\xfc",  # <Module><VisNoL><VisNoH> not tested
-    "CALL_COLL_COMMAND": "\x1e\4\1\1\xfd\0\0",  # <CmdNo>
-    "GET_LAST_IR_CODE": "\x32\2\1\x01\xff\0\0",
-    "RESTART_FORWARD_TABLE": "\x3c\1\1\x01\0\0\0",  # Weiterleitungstabelle löschen und -automatik starten
-    "GET_CURRENT_ERROR": "\x3c\1\2\x01\0\0\0",
-    "GET_LAST_ERROR": "\x3c\1\3\x01\0\0\0",
-    "REBOOT_ROUTER": "\x3c\1\4\x01\0\0\0",  #
-    "REBOOT_MODULE": "\x3c\3\1\x01\xff\0\0",  # <Module> or 0xFF for all modules
-    "READ_MODULE_MIRR_STATUS": "\x64\1\5\1\xff\0\0",  # <Module>
+    "SET_OUTPUT_ON": "\x1e\1\1<rtr><mod>\3\0<rtr><mod><arg1>",
+    "SET_OUTPUT_OFF": "\x1e\1\2<rtr><mod>\3\0<rtr><mod><arg1>",
+    "SET_DIMMER_VALUE": "\x1e\1\3<rtr><mod>\4\0<rtr><mod><arg1><arg2>",  # <Module><DimNo><DimVal>
+    "SET_SHUTTER_POSITION": "\x1e\1\4<rtr>\0\5\0<rtr><mod>\1<arg1><arg2>",  # <Module><RollNo><RolVal>
+    "SET_BLIND_TILT": "\x1e\1\4<rtr>\0\5\0<rtr><mod>\2<arg1><arg2>",
+    "SET_SETPOINT_VALUE": "\x1e\2\1<rtr>\0\5\0<rtr><mod><arg1><arg2><arg3>",  # <Module><ValNo><ValL><ValH>
+    "CALL_VIS_COMMAND": "\x1e\3\1\0\0\4\0<rtr><mod><arg2><arg3>",  # <Module><VisNoL><VisNoH> not tested
+    "CALL_COLL_COMMAND": "\x1e\4\1<rtr><arg2>\0\0",  # <CmdNo>
+    "GET_LAST_IR_CODE": "\x32\2\1<rtr><mod>\0\0",
+    "RESTART_FORWARD_TABLE": "\x3c\1\1<rtr>\0\0\0",  # Weiterleitungstabelle löschen und -automatik starten
+    "GET_CURRENT_ERROR": "\x3c\1\2<rtr>\0\0\0",
+    "GET_LAST_ERROR": "\x3c\1\3<rtr>\0\0\0",
+    "REBOOT_ROUTER": "\x3c\1\4<rtr>\0\0\0",  #
+    "REBOOT_MODULE": "\x3c\3\1<rtr><mod>\0\0",  # <Module> or 0xFF for all modules
+    "READ_MODULE_MIRR_STATUS": "\x64\1\5<rtr><mod>\0\0",  # <Module>
 }
 
 
@@ -111,12 +111,22 @@ class HbtnComm:
         return await self.async_send_command(SMIP_COMMANDS["GET_SMIP_FIRMWARE"])
 
     async def get_smr(self, rtr_id) -> bytes:
-        """Get router smr."""
-        resp = await self.async_send_command(SMIP_COMMANDS["GET_ROUTER_SMR"])
+        rtr_nmbr = int(rtr_id / 100)
+        cmd_str = SMIP_COMMANDS["GET_ROUTER_SMR"]
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        resp = await self.async_send_command(cmd_str)
         router_string = resp.decode("iso8859-1")
         if router_string[0:5] == "Error":
             return b""
         return resp
+
+    async def async_send_only(self, cmd_string: str) -> None:
+        """Send string and return"""
+        sck = socket.socket()  # Create a socket object
+        sck.connect((self._host, self._port))
+        full_string = wrap_command(cmd_string)
+        sck.send(full_string.encode("iso8859-1"))  # Send command
+        sck.close()
 
     async def async_send_command(self, cmd_string: str) -> bytes:
         """General function for communication via SmartIP"""
@@ -141,38 +151,54 @@ class HbtnComm:
 
     async def async_get_router_status(self, rtr_id) -> bytes:
         """Get router status."""
-        resp = await self.async_send_command(SMIP_COMMANDS["GET_ROUTER_STATUS"])
+        rtr_nmbr = int(rtr_id / 100)
+        cmd_str = SMIP_COMMANDS["GET_ROUTER_STATUS"]
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        resp = await self.async_send_command(cmd_str)
         if resp[0:5].decode("iso8859-1") == "Error":
             return b""
         return resp
 
     async def async_get_router_modules(self, rtr_id) -> bytes:
         """Get summary of all Habitron modules of a router."""
-
-        resp = await self.async_send_command(SMIP_COMMANDS["GET_MODULES"])
+        rtr_nmbr = int(rtr_id / 100)
+        cmd_str = SMIP_COMMANDS["GET_MODULES"]
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        resp = await self.async_send_command(cmd_str)
         if resp[0:5].decode("iso8859-1") == "Error":
             return b""
         return resp
 
     async def get_global_descriptions(self, rtr_id) -> bytes:
         """Get descriptions of commands, etc."""
-        return await self.async_send_command(SMIP_COMMANDS["GET_GLOBAL_DESCRIPTIONS"])
+        rtr_nmbr = int(rtr_id / 100)
+        cmd_str = SMIP_COMMANDS["GET_GLOBAL_DESCRIPTIONS"]
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        return await self.async_send_command(cmd_str)
 
     async def async_get_error_status(self, rtr_id) -> bytes:
         """Get error byte for each module"""
-        return await self.async_send_command(SMIP_COMMANDS["GET_CURRENT_ERROR"])
+        rtr_nmbr = int(rtr_id / 100)
+        cmd_str = SMIP_COMMANDS["GET_CURRENT_ERROR"]
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        return await self.async_send_command(cmd_str)
 
     async def async_start_mirror(self, rtr_id) -> None:
         """Starts mirror on specified router"""
-        await self.async_send_command(SMIP_COMMANDS["START_MIRROR"])
+        rtr_nmbr = int(rtr_id / 100)
+        cmd_str = SMIP_COMMANDS["START_MIRROR"]
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        await self.async_send_command(cmd_str)
 
     async def async_system_update(self) -> None:
         """Trigger update of Habitron states, must poll all routers"""
 
         if self.router.coord.update_interval.seconds == 6:
-            sys_status = await self.get_mirror_status(self.router.modules_desc)
+            sys_status = await self.get_mirror_status(
+                self.router.id, self.router.modules_desc
+            )
         else:
-            sys_status = await self.get_compact_status()
+            sys_status = await self.get_compact_status(self.router.id)
         if sys_status == b"":
             return
         else:
@@ -180,93 +206,103 @@ class HbtnComm:
 
     async def async_set_group_mode(self, rtr_id, grp_no, mode) -> None:
         """Set mode for given group"""
-        rtr_id = int(rtr_id / 100)
+        rtr_nmbr = int(rtr_id / 100)
         cmd_str = SMIP_COMMANDS["SET_GROUP_MODE"]
-        cmd_str = cmd_str.replace("\xff", chr(grp_no))
-        cmd_str = cmd_str.replace("\xfe", chr(mode))
-        await self.async_send_command(cmd_str)
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        cmd_str = cmd_str.replace("<mod>", chr(grp_no))
+        cmd_str = cmd_str.replace("<arg1>", chr(mode))
+        await self.async_send_only(cmd_str)
 
     async def async_set_output(self, mod_id, nmbr, val) -> None:
         """Send turn_on/turn_off command"""
-        rtr_id = int(mod_id / 100)
-        mod_addr = int(mod_id - 100 * rtr_id)
+        rtr_nmbr = int(mod_id / 100)
+        mod_addr = int(mod_id - 100 * rtr_nmbr)
         if val:
             cmd_str = SMIP_COMMANDS["SET_OUTPUT_ON"]
         else:
             cmd_str = SMIP_COMMANDS["SET_OUTPUT_OFF"]
-        cmd_str = cmd_str.replace("\xff", chr(mod_addr))
-        cmd_str = cmd_str.replace("\xfe", chr(nmbr))
-        await self.async_send_command(cmd_str)
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
+        cmd_str = cmd_str.replace("<arg1>", chr(nmbr))
+        await self.async_send_only(cmd_str)
 
     async def async_set_dimmval(self, mod_id, nmbr, val) -> None:
         """Send value to dimm output"""
-        rtr_id = int(mod_id / 100)
-        mod_addr = int(mod_id - 100 * rtr_id)
+        rtr_nmbr = int(mod_id / 100)
+        mod_addr = int(mod_id - 100 * rtr_nmbr)
         cmd_str = SMIP_COMMANDS["SET_DIMMER_VALUE"]
-        cmd_str = cmd_str.replace("\xff", chr(mod_addr))
-        cmd_str = cmd_str.replace("\xfe", chr(nmbr))
-        cmd_str = cmd_str.replace("\xfd", chr(val))
-        await self.async_send_command(cmd_str)
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
+        cmd_str = cmd_str.replace("<arg1>", chr(nmbr))
+        cmd_str = cmd_str.replace("<arg2>", chr(val))
+        await self.async_send_only(cmd_str)
 
     async def async_set_shutterpos(self, mod_id, nmbr, val) -> None:
         """Send value to dimm output"""
-        rtr_id = int(mod_id / 100)
-        mod_addr = int(mod_id - 100 * rtr_id)
+        rtr_nmbr = int(mod_id / 100)
+        mod_addr = int(mod_id - 100 * rtr_nmbr)
         cmd_str = SMIP_COMMANDS["SET_SHUTTER_POSITION"]
-        cmd_str = cmd_str.replace("\xff", chr(mod_addr))
-        cmd_str = cmd_str.replace("\xfe", chr(nmbr))
-        cmd_str = cmd_str.replace("\xfd", chr(val))
-        await self.async_send_command(cmd_str)
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
+        cmd_str = cmd_str.replace("<arg1>", chr(nmbr))
+        cmd_str = cmd_str.replace("<arg2>", chr(val))
+        await self.async_send_only(cmd_str)
 
     async def async_set_blindtilt(self, mod_id, nmbr, val) -> None:
         """Send value to dimm output"""
-        rtr_id = int(mod_id / 100)
-        mod_addr = int(mod_id - 100 * rtr_id)
+        rtr_nmbr = int(mod_id / 100)
+        mod_addr = int(mod_id - 100 * rtr_nmbr)
         cmd_str = SMIP_COMMANDS["SET_BLIND_TILT"]
-        cmd_str = cmd_str.replace("\xff", chr(mod_addr))
-        cmd_str = cmd_str.replace("\xfe", chr(nmbr))
-        cmd_str = cmd_str.replace("\xfd", chr(val))
-        await self.async_send_command(cmd_str)
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
+        cmd_str = cmd_str.replace("<arg1>", chr(nmbr))
+        cmd_str = cmd_str.replace("<arg2>", chr(val))
+        await self.async_send_only(cmd_str)
 
     async def async_set_setpoint(self, mod_id, nmbr, val) -> None:
         """Send two byte value for setpoint definition"""
-        rtr_id = int(mod_id / 100)
-        mod_addr = int(mod_id - 100 * rtr_id)
+        rtr_nmbr = int(mod_id / 100)
+        mod_addr = int(mod_id - 100 * rtr_nmbr)
         cmd_str = SMIP_COMMANDS["SET_SETPOINT_VALUE"]
-        hi_val = max(val - 255, 0)
+        hi_val = int(val / 256)
         lo_val = val - 256 * hi_val
-        cmd_str = cmd_str.replace("\xff", chr(mod_addr))
-        cmd_str = cmd_str.replace("\xfe", chr(nmbr))
-        cmd_str = cmd_str.replace("\xfc", chr(hi_val))
-        cmd_str = cmd_str.replace("\xfd", chr(lo_val))
-        await self.async_send_command(cmd_str)
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
+        cmd_str = cmd_str.replace("<arg1>", chr(nmbr))
+        cmd_str = cmd_str.replace("<arg3>", chr(hi_val))
+        cmd_str = cmd_str.replace("<arg2>", chr(lo_val))
+        await self.async_send_only(cmd_str)
 
     async def async_call_vis_command(self, mod_id, nmbr) -> None:
         """Call of visualization command of nmbr"""
-        rtr_id = int(mod_id / 100)
-        mod_addr = int(mod_id - 100 * rtr_id)
+        rtr_nmbr = int(mod_id / 100)
+        mod_addr = int(mod_id - 100 * rtr_nmbr)
         cmd_str = SMIP_COMMANDS["CALL_VIS_COMMAND"]
-        hi_no = max(nmbr - 255, 0)
+        hi_no = int(nmbr / 256)
         lo_no = nmbr - 256 * hi_no
-        cmd_str = cmd_str.replace("\xff", chr(mod_addr))
-        cmd_str = cmd_str.replace("\xfc", chr(hi_no))
-        cmd_str = cmd_str.replace("\xfd", chr(lo_no))
-        await self.async_send_command(cmd_str)
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
+        cmd_str = cmd_str.replace("<arg2>", chr(hi_no))
+        cmd_str = cmd_str.replace("<arg3>", chr(lo_no))
+        await self.async_send_only(cmd_str)
 
     async def async_call_coll_command(self, rtr_id, nmbr) -> None:
         """Call collective command of nmbr"""
-        rtr_id = rtr_id / 100
+        rtr_nmbr = int(rtr_id / 100)
         cmd_str = SMIP_COMMANDS["CALL_COLL_COMMAND"]
-        cmd_str = cmd_str.replace("\xfe", chr(nmbr))
-        await self.async_send_command(cmd_str)
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        cmd_str = cmd_str.replace("<arg1>", chr(nmbr))
+        await self.async_send_only(cmd_str)
 
-    async def get_mirror_status(self, mod_desc) -> bytes:
+    async def get_mirror_status(self, rtr_id, mod_desc) -> bytes:
         """Get common sys_status by separate calls to mirror"""
+        rtr_nmbr = int(rtr_id / 100)
         sys_status = b""
         sys_crc = 0
         for desc in mod_desc:
             cmd_str = SMIP_COMMANDS["READ_MODULE_MIRR_STATUS"]
-            cmd_str = cmd_str.replace("\xff", chr(desc.addr))
+            cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+            cmd_str = cmd_str.replace("<mod>", chr(desc.addr))
             [resp, crc] = await self.async_send_command_crc(cmd_str)
             status = (
                 resp[0 : MirrIdx.LED_I]
@@ -287,10 +323,12 @@ class HbtnComm:
             self.crc = sys_crc
             return sys_status
 
-    async def get_compact_status(self) -> bytes:
+    async def get_compact_status(self, rtr_id) -> bytes:
         """Get compact status for all modules, if changed crc"""
-        cmd_string = SMIP_COMMANDS["GET_COMPACT_STATUS"]
-        [resp_bytes, crc] = await self.async_send_command_crc(cmd_string)
+        rtr_nmbr = int(rtr_id / 100)
+        cmd_str = SMIP_COMMANDS["GET_COMPACT_STATUS"]
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        [resp_bytes, crc] = await self.async_send_command_crc(cmd_str)
         if crc == self.crc:
             return b""
         else:
@@ -299,10 +337,11 @@ class HbtnComm:
 
     async def async_get_module_definitions(self, mod_id) -> bytes:
         """Get summary of Habitron module: names, commands, etc."""
-        rtr_id = int(mod_id / 100)
-        mod_addr = int(mod_id - 100 * rtr_id)
+        rtr_nmbr = int(mod_id / 100)
+        mod_addr = int(mod_id - 100 * rtr_nmbr)
         cmd_str = SMIP_COMMANDS["GET_MODULE_SMC"]
-        cmd_str = cmd_str[0:4] + chr(mod_addr) + "\0\0"
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
         resp = await self.async_send_command(cmd_str)
         if resp[0:5].decode("iso8859-1") == "Error":
             return b""
@@ -310,26 +349,73 @@ class HbtnComm:
 
     async def async_get_module_settings(self, mod_id) -> bytes:
         """Get settings of Habitron module."""
-        rtr_id = int(mod_id / 100)
-        mod_addr = int(mod_id - 100 * rtr_id)
+        rtr_nmbr = int(mod_id / 100)
+        mod_addr = int(mod_id - 100 * rtr_nmbr)
         cmd_str = SMIP_COMMANDS["GET_MODULE_SMG"]
-        cmd_str = cmd_str[0:4] + chr(mod_addr) + "\0\0"
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
         resp = await self.async_send_command(cmd_str)
         if resp[0:5].decode("iso8859-1") == "Error":
             return b""
         return resp
 
-    async def module_restart(self, mod_nmbr: int) -> None:
+    async def save_smc_file(self, mod_id) -> None:
+        """Get module definitions (smc) and saves them to file"""
+        data = await self.async_get_module_definitions(mod_id)
+        file_name = f"Module_{mod_id}.smc"
+        str_data = ""
+        for b_idx in range(7):
+            str_data += f"{data[b_idx]};"  # header
+        str_data += chr(13)
+        data = data[b_idx + 1 : len(data)]
+        while len(data) > 6:
+            line_len = data[5] + 5
+            for b_idx in range(line_len):
+                str_data += f"{data[b_idx]};"
+            str_data += chr(13)
+            data = data[b_idx + 1 : len(data)]
+        await self.save_config_data(file_name, str_data)
+
+    async def save_smg_file(self, mod_id) -> None:
+        """Get module settings (smg) and saves them to file"""
+        data = await self.async_get_module_settings(mod_id)
+        file_name = f"Module_{mod_id}.smg"
+        str_data = ""
+        for byt in data:
+            str_data += f"{byt};"
+        await self.save_config_data(file_name, str_data)
+
+    async def save_smr_file(self, rtr_id) -> None:
+        """Get module settings (smg) and saves them to file"""
+        data = await self.get_smr(rtr_id)
+        file_name = f"Router_{rtr_id}.smr"
+        str_data = ""
+        for byt in data:
+            str_data += f"{byt};"
+        await self.save_config_data(file_name, str_data)
+
+    async def save_config_data(self, file_name: str, str_data: str) -> None:
+        """Saving config info to text file"""
+        path = "./config/"
+        file_path = path + file_name
+        hbtn_file = open(file_path, "w")
+        hbtn_file.write(str_data)
+        hbtn_file.close()
+
+    async def module_restart(self, rtr_id, mod_nmbr: int) -> None:
         """Restarts a single module or all with arg 0xFF or router if arg 0"""
+        rtr_nmbr = int(rtr_id / 100)
         if mod_nmbr > 0:
             # module restart
             cmd_str = SMIP_COMMANDS["REBOOT_MODULE"]
-            if mod_nmbr < 65:
-                cmd_str = cmd_str.replace("\xff", chr(mod_nmbr))
+            cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+            cmd_str = cmd_str.replace("<mod>", chr(mod_nmbr))
+
         else:
             # router restart
             cmd_str = SMIP_COMMANDS["REBOOT_ROUTER"]
-        await self.async_send_command(cmd_str)
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        await self.async_send_only(cmd_str)
 
 
 async def test_connection(host_name) -> bool:

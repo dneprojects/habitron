@@ -8,7 +8,7 @@ from homeassistant import exceptions
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 
-from .const import DOMAIN, RESTART_KEY_NMBR, RESTART_ALL
+from .const import DOMAIN, ROUTER_NMBR, RESTART_KEY_NMBR, FILE_MOD_NMBR, RESTART_ALL
 from .smart_ip import SmartIP
 from .communicate import TimeoutException
 
@@ -25,7 +25,19 @@ PLATFORMS: list[str] = [
 ]
 SERVICE_MOD_RESTART_SCHEMA = vol.Schema(
     {
+        vol.Required(ROUTER_NMBR): int,
         vol.Optional(RESTART_KEY_NMBR): int,
+    }
+)
+SERVICE_MOD_FILE_SCHEMA = vol.Schema(
+    {
+        vol.Required(ROUTER_NMBR): int,
+        vol.Required(FILE_MOD_NMBR): int,
+    }
+)
+SERVICE_RTR_FILE_SCHEMA = vol.Schema(
+    {
+        vol.Required(ROUTER_NMBR): int,
     }
 )
 SERVICE_RTR_RESTART_SCHEMA = vol.Schema({})
@@ -38,18 +50,34 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     async def restart_module(call: ServiceCall):
         """Handle the service call."""
+        rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
         mod_nmbr = call.data.get(RESTART_KEY_NMBR, RESTART_ALL)
-        await smip.comm.module_restart(mod_nmbr)
+        await smip.comm.module_restart(rtr_id, rtr_id + mod_nmbr)
 
     async def restart_router(call: ServiceCall):
         """Handle the service call."""
-        await smip.comm.module_restart(0)
+        rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
+        await smip.comm.module_restart(rtr_id, 0)
 
-    async def get_comm_errors(call: ServiceCall):
+    async def save_module_smc(call: ServiceCall):
         """Handle the service call."""
-        res = smip.router.get_comm_errors()
-        print(res)
-        return res
+        rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
+        mod_nmbr = call.data.get(FILE_MOD_NMBR, 1)
+        await smip.comm.save_smc_file(rtr_id + mod_nmbr)
+        return
+
+    async def save_module_smg(call: ServiceCall):
+        """Handle the service call."""
+        rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
+        mod_nmbr = call.data.get(FILE_MOD_NMBR, 1)
+        await smip.comm.save_smg_file(rtr_id + mod_nmbr)
+        return
+
+    async def save_router_smr(call: ServiceCall):
+        """Handle the service call."""
+        rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
+        await smip.comm.save_smr_file(rtr_id)
+        return
 
     smip = SmartIP(hass, entry)
     try:
@@ -69,7 +97,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.services.async_register(
         DOMAIN, "rtr_restart", restart_router, schema=SERVICE_RTR_RESTART_SCHEMA
     )
-    hass.services.async_register(DOMAIN, "comm_errors", get_comm_errors)
+    hass.services.async_register(
+        DOMAIN, "save_module_smc", save_module_smc, schema=SERVICE_MOD_FILE_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN, "save_module_smg", save_module_smg, schema=SERVICE_MOD_FILE_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN, "save_router_smr", save_router_smr, schema=SERVICE_RTR_FILE_SCHEMA
+    )
 
     # This creates each HA object for each platform your device requires.
     # It's done by calling the `async_setup_entry` function in each platform module.

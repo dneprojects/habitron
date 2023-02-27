@@ -43,6 +43,8 @@ async def async_setup_entry(
 class HbtnNumber(CoordinatorEntity, NumberEntity):
     """Representation of a input number."""
 
+    _attr_has_entity_name = True
+
     device_class = NumberDeviceClass.TEMPERATURE
     native_max_value = 27.5
     native_min_value = 12.5
@@ -54,16 +56,20 @@ class HbtnNumber(CoordinatorEntity, NumberEntity):
         self.idx = idx
         self._setval = setval
         self._module = module
-        self._name = setval.name
         self._nmbr = setval.nmbr
-        self._attr_native_value = setval.value
+        self._attr_name = f"{self._module.name}: {setval.name}"
         self._attr_unique_id = f"{self._module.id}_number_{48+setval.nmbr}"
-        self._attr_name = f"{self._module.name}: {self._name}"
+        self._attr_native_value = setval.value
 
     @property
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
         return {"identifiers": {(DOMAIN, self._module.uid)}}
+
+    @property
+    def name(self) -> str:
+        """Return the display name of this number."""
+        return self._attr_name
 
     @callback
     def _handle_coordinator_update(self) -> None:

@@ -67,17 +67,19 @@ async def async_setup_entry(
 class SwitchedOutput(CoordinatorEntity, LightEntity):
     """Representation of habitron light entities."""
 
+    _attr_has_entity_name = True
+
     def __init__(self, output, module, coord, idx) -> None:
         """Initialize an HbtnLight, pass coordinator to CoordinatorEntity."""
         super().__init__(coord, context=idx)
         self.idx = idx
         self._output = output
         self._module = module
-        self._name = output.name
+        self._attr_name = f"{self._module.name}: {output.name}"
         self._nmbr = output.nmbr
         self._state = None
         self._brightness = None
-        self._attr_unique_id = f"{self._module.id}_{self._name}"
+        self._attr_unique_id = f"{self._module.id}_{output.name}"
         if output.type < 0:
             # Entity will not show up
             self._attr_entity_registry_enabled_default = False
@@ -92,7 +94,7 @@ class SwitchedOutput(CoordinatorEntity, LightEntity):
     @property
     def name(self) -> str:
         """Return the display name of this light."""
-        return self._name
+        return self._attr_name
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -105,16 +107,12 @@ class SwitchedOutput(CoordinatorEntity, LightEntity):
         await self._module.comm.async_set_output(
             self._module.mod_addr, self._nmbr + 1, 1
         )
-        # Update the data
-        await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Instruct the light to turn off."""
         await self._module.comm.async_set_output(
             self._module.mod_addr, self._nmbr + 1, 0
         )
-        # Update the data
-        # await self.coordinator.async_request_refresh()
 
 
 class DimmedOutput(SwitchedOutput):
@@ -169,12 +167,12 @@ class DimmedOutput(SwitchedOutput):
             self._nmbr + 1,
             int(self._brightness * 100.0 / 255),
         )
-        # Update the data
-        # await self.coordinator.async_request_refresh()
 
 
 class SwitchedLed(CoordinatorEntity, LightEntity):
     """Module switch background LEDs"""
+
+    _attr_has_entity_name = True
 
     def __init__(self, led, module, coord, idx) -> None:
         """Initialize an HbtnLED, pass coordinator to CoordinatorEntity."""
@@ -182,16 +180,13 @@ class SwitchedLed(CoordinatorEntity, LightEntity):
         self.idx = idx
         self._led = led
         self._module = module
-        self._name = led.name
+        self._attr_name = f"{self._module.name}: {led.name}"
         self._nmbr = led.nmbr
         self._state = None
         self._brightness = None
         self._attr_unique_id = f"{self._module.id}_led_{self.idx}"
         self._attr_icon = "mdi:lightbulb-alert-outline"
-        self._attr_name = f"{self._module.name}: {self._name}"
 
-    # To link this entity to its device, this property must return an
-    # identifiers value matching that used in the module
     @property
     def device_info(self) -> None:
         """Return information to link this entity with the correct device."""
@@ -213,13 +208,9 @@ class SwitchedLed(CoordinatorEntity, LightEntity):
         await self._module.comm.async_set_output(
             self._module.mod_addr, self._nmbr + 16 + 1, 1
         )
-        # Update the data
-        # await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Instruct the led to turn off."""
         await self._module.comm.async_set_output(
             self._module.mod_addr, self._nmbr + 16 + 1, 0
         )
-        # Update the data
-        # await self.coordinator.async_request_refresh()

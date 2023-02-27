@@ -42,24 +42,24 @@ async def async_setup_entry(
 class CollCmdButton(ButtonEntity):
     """Representation of a button to trigger a collective command."""
 
+    _attr_has_entity_name = True
+
     def __init__(self, coll_cmd, module) -> None:
         """Initialize an CollCommand."""
         self._module = module
-        self._name = coll_cmd.name
         self._nmbr = coll_cmd.nmbr
+        self._attr_name = f"Cmd {self._nmbr}: {coll_cmd.name}"
         self._attr_unique_id = "Cmd_" + str(coll_cmd.nmbr) + "_" + coll_cmd.name
 
-        # This is the name for this *entity*, the "name" attribute from "device_info"
-        # is used as the device name for device screens in the UI. This name is used on
-        # entity screens, and used to build the Entity ID that's used is automations etc.
-        self._attr_name = f"Cmd {self._nmbr}: {self._name}"
-
-    # To link this entity to its device, this property must return an
-    # identifiers value matching that used in the module
     @property
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
         return {"identifiers": {(DOMAIN, self._module.uid)}}
+
+    @property
+    def name(self) -> str:
+        """Return the display name of this button."""
+        return self._attr_name
 
     async def async_press(self) -> None:
         """Handle the button press."""
@@ -71,26 +71,26 @@ class CollCmdButton(ButtonEntity):
 class DirCmdButton(ButtonEntity):
     """Representation of a button to trigger a visualization command."""
 
+    _attr_has_entity_name = True
+
     def __init__(self, dir_cmd, module) -> None:
         """Initialize an VisCommand."""
         self._module = module
-        self._name = dir_cmd.name
         self._nmbr = dir_cmd.nmbr
+        self._attr_name = f"{self._module.name} DirectCmd {self._nmbr}: {dir_cmd.name}"
         self._attr_unique_id = (
-            f"Mod_{self._module.mod_addr}_DCmd{self._nmbr}_{self._name}"
+            f"Mod_{self._module.mod_addr}_DCmd{self._nmbr}_{dir_cmd.name}"
         )
 
-        # This is the name for this *entity*, the "name" attribute from "device_info"
-        # is used as the device name for device screens in the UI. This name is used on
-        # entity screens, and used to build the Entity ID that's used is automations etc.
-        self._attr_name = f"{self._module.name} DirectCmd {self._nmbr}: {self._name}"
-
-    # To link this entity to its device, this property must return an
-    # identifiers value matching that used in the module
     @property
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
         return {"identifiers": {(DOMAIN, self._module.uid)}}
+
+    @property
+    def name(self) -> str:
+        """Return the display name of this button."""
+        return self._attr_name
 
     async def async_press(self) -> None:
         """Handle the button press."""
@@ -102,23 +102,26 @@ class DirCmdButton(ButtonEntity):
 class VisCmdButton(ButtonEntity):
     """Representation of a button to trigger a visualization command."""
 
+    _attr_has_entity_name = True
+
     def __init__(self, vis_cmd, module) -> None:
         """Initialize an VisCommand."""
         self._module = module
-        self._name = vis_cmd.name
         self._nmbr = vis_cmd.nmbr
+        self._attr_name = f"{self._module.name} VisCmd {self._nmbr-256}: {vis_cmd.name}"
         self._attr_unique_id = (
-            f"Mod_{self._module.mod_addr}_VCmd{self._nmbr}_{self._name}"
+            f"Mod_{self._module.mod_addr}_VCmd{self._nmbr}_{vis_cmd.name}"
         )
 
-        self._attr_name = f"{self._module.name} VisCmd {self._nmbr-256}: {self._name}"
-
-    # To link this entity to its device, this property must return an
-    # identifiers value matching that used in the module
     @property
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
         return {"identifiers": {(DOMAIN, self._module.uid)}}
+
+    @property
+    def name(self) -> str:
+        """Return the display name of this button."""
+        return self._attr_name
 
     async def async_press(self) -> None:
         """Handle the button press."""
