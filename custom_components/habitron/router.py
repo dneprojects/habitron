@@ -68,13 +68,6 @@ class GroupMode(Enum):
     User2 = 112
 
 
-class ConfigMode(Enum):
-    """Habitron alarm mode states"""
-
-    Off = 0
-    On = 8
-
-
 class HbtnRouter:
     """Habitron Router class."""
 
@@ -289,8 +282,8 @@ class HbtnRouter:
 
     async def async_reset(self) -> None:
         """Call reset command for self"""
-        self.comm.module_restart(0)
+        self.comm.module_restart(self.id, 0)
 
     async def async_reset_all_modules(self) -> None:
         """Call reset command for all modules"""
-        self.comm.module_restart(0xFF)
+        self.comm.module_restart(self.id, 0xFF)

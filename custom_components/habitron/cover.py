@@ -59,6 +59,8 @@ async def async_setup_entry(
 class HbtnShutter(CoordinatorEntity, CoverEntity):
     """Representation of a shutter cover."""
 
+    _attr_has_entity_name = True
+
     supported_features = (
         CoverEntityFeature.SET_POSITION
         | CoverEntityFeature.OPEN
@@ -66,6 +68,7 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
         | CoverEntityFeature.STOP
     )
     device_class = "shutter"
+    has_entity_name = True
 
     def __init__(self, cover, module, coord, idx) -> None:
         """Initialize an HbtnShutter, pass coordinator to CoordinatorEntity."""
@@ -73,14 +76,12 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
         self.idx = idx
         self._cover = cover
         self._module = module
-        self._name = cover.name
+        self._attr_name = cover.name
         self._nmbr = cover.nmbr
         self._polarity = cover.type > 0
         self._position = 0
         self._moving = 0
         self._attr_unique_id = f"{self._module.id}_cover_{48+cover.nmbr}"
-
-        self._attr_name = self._name
 
     # To link this entity to its device, this property must return an
     # identifiers value matching that used in the module
@@ -88,6 +89,11 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
         return {"identifiers": {(DOMAIN, self._module.uid)}}
+
+    @property
+    def name(self) -> str:
+        """Return name"""
+        return self._attr_name
 
     @property
     def current_cover_position(self) -> int:
@@ -190,7 +196,6 @@ class HbtnBlind(HbtnShutter):
         """Initialize an HbtnShutterTilt."""
         super().__init__(cover, module, coord, idx)
         self._tilt_position = 0
-        self._attr_name = self._name
 
     @property
     def current_cover_tilt_position(self) -> int:

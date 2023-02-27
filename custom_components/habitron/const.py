@@ -6,12 +6,14 @@ from typing import Final
 
 DOMAIN = "habitron"  # This is the internal name of the integration, it should also match the directory
 CONF_DEFAULT_HOST = "SmartIP"  # default DNS name of SmartIP
-CONF_DEFAULT_INTERVAL = 10  # default update interval
-CONF_MIN_INTERVAL = 3  # min update interval
-CONF_MAX_INTERVAL = 20  # max update interval
+CONF_DEFAULT_INTERVAL = 5  # default update interval
+CONF_MIN_INTERVAL = 2  # min update interval
+CONF_MAX_INTERVAL = 10  # max update interval
 RESTART_RTR = 0
 RESTART_ALL = 0xFF
+ROUTER_NMBR = "rtr_nmbr"
 RESTART_KEY_NMBR = "mod_nmbr"
+FILE_MOD_NMBR = "mod_nmbr"
 
 MODULE_CODES: Final[dict[str, str]] = {
     "\x01\x02": "Smart Controller",

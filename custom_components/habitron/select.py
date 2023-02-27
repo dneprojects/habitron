@@ -10,7 +10,7 @@ from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .router import DaytimeMode, AlarmMode, ConfigMode
+from .router import DaytimeMode, AlarmMode
 
 
 async def async_setup_entry(
@@ -38,7 +38,6 @@ async def async_setup_entry(
     new_devices.append(HbtnSelectDaytimeMode(0, hbtn_rt, hbtn_cord, len(new_devices)))
     new_devices.append(HbtnSelectAlarmMode(0, hbtn_rt, hbtn_cord, len(new_devices)))
     new_devices.append(HbtnSelectGroupMode(0, hbtn_rt, hbtn_cord, len(new_devices)))
-    new_devices.append(HbtnSelectConfigMode(0, hbtn_rt, hbtn_cord, len(new_devices)))
 
     # Fetch initial data so we have data when entities subscribe
     #
@@ -55,6 +54,8 @@ async def async_setup_entry(
 
 class HbtnMode(CoordinatorEntity, SelectEntity):
     """Representation of a input select for Habitron modes."""
+
+    _attr_has_entity_name = True
 
     def __init__(self, module, hbtnr, coord, idx) -> None:
         """Initialize a Habitron mode, pass coordinator to CoordinatorEntity."""
@@ -91,6 +92,11 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
         return {"identifiers": {(DOMAIN, self._module.uid)}}
 
     @property
+    def name(self) -> str:
+        """Return the display name of this selector."""
+        return self._attr_name
+
+    @property
     def options(self) -> list[str]:
         """Return all mode names of enumeration type"""
         all_modes = []
@@ -120,7 +126,7 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
         """Change the selected option."""
         mode_val = self._enum[option].value
         self._mode = (self._module.mode & (0xFF - self._mask)) + mode_val
-        self._module.mode = self._mode
+        # self._module.mode = self._mode
         await self._module.comm.async_set_group_mode(
             self._module.mod_addr, self._module.group, self._mode
         )
@@ -149,6 +155,14 @@ class HbtnSelectDaytimeMode(HbtnMode):
                 False  # Entity will initally be disabled
             )
 
+    async def async_select_option(self, option: str) -> None:
+        """Change the selected option."""
+        mode_val = self._enum[option].value
+        set_val = 0x41 + mode_val
+        await self._module.comm.async_set_group_mode(
+            self._module.mod_addr, self._module.group, set_val
+        )
+
 
 class HbtnSelectAlarmMode(HbtnMode):
     """Daytime mode object"""
@@ -168,6 +182,17 @@ class HbtnSelectAlarmMode(HbtnMode):
         else:
             self._attr_name = f"Group {self._module.group} alarm: "
             self._attr_unique_id = f"{self._module.id}_alarm_mode"
+
+    async def async_select_option(self, option: str) -> None:
+        """Change the selected option."""
+        mode_val = self._enum[option].value > 0
+        if self._enum[option].value > 0:
+            set_val = 0x40  # turn alarm mode on
+        else:
+            set_val = 0x41  # turn alarm mode off
+        await self._module.comm.async_set_group_mode(
+            self._module.mod_addr, self._module.group, set_val
+        )
 
 
 class HbtnSelectGroupMode(HbtnMode):
@@ -200,18 +225,3 @@ class HbtnSelectGroupMode(HbtnMode):
         else:
             self._attr_name = f"Group {self._module.group} mode: "
             self._attr_unique_id = f"{self._module.id}_group_mode"
-
-
-class HbtnSelectConfigMode(HbtnMode):
-    """Config mode object"""
-
-    def __init__(self, module, hbtnr, coord, idx) -> None:
-        """Initialize alarm mode selector."""
-        super().__init__(module, hbtnr, coord, idx)
-        self._mask = 0x08
-        self._value = self._mode & self._mask
-        self._enum = ConfigMode
-        self._current_option = self._enum(self._value).name
-        self._attr_name = f"Router {self.hbtnr.name} config: "
-        self._attr_unique_id = f"{self.hbtnr.uid}_config_mode"
-        self._attr_entity_category = EntityCategory.CONFIG

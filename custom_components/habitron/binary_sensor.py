@@ -65,6 +65,7 @@ class InputSwitch(CoordinatorEntity, BinarySensorEntity):
     """Representation of habitron switch input entities."""
 
     device_class = "plug"
+    _attr_has_entity_name = True
 
     def __init__(self, inpt, module, coord, idx) -> None:
         """Initialize an InputSwitch, pass coordinator to CoordinatorEntity."""
@@ -72,7 +73,7 @@ class InputSwitch(CoordinatorEntity, BinarySensorEntity):
         self.idx = idx
         self._input = inpt
         self._module = module
-        self._name = inpt.name
+        self._attr_name = f"{self._module.name}: {inpt.name}"
         self._nmbr = inpt.nmbr
         self._state = False
         self._attr_unique_id = f"{self._module.id}_In{self._nmbr}"
@@ -90,7 +91,7 @@ class InputSwitch(CoordinatorEntity, BinarySensorEntity):
     @property
     def name(self) -> str:
         """Return the display name of this switch."""
-        return self._name
+        return self._attr_name
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -109,13 +110,14 @@ class InputButton(InputSwitch):
 class HbtnFlag(CoordinatorEntity, BinarySensorEntity):
     """Representation of habitron flag entities."""
 
+    _attr_has_entity_name = True
+
     def __init__(self, flag, module, coord, idx) -> None:
         """Initialize an HbtnFlag, pass coordinator to CoordinatorEntity."""
         super().__init__(coord, context=idx)
         self.idx = idx
         self._flag = flag
         self._module = module
-        self._name = flag.name
         self._idx = flag.idx
         self._nmbr = flag.nmbr
         self._state = False
@@ -139,7 +141,7 @@ class HbtnFlag(CoordinatorEntity, BinarySensorEntity):
     @property
     def name(self) -> str:
         """Return the display name of this flag."""
-        return self._name
+        return self._attr_name
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -157,7 +159,6 @@ class MotionSensor(CoordinatorEntity, BinarySensorEntity):
         self.idx = idx
         self._sensor = sensor
         self._module = module
-        self._name = f"{self._module.name}: Motion"
         self._nmbr = sensor.nmbr
         self._state = False
         self._attr_unique_id = f"{self._module.id}_motion"
@@ -181,7 +182,7 @@ class MotionSensor(CoordinatorEntity, BinarySensorEntity):
     @property
     def name(self) -> str:
         """Return the display name of this flag."""
-        return self._name
+        return self._attr_name
 
     @callback
     def _handle_coordinator_update(self) -> None:
