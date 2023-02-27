@@ -48,6 +48,8 @@ async def async_setup_entry(
 class HbtnClimate(CoordinatorEntity, ClimateEntity):
     """Representation of habitron climate entities."""
 
+    _attr_has_entity_name = True
+
     _attr_supported_features = ClimateEntityFeature.TARGET_TEMPERATURE
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
 
