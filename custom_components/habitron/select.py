@@ -146,10 +146,10 @@ class HbtnSelectDaytimeMode(HbtnMode):
         self._current_option = self._enum(self._value).name
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
         if isinstance(self._module, int):
-            self._attr_name = "Group 0 daytime: "
+            self._attr_name = "Group 0 daytime"
             self._attr_unique_id = "group_0_daytime_mode"
         else:
-            self._attr_name = f"Group {self._module.group} daytime: "
+            self._attr_name = f"Group {self._module.group} daytime"
             self._attr_unique_id = f"{self._module.id}_daytime_mode"
             self._attr_entity_registry_enabled_default = (
                 False  # Entity will initally be disabled
@@ -177,15 +177,14 @@ class HbtnSelectAlarmMode(HbtnMode):
         self._enum = AlarmMode
         self._current_option = self._enum(self._value).name
         if isinstance(self._module, int):
-            self._attr_name = "Group 0 alarm: "
+            self._attr_name = "Group 0 alarm"
             self._attr_unique_id = "group_0_alarm_mode"
         else:
-            self._attr_name = f"Group {self._module.group} alarm: "
+            self._attr_name = f"Group {self._module.group} alarm"
             self._attr_unique_id = f"{self._module.id}_alarm_mode"
 
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
-        mode_val = self._enum[option].value > 0
         if self._enum[option].value > 0:
             set_val = 0x40  # turn alarm mode on
         else:
@@ -220,8 +219,8 @@ class HbtnSelectGroupMode(HbtnMode):
         self._enum = group_enum
         self._current_option = self._enum(self._value).name
         if isinstance(self._module, int):
-            self._attr_name = "Group 0 mode: "
+            self._attr_name = "Group 0 mode"
             self._attr_unique_id = "group_0_mode"
         else:
-            self._attr_name = f"Group {self._module.group} mode: "
+            self._attr_name = f"Group {self._module.group} mode"
             self._attr_unique_id = f"{self._module.id}_group_mode"

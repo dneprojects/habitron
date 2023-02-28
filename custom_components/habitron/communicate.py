@@ -398,7 +398,7 @@ class HbtnComm:
         """Saving config info to text file"""
         path = "./config/"
         file_path = path + file_name
-        hbtn_file = open(file_path, "w")
+        hbtn_file = open(file_path, "w", encoding="ascii", errors="surrogateescape")
         hbtn_file.write(str_data)
         hbtn_file.close()
 
