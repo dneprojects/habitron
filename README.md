@@ -54,7 +54,7 @@ A second parameter is used to control the polling update interval.
 | Configuration parameter | Optional  | Description  |
 | :---------------------- | :-------- | :----------- |
 | `host name`             | no        | Either the DNS host name of the SmartIP or its IP address.
-| `update interval`       | no        | Polling update interval in seconds, must be between 3 and 20 seconds.
+| `update interval`       | no        | Polling update interval in seconds, must be between 2 and 10 seconds.
 
 These parameters can be changed after installation as well.
 
