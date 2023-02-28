@@ -293,6 +293,7 @@ class SmartController(HbtnModule):
         self.leds = [IfDescriptor("", i, 0, 0) for i in range(8)]
         self.diags = [IfDescriptor("", i, 0, 0) for i in range(2)]
         self.setvalues = [IfDescriptor("Set temperature", 0, 2, 20.0)]
+        self.setvalues.append(IfDescriptor("Set temperature 2", 1, 2, 20.0))
         self.auxheat_value = 0
 
         self.sensors.append(IfDescriptor("Movement", 0, 2, 0))
@@ -325,6 +326,13 @@ class SmartController(HbtnModule):
         self.setvalues[0].value = (
             int.from_bytes(
                 self.status[MStatIdx.T_SETP_0 : MStatIdx.T_SETP_0 + 2],
+                "little",
+            )
+            / 10
+        )
+        self.setvalues[1].value = (
+            int.from_bytes(
+                self.status[MStatIdx.T_SETP_1 : MStatIdx.T_SETP_1 + 2],
                 "little",
             )
             / 10

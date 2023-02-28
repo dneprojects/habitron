@@ -16,6 +16,7 @@ from .communicate import TimeoutException
 PLATFORMS: list[str] = [
     "sensor",
     "light",
+    "switch",
     "cover",
     "number",
     "button",

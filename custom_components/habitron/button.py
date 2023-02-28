@@ -77,7 +77,7 @@ class DirCmdButton(ButtonEntity):
         """Initialize an VisCommand."""
         self._module = module
         self._nmbr = dir_cmd.nmbr
-        self._attr_name = f"{self._module.name} DirectCmd {self._nmbr}: {dir_cmd.name}"
+        self._attr_name = f"DirectCmd {self._nmbr}: {dir_cmd.name}"
         self._attr_unique_id = (
             f"Mod_{self._module.mod_addr}_DCmd{self._nmbr}_{dir_cmd.name}"
         )
@@ -108,7 +108,7 @@ class VisCmdButton(ButtonEntity):
         """Initialize an VisCommand."""
         self._module = module
         self._nmbr = vis_cmd.nmbr
-        self._attr_name = f"{self._module.name} VisCmd {self._nmbr-256}: {vis_cmd.name}"
+        self._attr_name = f"VisCmd {self._nmbr-256}: {vis_cmd.name}"
         self._attr_unique_id = (
             f"Mod_{self._module.mod_addr}_VCmd{self._nmbr}_{vis_cmd.name}"
         )
@@ -133,12 +133,14 @@ class VisCmdButton(ButtonEntity):
 class RestartButton(ButtonEntity):
     """Representation of a button to trigger a visualization command."""
 
+    _attr_has_entity_name = True
+
     def __init__(self, module) -> None:
         """Initialize an VisCommand."""
         self._name = "restart"
         self._module = module
         self._attr_unique_id = f"Mod_{self._module.uid}_{self._name}"
-        self._attr_name = f"{module.name}: Reset"
+        self._attr_name = "Reset"
         self._attr_entity_category = EntityCategory.CONFIG
 
     # To link this entity to its device, this property must return an
@@ -156,12 +158,14 @@ class RestartButton(ButtonEntity):
 class RestartAllButton(ButtonEntity):
     """Representation of a button to trigger a visualization command."""
 
+    _attr_has_entity_name = True
+
     def __init__(self, router) -> None:
         """Initialize an VisCommand."""
         self._name = "restart_all"
         self._router = router
         self._attr_unique_id = f"Mod_{self._router.uid}_{self._name}"
-        self._attr_name = f"{router.name}: Reset all modules"
+        self._attr_name = "Reset all modules"
         self._attr_entity_category = EntityCategory.CONFIG
 
     # To link this entity to its device, this property must return an
