@@ -64,7 +64,6 @@ async def async_setup_entry(
 class InputSwitch(CoordinatorEntity, BinarySensorEntity):
     """Representation of habitron switch input entities."""
 
-    device_class = "plug"
     _attr_has_entity_name = True
 
     def __init__(self, inpt, module, coord, idx) -> None:
@@ -73,7 +72,7 @@ class InputSwitch(CoordinatorEntity, BinarySensorEntity):
         self.idx = idx
         self._input = inpt
         self._module = module
-        self._attr_name = f"{self._module.name}: {inpt.name}"
+        self._attr_name = inpt.name
         self._nmbr = inpt.nmbr
         self._state = False
         self._attr_unique_id = f"{self._module.id}_In{self._nmbr}"
@@ -97,6 +96,10 @@ class InputSwitch(CoordinatorEntity, BinarySensorEntity):
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
         self._attr_is_on = self._module.inputs[self._nmbr].value == 1
+        if self._attr_is_on:
+            self._attr_icon = "mdi:toggle-switch-variant"
+        else:
+            self._attr_icon = "mdi:toggle-switch-variant-off"
         self._state = self._attr_is_on
         self.async_write_ha_state()
 
@@ -104,7 +107,16 @@ class InputSwitch(CoordinatorEntity, BinarySensorEntity):
 class InputButton(InputSwitch):
     """Representation of habitron button switch input."""
 
-    device_class = "running"
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self._attr_is_on = self._module.inputs[self._nmbr].value == 1
+        if self._attr_is_on:
+            self._attr_icon = "mdi:play"
+        else:
+            self._attr_icon = "mdi:stop"
+        self._state = self._attr_is_on
+        self.async_write_ha_state()
 
 
 class HbtnFlag(CoordinatorEntity, BinarySensorEntity):
@@ -147,6 +159,10 @@ class HbtnFlag(CoordinatorEntity, BinarySensorEntity):
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
         self._attr_is_on = self._module.flags[self._idx].value == 1
+        if self._attr_is_on:
+            self._attr_icon = "mdi:bookmark-check"
+        else:
+            self._attr_icon = "mdi:bookmark-outline"
         self._state = self._attr_is_on
         self.async_write_ha_state()
 
@@ -188,5 +204,9 @@ class MotionSensor(CoordinatorEntity, BinarySensorEntity):
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
         self._attr_is_on = self._module.sensors[self._nmbr].value > 0
+        if self._attr_is_on:
+            self._attr_icon = "mdi:motion-sensor"
+        else:
+            self._attr_icon = "mdi:motion-sensor-off"
         self._state = self._attr_is_on
         self.async_write_ha_state()
