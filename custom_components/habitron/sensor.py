@@ -142,7 +142,7 @@ class TemperatureSensor(HbtnSensor):
         """Initialize the sensor."""
         super().__init__(module, nmbr, coord, idx)
         self._attr_unique_id = f"{self._module.id}_temperature"
-        self._attr_name = f"{self._module.name}: Temperature"
+        self._attr_name = "Temperature"
 
 
 class HumiditySensor(HbtnSensor):
@@ -156,7 +156,7 @@ class HumiditySensor(HbtnSensor):
         """Initialize the sensor."""
         super().__init__(module, nmbr, coord, idx)
         self._attr_unique_id = f"{self._module.id}_humidity"
-        self._attr_name = f"{self._module.name}: Humidity"
+        self._attr_name = "Humidity"
 
 
 class IlluminanceSensor(HbtnSensor):
@@ -170,7 +170,7 @@ class IlluminanceSensor(HbtnSensor):
         """Initialize the sensor."""
         super().__init__(module, nmbr, coord, idx)
         self._attr_unique_id = f"{self._module.id}_illuminance"
-        self._attr_name = f"{self._module.name}: Illuminance"
+        self._attr_name = "Illuminance"
 
 
 class WindSensor(HbtnSensor):
@@ -184,7 +184,7 @@ class WindSensor(HbtnSensor):
         """Initialize the sensor."""
         super().__init__(module, nmbr, coord, idx)
         self._attr_unique_id = f"{self._module.id}_wind"
-        self._attr_name = f"{self._module.name}: Wind"
+        self._attr_name = "Wind"
 
 
 class RainSensor(HbtnSensor):
@@ -198,7 +198,7 @@ class RainSensor(HbtnSensor):
         """Initialize the sensor."""
         super().__init__(module, nmbr, coord, idx)
         self._attr_unique_id = f"{self._module.id}_rain"
-        self._attr_name = f"{self._module.name}: Rain"
+        self._attr_name = "Rain"
 
 
 class WindpeakSensor(HbtnSensor):
@@ -212,7 +212,7 @@ class WindpeakSensor(HbtnSensor):
         """Initialize the sensor."""
         super().__init__(module, nmbr, coord, idx)
         self._attr_unique_id = f"{self._module.id}_windpeak"
-        self._attr_name = f"{self._module.name}: Wind Peak"
+        self._attr_name = "Wind Peak"
 
 
 class AirqualitySensor(HbtnSensor):
@@ -224,7 +224,7 @@ class AirqualitySensor(HbtnSensor):
         """Initialize the sensor."""
         super().__init__(module, nmbr, coord, idx)
         self._attr_unique_id = f"{self._module.id}_airquality"
-        self._attr_name = f"{self._module.name}: Airquality"
+        self._attr_name = "Airquality"
 
 
 class HbtnDiagSensor(CoordinatorEntity, SensorEntity):
@@ -270,7 +270,7 @@ class TemperatureDSensor(HbtnDiagSensor):
         """Initialize the sensor."""
         super().__init__(module, nmbr, coord, idx)
         self._attr_unique_id = f"{self._module.id}_powtemperature"
-        self._attr_name = f"{self._module.name}: Power Unit Temperature"
+        self._attr_name = "Power Unit Temperature"
 
 
 class StatusSensor(HbtnDiagSensor):
@@ -280,7 +280,7 @@ class StatusSensor(HbtnDiagSensor):
         """Initialize the sensor."""
         super().__init__(module, nmbr, coord, idx)
         self._attr_unique_id = f"{self._module.id}_module_status"
-        self._attr_name = f"{self._module.name}: Module Status"
+        self._attr_name = "Module Status"
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -304,7 +304,7 @@ class LogicSensor(HbtnSensor):
         super().__init__(module, logic.nmbr, coord, idx)
         self.nmbr = logic.nmbr
         self._attr_unique_id = f"{self._module.id}_logic_{logic.nmbr}"
-        self._attr_name = f"{self._module.name} Cnt{logic.nmbr + 1}: {logic.name}"
+        self._attr_name = f"Cnt{logic.nmbr + 1}: {logic.name}"
         self._attr_icon = "mdi:counter"
 
     @callback
