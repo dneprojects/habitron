@@ -65,7 +65,11 @@ According to the modules found, several entities will be created automatically.
 
 ### Lights
 
-This integration creates light entities for all module outputs, dimmers. and LEDs. If covers are configured, the associated outputs will not appear as lights.
+This integration creates light entities for all module outputs, and dimmers. If covers are configured, the associated outputs will not appear as lights. All outputs without names are deactivated.
+
+### LEDs
+
+The red LEDs around the buttons on Smart Controller are implemented as switches as they should not appear as lights. Even if no nae is given, all LEDs will show up as entities.
 
 ### Covers
 
@@ -89,18 +93,23 @@ Depending on the module, a couple of sensors are created:
 | Humidity             | Air humidity in percent.                                      |
 | Luminance            | Luminace in lux.                                              |
 | Air qualitiy         | Index in percent.                                             |
+| Motion               | Motion sensors appear as binary sensors (see above)           |
 
 ### Buttons
 
-The habitron integration creates buttons for collective commands and visualization commands.
+The habitron integration creates buttons for collective commands, direct commands, and visualization commands.
 
 ### Numbers
 
-For Smart Controller modules, an input number entitiy is created to control the temperature setpoint.
+For Smart Controller modules, an input number entitiy is created to control the two temperature setpoints.
 
 ### Select
 
-The habitron system offers modes for daylight, alarm, and other modes. These are associated with group of modules. For each Smart Controller module three select entities are created to give access to these values. User defined modes will be detected.
+The habitron system offers modes for daylight, alarm, and other modes. These are associated with group of modules. For each Smart Controller module three select entities are created to give access to these values. User defined modes will be detected. The daylight mode control is deactivated by default as it usually is set automatically.
+
+### Climate
+
+Based on the first temperature setpoint and the sensor temperature, a climate controller is implemented. It supports heating on/off actions and its state can be used as input for automations. A manual on or off command will change the automatic operation for 5 minutes.
 
 ## Services
 
@@ -112,7 +121,8 @@ Restarts the module of the given address or restarts all modules if no argument 
 
 | Service data attribute  | Optional  | Description  |
 | :---------------------- | :-------- | :----------- |
-| `mod_nmbr`              | yes       | The address of the habitron module, which shall be restarted.
+| `rtr_nmbr`              | no        | The address of the habitron router, which serves the module.
+| `mod_nmbr`              | yes       | The address of the habitron module, which shall be restarted. If FF, all modules will be restarted.
 
 ### Service `habitron.restart_router`
 
@@ -120,9 +130,42 @@ Restarts the habitron router.
 
 | Service data attribute  | Optional  | Description  |
 | :---------------------- | :-------- | :----------- |
-| None                    | no        | No parameter needed.
+| `rtr_nmbr`              | no        | The address of the habitron router, which shall be restarted.
 
-## Unsupported modules
+### Service `habitron.save_module_smc`
+
+Saves a module's SMC data (module rules and names) to file. The file name is set automatically. It will appear in the config directory.
+
+| Service data attribute  | Optional  | Description  |
+| :---------------------- | :-------- | :----------- |
+| `rtr_nmbr`              | no        | The address of the habitron router, which serves the module.
+| `mod_nmbr`              | no        | The address of the habitron module.
+
+### Service `habitron.save_module_smg`
+
+Saves a module's SMG data (module settings) to file. The file name is set automatically. It will appear in the config directory.
+
+| Service data attribute  | Optional  | Description  |
+| :---------------------- | :-------- | :----------- |
+| `rtr_nmbr`              | no        | The address of the habitron router, which serves the module.
+| `mod_nmbr`              | no        | The address of the habitron module.
+
+### Service `habitron.save_router_smr`
+
+Saves a router's SMR data (router settings) to file. The file name is set automatically. It will appear in the config directory.
+
+| Service data attribute  | Optional  | Description  |
+| :---------------------- | :-------- | :----------- |
+| `rtr_nmbr`              | no        | The address of the habitron router, which serves the module.
+
+
+## Unsupported
+
+### Features
+
+Multiple routers are not supported.
+
+### Modules
 
 The following modules are not supported:
 
