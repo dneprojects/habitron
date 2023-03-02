@@ -167,7 +167,7 @@ Multiple routers are not supported.
 
 =======
 
-Saves a module's SMC data (module rules and names) to file. The file name is set automatically. It will appear in the config directory.
+Saves a module's SMC data (module rules and names) to file. The file name is set automatically. It will appear directory "habitron/data".
 
 | Service data attribute  | Optional  | Description  |
 | :---------------------- | :-------- | :----------- |
@@ -176,7 +176,7 @@ Saves a module's SMC data (module rules and names) to file. The file name is set
 
 ### Service `habitron.save_module_smg`
 
-Saves a module's SMG data (module settings) to file. The file name is set automatically. It will appear in the config directory.
+Saves a module's SMG data (module settings) to file. The file name is set automatically. It will appear directory "habitron/data".
 
 | Service data attribute  | Optional  | Description  |
 | :---------------------- | :-------- | :----------- |
@@ -185,7 +185,7 @@ Saves a module's SMG data (module settings) to file. The file name is set automa
 
 ### Service `habitron.save_router_smr`
 
-Saves a router's SMR data (router settings) to file. The file name is set automatically. It will appear in the config directory.
+Saves a router's SMR data (router settings) to file. The file name is set automatically. It will appear directory "habitron/data".
 
 | Service data attribute  | Optional  | Description  |
 | :---------------------- | :-------- | :----------- |
