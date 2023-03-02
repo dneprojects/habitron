@@ -150,6 +150,6 @@ class DimmedOutput(SwitchedOutput):
         self._brightness = kwargs.get(ATTR_BRIGHTNESS, self._brightness)
         await self._module.comm.async_set_dimmval(
             self._module.mod_addr,
-            self._nmbr + 1,
+            self._nmbr - self._out_offs + 1,
             int(self._brightness * 100.0 / 255),
         )

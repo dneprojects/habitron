@@ -108,7 +108,9 @@ class VisCmdButton(ButtonEntity):
         """Initialize an VisCommand."""
         self._module = module
         self._nmbr = vis_cmd.nmbr
-        self._attr_name = f"VisCmd {self._nmbr-256}: {vis_cmd.name}"
+        no_hi = int(self._nmbr / 256)
+        no_lo = self._nmbr - no_hi * 256
+        self._attr_name = f"VisCmd {no_hi}/{no_lo}: {vis_cmd.name}"
         self._attr_unique_id = (
             f"Mod_{self._module.mod_addr}_VCmd{self._nmbr}_{vis_cmd.name}"
         )

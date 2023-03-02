@@ -1,14 +1,9 @@
 """Communicate class for Habitron system."""
 from __future__ import annotations
 
-from binascii import hexlify
-
-# In a real implementation, this would be in an external library that's on PyPI.
-# The PyPI package needs to be included in the `requirements` section of manifest.json
-# See https://developers.home-assistant.io/docs/creating_integration_manifest
-# for more information.
-# This dummy smip always returns 3 rollers.
+import os
 import socket
+from binascii import hexlify
 from typing import Final
 
 from pymodbus.utilities import computeCRC
@@ -17,7 +12,10 @@ from homeassistant import exceptions
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 
-from .const import MirrIdx
+from .const import DOMAIN, MirrIdx
+
+BASE_PATH_COMPONENT = "./homeassistant/components"
+BASE_PATH_CUSTOM_COMPONENT = "./config/custom_components"
 
 SMIP_COMMANDS: Final[dict[str, str]] = {
     "GET_MODULES": "\x0a\1\2<rtr>\0\0\0",
@@ -111,6 +109,7 @@ class HbtnComm:
         return await self.async_send_command(SMIP_COMMANDS["GET_SMIP_FIRMWARE"])
 
     async def get_smr(self, rtr_id) -> bytes:
+        """Get router SMR information"""
         rtr_nmbr = int(rtr_id / 100)
         cmd_str = SMIP_COMMANDS["GET_ROUTER_SMR"]
         cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
@@ -396,8 +395,14 @@ class HbtnComm:
 
     async def save_config_data(self, file_name: str, str_data: str) -> None:
         """Saving config info to text file"""
-        path = "./config/"
-        file_path = path + file_name
+        cwork_dir = os.getcwd()
+        if os.path.isdir(BASE_PATH_COMPONENT):
+            data_path = f"{BASE_PATH_COMPONENT}/{DOMAIN}/data/"
+        else:
+            data_path = f"{BASE_PATH_CUSTOM_COMPONENT}/{DOMAIN}/data/"
+        if not (os.path.isdir(data_path)):
+            os.mkdir(data_path)
+        file_path = data_path + file_name
         hbtn_file = open(file_path, "w", encoding="ascii", errors="surrogateescape")
         hbtn_file.write(str_data)
         hbtn_file.close()
