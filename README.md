@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/github/v/release/dneprojects/habitron" alt="Current version">
 </p>
 
-The `habitron` implementation allows you to integrate your [Habitron](https://www.habitron.de/) devices in Home Assistant.
+The `habitron` implementation allows you to integrate your [Habitron](https://www.habitron.de/) devices in Home Assistant. It is implemented using a _push_ model in _async_.
 
 ## Installation
 
@@ -38,13 +38,13 @@ $ mv habitron-master/custom_components/habitron <home-assistant-install-director
   6. Select category `Integration`
   7. Click `Add`
   8. Click `Install` on the Habitron integration box that has now appeared
-  
+
 
 > :warning: **After executing one of the above installation methods, restart Home Assistant. Also clear your browser cache before proceeding to the next step, as the integration may not be visible otherwise.**
 
 
 In your Home Assistant installation go to: Configuration > Integrations, click the button Add Integration > Habitron
-Enter the details for your camera. The SMartIP, router and modules as devices. 
+Enter the details for your camera. The SMartIP, router and modules as devices.
 
 ## Configuration
 
@@ -134,6 +134,39 @@ Restarts the habitron router.
 
 ### Service `habitron.save_module_smc`
 
+Saves a module's SMC data (module rules and names) to file. The file name is set automatically. It will appear directory "habitron/data".
+
+| Service data attribute  | Optional  | Description  |
+| :---------------------- | :-------- | :----------- |
+| `rtr_nmbr`              | no        | The address of the habitron router, which serves the module.
+| `mod_nmbr`              | no        | The address of the habitron module.
+
+### Service `habitron.save_module_smg`
+
+Saves a module's SMG data (module settings) to file. The file name is set automatically. It will appear directory "habitron/data".
+
+| Service data attribute  | Optional  | Description  |
+| :---------------------- | :-------- | :----------- |
+| `rtr_nmbr`              | no        | The address of the habitron router, which serves the module.
+| `mod_nmbr`              | no        | The address of the habitron module.
+
+### Service `habitron.save_router_smr`
+
+Saves a router's SMR data (router settings) to file. The file name is set automatically. It will appear directory "habitron/data".
+
+| Service data attribute  | Optional  | Description  |
+| :---------------------- | :-------- | :----------- |
+| `rtr_nmbr`              | no        | The address of the habitron router, which serves the module.
+
+
+## Unsupported
+
+### Features
+
+Multiple routers are not supported.
+
+=======
+
 Saves a module's SMC data (module rules and names) to file. The file name is set automatically. It will appear in the config directory.
 
 | Service data attribute  | Optional  | Description  |
@@ -174,3 +207,4 @@ The following modules are not supported:
 Not tested:
 - Smart Dimm
 - Unterputzmodul
+
