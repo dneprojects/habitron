@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/github/v/release/dneprojects/habitron" alt="Current version">
 </p>
 
-The `habitron` implementation allows you to integrate your [Habitron](https://www.habitron.de/) devices in Home Assistant.
+The `habitron` implementation allows you to integrate your [Habitron](https://www.habitron.de/) devices in Home Assistant. It is implemented using a _push_ model in _async_.
 
 ## Installation
 
@@ -38,13 +38,13 @@ $ mv habitron-master/custom_components/habitron <home-assistant-install-director
   6. Select category `Integration`
   7. Click `Add`
   8. Click `Install` on the Habitron integration box that has now appeared
-  
+
 
 > :warning: **After executing one of the above installation methods, restart Home Assistant. Also clear your browser cache before proceeding to the next step, as the integration may not be visible otherwise.**
 
 
 In your Home Assistant installation go to: Configuration > Integrations, click the button Add Integration > Habitron
-Enter the details for your camera. The SMartIP, router and modules as devices. 
+Enter the details for your camera. The SMartIP, router and modules as devices.
 
 ## Configuration
 
@@ -54,7 +54,7 @@ A second parameter is used to control the polling update interval.
 | Configuration parameter | Optional  | Description  |
 | :---------------------- | :-------- | :----------- |
 | `host name`             | no        | Either the DNS host name of the SmartIP or its IP address.
-| `update interval`       | no        | Polling update interval in seconds, must be between 3 and 20 seconds.
+| `update interval`       | no        | Polling update interval in seconds, must be between 2 and 10 seconds.
 
 These parameters can be changed after installation as well.
 
@@ -65,7 +65,11 @@ According to the modules found, several entities will be created automatically.
 
 ### Lights
 
-This integration creates light entities for all module outputs, dimmers. and LEDs. If covers are configured, the associated outputs will not appear as lights.
+This integration creates light entities for all module outputs, and dimmers. If covers are configured, the associated outputs will not appear as lights. All outputs without names are deactivated.
+
+### LEDs
+
+The red LEDs around the buttons on Smart Controller are implemented as switches as they should not appear as lights. Even if no nae is given, all LEDs will show up as entities.
 
 ### Covers
 
@@ -89,18 +93,23 @@ Depending on the module, a couple of sensors are created:
 | Humidity             | Air humidity in percent.                                      |
 | Luminance            | Luminace in lux.                                              |
 | Air qualitiy         | Index in percent.                                             |
+| Motion               | Motion sensors appear as binary sensors (see above)           |
 
 ### Buttons
 
-The habitron integration creates buttons for collective commands and visualization commands.
+The habitron integration creates buttons for collective commands, direct commands, and visualization commands.
 
 ### Numbers
 
-For Smart Controller modules, an input number entitiy is created to control the temperature setpoint.
+For Smart Controller modules, an input number entitiy is created to control the two temperature setpoints.
 
 ### Select
 
-The habitron system offers modes for daylight, alarm, and other modes. These are associated with group of modules. For each Smart Controller module three select entities are created to give access to these values. User defined modes will be detected.
+The habitron system offers modes for daylight, alarm, and other modes. These are associated with group of modules. For each Smart Controller module three select entities are created to give access to these values. User defined modes will be detected. The daylight mode control is deactivated by default as it usually is set automatically.
+
+### Climate
+
+Based on the first temperature setpoint and the sensor temperature, a climate controller is implemented. It supports heating on/off actions and its state can be used as input for automations. A manual on or off command will change the automatic operation for 5 minutes.
 
 ## Services
 
@@ -112,7 +121,8 @@ Restarts the module of the given address or restarts all modules if no argument 
 
 | Service data attribute  | Optional  | Description  |
 | :---------------------- | :-------- | :----------- |
-| `mod_nmbr`              | yes       | The address of the habitron module, which shall be restarted.
+| `rtr_nmbr`              | no        | The address of the habitron router, which serves the module.
+| `mod_nmbr`              | yes       | The address of the habitron module, which shall be restarted. If FF, all modules will be restarted.
 
 ### Service `habitron.restart_router`
 
@@ -120,9 +130,42 @@ Restarts the habitron router.
 
 | Service data attribute  | Optional  | Description  |
 | :---------------------- | :-------- | :----------- |
-| None                    | no        | No parameter needed.
+| `rtr_nmbr`              | no        | The address of the habitron router, which shall be restarted.
 
-## Unsupported modules
+### Service `habitron.save_module_smc`
+
+Saves a module's SMC data (module rules and names) to file. The file name is set automatically. It will appear directory "habitron/data".
+
+| Service data attribute  | Optional  | Description  |
+| :---------------------- | :-------- | :----------- |
+| `rtr_nmbr`              | no        | The address of the habitron router, which serves the module.
+| `mod_nmbr`              | no        | The address of the habitron module.
+
+### Service `habitron.save_module_smg`
+
+Saves a module's SMG data (module settings) to file. The file name is set automatically. It will appear directory "habitron/data".
+
+| Service data attribute  | Optional  | Description  |
+| :---------------------- | :-------- | :----------- |
+| `rtr_nmbr`              | no        | The address of the habitron router, which serves the module.
+| `mod_nmbr`              | no        | The address of the habitron module.
+
+### Service `habitron.save_router_smr`
+
+Saves a router's SMR data (router settings) to file. The file name is set automatically. It will appear directory "habitron/data".
+
+| Service data attribute  | Optional  | Description  |
+| :---------------------- | :-------- | :----------- |
+| `rtr_nmbr`              | no        | The address of the habitron router, which serves the module.
+
+
+## Unsupported
+
+### Features
+
+Multiple routers are not supported.
+
+### Modules
 
 The following modules are not supported:
 
@@ -131,3 +174,4 @@ The following modules are not supported:
 Not tested:
 - Smart Dimm
 - Unterputzmodul
+

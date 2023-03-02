@@ -134,7 +134,7 @@ class HbtnFlag(CoordinatorEntity, BinarySensorEntity):
         self._nmbr = flag.nmbr
         self._state = False
         self._attr_unique_id = f"{self._module.id}_flag_{flag.nmbr}"
-        self._attr_name = f"{self._module.name}: Flag {flag.nmbr} {flag.name}"
+        self._attr_name = f"Flag {flag.nmbr} {flag.name}"
 
     # To link this entity to its device, this property must return an
     # identifiers value matching that used in the module
