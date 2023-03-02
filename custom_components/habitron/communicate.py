@@ -15,7 +15,7 @@ from homeassistant.config_entries import ConfigEntry
 from .const import DOMAIN, MirrIdx
 
 BASE_PATH_COMPONENT = "./homeassistant/components"
-BASE_PATH_CUSTOM_COMPONENT = "./config/custom_components"
+BASE_PATH_CUSTOM_COMPONENT = "./custom_components"
 
 SMIP_COMMANDS: Final[dict[str, str]] = {
     "GET_MODULES": "\x0a\1\2<rtr>\0\0\0",
