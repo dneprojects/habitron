@@ -165,6 +165,39 @@ Saves a router's SMR data (router settings) to file. The file name is set automa
 
 Multiple routers are not supported.
 
+=======
+
+Saves a module's SMC data (module rules and names) to file. The file name is set automatically. It will appear in the config directory.
+
+| Service data attribute  | Optional  | Description  |
+| :---------------------- | :-------- | :----------- |
+| `rtr_nmbr`              | no        | The address of the habitron router, which serves the module.
+| `mod_nmbr`              | no        | The address of the habitron module.
+
+### Service `habitron.save_module_smg`
+
+Saves a module's SMG data (module settings) to file. The file name is set automatically. It will appear in the config directory.
+
+| Service data attribute  | Optional  | Description  |
+| :---------------------- | :-------- | :----------- |
+| `rtr_nmbr`              | no        | The address of the habitron router, which serves the module.
+| `mod_nmbr`              | no        | The address of the habitron module.
+
+### Service `habitron.save_router_smr`
+
+Saves a router's SMR data (router settings) to file. The file name is set automatically. It will appear in the config directory.
+
+| Service data attribute  | Optional  | Description  |
+| :---------------------- | :-------- | :----------- |
+| `rtr_nmbr`              | no        | The address of the habitron router, which serves the module.
+
+
+## Unsupported
+
+### Features
+
+Multiple routers are not supported.
+
 ### Modules
 
 The following modules are not supported:
