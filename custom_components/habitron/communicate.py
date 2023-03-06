@@ -12,7 +12,7 @@ from homeassistant import exceptions
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 
-from .const import DOMAIN, MirrIdx
+from .const import DOMAIN, MirrIdx, ModuleDescriptor
 
 BASE_PATH_COMPONENT = "./homeassistant/components"
 BASE_PATH_CUSTOM_COMPONENT = "./custom_components"
@@ -193,9 +193,7 @@ class HbtnComm:
         """Trigger update of Habitron states, must poll all routers"""
 
         if self.router.coord.update_interval.seconds == 6:
-            sys_status = await self.get_mirror_status(
-                self.router.id, self.router.modules_desc
-            )
+            sys_status = await self.get_mirror_status(self.router.modules_desc)
         else:
             sys_status = await self.get_compact_status(self.router.id)
         if sys_status == b"":
@@ -293,18 +291,25 @@ class HbtnComm:
         cmd_str = cmd_str.replace("<arg1>", chr(nmbr))
         await self.async_send_only(cmd_str)
 
-    async def get_mirror_status(self, rtr_id, mod_desc) -> bytes:
+    async def get_mirror_status(self, mod_desc) -> bytes:
         """Get common sys_status by separate calls to mirror"""
-        rtr_nmbr = int(rtr_id / 100)
+        if isinstance(mod_desc, ModuleDescriptor):
+            rtr_nmbr = int(mod_desc[0].uid / 100)
+        else:
+            mod_uid = mod_desc
+            rtr_nmbr = int(mod_uid / 100)
+            mod_desc: list[ModuleDescriptor] = []
+            mod_desc.append(ModuleDescriptor(mod_uid, "", "", 1))
         sys_status = b""
         sys_crc = 0
         for desc in mod_desc:
             cmd_str = SMIP_COMMANDS["READ_MODULE_MIRR_STATUS"]
             cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-            cmd_str = cmd_str.replace("<mod>", chr(desc.addr))
+            cmd_str = cmd_str.replace("<mod>", chr(desc.uid - 100 * rtr_nmbr))
             [resp, crc] = await self.async_send_command_crc(cmd_str)
             status = (
-                resp[0 : MirrIdx.LED_I]
+                (chr(91) + chr(1)).encode("iso8859-1")
+                + resp[0 : MirrIdx.LED_I]
                 + resp[MirrIdx.IR_H : MirrIdx.ROLL_T]
                 + resp[MirrIdx.ROLL_POS : MirrIdx.BLAD_T]
                 + resp[MirrIdx.BLAD_POS : MirrIdx.T_SHORT]
@@ -312,7 +317,7 @@ class HbtnComm:
                 + resp[MirrIdx.RAIN : MirrIdx.RAIN + 2]
                 + resp[MirrIdx.USER_CNT : MirrIdx.FINGER_CNT + 1]
                 + resp[MirrIdx.MODULE_STAT : MirrIdx.MODULE_STAT + 1]
-                + resp[MirrIdx.COUNTER : MirrIdx.END]
+                + resp[MirrIdx.COUNTER : MirrIdx.END - 3]
             )
             sys_status = sys_status + status
             sys_crc += crc
@@ -327,6 +332,20 @@ class HbtnComm:
         rtr_nmbr = int(rtr_id / 100)
         cmd_str = SMIP_COMMANDS["GET_COMPACT_STATUS"]
         cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        [resp_bytes, crc] = await self.async_send_command_crc(cmd_str)
+        if crc == self.crc:
+            return b""
+        else:
+            self.crc = crc
+            return resp_bytes
+
+    async def get_module_status(self, mod_id) -> bytes:
+        """Get compact status for all modules, if changed crc"""
+        rtr_nmbr = int(mod_id / 100)
+        mod_nmbr = mod_id - rtr_nmbr * 100
+        cmd_str = SMIP_COMMANDS["GET_MODULE_STATUS"]
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        cmd_str = cmd_str.replace("<mod>", chr(mod_nmbr))
         [resp_bytes, crc] = await self.async_send_command_crc(cmd_str)
         if crc == self.crc:
             return b""
@@ -357,6 +376,18 @@ class HbtnComm:
         if resp[0:5].decode("iso8859-1") == "Error":
             return b""
         return resp
+
+    async def save_module_status(self, mod_id) -> None:
+        """Get module module status and saves it to file"""
+        data = await self.get_module_status(mod_id)
+        file_name = f"Module_{mod_id}.mstat"
+        await self.save_config_data(file_name, format_block_output(data))
+
+    async def save_router_status(self, rtr_id) -> None:
+        """Get module mirror status and saves it to file"""
+        data = await self.async_get_router_status(rtr_id)
+        file_name = f"Router_{rtr_id}.rstat"
+        await self.save_config_data(file_name, format_block_output(data))
 
     async def save_smc_file(self, mod_id) -> None:
         """Get module definitions (smc) and saves them to file"""
@@ -395,7 +426,6 @@ class HbtnComm:
 
     async def save_config_data(self, file_name: str, str_data: str) -> None:
         """Saving config info to text file"""
-        cwork_dir = os.getcwd()
         if os.path.isdir(BASE_PATH_COMPONENT):
             data_path = f"{BASE_PATH_COMPONENT}/{DOMAIN}/data/"
         else:
@@ -500,6 +530,21 @@ def wrap_command(cmd_string: str) -> str:
     crc_high = (cmd_crc - crc_low) >> 8
     cmd_postfix = chr(crc_high) + chr(crc_low) + cmd_postfix
     return full_string + cmd_postfix
+
+
+def format_block_output(byte_str: bytes) -> str:
+    """Format block hex output with lines"""
+    lbs = len(byte_str)
+    res_str = ""
+    ptr = 0
+    while ptr < lbs:
+        line = ""
+        end_l = min([ptr + 10, lbs])
+        for i in range(end_l - ptr):
+            line = line + f"{'{:02X}'.format(byte_str[ptr+i])} "
+        res_str += f"{'{:03d}'.format(ptr)}  {line}{chr(13)}"
+        ptr += 10
+    return res_str
 
 
 class TimeoutException(exceptions.HomeAssistantError):
