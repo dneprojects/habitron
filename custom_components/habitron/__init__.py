@@ -26,22 +26,26 @@ PLATFORMS: list[str] = [
 ]
 SERVICE_MOD_RESTART_SCHEMA = vol.Schema(
     {
-        vol.Required(ROUTER_NMBR): int,
-        vol.Optional(RESTART_KEY_NMBR): int,
+        vol.Required(ROUTER_NMBR, default=1): int,
+        vol.Optional(RESTART_KEY_NMBR, default=1): int,
     }
 )
 SERVICE_MOD_FILE_SCHEMA = vol.Schema(
     {
-        vol.Required(ROUTER_NMBR): int,
-        vol.Required(FILE_MOD_NMBR): int,
+        vol.Required(ROUTER_NMBR, default=1): int,
+        vol.Required(FILE_MOD_NMBR, default=1): int,
     }
 )
 SERVICE_RTR_FILE_SCHEMA = vol.Schema(
     {
-        vol.Required(ROUTER_NMBR): int,
+        vol.Required(ROUTER_NMBR, default=1): int,
     }
 )
-SERVICE_RTR_RESTART_SCHEMA = vol.Schema({})
+SERVICE_RTR_RESTART_SCHEMA = vol.Schema(
+    {
+        vol.Required(ROUTER_NMBR, default=1): int,
+    }
+)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -80,6 +84,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await smip.comm.save_smr_file(rtr_id)
         return
 
+    async def save_module_status(call: ServiceCall):
+        """Handle the service call."""
+        rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
+        mod_nmbr = call.data.get(FILE_MOD_NMBR, 1)
+        await smip.comm.save_module_status(rtr_id + mod_nmbr)
+        return
+
+    async def save_router_status(call: ServiceCall):
+        """Handle the service call."""
+        rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
+        await smip.comm.save_router_status(rtr_id)
+        return
+
     smip = SmartIP(hass, entry)
     try:
         await smip.initialize(hass, entry)
@@ -106,6 +123,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
     hass.services.async_register(
         DOMAIN, "save_router_smr", save_router_smr, schema=SERVICE_RTR_FILE_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN, "save_module_status", save_module_status, schema=SERVICE_MOD_FILE_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN, "save_router_status", save_router_status, schema=SERVICE_RTR_FILE_SCHEMA
     )
 
     # This creates each HA object for each platform your device requires.
