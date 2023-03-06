@@ -42,5 +42,21 @@
         "abort": {
             "already_configured": "Habitron Integration bereits installiert"
         }
+    },
+    "entity": {
+      "select": {
+        "habitron_mode": {
+            "state": {
+                "On": "Aktiv",
+                "Off": "Aus",
+                "Day": "Tag",
+                "Night": "Nacht",
+                "Absent": "Abwesend",
+                "Present": "Anwesend",
+                "Sleeping": "Schlafen",
+                "Vacation": "Urlaub"
+            }
+        }
+      }
     }
 }

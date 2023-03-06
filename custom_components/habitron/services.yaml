@@ -5,7 +5,7 @@ mod_restart:
   fields:
     rtr_nmbr:
       name: Router number
-      description: Habitron's router address, default 1
+      description: Habitron's router address
       required: true
       example: 1
       selector:
@@ -26,7 +26,7 @@ rtr_restart:
   fields:
     rtr_nmbr:
       name: Router number
-      description: Habitron's router address, default 1
+      description: Habitron's router address
       required: true
       example: 1
       selector:
@@ -39,7 +39,7 @@ save_module_smc:
   fields:
     rtr_nmbr:
       name: Router number
-      description: Habitron's router address, default 1
+      description: Habitron's router address
       required: true
       example: 1
       selector:
@@ -48,7 +48,7 @@ save_module_smc:
           max: 8
     mod_nmbr:
       name: Module number
-      description: Habitron's module address, default 0xFF for all modules
+      description: Habitron's module address
       required: true
       example: 1
       selector:
@@ -61,7 +61,7 @@ save_module_smg:
   fields:
     rtr_nmbr:
       name: Router number
-      description: Habitron's router address, default 1
+      description: Habitron's router address
       required: true
       example: 1
       selector:
@@ -70,7 +70,7 @@ save_module_smg:
           max: 8
     mod_nmbr:
       name: Module number
-      description: Habitron's module address, default 0xFF for all modules
+      description: Habitron's module address
       required: true
       example: 1
       selector:
@@ -83,7 +83,42 @@ save_router_smr:
   fields:
     rtr_nmbr:
       name: Router number
-      description: Habitron's router address, default 1
+      description: Habitron's router address
+      required: true
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 8
+save_module_status:
+  name: Save module status to file
+  description: Get module status and save it to .mstat text file
+  fields:
+    rtr_nmbr:
+      name: Router number
+      description: Habitron's router address
+      required: true
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 8
+    mod_nmbr:
+      name: Module number
+      description: Habitron's module address
+      required: true
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 64
+save_router_status:
+  name: Save router status to file
+  description: Get router status and save it to .rstat text file
+  fields:
+    rtr_nmbr:
+      name: Router number
+      description: Habitron's router address
       required: true
       example: 1
       selector:
