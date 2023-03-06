@@ -35,8 +35,29 @@ MODULE_CODES: Final[dict[str, str]] = {
 class RoutIdx:
     """Definition of router status index values"""
 
+    ADDR = 0
+    DEVICE_CNT = 1
     MODE0 = 2
-    FLAG_GLOB = 38  # 1..8
+    MEM_ERR_1 = 3  # 2 bytes
+    MEM_ERR_2 = 5
+    MEM_TEST_STRT = 7
+    TIME_OUT = 8  # Channels 1..4: 8..11
+    ERR_MSTR_RING = 12
+    REBOOTED = 13
+    MEM_TEST = 14
+    BOOT_CNT = 15  # 2 bytes
+    VOLTAGE_24 = 17  # 2 bytes
+    VOLTAGE_5 = 19  # 2 bytes
+    CURRENTS = 21  # Channels 1..8, 2 bytes: 21..36
+    ERR_SYSTEM = 37
+    FLAG_GLOB = 38  # 1..16: 38..39
+    BOOT_FINISHED = 40
+    MOD_RESPONSE = 41
+    MIRROR_STRTED = 42
+
+
+TRUE_VAL = 0x4A  # Status values returned by router
+FALSE_VAL = 0x4E
 
 
 class MSetIdx:
@@ -55,6 +76,7 @@ class MSetIdx:
 class MStatIdx:
     """Definition of module status index values"""
 
+    BYTE_COUNT = 0  # in compact status included
     ADDR = 1
     MODE = 4
     INP_1_8 = 5
@@ -98,7 +120,7 @@ class MStatIdx:
     COUNTER_VAL = 60  # cnt val
     LOGIC_OUT = 88  # 1..8, 89 9..16
     FLAG_LOC = 90  # 1..8, 91 9..16 Logic-Ausgänge
-    END = 92
+    END = 92  # incl. byte_count
 
 
 class MirrIdx:
@@ -196,3 +218,13 @@ class SMirrIdx:
     T_SETP_1 = 38
     T_SETP_2 = 40
     END = 42
+
+
+class ModuleDescriptor:
+    """Habitron modules descriptor."""
+
+    def __init__(self, uid, mtype, name, group) -> None:
+        self.uid: int = uid
+        self.mtype: str = mtype
+        self.name: str = name
+        self.group: int = group

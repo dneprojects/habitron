@@ -9,6 +9,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
+from .interfaces import TYPE_DIAG
 
 
 # See cover.py for more details.
@@ -27,10 +28,10 @@ async def async_setup_entry(
     new_devices = []
     for hbt_module in hbtn_rt.modules:
         for mod_sensor in hbt_module.sensors:
-            if mod_sensor.name == "Temperature":
+            if mod_sensor.name[0:11] == "Temperature":
                 new_devices.append(
                     TemperatureSensor(
-                        hbt_module, mod_sensor.nmbr, hbtn_cord, len(new_devices)
+                        hbt_module, mod_sensor, hbtn_cord, len(new_devices)
                     )
                 )
             elif mod_sensor.name == "Humidity":
@@ -80,23 +81,21 @@ async def async_setup_entry(
                         hbt_module, mod_diag.nmbr, hbtn_cord, len(new_devices)
                     )
                 )
+    for time_out in hbtn_rt.chan_timeouts:
+        new_devices.append(
+            TimeOutSensor(hbtn_rt, time_out, hbtn_cord, len(new_devices))
+        )
+    for ch_curr in hbtn_rt.chan_currents:
+        new_devices.append(CurrSensor(hbtn_rt, ch_curr, hbtn_cord, len(new_devices)))
+    for rt_vtg in hbtn_rt.voltages:
+        new_devices.append(VoltSensor(hbtn_rt, rt_vtg, hbtn_cord, len(new_devices)))
 
-    # Fetch initial data so we have data when entities subscribe
-    #
-    # If the refresh fails, async_config_entry_first_refresh will
-    # raise ConfigEntryNotReady and setup will try again later
-    #
-    # If you do not want to retry setup on failure, use
-    # coordinator.async_refresh() instead
     if new_devices:
         await hbtn_cord.async_config_entry_first_refresh()
         hbtn_cord.data = new_devices
         async_add_entities(new_devices)
 
 
-# This base class shows the common properties and methods for a sensor as used in this
-# example. See each sensor for further details about properties and methods that
-# have been overridden.
 class HbtnSensor(CoordinatorEntity, SensorEntity):
     """Base representation of a Habitron sensor."""
 
@@ -138,11 +137,15 @@ class TemperatureSensor(HbtnSensor):
     _attr_native_unit_of_measurement = "°C"
     _attr_unit_of_measurement = "°C"
 
-    def __init__(self, module, nmbr, coord, idx) -> None:
+    def __init__(self, module, sensor, coord, idx) -> None:
         """Initialize the sensor."""
-        super().__init__(module, nmbr, coord, idx)
-        self._attr_unique_id = f"{self._module.id}_temperature"
-        self._attr_name = "Temperature"
+        super().__init__(module, sensor.nmbr, coord, idx)
+        self._attr_unique_id = f"{self._module.id}_{sensor.name.lower()}"
+        self._attr_name = sensor.name
+        if sensor.name == "Temperature ext.":
+            self._attr_entity_registry_enabled_default = (
+                False  # Entity will initally be disabled
+            )
 
 
 class HumiditySensor(HbtnSensor):
@@ -311,4 +314,82 @@ class LogicSensor(HbtnSensor):
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
         self._attr_native_value = self._module.logic[self.nmbr].value
+        self.async_write_ha_state()
+
+
+class CurrSensor(HbtnSensor):
+    """Representation of a current sensor."""
+
+    device_class = SensorDeviceClass.CURRENT
+    _attr_native_unit_of_measurement = "A"
+    _attr_unit_of_measurement = "A"
+
+    def __init__(self, module, sensor, coord, idx) -> None:
+        """Initialize the sensor."""
+        super().__init__(module, sensor.nmbr, coord, idx)
+        self._attr_unique_id = f"{self._module.id}_{sensor.name.lower()}"
+        self._attr_name = sensor.name
+        self.nmbr = sensor.nmbr
+        if abs(sensor.type) == TYPE_DIAG:
+            self._attr_entity_category = EntityCategory.DIAGNOSTIC
+            self._attr_entity_registry_enabled_default = (
+                False  # Entity will initally be disabled
+            )
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self._attr_native_value = self._module.chan_currents[self.nmbr].value
+        self.async_write_ha_state()
+
+
+class VoltSensor(HbtnSensor):
+    """Representation of a voltage sensor."""
+
+    device_class = SensorDeviceClass.VOLTAGE
+    _attr_native_unit_of_measurement = "V"
+    _attr_unit_of_measurement = "V"
+
+    def __init__(self, module, sensor, coord, idx) -> None:
+        """Initialize the sensor."""
+        super().__init__(module, sensor.nmbr, coord, idx)
+        self._attr_unique_id = f"{self._module.id}_{sensor.name.lower()}"
+        self._attr_name = sensor.name
+        self.nmbr = sensor.nmbr
+        if abs(sensor.type) == TYPE_DIAG:
+            self._attr_entity_category = EntityCategory.DIAGNOSTIC
+            self._attr_entity_registry_enabled_default = (
+                False  # Entity will initally be disabled
+            )
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self._attr_native_value = self._module.voltages[self.nmbr].value
+        self.async_write_ha_state()
+
+
+class TimeOutSensor(HbtnSensor):
+    """Representation of a timeout count sensor."""
+
+    _attr_native_unit_of_measurement = ""
+    _attr_unit_of_measurement = ""
+
+    def __init__(self, module, timeout, coord, idx) -> None:
+        """Initialize the sensor."""
+        super().__init__(module, timeout.nmbr, coord, idx)
+        self.nmbr = timeout.nmbr
+        self._attr_unique_id = f"{self._module.id}_timeout_{timeout.nmbr}"
+        self._attr_name = timeout.name
+        self._attr_icon = "mdi:timer-alert-outline"
+        if abs(timeout.type) == TYPE_DIAG:
+            self._attr_entity_category = EntityCategory.DIAGNOSTIC
+            self._attr_entity_registry_enabled_default = (
+                False  # Entity will initally be disabled
+            )
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self._attr_native_value = self._module.chan_timeouts[self.nmbr].value
         self.async_write_ha_state()

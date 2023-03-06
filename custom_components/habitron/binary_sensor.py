@@ -6,10 +6,12 @@ from __future__ import annotations
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
+from .interfaces import TYPE_DIAG
 
 # from homeassistant.helpers.entity import Entity
 
@@ -47,14 +49,9 @@ async def async_setup_entry(
                 )
     for rt_flg in hbtn_rt.flags:
         new_devices.append(HbtnFlag(rt_flg, hbtn_rt, hbtn_cord, len(new_devices)))
+    for rt_stat in hbtn_rt.states:
+        new_devices.append(HbtnState(rt_stat, hbtn_rt, hbtn_cord, len(new_devices)))
 
-    # Fetch initial data so we have data when entities subscribe
-    #
-    # If the refresh fails, async_config_entry_first_refresh will
-    # raise ConfigEntryNotReady and setup will try again later
-    #
-    # If you do not want to retry setup on failure, use
-    # coordinator.async_refresh() instead
     if new_devices:
         await hbtn_cord.async_config_entry_first_refresh()
         hbtn_cord.data = new_devices
@@ -163,6 +160,58 @@ class HbtnFlag(CoordinatorEntity, BinarySensorEntity):
             self._attr_icon = "mdi:bookmark-check"
         else:
             self._attr_icon = "mdi:bookmark-outline"
+        self._state = self._attr_is_on
+        self.async_write_ha_state()
+
+
+class HbtnState(CoordinatorEntity, BinarySensorEntity):
+    """Representation of habitron state entities."""
+
+    _attr_has_entity_name = True
+
+    def __init__(self, state, module, coord, idx) -> None:
+        """Initialize an Hbtnstate, pass coordinator to CoordinatorEntity."""
+        super().__init__(coord, context=idx)
+        self.idx = idx
+        self._state = state
+        self._module = module
+        self._nmbr = state.nmbr
+        self._state = False
+        self._attr_unique_id = f"{self._module.id}_state_{state.nmbr}"
+        self._attr_name = state.name
+        if state.type == TYPE_DIAG:
+            self._attr_entity_category = EntityCategory.DIAGNOSTIC
+            self._attr_entity_registry_enabled_default = (
+                False  # Entity will initally be disabled
+            )
+
+    # To link this entity to its device, this property must return an
+    # identifiers value matching that used in the module
+    @property
+    def device_info(self) -> None:
+        """Return information to link this entity with the correct device."""
+        if isinstance(self._module.id, int):
+            return {"identifiers": {(DOMAIN, self._module.uid)}}  # router
+        return {"identifiers": {(DOMAIN, self._module.uid)}}
+
+    @property
+    def available(self) -> bool:
+        """Return True if module and smip is available."""
+        return True
+
+    @property
+    def name(self) -> str:
+        """Return the display name of this state."""
+        return self._attr_name
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self._attr_is_on = self._module.states[self._nmbr].value == 1
+        if self._attr_is_on:
+            self._attr_icon = "mdi:checkbox-marked-circle-outline"
+        else:
+            self._attr_icon = "mdi:alert-circle-outline"
         self._state = self._attr_is_on
         self.async_write_ha_state()
 

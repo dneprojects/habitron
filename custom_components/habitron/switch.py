@@ -40,13 +40,6 @@ async def async_setup_entry(
                 SwitchedLed(loc_led, hbt_module, hbtn_cord, len(new_devices))
             )
 
-    # Fetch initial data so we have data when entities subscribe
-    #
-    # If the refresh fails, async_config_entry_first_refresh will
-    # raise ConfigEntryNotReady and setup will try again later
-    #
-    # If you do not want to retry setup on failure, use
-    # coordinator.async_refresh() instead
     if new_devices:
         await hbtn_cord.async_config_entry_first_refresh()
         hbtn_cord.data = new_devices
@@ -56,6 +49,7 @@ async def async_setup_entry(
 class SwitchedLed(CoordinatorEntity, SwitchEntity):
     """Module switch background LEDs"""
 
+    device_class = "switch"
     _attr_has_entity_name = True
 
     def __init__(self, led, module, coord, idx) -> None:
@@ -85,6 +79,7 @@ class SwitchedLed(CoordinatorEntity, SwitchEntity):
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
         self._attr_is_on = self._module.leds[self._nmbr].value == 1
+        self._attr_state = self._attr_is_on
         if self._attr_is_on:
             self._attr_icon = "mdi:circle-double"
         else:
