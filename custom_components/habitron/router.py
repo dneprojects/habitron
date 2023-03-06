@@ -97,7 +97,7 @@ class HbtnRouter:
         self.mode0 = 0x11
         self.mod_reg = dict()
         self._sys_ok = True
-        self._mirror_started = False
+        self._mirror_started = True
         self._skip_update = ROUTER_SKIP_TIMES
 
     async def initialize(self) -> bool:
@@ -263,7 +263,6 @@ class HbtnRouter:
 
     async def update_system_status(self, sys_status) -> None:
         """Distribute module status to all modules and update self status"""
-        self.sys_status = sys_status
         if self._skip_update:
             self._skip_update -= 1
         else:
@@ -291,12 +290,15 @@ class HbtnRouter:
             self.voltages[0].value = self.status[RoutIdx.VOLTAGE_5] / 10
             self.voltages[1].value = self.status[RoutIdx.VOLTAGE_24] / 10
             self._sys_ok = self.status[RoutIdx.ERR_SYSTEM] == FALSE_VAL
-            self._mirror_started = self.status[RoutIdx.MIRROR_STRTED] == TRUE_VAL
+            self._mirror_started = self.status[RoutIdx.MIRROR_STARTED] == TRUE_VAL
             self.states[0].value = self._sys_ok
             self.states[1].value = self._mirror_started
             if not (self._mirror_started):
                 await self.comm.async_start_mirror(self.id)
+        if sys_status == b"":
+            return  # No changes in module status
 
+        self.sys_status = sys_status
         for m_idx in range(len(self.modules)):
             mod_status = self.sys_status[
                 m_idx * MStatIdx.END : (m_idx + 1) * MStatIdx.END
