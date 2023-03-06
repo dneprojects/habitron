@@ -196,10 +196,7 @@ class HbtnComm:
             sys_status = await self.get_mirror_status(self.router.modules_desc)
         else:
             sys_status = await self.get_compact_status(self.router.id)
-        if sys_status == b"":
-            return
-        else:
-            await self.router.update_system_status(sys_status)
+        await self.router.update_system_status(sys_status)
 
     async def async_set_group_mode(self, rtr_id, grp_no, mode) -> None:
         """Set mode for given group"""
