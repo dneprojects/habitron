@@ -21,8 +21,8 @@ async def async_setup_entry(
     new_devices = []
 
     for hbt_module in hbtn_rt.modules:
-        for dir_cmd in hbt_module.dir_commands:
-            new_devices.append(DirCmdButton(dir_cmd, hbt_module))
+        # for dir_cmd in hbt_module.dir_commands:
+        #     new_devices.append(DirCmdButton(dir_cmd, hbt_module))
         for vis_cmd in hbt_module.vis_commands:
             new_devices.append(VisCmdButton(vis_cmd, hbt_module))
         new_devices.append(RestartButton(hbt_module))

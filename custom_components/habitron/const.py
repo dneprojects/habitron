@@ -51,9 +51,9 @@ class RoutIdx:
     CURRENTS = 21  # Channels 1..8, 2 bytes: 21..36
     ERR_SYSTEM = 37
     FLAG_GLOB = 38  # 1..16: 38..39
-    BOOT_FINISHED = 40
+    BOOTING = 40
     MOD_RESPONSE = 41
-    MIRROR_STRTED = 42
+    MIRROR_STARTED = 42
 
 
 TRUE_VAL = 0x4A  # Status values returned by router
