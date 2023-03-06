@@ -134,7 +134,7 @@ Restarts the habitron router.
 
 ### Service `habitron.save_module_smc`
 
-Saves a module's SMC data (module rules and names) to file. The file name is set automatically. It will appear directory "habitron/data".
+Saves a module's SMC data (module rules and names) to file. The file name is set automatically. It will appear in the config directory.
 
 | Service data attribute  | Optional  | Description  |
 | :---------------------- | :-------- | :----------- |
@@ -143,7 +143,7 @@ Saves a module's SMC data (module rules and names) to file. The file name is set
 
 ### Service `habitron.save_module_smg`
 
-Saves a module's SMG data (module settings) to file. The file name is set automatically. It will appear directory "habitron/data".
+Saves a module's SMG data (module settings) to file. The file name is set automatically. It will appear in the config directory.
 
 | Service data attribute  | Optional  | Description  |
 | :---------------------- | :-------- | :----------- |
@@ -152,7 +152,7 @@ Saves a module's SMG data (module settings) to file. The file name is set automa
 
 ### Service `habitron.save_router_smr`
 
-Saves a router's SMR data (router settings) to file. The file name is set automatically. It will appear directory "habitron/data".
+Saves a router's SMR data (router settings) to file. The file name is set automatically. It will appear in the config directory.
 
 | Service data attribute  | Optional  | Description  |
 | :---------------------- | :-------- | :----------- |
@@ -174,4 +174,3 @@ The following modules are not supported:
 Not tested:
 - Smart Dimm
 - Unterputzmodul
-

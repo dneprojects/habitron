@@ -10,8 +10,7 @@ from .const import RoutIdx
 from .communicate import HbtnComm
 
 # for more information.
-from .const import DOMAIN, MODULE_CODES, MStatIdx
-from .module import ModuleDescriptor
+from .const import DOMAIN, MODULE_CODES, MStatIdx, ModuleDescriptor, TRUE_VAL, FALSE_VAL
 from .module import (
     HbtnModule as hbtm,
     SmartController as hbtscm,
@@ -23,24 +22,7 @@ from .module import (
     SmartUpM as hbtupm,
 )
 from .coordinator import HbtnCoordinator
-
-
-class CmdDescriptor:
-    """Habitron interface descriptor."""
-
-    def __init__(self, cname, cnmbr) -> None:
-        self.name: str = cname
-        self.nmbr: int = cnmbr
-
-
-class StateDescriptor:
-    """Descriptor for modes and flags"""
-
-    def __init__(self, sname, sidx, snmbr, svalue) -> None:
-        self.name: str = sname
-        self.idx: int = sidx
-        self.nmbr: int = snmbr
-        self.value: bool = svalue
+from .interfaces import IfDescriptor, CmdDescriptor, StateDescriptor, TYPE_DIAG
 
 
 class DaytimeMode(Enum):
@@ -66,6 +48,9 @@ class GroupMode(Enum):
     Summer = 80
     User1 = 96
     User2 = 112
+
+
+ROUTER_SKIP_TIMES = 5
 
 
 class HbtnRouter:
@@ -94,11 +79,26 @@ class HbtnRouter:
         self.modules = []
         self.coll_commands: list[CmdDescriptor] = []
         self.flags: list[CmdDescriptor] = []
+        self.chan_timeouts = [
+            IfDescriptor(f"Timeouts channel {i+1}", i, TYPE_DIAG, 0) for i in range(4)
+        ]
+        self.chan_currents = [
+            IfDescriptor(f"Current channel {i+1}", i, TYPE_DIAG, 0) for i in range(8)
+        ]
+        self.voltages = [IfDescriptor("", i, TYPE_DIAG, 0) for i in range(2)]
+        self.voltages[0].name = "Voltage 5V"
+        self.voltages[1].name = "Voltage 24V"
+        self.states = [IfDescriptor("", i, TYPE_DIAG, True) for i in range(2)]
+        self.states[0].name = "System OK"
+        self.states[1].name = "Mirror started"
         self.user1_name = "user1"
         self.user2_name = "user2"
         self.sys_status = ""
         self.mode0 = 0x11
         self.mod_reg = dict()
+        self._sys_ok = True
+        self._mirror_started = False
+        self._skip_update = ROUTER_SKIP_TIMES
 
     async def initialize(self) -> bool:
         """Initialize router instance"""
@@ -264,14 +264,39 @@ class HbtnRouter:
     async def update_system_status(self, sys_status) -> None:
         """Distribute module status to all modules and update self status"""
         self.sys_status = sys_status
-        self.status = await self.comm.async_get_router_status(self.id)
-        self.mode0 = int(self.status[RoutIdx.MODE0])
-        flags_state = int.from_bytes(
-            self.status[RoutIdx.FLAG_GLOB : RoutIdx.FLAG_GLOB + 2],
-            "little",
-        )
-        for flg in self.flags:
-            flg.value = int((flags_state & (0x01 << flg.nmbr - 1)) > 0)
+        if self._skip_update:
+            self._skip_update -= 1
+        else:
+            # update not always
+            self._skip_update = ROUTER_SKIP_TIMES
+            self.status = await self.comm.async_get_router_status(self.id)
+            self.mode0 = int(self.status[RoutIdx.MODE0])
+            flags_state = int.from_bytes(
+                self.status[RoutIdx.FLAG_GLOB : RoutIdx.FLAG_GLOB + 2],
+                "little",
+            )
+            for flg in self.flags:
+                flg.value = int((flags_state & (0x01 << flg.nmbr - 1)) > 0)
+            for time_out in self.chan_timeouts:
+                time_out.value = self.status[RoutIdx.TIME_OUT + time_out.nmbr]
+            for curr in self.chan_currents:
+                i_0 = RoutIdx.CURRENTS + curr.nmbr * 2
+                curr.value = (
+                    int.from_bytes(
+                        self.status[i_0 : i_0 + 2],
+                        "little",
+                    )
+                    / 1000
+                )
+            self.voltages[0].value = self.status[RoutIdx.VOLTAGE_5] / 10
+            self.voltages[1].value = self.status[RoutIdx.VOLTAGE_24] / 10
+            self._sys_ok = self.status[RoutIdx.ERR_SYSTEM] == FALSE_VAL
+            self._mirror_started = self.status[RoutIdx.MIRROR_STRTED] == TRUE_VAL
+            self.states[0].value = self._sys_ok
+            self.states[1].value = self._mirror_started
+            if not (self._mirror_started):
+                await self.comm.async_start_mirror(self.id)
+
         for m_idx in range(len(self.modules)):
             mod_status = self.sys_status[
                 m_idx * MStatIdx.END : (m_idx + 1) * MStatIdx.END

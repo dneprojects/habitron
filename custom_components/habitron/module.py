@@ -1,47 +1,12 @@
-"""Module class."""
+"""Module modules."""
 from __future__ import annotations
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
-from .const import DOMAIN, MStatIdx, MSetIdx
-
-# In a real implementation, this would be in an external library that's on PyPI.
-# The PyPI package needs to be included in the `requirements` section of manifest.json
-# See https://developers.home-assistant.io/docs/creating_integration_manifest
-# for more information.
-
-
-class ModuleDescriptor:
-    """Habitron modules descriptor."""
-
-    def __init__(self, uid, mtype, name, group) -> None:
-        self.uid: int = uid
-        self.mtype: str = mtype
-        self.name: str = name
-        self.group: int = group
-
-
-class IfDescriptor:
-    """Habitron interface descriptor."""
-
-    def __init__(self, iname, inmbr, itype, ivalue) -> None:
-        self.name: str = iname
-        self.nmbr: int = inmbr
-        self.type: int = itype
-        self.value: int = ivalue
-
-
-class IfDescriptorC:
-    """Habitron interface descriptor."""
-
-    def __init__(self, iname, inmbr, itype, ivalue, itilt) -> None:
-        self.name: str = iname
-        self.nmbr: int = inmbr
-        self.type: int = itype
-        self.value: int = ivalue
-        self.tilt: int = itilt
+from .const import DOMAIN, MStatIdx, MSetIdx, ModuleDescriptor
+from .interfaces import IfDescriptor, IfDescriptorC
 
 
 class HbtnModule:
@@ -298,9 +263,10 @@ class SmartController(HbtnModule):
 
         self.sensors.append(IfDescriptor("Movement", 0, 2, 0))
         self.sensors.append(IfDescriptor("Temperature", 1, 2, 0))
-        self.sensors.append(IfDescriptor("Humidity", 2, 2, 0))
-        self.sensors.append(IfDescriptor("Illuminance", 3, 2, 0))
-        self.sensors.append(IfDescriptor("Airquality", 4, 2, 0))
+        self.sensors.append(IfDescriptor("Temperature ext.", 2, 2, 0))
+        self.sensors.append(IfDescriptor("Humidity", 3, 2, 0))
+        self.sensors.append(IfDescriptor("Illuminance", 4, 2, 0))
+        self.sensors.append(IfDescriptor("Airquality", 5, 2, 0))
 
     def update(self, mod_status) -> None:
         """Module specific update method reads and parses status"""
@@ -308,21 +274,21 @@ class SmartController(HbtnModule):
         self.sensors[0].value = int(self.status[MStatIdx.MOV])  # movement?
         self.sensors[1].value = (
             int.from_bytes(
-                self.status[MStatIdx.TEMP_EXT : MStatIdx.TEMP_EXT + 2],
-                "little",
-            )
-            / 10
-        )  # external temperature
-        self.sensors[1].value = (
-            int.from_bytes(
                 self.status[MStatIdx.TEMP_ROOM : MStatIdx.TEMP_ROOM + 2],
                 "little",
             )
             / 10
         )  # current room temperature
-        self.sensors[2].value = int(self.status[MStatIdx.HUM])  # current humidity
-        self.sensors[3].value = int(self.status[MStatIdx.LUM]) * 10  # illuminance
-        self.sensors[4].value = int(self.status[MStatIdx.AQI])  # current aqi?
+        self.sensors[2].value = (
+            int.from_bytes(
+                self.status[MStatIdx.TEMP_EXT : MStatIdx.TEMP_EXT + 2],
+                "little",
+            )
+            / 10
+        )  # external temperature
+        self.sensors[3].value = int(self.status[MStatIdx.HUM])  # current humidity
+        self.sensors[4].value = int(self.status[MStatIdx.LUM]) * 10  # illuminance
+        self.sensors[5].value = int(self.status[MStatIdx.AQI])  # current aqi?
         self.setvalues[0].value = (
             int.from_bytes(
                 self.status[MStatIdx.T_SETP_0 : MStatIdx.T_SETP_0 + 2],
