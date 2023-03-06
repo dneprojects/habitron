@@ -71,6 +71,7 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
         self._current_option = ""
         self._enum = DaytimeMode
         self.hbtnr = hbtnr
+        self._attr_translation_key = "habitron_mode"
 
     @property
     def should_poll(self) -> bool:

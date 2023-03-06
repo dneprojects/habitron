@@ -21,6 +21,22 @@
             }
         }
     },
+    "entity": {
+        "select": {
+            "habitron_mode": {
+                "state": {
+                    "Absent": "Absent",
+                    "Day": "Day",
+                    "Night": "Night",
+                    "Off": "Off",
+                    "On": "On",
+                    "Present": "Present",
+                    "Sleeping": "Sleeping",
+                    "Vacation": "Vacation"
+                }
+            }
+        }
+    },
     "options": {
         "abort": {
             "already_configured": "Already_configured_device"
