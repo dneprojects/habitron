@@ -89,7 +89,7 @@ Depending on the module, a couple of sensors are created:
 
 | Sensor               | Description |
 | :------------------- | :------------------------------------------------------------ |
-| Temperature          | Temperature in the surrounding of the module.                 |
+| Temperature          | Temperatures of ambient air, power electronics, ext. sensor.  |
 | Humidity             | Air humidity in percent.                                      |
 | Luminance            | Luminace in lux.                                              |
 | Air qualitiy         | Index in percent.                                             |
@@ -110,6 +110,10 @@ The habitron system offers modes for daylight, alarm, and other modes. These are
 ### Climate
 
 Based on the first temperature setpoint and the sensor temperature, a climate controller is implemented. It supports heating on/off actions and its state can be used as input for automations. A manual on or off command will change the automatic operation for 5 minutes.
+
+### Diagnostic values
+
+Some values, e.g. the mdoule status, are implemented as diagnostic values. By default, they will be diabled. They can be found on the device panel and enabled there. Diagnostic entities are grouped in a seperate category, but they can be utilized as any other entity. The router provides some more diagnostic values, e.g. voltages, currents, and timeouts.
 
 ## Services
 
@@ -143,7 +147,7 @@ Saves a module's SMC data (module rules and names) to file. The file name is set
 
 ### Service `habitron.save_module_smg`
 
-Saves a module's SMG data (module settings) to file. The file name is set automatically. It will appear in the config directory.
+Saves a module's SMG data (module settings) to file. The file name is set automatically. It will appear in a data subdirectory of the habitron integration.
 
 | Service data attribute  | Optional  | Description  |
 | :---------------------- | :-------- | :----------- |
@@ -152,7 +156,24 @@ Saves a module's SMG data (module settings) to file. The file name is set automa
 
 ### Service `habitron.save_router_smr`
 
-Saves a router's SMR data (router settings) to file. The file name is set automatically. It will appear in the config directory.
+Saves a router's SMR data (router settings) to file. The file name is set automatically. It will appear in a data subdirectory of the habitron integration.
+
+| Service data attribute  | Optional  | Description  |
+| :---------------------- | :-------- | :----------- |
+| `rtr_nmbr`              | no        | The address of the habitron router, which serves the module.
+
+### Service `habitron.save_module_status`
+
+Saves a module's current status data (module input, output, sensor values) to file. The file name is set automatically ("*.mstat"). in a data subdirectory of the habitron integration.
+
+| Service data attribute  | Optional  | Description  |
+| :---------------------- | :-------- | :----------- |
+| `rtr_nmbr`              | no        | The address of the habitron router, which serves the module.
+| `mod_nmbr`              | no        | The address of the habitron module.
+
+### Service `habitron.save_router_status`
+
+Saves a router's status data (router diagnostic values) to file. The file name is set automatically ("*.rstat"). in a data subdirectory of the habitron integration.
 
 | Service data attribute  | Optional  | Description  |
 | :---------------------- | :-------- | :----------- |
