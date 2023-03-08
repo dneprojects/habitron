@@ -60,5 +60,5 @@ These parameters can be changed after installation as well.
 
 ## More Information
 
-More information can be found <a href="./custom_components/habitron/README.md/hacs">here</a>.
+More information can be found <a href="./custom_components/habitron/README.md">here</a>.
 
