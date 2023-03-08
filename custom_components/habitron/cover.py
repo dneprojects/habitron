@@ -79,6 +79,12 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
         self._attr_name = cover.name
         self._nmbr = cover.nmbr
         self._polarity = cover.type > 0
+        if self._polarity:
+            self._out_up = self._nmbr * 2
+            self._out_down = self._nmbr * 2 + 1
+        else:
+            self._out_up = self._nmbr * 2 + 1
+            self._out_down = self._nmbr * 2
         self._position = 0
         self._moving = 0
         self._attr_unique_id = f"{self._module.id}_cover_{48+cover.nmbr}"
@@ -106,6 +112,11 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
         return self._position == 0
 
     @property
+    def is_open(self) -> bool:
+        """Return if the cover is closed, same as position 0."""
+        return self._position == 100
+
+    @property
     def is_closing(self) -> bool:
         """Return if the cover is closing or not."""
         return self._moving < 0
@@ -120,16 +131,18 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
         """Handle updated data from the coordinator."""
         self._position = 100 - self._module.covers[self._nmbr].value
         self._moving = 0
-        if self._module.outputs[self._nmbr * 2].value > 0:
-            if self._polarity:
-                self._moving = 1
-            else:
-                self._moving = -1
-        if self._module.outputs[(self._nmbr * 2) + 1].value > 0:
-            if self._polarity:
-                self._moving = -1
+        if self._module.outputs[self._out_up].value > 0:
+            if self._position == 100:
+                self._module.comm.set_output(self._module.mod_addr, self._out_up + 1, 0)
             else:
                 self._moving = 1
+        if self._module.outputs[self._out_down].value > 0:
+            if self._position == 0:
+                self._module.comm.set_output(
+                    self._module.mod_addr, self._out_down + 1, 0
+                )
+            else:
+                self._moving = -1
         self.async_write_ha_state()
 
     # These methods allow HA to tell the actual device what to do. In this case, move
@@ -137,33 +150,23 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
     async def async_stop_cover(self, **kwargs: Any) -> None:
         """Stop the cover."""
         await self._module.comm.async_set_output(
-            self._module.mod_addr, self._nmbr * 2 + 1, 0
+            self._module.mod_addr, self._out_up + 1, 0
         )
         await self._module.comm.async_set_output(
-            self._module.mod_addr, self._nmbr * 2 + 2, 0
+            self._module.mod_addr, self._out_down + 1, 0
         )
 
     async def async_open_cover(self, **kwargs: Any) -> None:
         """Open the cover."""
-        if self._polarity:
-            await self._module.comm.async_set_output(
-                self._module.mod_addr, self._nmbr * 2 + 1, 1
-            )
-        else:
-            await self._module.comm.async_set_output(
-                self._module.mod_addr, self._nmbr * 2 + 2, 1
-            )
+        await self._module.comm.async_set_output(
+            self._module.mod_addr, self._out_up + 1, 1
+        )
 
     async def async_close_cover(self, **kwargs: Any) -> None:
         """Close the cover."""
-        if self._polarity:
-            await self._module.comm.async_set_output(
-                self._module.mod_addr, self._nmbr * 2 + 2, 1
-            )
-        else:
-            await self._module.comm.async_set_output(
-                self._module.mod_addr, self._nmbr * 2 + 1, 1
-            )
+        await self._module.comm.async_set_output(
+            self._module.mod_addr, self._out_down + 1, 1
+        )
 
     async def async_set_cover_position(self, **kwargs: Any) -> None:
         """Move the cover to position."""
@@ -208,16 +211,19 @@ class HbtnBlind(HbtnShutter):
         self._position = 100 - self._module.covers[self._nmbr].value
         self._tilt_position = 100 - self._module.covers[self._nmbr].tilt
         self._moving = 0
-        if self._module.outputs[self._nmbr * 2].value > 0:
-            if self._polarity:
-                self._moving = 1
-            else:
-                self._moving = -1
-        if self._module.outputs[(self._nmbr * 2) + 1].value > 0:
-            if self._polarity:
-                self._moving = -1
+
+        if self._module.outputs[self._out_up].value > 0:
+            if self._position == 100:
+                self._module.comm.set_output(self._module.mod_addr, self._out_up + 1, 0)
             else:
                 self._moving = 1
+        if self._module.outputs[self._out_down].value > 0:
+            if self._position == 0:
+                self._module.comm.set_output(
+                    self._module.mod_addr, self._out_down + 1, 0
+                )
+            else:
+                self._moving = -1
         self.async_write_ha_state()
 
     async def async_set_cover_tilt_position(self, **kwargs: Any) -> None:
