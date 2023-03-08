@@ -1,5 +1,5 @@
 <h2 align="center">
-  <a href="https://habitron.de"><img src="./custom_components/habitron/logos/logo@2x.png" alt="Habitron logotype" width="300"></a>
+  <a href="https://habitron.de"><img src="./logos/logo@2x.png" alt="Habitron logotype" width="300"></a>
   <br>
   <i>Home Assistant Habitron custom integration</i>
   <br>
@@ -11,40 +11,6 @@
 </p>
 
 The `habitron` implementation allows you to integrate your [Habitron](https://www.habitron.de/) devices in Home Assistant. It is implemented using a _push_ model in _async_.
-
-## Installation
-
-### Manual install
-
-```bash
-# Download a copy of this repository
-$ wget https://github.com/dneprojects/habitron/archive/master.zip
-
-# Unzip the archive
-$ unzip master.zip
-
-# Move the habitron directory into your custom_components directory in your Home Assistant install
-$ mv habitron-master/custom_components/habitron <home-assistant-install-directory>/config/custom_components/
-```
-
-
-### HACS install ([How to install HACS](https://hacs.xyz/docs/setup/prerequisites))
-
-  1. Click on HACS in the Home Assistant menu
-  2. Click on `Integrations`
-  3. Click the top right menu (the three dots)
-  4. Select `Custom repositories`
-  5. Paste the repository URL (`https://github.com/dneprojects/habitron`) in the dialog box
-  6. Select category `Integration`
-  7. Click `Add`
-  8. Click `Install` on the Habitron integration box that has now appeared
-
-
-> :warning: **After executing one of the above installation methods, restart Home Assistant. Also clear your browser cache before proceeding to the next step, as the integration may not be visible otherwise.**
-
-
-In your Home Assistant installation go to: Configuration > Integrations, click the button Add Integration > Habitron
-Enter the details for your camera. The SMartIP, router and modules as devices.
 
 ## Configuration
 
