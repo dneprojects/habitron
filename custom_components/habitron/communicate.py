@@ -119,7 +119,7 @@ class HbtnComm:
             return b""
         return resp
 
-    async def async_send_only(self, cmd_string: str) -> None:
+    def send_only(self, cmd_string: str) -> None:
         """Send string and return"""
         sck = socket.socket()  # Create a socket object
         sck.connect((self._host, self._port))
@@ -205,7 +205,20 @@ class HbtnComm:
         cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
         cmd_str = cmd_str.replace("<mod>", chr(grp_no))
         cmd_str = cmd_str.replace("<arg1>", chr(mode))
-        await self.async_send_only(cmd_str)
+        self.send_only(cmd_str)
+
+    def set_output(self, mod_id, nmbr, val) -> None:
+        """Send turn_on/turn_off command"""
+        rtr_nmbr = int(mod_id / 100)
+        mod_addr = int(mod_id - 100 * rtr_nmbr)
+        if val:
+            cmd_str = SMIP_COMMANDS["SET_OUTPUT_ON"]
+        else:
+            cmd_str = SMIP_COMMANDS["SET_OUTPUT_OFF"]
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
+        cmd_str = cmd_str.replace("<arg1>", chr(nmbr))
+        self.send_only(cmd_str)
 
     async def async_set_output(self, mod_id, nmbr, val) -> None:
         """Send turn_on/turn_off command"""
@@ -218,7 +231,7 @@ class HbtnComm:
         cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
         cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
         cmd_str = cmd_str.replace("<arg1>", chr(nmbr))
-        await self.async_send_only(cmd_str)
+        self.send_only(cmd_str)
 
     async def async_set_dimmval(self, mod_id, nmbr, val) -> None:
         """Send value to dimm output"""
@@ -229,7 +242,7 @@ class HbtnComm:
         cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
         cmd_str = cmd_str.replace("<arg1>", chr(nmbr))
         cmd_str = cmd_str.replace("<arg2>", chr(val))
-        await self.async_send_only(cmd_str)
+        self.send_only(cmd_str)
 
     async def async_set_shutterpos(self, mod_id, nmbr, val) -> None:
         """Send value to dimm output"""
@@ -240,7 +253,7 @@ class HbtnComm:
         cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
         cmd_str = cmd_str.replace("<arg1>", chr(nmbr))
         cmd_str = cmd_str.replace("<arg2>", chr(val))
-        await self.async_send_only(cmd_str)
+        self.send_only(cmd_str)
 
     async def async_set_blindtilt(self, mod_id, nmbr, val) -> None:
         """Send value to dimm output"""
@@ -251,7 +264,7 @@ class HbtnComm:
         cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
         cmd_str = cmd_str.replace("<arg1>", chr(nmbr))
         cmd_str = cmd_str.replace("<arg2>", chr(val))
-        await self.async_send_only(cmd_str)
+        self.send_only(cmd_str)
 
     async def async_set_setpoint(self, mod_id, nmbr, val) -> None:
         """Send two byte value for setpoint definition"""
@@ -265,7 +278,7 @@ class HbtnComm:
         cmd_str = cmd_str.replace("<arg1>", chr(nmbr))
         cmd_str = cmd_str.replace("<arg3>", chr(hi_val))
         cmd_str = cmd_str.replace("<arg2>", chr(lo_val))
-        await self.async_send_only(cmd_str)
+        self.send_only(cmd_str)
 
     async def async_call_vis_command(self, mod_id, nmbr) -> None:
         """Call of visualization command of nmbr"""
@@ -278,7 +291,7 @@ class HbtnComm:
         cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
         cmd_str = cmd_str.replace("<arg2>", chr(hi_no))
         cmd_str = cmd_str.replace("<arg3>", chr(lo_no))
-        await self.async_send_only(cmd_str)
+        self.send_only(cmd_str)
 
     async def async_call_coll_command(self, rtr_id, nmbr) -> None:
         """Call collective command of nmbr"""
@@ -286,7 +299,7 @@ class HbtnComm:
         cmd_str = SMIP_COMMANDS["CALL_COLL_COMMAND"]
         cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
         cmd_str = cmd_str.replace("<arg1>", chr(nmbr))
-        await self.async_send_only(cmd_str)
+        self.send_only(cmd_str)
 
     async def get_mirror_status(self, mod_desc) -> bytes:
         """Get common sys_status by separate calls to mirror"""
@@ -447,7 +460,7 @@ class HbtnComm:
             # router restart
             cmd_str = SMIP_COMMANDS["REBOOT_ROUTER"]
         cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        await self.async_send_only(cmd_str)
+        self.send_only(cmd_str)
 
 
 async def test_connection(host_name) -> bool:
