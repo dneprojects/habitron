@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/github/v/release/dneprojects/habitron" alt="Current version">
 </p>
 
-The `habitron` implementation allows you to integrate your [Habitron](https://www.habitron.de/) devices in Home Assistant. It is implemented using a _push_ model in _async_.
+The `habitron` implementation allows you to integrate your [Habitron](https://www.habitron.de/) devices in Home Assistant. It is implemented using a _polling_ model in _async_.
 
 ## Installation
 
@@ -58,5 +58,7 @@ A second parameter is used to control the polling update interval.
 
 These parameters can be changed after installation as well.
 
+## More Information
 
+More information can be found <a href="./custom_components/habitron/README.md">here</a>.
 
