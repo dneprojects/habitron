@@ -155,9 +155,11 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         if user_input is None:
             default_host = self.config_entry.data["habitron_host"]
             default_interval = self.config_entry.data["update_interval"]
+            default_enablestate = True
         else:
             default_host = user_input["habitron_host"]
             default_interval = user_input["update_interval"]
+            default_enablestate = user_input["updates_enabled"]
         opt_schema = vol.Schema(
             {
                 vol.Required(
@@ -168,6 +170,10 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     "update_interval",
                     default=default_interval,
                 ): int,
+                vol.Required(
+                    "updates_enabled",
+                    default=default_enablestate,
+                ): bool,
             }
         )
         errors = {}
