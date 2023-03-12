@@ -37,7 +37,8 @@
       "init": {
         "data": {
           "habitron_host": "Host name or IP of SmartIP",
-          "update_interval": "Update interval [s]"
+          "update_interval": "Update interval [s]",
+          "updates_enabled": "Perform cyclic updates"
         },
         "title": "Setup communication"
       }

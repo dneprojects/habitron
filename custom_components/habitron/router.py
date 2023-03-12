@@ -69,7 +69,8 @@ class HbtnRouter:
         self.comm = comm
         self.coord = HbtnCoordinator(hass, self.comm)
         self.name = "Router"
-        self.version = "0.0.0"
+        self.version = ""
+        self.serial = ""
         self.status = ""
         self.smr = ""
         self.chan_list = []
@@ -115,13 +116,13 @@ class HbtnRouter:
             name=self.name,
             model="Smart Router",
             sw_version=self.version,
-            hw_version=self.version,
+            hw_version=self.serial,
             via_device=(DOMAIN, 0),
         )
         # Further initialization of module instances
         await self.comm.async_start_mirror(self.id)
         self.modules_desc = await self.get_modules(self.module_grp)
-        await self.comm.async_system_update()
+        await self.comm.async_system_update()  # Inital update
 
         for mod_desc in self.modules_desc:
             if mod_desc.mtype == "Smart Controller":
@@ -153,7 +154,6 @@ class HbtnRouter:
         """Parse router smr info and set values"""
         self.status = await self.comm.async_get_router_status(self.id)
         self.smr = await self.comm.get_smr(self.id)
-        self.version = self.smr[-22 : len(self.smr)].decode("iso8859-1")
         # self.group_list = []
         ptr = 1
         max_mod_no = 0
@@ -183,6 +183,11 @@ class HbtnRouter:
             self.smr[ptr + 1 : ptr + 1 + str_len].decode("iso8859-1").strip()
         )
         ptr += str_len + 1
+        str_len = self.smr[ptr]
+        self.serial = self.smr[ptr + 1 : ptr + 1 + str_len].decode("iso8859-1").strip()
+        ptr += str_len + 71 + 1
+        str_len = self.smr[ptr]
+        self.version = self.smr[ptr + 1 : ptr + 1 + str_len].decode("iso8859-1").strip()
 
     async def get_modules(self, mod_groups) -> list[ModuleDescriptor]:
         """Get summary of all Habitron modules."""

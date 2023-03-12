@@ -31,9 +31,10 @@ class HbtnCoordinator(DataUpdateCoordinator):
         self.config = hbtn_comm._config
         self.rtr_id = 1
 
-    def set_update_interval(self, interval: int):
+    def set_update_interval(self, interval: int, updates: bool):
         """Updating interval for integration re-configuration"""
         self.update_interval = timedelta(seconds=interval)
+        self.comm.update_suspended = not (updates)
 
     async def _async_update_data(self):
         """Fetch data from Habitron comm endpoint, preprocess and store for lookup."""
@@ -44,4 +45,6 @@ class HbtnCoordinator(DataUpdateCoordinator):
             # Note: using context is not required if there is no need or ability to limit
             # data retrieved from API.
             # listening_idx = set(self.async_contexts())
+
+            # not inital update, can be diabled
             return await self.comm.async_system_update()

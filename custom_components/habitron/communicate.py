@@ -68,6 +68,7 @@ class HbtnComm:
         self._config = config
         self.crc = 0
         self.router = []
+        self.update_suspended = False
 
     @property
     def com_ip(self) -> str:
@@ -87,8 +88,10 @@ class HbtnComm:
     async def set_host(self, host: str):
         """Updating host information for integration re-configuration"""
         self._config.data = self._config.options
-        self._name = host
-        self._host = get_host_ip(self._name)
+        if self._host_conf == host:
+            return
+        self._host_conf = host
+        self._host = get_host_ip(self._host_conf)
         await self._hass.config_entries.async_reload(self._config.entry_id)
 
     def get_mac(self) -> str:
@@ -192,8 +195,9 @@ class HbtnComm:
     async def async_system_update(self) -> None:
         """Trigger update of Habitron states, must poll all routers"""
 
-        if self.router.coord.update_interval.seconds == 6:
-            sys_status = await self.get_mirror_status(self.router.modules_desc)
+        if self.update_suspended:
+            # disable update to avoid conflict with SmartConfig or other communication
+            return
         else:
             sys_status = await self.get_compact_status(self.router.id)
         await self.router.update_system_status(sys_status)
