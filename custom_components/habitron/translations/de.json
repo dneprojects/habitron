@@ -27,7 +27,8 @@
                 "title": "Einstellungen zur Kommunikation",
                 "data": {
                     "habitron_host": "Host-Name oder IP des SmartIP",
-                    "update_interval": "Update Intervall [s]"
+                    "update_interval": "Update Intervall [s]",
+                    "updates_enabled": "Zyklische Updates ausführen"
                 }
             }
         },

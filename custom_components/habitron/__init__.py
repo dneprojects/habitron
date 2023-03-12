@@ -154,7 +154,9 @@ async def update_listener(hass: HomeAssistant, entry: ConfigEntry):
     hbtn_comm = hass.data[DOMAIN][entry.entry_id].router.comm
     hbtn_cord = hass.data[DOMAIN][entry.entry_id].router.coord
     await hbtn_comm.set_host(entry.options["habitron_host"])
-    hbtn_cord.set_update_interval(entry.options["update_interval"])
+    hbtn_cord.set_update_interval(
+        entry.options["update_interval"], entry.options["updates_enabled"]
+    )
 
 
 class ConfigEntryNotReady(exceptions.HomeAssistantError):
