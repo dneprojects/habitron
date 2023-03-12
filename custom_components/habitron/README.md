@@ -17,10 +17,11 @@ The `habitron` implementation allows you to integrate your [Habitron](https://ww
 For the habitron integration to work, the network interface SmartIP must be reachable via your local network. During configuration, the DNS hostname or the IP address has to given.
 A second parameter is used to control the polling update interval.
 
-| Configuration parameter | Optional  | Description  |
-| :---------------------- | :-------- | :----------- |
-| `host name`             | no        | Either the DNS host name of the SmartIP or its IP address.
-| `update interval`       | no        | Polling update interval in seconds, must be between 2 and 10 seconds.
+| Configuration parameter     | Optional  | Description  |
+| :-------------------------- | :-------- | :----------- |
+| `Host name or IP of SmartIP`| no        | Either the DNS host name of the SmartIP or its IP address.
+| `Update interval [s]`       | no        | Polling update interval in seconds, must be between 2 and 10 seconds.
+| `Perform cyclic updates`    | no        | Must be checked for nomal operation. Uncheck only to suspend polling for communication with SmartConfig software.
 
 These parameters can be changed after installation as well.
 
@@ -161,3 +162,4 @@ The following modules are not supported:
 Not tested:
 - Smart Dimm
 - Unterputzmodul
+
