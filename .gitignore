@@ -127,3 +127,10 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+data/Module_101.cmstat
+data/Module_101.cpstat
+data/Module_101.smg
+data/Module_101.mstat
+.gitignore
+data/Module_101.mmstat
+data/Module_102.mstat

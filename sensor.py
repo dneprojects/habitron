@@ -50,10 +50,6 @@ async def async_setup_entry(
                 new_devices.append(
                     WindSensor(hbt_module, mod_sensor.nmbr, hbtn_cord, len(new_devices))
                 )
-            elif mod_sensor.name == "Rain":
-                new_devices.append(
-                    RainSensor(hbt_module, mod_sensor.nmbr, hbtn_cord, len(new_devices))
-                )
             elif mod_sensor.name == "Windpeak":
                 new_devices.append(
                     WindpeakSensor(
@@ -188,20 +184,7 @@ class WindSensor(HbtnSensor):
         super().__init__(module, nmbr, coord, idx)
         self._attr_unique_id = f"{self._module.id}_wind"
         self._attr_name = "Wind"
-
-
-class RainSensor(HbtnSensor):
-    """Representation of a rain sensor."""
-
-    # device_class = DEVICE_CLASS_BOOL
-    _attr_native_unit_of_measurement = ""
-    _attr_unit_of_measurement = ""
-
-    def __init__(self, module, nmbr, coord, idx) -> None:
-        """Initialize the sensor."""
-        super().__init__(module, nmbr, coord, idx)
-        self._attr_unique_id = f"{self._module.id}_rain"
-        self._attr_name = "Rain"
+        self._attr_icon = "mdi:weather-windy-variant"
 
 
 class WindpeakSensor(HbtnSensor):
@@ -216,6 +199,7 @@ class WindpeakSensor(HbtnSensor):
         super().__init__(module, nmbr, coord, idx)
         self._attr_unique_id = f"{self._module.id}_windpeak"
         self._attr_name = "Wind Peak"
+        self._attr_icon = "mdi:weather-windy-variant"
 
 
 class AirqualitySensor(HbtnSensor):
