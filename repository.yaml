@@ -1,4 +1,0 @@
-# https://developers.home-assistant.io/docs/add-ons/repository#repository-configuration
-name: Habitron add-on repository
-url: 'https://github.com/dneprojects/habitron'
-maintainer: dneprojects <dne.projects.1@gmail.com>
