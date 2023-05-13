@@ -50,10 +50,6 @@ async def async_setup_entry(
                 new_devices.append(
                     MotionSensor(mod_sensor, hbt_module, hbtn_cord, len(new_devices))
                 )
-            elif mod_sensor.name == "Rain":
-                new_devices.append(
-                    RainSensor(mod_sensor, hbt_module, hbtn_cord, len(new_devices))
-                )
     for rt_flg in hbtn_rt.flags:
         new_devices.append(HbtnFlag(rt_flg, hbtn_rt, hbtn_cord, len(new_devices)))
     for rt_stat in hbtn_rt.states:
@@ -266,52 +262,5 @@ class MotionSensor(CoordinatorEntity, BinarySensorEntity):
             self._attr_icon = "mdi:motion-sensor"
         else:
             self._attr_icon = "mdi:motion-sensor-off"
-        self._state = self._attr_is_on
-        self.async_write_ha_state()
-
-
-class RainSensor(CoordinatorEntity, BinarySensorEntity):
-    """Representation of habitron button switch input."""
-
-    _attr_device_class = BinarySensorDeviceClass.MOISTURE
-
-    def __init__(self, sensor, module, coord, idx) -> None:
-        super().__init__(coord, context=idx)
-        self.idx = idx
-        self._sensor = sensor
-        self._module = module
-        self._nmbr = sensor.nmbr
-        self._state = False
-        self._attr_unique_id = f"{self._module.id}_rain"
-        self._attr_name = f"{self._module.name}: Rain"
-        self._attr_icon = "mdi:weather-rainy"
-
-    # To link this entity to its device, this property must return an
-    # identifiers value matching that used in the module
-    @property
-    def device_info(self) -> None:
-        """Return information to link this entity with the correct device."""
-        if isinstance(self._module.id, int):
-            return {"identifiers": {(DOMAIN, self._module.uid)}}  # router
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
-
-    @property
-    def available(self) -> bool:
-        """Return True if module and smip is available."""
-        return True
-
-    @property
-    def name(self) -> str:
-        """Return the display name of this flag."""
-        return self._attr_name
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self._attr_is_on = self._module.sensors[self._nmbr].value == 74
-        if self._attr_is_on:
-            self._attr_icon = "mdi:weather-rainy"
-        else:
-            self._attr_icon = "mdi:weather-partly-cloudy"
         self._state = self._attr_is_on
         self.async_write_ha_state()
