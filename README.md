@@ -12,42 +12,6 @@
 
 The `habitron` implementation allows you to integrate your [Habitron](https://www.habitron.de/) devices in Home Assistant. It is implemented using a _polling_ model in _async_.
 
-## Installation
-
-### Manual install
-
-```bash
-# Download a copy of this repository
-$ wget https://github.com/dneprojects/habitron/archive/master.zip
-
-# Unzip the archive
-$ unzip master.zip
-
-# Move the habitron directory into your custom_components directory in your Home Assistant install
-$ mv habitron-master/custom_components/habitron <home-assistant-install-directory>/config/custom_components/
-```
-
-
-### HACS install ([How to install HACS](https://hacs.xyz/docs/setup/prerequisites))
-
-  1. Click on HACS in the Home Assistant menu
-  2. Click on `Integrations`
-  3. Click the top right menu (the three dots)
-  4. Select `Custom repositories`
-  5. Paste the repository URL (`https://github.com/dneprojects/habitron`) in the dialog box
-  6. Select category `Integration`
-  7. Click `Add`
-  8. Click `Install` on the Habitron integration box that has now appeared
-
-
-> :warning: **After executing one of the above installation methods, restart Home Assistant. Also clear your browser cache before proceeding to the next step, as the integration may not be visible otherwise.**
-
-
-In your Home Assistant installation go to: Configuration > Integrations, click the button Add Integration > Habitron
-Enter the details for your camera. The SMartIP, router and modules as devices.
-
-The `habitron` implementation allows you to integrate your [Habitron](https://www.habitron.de/) devices in Home Assistant. It is implemented using a _polling_ model in _async_.
-
 ## Configuration
 
 For the habitron integration to work, the network interface SmartIP must be reachable via your local network. During configuration, the DNS hostname or the IP address has to given.
@@ -61,7 +25,7 @@ A second parameter is used to control the polling update interval.
 
 These parameters can be changed after installation as well.
 
-## More Information
+## Entities
 
 For any module, a device is created. These will show up after the discovery phase and can be associated with Home Assistant rooms or zones.
 According to the modules found, several entities will be created automatically.
