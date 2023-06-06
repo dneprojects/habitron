@@ -5,7 +5,7 @@ from typing import Final
 
 
 DOMAIN = "habitron"  # This is the internal name of the integration, it should also match the directory
-CONF_DEFAULT_HOST = "SmartIP"  # default DNS name of SmartIP
+CONF_DEFAULT_HOST = "192.168.178.51"  # default DNS name of SmartIP
 CONF_DEFAULT_INTERVAL = 5  # default update interval
 CONF_MIN_INTERVAL = 2  # min update interval
 CONF_MAX_INTERVAL = 10  # max update interval
