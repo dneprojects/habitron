@@ -29,8 +29,9 @@ class SmartIP:
         self._name = "SmartIP"
         self.comm = hbtn_com(hass, config)
         self.online = True
-        self._mac = ""  # self.comm.com_mac
-        self._version = ""
+        self._mac = self.comm.com_mac
+        self._version = self.comm.com_version
+        self._type = self.comm.com_hwtype
         self.router = []
 
         self._host = self.comm.com_ip
@@ -46,7 +47,7 @@ class SmartIP:
             name=self._name,
             model=self._name,
             sw_version=self._version,
-            hw_version=self._version,
+            hw_version=self._type,
         )
 
     @property
