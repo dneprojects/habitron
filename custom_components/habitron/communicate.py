@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 import os
+import struct
 import socket
-from binascii import hexlify
+import requests
 from typing import Final
 
 from pymodbus.utilities import computeCRC
@@ -63,12 +64,15 @@ class HbtnComm:
         self._host_conf = config.data.__getitem__("habitron_host")
         self._host = get_host_ip(self._host_conf)
         self._port = 7777
-        self._mac = "00:80:a3:d4:d1:4f"
         self._hass = hass
         self._config = config
         self.crc = 0
         self.router = []
         self.update_suspended = False
+        self.smart_ips = discover_smartips(False)
+        self._mac = self._mac = self.smart_ips[0]["mac"]
+        self._version = self.smart_ips[0]["version"]
+        self._hwtype = f"{self.smart_ips[0]['type']} {self.smart_ips[0]['serial']}"
 
     @property
     def com_ip(self) -> str:
@@ -77,13 +81,23 @@ class HbtnComm:
 
     @property
     def com_port(self) -> str:
-        """Version for SmartIP."""
+        """Port for SmartIP."""
         return self._port
 
     @property
     def com_mac(self) -> str:
         """Mac address for SmartIP."""
         return self._mac
+
+    @property
+    def com_version(self) -> str:
+        """Firmware version of SmartIP."""
+        return self._version
+
+    @property
+    def com_hwtype(self) -> str:
+        """Firmware version of SmartIP."""
+        return self._hwtype
 
     async def set_host(self, host: str):
         """Updating host information for integration re-configuration"""
@@ -93,15 +107,6 @@ class HbtnComm:
         self._host_conf = host
         self._host = get_host_ip(self._host_conf)
         await self._hass.config_entries.async_reload(self._config.entry_id)
-
-    def get_mac(self) -> str:
-        """Get mac address of SmartIP."""
-        sck = socket.socket()  # Create a socket object
-        sck.connect((self._host, self._port))
-        mac_res = sck.getsockname()[2]
-        self.com_mac = hexlify(mac_res)
-        sck.close()
-        return self.com_mac
 
     def set_router(self, rtr) -> None:
         """Registers the router instance"""
@@ -559,6 +564,127 @@ def format_block_output(byte_str: bytes) -> str:
         res_str += f"{'{:03d}'.format(ptr)}  {line}{chr(13)}"
         ptr += 10
     return res_str
+
+
+def get_udp_broadcast_socket(timeout):
+    """Get a UDP broadcast socket with a specific timeout."""
+
+    network_socket = socket.socket(
+        socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP
+    )
+
+    network_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, True)
+    network_socket.settimeout(timeout)
+
+    return network_socket
+
+
+def discover_smartips(flg_one):
+    """Discover SmartIP and SmartServer hardware on the network.
+
+    :param address: string - The broadcast address to use.
+    :param port: int - The port to use for the broadcast.
+    :param timeout: int - The timeout to wait for answers.
+    :param bind_to: string - The network interface to bind to
+    :param try_info_api:  bool - Whether to try the HTTP info interface on
+                                 discovered SmartIPs.
+    :return:
+    """
+    smip_port = 30718
+    base_ip = "192.168.178.0"
+    lower_ip = 2
+    upper_ip = 255
+    timeout = 0.1
+    try_info_api = False
+
+    req_header_data = [0x00, 0x00, 0x00, 0xF6]
+    req_header = struct.pack("B" * len(req_header_data), *req_header_data)
+    network_socket = get_udp_broadcast_socket(timeout)
+
+    resp_header_data = [0x00, 0x00, 0x00, 0xF7]
+    resp_header = struct.pack("B" * len(resp_header_data), *resp_header_data)
+
+    smartips = []
+
+    for ip in range(lower_ip, upper_ip):
+        try:
+            tst_address = base_ip.replace(".0", f".{ip}")
+            network_socket.sendto(req_header, (tst_address, smip_port))
+            response, address_info = network_socket.recvfrom(1024)
+
+            print(f"SmartIP found at address {tst_address}")
+            smip_ip = address_info[0]
+
+            if response[0:4] == resp_header and smip_ip != "0.0.0.0":
+                smip_version = f"{response[7]}.{response[6]}.{response[5]}"
+                smip_mac = f"{response[24]:02X}:{response[25]:02X}:{response[26]:02X}:{response[27]:02X}:{response[28]:02X}:{response[29]:02X}"
+                smip_serial = (
+                    f"{response[20]:c}{response[21]:c}{response[22]:c}{response[23]:c}"
+                )
+                smip_type = f"{response[8]:c}-{response[9]:c}"
+                smartip_info = {
+                    "type": smip_type,
+                    "version": smip_version,
+                    "serial": smip_serial,
+                    "mac": smip_mac,
+                    "ip": smip_ip,
+                }
+
+                smartips.append(smartip_info)
+                if flg_one:
+                    break
+
+            else:
+                print(("Response: %s (%d)" % ([response], len(response)), address_info))
+
+        except socket.timeout:
+            pass
+
+    network_socket.close()
+
+    if try_info_api:
+        # starting with newer firmwares, we do have a JSON endpoint
+        # reporting some additional information
+        # @ /api/info (it's behind HTTP Digest Auth with admin/PASS
+
+        add_http_info(smartips)
+
+    return smartips
+
+
+def add_http_info(smartips):
+    """Request and annotate HTTP info for discovered SmartIPs."""
+
+    smartip_info_template = "http://{ip}/api/info"
+    auth_user = "admin"
+    auth_passwd = "PASS"
+
+    auth = requests.auth.HTTPDigestAuth(auth_user, auth_passwd)
+    for smartip in smartips:
+        url = smartip_info_template.format(**smartip)
+        response = requests.get(url, auth=auth)
+
+        if response.status_code == 200:
+            data = response.json()
+
+            if data.get("status", None) == "OK":
+                smartip.update(
+                    {
+                        "firmware": data.get("version", None),
+                        "free_ram": data.get("free_ram", None),
+                    }
+                )
+            else:
+                print("Info API call succeeded, but did not return status ok")
+
+        else:
+            print(
+                (
+                    "Info API call failed with status code {}".format(
+                        response.status_code
+                    )
+                )
+            )
 
 
 class TimeoutException(exceptions.HomeAssistantError):

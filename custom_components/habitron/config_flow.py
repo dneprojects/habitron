@@ -18,7 +18,7 @@ from .const import (
     CONF_MIN_INTERVAL,
     CONF_MAX_INTERVAL,
 )  # pylint:disable=unused-import
-from .communicate import test_connection
+from .communicate import test_connection, discover_smartips
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -90,9 +90,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(self, user_input=None) -> FlowResult:
         """Handle the initial step."""
         await self.async_set_unique_id("unique_habitron")
+
+        smartips = discover_smartips(True)
+
         self._abort_if_unique_id_configured()
         if user_input is None:
-            default_host = CONF_DEFAULT_HOST
+            default_host = smartips[0]["ip"]
             default_interval = CONF_DEFAULT_INTERVAL
         else:
             default_host = user_input["habitron_host"]
