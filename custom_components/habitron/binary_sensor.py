@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 # Import the device class from the component that you want to support
-from homeassistant.components.binary_sensor import BinarySensorEntity
+from homeassistant.components.binary_sensor import (
+    BinarySensorEntity,
+    BinarySensorDeviceClass,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import EntityCategory
@@ -218,6 +221,8 @@ class HbtnState(CoordinatorEntity, BinarySensorEntity):
 
 class MotionSensor(CoordinatorEntity, BinarySensorEntity):
     """Representation of habitron button switch input."""
+
+    _attr_device_class = BinarySensorDeviceClass.MOTION
 
     def __init__(self, sensor, module, coord, idx) -> None:
         super().__init__(coord, context=idx)
