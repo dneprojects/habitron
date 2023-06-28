@@ -144,7 +144,8 @@ class HbtnRouter:
             elif mod_desc.mtype == "Smart Nature":
                 self.modules.append(hbtsnm(mod_desc, self.hass, self.config, self.comm))
             else:
-                self.modules.append(hbtm(mod_desc, self.hass, self.config, self.comm))
+                continue  # Prevent dealing with unknown modules
+                # self.modules.append(hbtm(mod_desc, self.hass, self.config, self.comm))
             await self.modules[-1].initialize(self.sys_status)
 
         await self.get_descriptions()  # Some descriptions for modules, too
