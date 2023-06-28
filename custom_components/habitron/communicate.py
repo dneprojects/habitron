@@ -485,11 +485,14 @@ async def test_connection(host_name) -> bool:
     except ConnectionRefusedError as exc:
         raise ConnectionRefusedError from exc
     sck.settimeout(15)  # 15 seconds
-    full_string = "¨!\0\x0bSmartConfig\x05michlS\x05\n\x04\x04\x01\0\0\0\x5f\xbe?"
+    # router restart
+    cmd_str = SMIP_COMMANDS["CHECK_COMM_STATUS"]
+    full_string = wrap_command(cmd_str)
+    # full_string = "¨!\0\x0bSmartConfig\x05michlS\x05\n\x04\x04\x01\0\0\0\x5f\xbe?"
     resp_bytes = send_receive(sck, full_string)
     sck.close()
-    ver_string = resp_bytes.decode("iso8859-1")
-    return bool(ver_string[0:2] == "\x01\x18")
+    resp_string = resp_bytes.decode("iso8859-1")
+    return bool(resp_string[0:2] == "OK")
 
 
 def get_host_ip(host_name: str) -> str:
