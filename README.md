@@ -44,7 +44,8 @@ $ mv habitron-master/custom_components/habitron <home-assistant-install-director
 
 
 In your Home Assistant installation go to: Configuration > Integrations, click the button Add Integration > Habitron
-Enter the details for your camera. The SMartIP, router and modules as devices.
+Enter the details for your SmartIP host name or its IP-address, and the update interval. 
+If the connection is established, the SmartIP, router and modules appear as devices.
 
 ## Configuration
 
