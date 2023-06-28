@@ -91,11 +91,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Handle the initial step."""
         await self.async_set_unique_id("unique_habitron")
 
-        smartips = discover_smartips(True)
+        # smartips = discover_smartips(True)
 
         self._abort_if_unique_id_configured()
         if user_input is None:
-            default_host = smartips[0]["ip"]
+            # default_host = smartips[0]["ip"]
+            default_host = CONF_DEFAULT_HOST
             default_interval = CONF_DEFAULT_INTERVAL
         else:
             default_host = user_input["habitron_host"]
