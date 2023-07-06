@@ -5,7 +5,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
-from .const import DOMAIN, MStatIdx, MSetIdx, ModuleDescriptor
+from .const import DOMAIN, ModuleDescriptor, MSetIdx, MStatIdx
 from .interfaces import IfDescriptor, IfDescriptorC
 
 
@@ -35,7 +35,7 @@ class HbtnModule:
         self.smc = ""
         self.status = ""
         self.mstatus = ""
-        self.shutter_state = list()
+        self.shutter_state = []
         self.id = "Mod_" + f"{mod_descriptor.uid}"
         self.group = mod_descriptor.group
         self.mode = 1
@@ -70,7 +70,7 @@ class HbtnModule:
         return self._type
 
     async def initialize(self, sys_status) -> None:
-        """Initialize module instance"""
+        """Initialize module instance."""
         await self.get_names()
         await self.get_settings()
         device_registry = dr.async_get(self._hass)
@@ -209,7 +209,6 @@ class HbtnModule:
         """General update for Habitron modules."""
         self.status = mod_status
         self.mode = self.status[MStatIdx.MODE]
-        return
 
     def extract_status(self, sys_status) -> bytes:
         """Extract status of Habitron module from system status."""
@@ -222,7 +221,7 @@ class HbtnModule:
         return sys_status[m_idx * stat_len : (m_idx + 1) * stat_len]
 
     def set_default_names(self, mod_entities, def_name: str) -> None:
-        """Sets default names for entities"""
+        """Sets default names for entities."""
         e_idx = 0
         # pylint: disable-next=consider-using-enumerate
         for e_idx in range(len(mod_entities)):
@@ -234,7 +233,7 @@ class HbtnModule:
                 )
 
     async def async_reset(self) -> None:
-        """Call reset command for self"""
+        """Call reset command for self."""
         self.comm.module_restart(self._addr)
 
 
@@ -269,7 +268,7 @@ class SmartController(HbtnModule):
         self.sensors.append(IfDescriptor("Airquality", 5, 2, 0))
 
     def update(self, mod_status) -> None:
-        """Module specific update method reads and parses status"""
+        """Module specific update method reads and parses status."""
         super().update(mod_status)
         self.sensors[0].value = int(self.status[MStatIdx.MOV])  # movement?
         self.sensors[1].value = (
@@ -380,7 +379,7 @@ class SmartOutput(HbtnModule):
         self.diags = [IfDescriptor("", 1, 0, 0)]
 
     def update(self, mod_status) -> None:
-        """Module specific update method reads and parses status"""
+        """Module specific update method reads and parses status."""
         super().update(mod_status)
         out_state = int(self.status[MStatIdx.OUT_1_8])
         for o_idx in range(8):
@@ -414,7 +413,7 @@ class SmartDimm(HbtnModule):
         self.diags = [IfDescriptor("", i, 0, 0) for i in range(2)]
 
     def update(self, mod_status) -> None:
-        """Module specific update method reads and parses status"""
+        """Module specific update method reads and parses status."""
         super().update(mod_status)
 
         inp_state = int(self.status[MStatIdx.INP_1_8])
@@ -462,7 +461,7 @@ class SmartUpM(HbtnModule):
         self.covers = [IfDescriptorC("", -1, 0, 0, 0)]
 
     def update(self, mod_status) -> None:
-        """Module specific update method reads and parses status"""
+        """Module specific update method reads and parses status."""
         super().update(mod_status)
 
         inp_state = int(self.status[MStatIdx.INP_1_8])
@@ -498,7 +497,7 @@ class SmartInput(HbtnModule):
         self.inputs = [IfDescriptor("", i, 1, 0) for i in range(8)]
 
     def update(self, mod_status) -> None:
-        """Module specific update method reads and parses status"""
+        """Module specific update method reads and parses status."""
         super().update(mod_status)
         inp_state = int(self.status[MStatIdx.INP_1_8])
         for mod_inp in self.inputs:
@@ -540,10 +539,9 @@ class SmartDetect(HbtnModule):
             via_device=(DOMAIN, self.comm.router.uid),
         )
         self.update(self.status)
-        return
 
     def update(self, mod_status) -> None:
-        """Module specific update method reads and parses status"""
+        """Module specific update method reads and parses status."""
         super().update(mod_status)
         self.sensors[0].value = int(self.status[MStatIdx.MOV])  # movement
         self.sensors[1].value = int(self.status[MStatIdx.LUM]) * 10  # illuminance
@@ -586,10 +584,9 @@ class SmartNature(HbtnModule):
             via_device=(DOMAIN, self.comm.router.uid),
         )
         self.update(self.status)
-        return
 
     def update(self, mod_status) -> None:
-        """Module specific update method reads and parses status"""
+        """Module specific update method reads and parses status."""
         super().update(mod_status)
         self.sensors[0].value = (
             int.from_bytes(

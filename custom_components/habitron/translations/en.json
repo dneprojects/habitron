@@ -25,14 +25,14 @@
         "select": {
             "habitron_mode": {
                 "state": {
-                    "Absent": "Absent",
-                    "Day": "Day",
-                    "Night": "Night",
-                    "Off": "Off",
-                    "On": "On",
-                    "Present": "Present",
-                    "Sleeping": "Sleeping",
-                    "Vacation": "Vacation"
+                    "absent": "Absent",
+                    "day": "Day",
+                    "night": "Night",
+                    "off": "Off",
+                    "on": "On",
+                    "present": "Present",
+                    "sleeping": "Sleeping",
+                    "vacation": "Vacation"
                 }
             }
         }

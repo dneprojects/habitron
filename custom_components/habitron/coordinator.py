@@ -8,7 +8,6 @@ import async_timeout
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -32,7 +31,7 @@ class HbtnCoordinator(DataUpdateCoordinator):
         self.rtr_id = 1
 
     def set_update_interval(self, interval: int, updates: bool):
-        """Updating interval for integration re-configuration"""
+        """Updating interval for integration re-configuration."""
         self.update_interval = timedelta(seconds=interval)
         self.comm.update_suspended = not (updates)
 

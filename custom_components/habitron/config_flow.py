@@ -11,14 +11,15 @@ from homeassistant import config_entries, exceptions
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 
+# pylint:disable=unused-import
+from .communicate import test_connection
 from .const import (
-    DOMAIN,
     CONF_DEFAULT_HOST,
     CONF_DEFAULT_INTERVAL,
-    CONF_MIN_INTERVAL,
     CONF_MAX_INTERVAL,
-)  # pylint:disable=unused-import
-from .communicate import test_connection, discover_smartips
+    CONF_MIN_INTERVAL,
+    DOMAIN,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -146,7 +147,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class OptionsFlowHandler(config_entries.OptionsFlow):
-    """Allow to change options of integration while running"""
+    """Allow to change options of integration while running."""
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize options flow."""

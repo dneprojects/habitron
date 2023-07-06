@@ -3,7 +3,6 @@
 
 from typing import Final
 
-
 DOMAIN = "habitron"  # This is the internal name of the integration, it should also match the directory
 CONF_DEFAULT_HOST = "192.168.178.51"  # default DNS name of SmartIP
 CONF_DEFAULT_INTERVAL = 5  # default update interval
@@ -33,7 +32,7 @@ MODULE_CODES: Final[dict[str, str]] = {
 
 
 class RoutIdx:
-    """Definition of router status index values"""
+    """Definition of router status index values."""
 
     ADDR = 0
     DEVICE_CNT = 1
@@ -61,7 +60,7 @@ FALSE_VAL = 0x4E
 
 
 class MSetIdx:
-    """Definition of module settings index values"""
+    """Definition of module settings index values."""
 
     SHUTTER_TIMES = 4
     TILT_TIMES = 20
@@ -74,7 +73,7 @@ class MSetIdx:
 
 
 class MStatIdx:
-    """Definition of module status index values"""
+    """Definition of module status index values."""
 
     BYTE_COUNT = 0  # in compact status included
     ADDR = 1
@@ -124,7 +123,7 @@ class MStatIdx:
 
 
 class MirrIdx:
-    """Definition of full mirror index values"""
+    """Definition of full mirror index values."""
 
     ADDR = 1
     MODE = 4
@@ -189,7 +188,7 @@ class MirrIdx:
 
 
 class SMirrIdx:
-    """Definition of small mirror index values"""
+    """Definition of small mirror index values."""
 
     ADDR = 1
     MODE = 4
