@@ -2,16 +2,16 @@
 from __future__ import annotations
 
 import os
-import struct
 import socket
-import requests
+import struct
 from typing import Final
 
 from pymodbus.utilities import computeCRC
+import requests
 
 from homeassistant import exceptions
-from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN, MirrIdx, ModuleDescriptor
 
@@ -69,10 +69,12 @@ class HbtnComm:
         self.crc = 0
         self.router = []
         self.update_suspended = False
-        self.smart_ips = discover_smartips(False)
-        self._mac = self._mac = self.smart_ips[0]["mac"]
-        self._version = self.smart_ips[0]["version"]
-        self._hwtype = f"{self.smart_ips[0]['type']} {self.smart_ips[0]['serial']}"
+        self.smart_ip_properties = query_smartip(self._host)
+        self._mac = self._mac = self.smart_ip_properties["mac"]
+        self._version = self.smart_ip_properties["version"]
+        self._hwtype = (
+            f"{self.smart_ip_properties['type']} {self.smart_ip_properties['serial']}"
+        )
 
     @property
     def com_ip(self) -> str:
@@ -100,7 +102,7 @@ class HbtnComm:
         return self._hwtype
 
     async def set_host(self, host: str):
-        """Updating host information for integration re-configuration"""
+        """Updating host information for integration re-configuration."""
         self._config.data = self._config.options
         if self._host_conf == host:
             return
@@ -109,15 +111,15 @@ class HbtnComm:
         await self._hass.config_entries.async_reload(self._config.entry_id)
 
     def set_router(self, rtr) -> None:
-        """Registers the router instance"""
+        """Registers the router instance."""
         self.router = rtr
 
     async def get_smip_version(self) -> bytes:
-        """Query of SmartIP firmware"""
+        """Query of SmartIP firmware."""
         return await self.async_send_command(SMIP_COMMANDS["GET_SMIP_FIRMWARE"])
 
     async def get_smr(self, rtr_id) -> bytes:
-        """Get router SMR information"""
+        """Get router SMR information."""
         rtr_nmbr = int(rtr_id / 100)
         cmd_str = SMIP_COMMANDS["GET_ROUTER_SMR"]
         cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
@@ -128,7 +130,7 @@ class HbtnComm:
         return resp
 
     def send_only(self, cmd_string: str) -> None:
-        """Send string and return"""
+        """Send string and return."""
         sck = socket.socket()  # Create a socket object
         sck.connect((self._host, self._port))
         full_string = wrap_command(cmd_string)
@@ -136,7 +138,7 @@ class HbtnComm:
         sck.close()
 
     async def async_send_command(self, cmd_string: str) -> bytes:
-        """General function for communication via SmartIP"""
+        """General function for communication via SmartIP."""
         sck = socket.socket()  # Create a socket object
         sck.connect((self._host, self._port))
         sck.settimeout(30)  # 30 seconds
@@ -147,7 +149,7 @@ class HbtnComm:
         return resp_bytes
 
     async def async_send_command_crc(self, cmd_string: str):
-        """General function for communication via SmartIP, returns additional crc"""
+        """General function for communication via SmartIP, returns additional crc."""
         sck = socket.socket()  # Create a socket object
         sck.connect((self._host, self._port))
         sck.settimeout(30)  # 30 seconds
@@ -184,21 +186,21 @@ class HbtnComm:
         return await self.async_send_command(cmd_str)
 
     async def async_get_error_status(self, rtr_id) -> bytes:
-        """Get error byte for each module"""
+        """Get error byte for each module."""
         rtr_nmbr = int(rtr_id / 100)
         cmd_str = SMIP_COMMANDS["GET_CURRENT_ERROR"]
         cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
         return await self.async_send_command(cmd_str)
 
     async def async_start_mirror(self, rtr_id) -> None:
-        """Starts mirror on specified router"""
+        """Starts mirror on specified router."""
         rtr_nmbr = int(rtr_id / 100)
         cmd_str = SMIP_COMMANDS["START_MIRROR"]
         cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
         await self.async_send_command(cmd_str)
 
     async def async_system_update(self) -> None:
-        """Trigger update of Habitron states, must poll all routers"""
+        """Trigger update of Habitron states, must poll all routers."""
 
         if self.update_suspended:
             # disable update to avoid conflict with SmartConfig or other communication
@@ -208,7 +210,7 @@ class HbtnComm:
         await self.router.update_system_status(sys_status)
 
     async def async_set_group_mode(self, rtr_id, grp_no, mode) -> None:
-        """Set mode for given group"""
+        """Set mode for given group."""
         rtr_nmbr = int(rtr_id / 100)
         cmd_str = SMIP_COMMANDS["SET_GROUP_MODE"]
         cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
@@ -217,7 +219,7 @@ class HbtnComm:
         self.send_only(cmd_str)
 
     def set_output(self, mod_id, nmbr, val) -> None:
-        """Send turn_on/turn_off command"""
+        """Send turn_on/turn_off command."""
         rtr_nmbr = int(mod_id / 100)
         mod_addr = int(mod_id - 100 * rtr_nmbr)
         if val:
@@ -230,7 +232,7 @@ class HbtnComm:
         self.send_only(cmd_str)
 
     async def async_set_output(self, mod_id, nmbr, val) -> None:
-        """Send turn_on/turn_off command"""
+        """Send turn_on/turn_off command."""
         rtr_nmbr = int(mod_id / 100)
         mod_addr = int(mod_id - 100 * rtr_nmbr)
         if val:
@@ -243,7 +245,7 @@ class HbtnComm:
         self.send_only(cmd_str)
 
     async def async_set_dimmval(self, mod_id, nmbr, val) -> None:
-        """Send value to dimm output"""
+        """Send value to dimm output."""
         rtr_nmbr = int(mod_id / 100)
         mod_addr = int(mod_id - 100 * rtr_nmbr)
         cmd_str = SMIP_COMMANDS["SET_DIMMER_VALUE"]
@@ -254,7 +256,7 @@ class HbtnComm:
         self.send_only(cmd_str)
 
     async def async_set_shutterpos(self, mod_id, nmbr, val) -> None:
-        """Send value to dimm output"""
+        """Send value to dimm output."""
         rtr_nmbr = int(mod_id / 100)
         mod_addr = int(mod_id - 100 * rtr_nmbr)
         cmd_str = SMIP_COMMANDS["SET_SHUTTER_POSITION"]
@@ -265,7 +267,7 @@ class HbtnComm:
         self.send_only(cmd_str)
 
     async def async_set_blindtilt(self, mod_id, nmbr, val) -> None:
-        """Send value to dimm output"""
+        """Send value to dimm output."""
         rtr_nmbr = int(mod_id / 100)
         mod_addr = int(mod_id - 100 * rtr_nmbr)
         cmd_str = SMIP_COMMANDS["SET_BLIND_TILT"]
@@ -276,7 +278,7 @@ class HbtnComm:
         self.send_only(cmd_str)
 
     async def async_set_setpoint(self, mod_id, nmbr, val) -> None:
-        """Send two byte value for setpoint definition"""
+        """Send two byte value for setpoint definition."""
         rtr_nmbr = int(mod_id / 100)
         mod_addr = int(mod_id - 100 * rtr_nmbr)
         cmd_str = SMIP_COMMANDS["SET_SETPOINT_VALUE"]
@@ -290,7 +292,7 @@ class HbtnComm:
         self.send_only(cmd_str)
 
     async def async_call_vis_command(self, mod_id, nmbr) -> None:
-        """Call of visualization command of nmbr"""
+        """Call of visualization command of nmbr."""
         rtr_nmbr = int(mod_id / 100)
         mod_addr = int(mod_id - 100 * rtr_nmbr)
         cmd_str = SMIP_COMMANDS["CALL_VIS_COMMAND"]
@@ -303,7 +305,7 @@ class HbtnComm:
         self.send_only(cmd_str)
 
     async def async_call_coll_command(self, rtr_id, nmbr) -> None:
-        """Call collective command of nmbr"""
+        """Call collective command of nmbr."""
         rtr_nmbr = int(rtr_id / 100)
         cmd_str = SMIP_COMMANDS["CALL_COLL_COMMAND"]
         cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
@@ -311,7 +313,7 @@ class HbtnComm:
         self.send_only(cmd_str)
 
     async def get_mirror_status(self, mod_desc) -> bytes:
-        """Get common sys_status by separate calls to mirror"""
+        """Get common sys_status by separate calls to mirror."""
         if isinstance(mod_desc, ModuleDescriptor):
             rtr_nmbr = int(mod_desc[0].uid / 100)
         else:
@@ -347,7 +349,7 @@ class HbtnComm:
             return sys_status
 
     async def get_compact_status(self, rtr_id) -> bytes:
-        """Get compact status for all modules, if changed crc"""
+        """Get compact status for all modules, if changed crc."""
         rtr_nmbr = int(rtr_id / 100)
         cmd_str = SMIP_COMMANDS["GET_COMPACT_STATUS"]
         cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
@@ -359,7 +361,7 @@ class HbtnComm:
             return resp_bytes
 
     async def get_module_status(self, mod_id) -> bytes:
-        """Get compact status for all modules, if changed crc"""
+        """Get compact status for all modules, if changed crc."""
         rtr_nmbr = int(mod_id / 100)
         mod_nmbr = mod_id - rtr_nmbr * 100
         cmd_str = SMIP_COMMANDS["GET_MODULE_STATUS"]
@@ -397,19 +399,19 @@ class HbtnComm:
         return resp
 
     async def save_module_status(self, mod_id) -> None:
-        """Get module module status and saves it to file"""
+        """Get module module status and saves it to file."""
         data = await self.get_module_status(mod_id)
         file_name = f"Module_{mod_id}.mstat"
         await self.save_config_data(file_name, format_block_output(data))
 
     async def save_router_status(self, rtr_id) -> None:
-        """Get module mirror status and saves it to file"""
+        """Get module mirror status and saves it to file."""
         data = await self.async_get_router_status(rtr_id)
         file_name = f"Router_{rtr_id}.rstat"
         await self.save_config_data(file_name, format_block_output(data))
 
     async def save_smc_file(self, mod_id) -> None:
-        """Get module definitions (smc) and saves them to file"""
+        """Get module definitions (smc) and saves them to file."""
         data = await self.async_get_module_definitions(mod_id)
         file_name = f"Module_{mod_id}.smc"
         str_data = ""
@@ -426,7 +428,7 @@ class HbtnComm:
         await self.save_config_data(file_name, str_data)
 
     async def save_smg_file(self, mod_id) -> None:
-        """Get module settings (smg) and saves them to file"""
+        """Get module settings (smg) and saves them to file."""
         data = await self.async_get_module_settings(mod_id)
         file_name = f"Module_{mod_id}.smg"
         str_data = ""
@@ -435,7 +437,7 @@ class HbtnComm:
         await self.save_config_data(file_name, str_data)
 
     async def save_smr_file(self, rtr_id) -> None:
-        """Get module settings (smg) and saves them to file"""
+        """Get module settings (smg) and saves them to file."""
         data = await self.get_smr(rtr_id)
         file_name = f"Router_{rtr_id}.smr"
         str_data = ""
@@ -444,7 +446,7 @@ class HbtnComm:
         await self.save_config_data(file_name, str_data)
 
     async def save_config_data(self, file_name: str, str_data: str) -> None:
-        """Saving config info to text file"""
+        """Saving config info to text file."""
         if os.path.isdir(BASE_PATH_COMPONENT):
             data_path = f"{BASE_PATH_COMPONENT}/{DOMAIN}/data/"
         else:
@@ -457,7 +459,7 @@ class HbtnComm:
         hbtn_file.close()
 
     async def module_restart(self, rtr_id, mod_nmbr: int) -> None:
-        """Restarts a single module or all with arg 0xFF or router if arg 0"""
+        """Restarts a single module or all with arg 0xFF or router if arg 0."""
         rtr_nmbr = int(rtr_id / 100)
         if mod_nmbr > 0:
             # module restart
@@ -488,7 +490,6 @@ async def test_connection(host_name) -> bool:
     # router restart
     cmd_str = SMIP_COMMANDS["CHECK_COMM_STATUS"]
     full_string = wrap_command(cmd_str)
-    # full_string = "¨!\0\x0bSmartConfig\x05michlS\x05\n\x04\x04\x01\0\0\0\x5f\xbe?"
     resp_bytes = send_receive(sck, full_string)
     sck.close()
     resp_string = resp_bytes.decode("iso8859-1")
@@ -496,13 +497,13 @@ async def test_connection(host_name) -> bool:
 
 
 def get_host_ip(host_name: str) -> str:
-    """Get IP from DNS host name, error handling"""
+    """Get IP from DNS host name, error handling."""
     host = socket.gethostbyname(host_name)
     return host
 
 
 def send_receive(sck, cmd_str: str) -> bytes:
-    """Send string to SmartIP and wait for response with timeout"""
+    """Send string to SmartIP and wait for response with timeout."""
     try:
         sck.send(cmd_str.encode("iso8859-1"))  # Send command
 
@@ -521,7 +522,7 @@ def send_receive(sck, cmd_str: str) -> bytes:
 
 
 async def async_send_receive(sck, cmd_str: str) -> bytes:
-    """Send string to SmartIP and wait for response with timeout"""
+    """Send string to SmartIP and wait for response with timeout."""
     try:
         sck.send(cmd_str.encode("iso8859-1"))  # Send command
 
@@ -541,7 +542,7 @@ async def async_send_receive(sck, cmd_str: str) -> bytes:
 
 
 def wrap_command(cmd_string: str) -> str:
-    """Take command and add prefix, crc, postfix"""
+    """Take command and add prefix, crc, postfix."""
     cmd_prefix = "¨\0\0\x0bSmartConfig\x05michlS\x05"
     cmd_postfix = "\x3f"
     full_string = cmd_prefix + cmd_string
@@ -555,7 +556,7 @@ def wrap_command(cmd_string: str) -> str:
 
 
 def format_block_output(byte_str: bytes) -> str:
-    """Format block hex output with lines"""
+    """Format block hex output with lines."""
     lbs = len(byte_str)
     res_str = ""
     ptr = 0
@@ -563,8 +564,8 @@ def format_block_output(byte_str: bytes) -> str:
         line = ""
         end_l = min([ptr + 10, lbs])
         for i in range(end_l - ptr):
-            line = line + f"{'{:02X}'.format(byte_str[ptr+i])} "
-        res_str += f"{'{:03d}'.format(ptr)}  {line}{chr(13)}"
+            line = line + f"{f'{byte_str[ptr+i]:02X}'} "
+        res_str += f"{f'{ptr:03d}'}  {line}{chr(13)}"
         ptr += 10
     return res_str
 
@@ -655,7 +656,62 @@ def discover_smartips(flg_one):
     return smartips
 
 
-def add_http_info(smartips):
+def query_smartip(smip_ip):
+    """Read properties of identified SmartIP.
+
+    :param smip_ip: ip address of a single smartip
+    """
+    smip_port = 30718
+    timeout = 0.1
+    try_info_api = False
+
+    req_header_data = [0x00, 0x00, 0x00, 0xF6]
+    req_header = struct.pack("B" * len(req_header_data), *req_header_data)
+    network_socket = get_udp_broadcast_socket(timeout)
+
+    resp_header_data = [0x00, 0x00, 0x00, 0xF7]
+    resp_header = struct.pack("B" * len(resp_header_data), *resp_header_data)
+
+    try:
+        network_socket.sendto(req_header, (smip_ip, smip_port))
+        response, address_info = network_socket.recvfrom(1024)
+
+        smip_ip = address_info[0]
+
+        if response[0:4] == resp_header and smip_ip != "0.0.0.0":
+            smip_version = f"{response[7]}.{response[6]}.{response[5]}"
+            smip_mac = f"{response[24]:02X}:{response[25]:02X}:{response[26]:02X}:{response[27]:02X}:{response[28]:02X}:{response[29]:02X}"
+            smip_serial = (
+                f"{response[20]:c}{response[21]:c}{response[22]:c}{response[23]:c}"
+            )
+            smip_type = f"{response[8]:c}-{response[9]:c}"
+            smartip_info = {
+                "type": smip_type,
+                "version": smip_version,
+                "serial": smip_serial,
+                "mac": smip_mac,
+                "ip": smip_ip,
+            }
+
+        else:
+            print(("Response: %s (%d)" % ([response], len(response)), address_info))
+
+    except socket.timeout:
+        pass
+
+    network_socket.close()
+
+    if try_info_api:
+        # starting with newer firmwares, we do have a JSON endpoint
+        # reporting some additional information
+        # @ /api/info (it's behind HTTP Digest Auth with admin/PASS
+
+        add_http_info(smartip_info)
+
+    return smartip_info
+
+
+def add_http_info(smartip_info):
     """Request and annotate HTTP info for discovered SmartIPs."""
 
     smartip_info_template = "http://{ip}/api/info"
@@ -663,31 +719,24 @@ def add_http_info(smartips):
     auth_passwd = "PASS"
 
     auth = requests.auth.HTTPDigestAuth(auth_user, auth_passwd)
-    for smartip in smartips:
-        url = smartip_info_template.format(**smartip)
-        response = requests.get(url, auth=auth)
+    url = smartip_info_template.format(**smartip_info)
+    response = requests.get(url, auth=auth, timeout=1)
 
-        if response.status_code == 200:
-            data = response.json()
+    if response.status_code == 200:
+        data = response.json()
 
-            if data.get("status", None) == "OK":
-                smartip.update(
-                    {
-                        "firmware": data.get("version", None),
-                        "free_ram": data.get("free_ram", None),
-                    }
-                )
-            else:
-                print("Info API call succeeded, but did not return status ok")
-
-        else:
-            print(
-                (
-                    "Info API call failed with status code {}".format(
-                        response.status_code
-                    )
-                )
+        if data.get("status", None) == "OK":
+            smartip_info.update(
+                {
+                    "firmware": data.get("version", None),
+                    "free_ram": data.get("free_ram", None),
+                }
             )
+        else:
+            print("Info API call succeeded, but did not return status ok")
+
+    else:
+        print(f"Info API call failed with status code {response.status_code}")
 
 
 class TimeoutException(exceptions.HomeAssistantError):
