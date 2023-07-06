@@ -4,15 +4,15 @@ from __future__ import annotations
 from typing import Any
 
 from homeassistant.components.cover import (
-    CoverEntity,
-    CoverEntityFeature,
     ATTR_POSITION,
     ATTR_TILT_POSITION,
+    CoverEntity,
+    CoverEntityFeature,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
@@ -98,7 +98,7 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
 
     @property
     def name(self) -> str:
-        """Return name"""
+        """Return name."""
         return self._attr_name
 
     @property

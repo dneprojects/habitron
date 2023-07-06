@@ -47,7 +47,7 @@ async def async_setup_entry(
 
 
 class SwitchedLed(CoordinatorEntity, SwitchEntity):
-    """Module switch background LEDs"""
+    """Module switch background LEDs."""
 
     device_class = "switch"
     _attr_has_entity_name = True
