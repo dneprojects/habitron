@@ -1,53 +1,60 @@
 """Habitron router class."""
 from __future__ import annotations
+
 from enum import Enum
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
-from .const import RoutIdx
 from .communicate import HbtnComm
 
 # for more information.
-from .const import DOMAIN, MODULE_CODES, MStatIdx, ModuleDescriptor, TRUE_VAL, FALSE_VAL
+from .const import (
+    DOMAIN,
+    FALSE_VAL,
+    MODULE_CODES,
+    TRUE_VAL,
+    ModuleDescriptor,
+    MStatIdx,
+    RoutIdx,
+)
+from .coordinator import HbtnCoordinator
+from .interfaces import TYPE_DIAG, CmdDescriptor, IfDescriptor, StateDescriptor
 from .module import (
-    HbtnModule as hbtm,
     SmartController as hbtscm,
     SmartDetect as hbtsdm,
+    SmartDimm as hbtdimm,
     SmartInput as hbtinm,
     SmartNature as hbtsnm,
     SmartOutput as hbtoutm,
-    SmartDimm as hbtdimm,
     SmartUpM as hbtupm,
 )
-from .coordinator import HbtnCoordinator
-from .interfaces import IfDescriptor, CmdDescriptor, StateDescriptor, TYPE_DIAG
 
 
 class DaytimeMode(Enum):
-    """Habitron daytime mode states"""
+    """Habitron daytime mode states."""
 
-    Day = 1
-    Night = 2
+    day = 1
+    night = 2
 
 
 class AlarmMode(Enum):
-    """Habitron alarm mode states"""
+    """Habitron alarm mode states."""
 
-    Off = 0
-    On = 4
+    off = 0
+    on = 4
 
 
 class GroupMode(Enum):
-    """Habitron group mode states"""
+    """Habitron group mode states."""
 
-    Absent = 16
-    Present = 32
-    Sleeping = 48
-    Summer = 80
-    User1 = 96
-    User2 = 112
+    absent = 16
+    present = 32
+    sleeping = 48
+    summer = 80
+    user1 = 96
+    user2 = 112
 
 
 ROUTER_SKIP_TIMES = 5
@@ -96,13 +103,13 @@ class HbtnRouter:
         self.user2_name = "user2"
         self.sys_status = ""
         self.mode0 = 0x11
-        self.mod_reg = dict()
+        self.mod_reg = {}
         self._sys_ok = True
         self._mirror_started = True
         self._skip_update = ROUTER_SKIP_TIMES
 
     async def initialize(self) -> bool:
-        """Initialize router instance"""
+        """Initialize router instance."""
 
         self.comm.set_router(self)
         await self.get_definitions()
@@ -127,19 +134,19 @@ class HbtnRouter:
         for mod_desc in self.modules_desc:
             if mod_desc.mtype == "Smart Controller":
                 self.modules.append(hbtscm(mod_desc, self.hass, self.config, self.comm))
-            elif mod_desc.mtype[0:9] == "Smart Out":
+            elif mod_desc.mtype[:9] == "Smart Out":
                 self.modules.append(
                     hbtoutm(mod_desc, self.hass, self.config, self.comm)
                 )
-            elif mod_desc.mtype[0:9] == "Smart Dimm":
+            elif mod_desc.mtype[:9] == "Smart Dimm":
                 self.modules.append(
                     hbtdimm(mod_desc, self.hass, self.config, self.comm)
                 )
-            elif mod_desc.mtype[0:9] == "Smart UpM":
+            elif mod_desc.mtype[:9] == "Smart UpM":
                 self.modules.append(hbtupm(mod_desc, self.hass, self.config, self.comm))
-            elif mod_desc.mtype[0:8] == "Smart In":
+            elif mod_desc.mtype[:8] == "Smart In":
                 self.modules.append(hbtinm(mod_desc, self.hass, self.config, self.comm))
-            elif mod_desc.mtype[0:12] == "Smart Detect":
+            elif mod_desc.mtype[:12] == "Smart Detect":
                 self.modules.append(hbtsdm(mod_desc, self.hass, self.config, self.comm))
             elif mod_desc.mtype == "Smart Nature":
                 self.modules.append(hbtsnm(mod_desc, self.hass, self.config, self.comm))
@@ -152,7 +159,7 @@ class HbtnRouter:
         return True
 
     async def get_definitions(self) -> None:
-        """Parse router smr info and set values"""
+        """Parse router smr info and set values."""
         self.status = await self.comm.async_get_router_status(self.id)
         self.smr = await self.comm.get_smr(self.id)
         # self.group_list = []
@@ -160,9 +167,9 @@ class HbtnRouter:
         max_mod_no = 0
         for ch_i in range(4):
             count = self.smr[ptr]
-            self.chan_list.append(sorted(list(self.smr[ptr + 1 : ptr + count + 1])))
+            self.chan_list.append(sorted(self.smr[ptr + 1 : ptr + count + 1]))
             # pylint: disable-next=nested-min-max
-            max_mod_no = max(max_mod_no, max(self.chan_list[ch_i]))
+            max_mod_no = max(max_mod_no, *self.chan_list[ch_i])
             ptr += 1 + count
         ptr += 2
         self.max_group = max(list(self.smr[ptr : ptr + 64]))
@@ -193,7 +200,7 @@ class HbtnRouter:
     async def get_modules(self, mod_groups) -> list[ModuleDescriptor]:
         """Get summary of all Habitron modules."""
         desc: list[ModuleDescriptor] = []
-        addr_dict = dict()
+        addr_dict = {}
         resp = await self.comm.async_get_router_modules(self.id)
         mod_string = resp.decode("iso8859-1")
         while len(resp) > 0:
@@ -205,7 +212,7 @@ class HbtnRouter:
             desc.append(ModuleDescriptor(mod_uid, mod_type, mod_name, mod_group))
             addr_dict[mod_uid] = len(desc) - 1
             mod_string = mod_string[4 + name_len : len(resp)]
-            resp = resp[4 + name_len : len(resp)]
+            resp = resp[4 + name_len :]
         self.mod_reg = addr_dict
         return desc
 
@@ -213,13 +220,13 @@ class HbtnRouter:
         """Get descriptions of commands, etc."""
         resp = await self.comm.get_global_descriptions(self.id)
 
-        no_lines = int.from_bytes(resp[0:2], "little")
-        resp = resp[4 : len(resp)]  # Strip 4 header bytes
+        no_lines = int.from_bytes(resp[:2], "little")
+        resp = resp[4:]
         for _ in range(no_lines):
             if resp == b"":
                 break
             line_len = int(resp[8]) + 9
-            line = resp[0:line_len]
+            line = resp[:line_len]
             content_code = int.from_bytes(line[1:3], "little")
             entry_no = int(line[3])
             entry_name = line[9:line_len].decode("iso8859-1").strip()
@@ -256,19 +263,16 @@ class HbtnRouter:
                     ].name = entry_name  # counter
                 # elif int(line[2]) == 7:
                 # Group name
-            resp = resp[line_len : len(resp)]
+            resp = resp[line_len:]
 
     async def get_comm_errors(self) -> bytes:
-        """Get current communication errors"""
+        """Get current communication errors."""
         resp = await self.comm.async_get_error_status(self.id)
-        error_list = list()
         err_cnt = resp[0]
-        for e_idx in range(err_cnt):
-            error_list.append({resp[2 * e_idx + 1], resp[2 * e_idx + 2]})
-        return error_list
+        return [{resp[2 * e_idx + 1], resp[2 * e_idx + 2]} for e_idx in range(err_cnt)]
 
     async def update_system_status(self, sys_status) -> None:
-        """Distribute module status to all modules and update self status"""
+        """Distribute module status to all modules and update self status."""
         if self._skip_update:
             self._skip_update -= 1
         else:
@@ -314,9 +318,9 @@ class HbtnRouter:
         return
 
     async def async_reset(self) -> None:
-        """Call reset command for self"""
+        """Call reset command for self."""
         self.comm.module_restart(self.id, 0)
 
     async def async_reset_all_modules(self) -> None:
-        """Call reset command for all modules"""
+        """Call reset command for all modules."""
         self.comm.module_restart(self.id, 0xFF)

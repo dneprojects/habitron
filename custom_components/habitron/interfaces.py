@@ -1,4 +1,4 @@
-"""Module interfaces"""
+"""Module interfaces."""
 
 # Contains interface descriptors for single entities, e.g. outputs, sensors
 
@@ -33,7 +33,7 @@ class CmdDescriptor:
 
 
 class StateDescriptor:
-    """Descriptor for modes and flags"""
+    """Descriptor for modes and flags."""
 
     def __init__(self, sname, sidx, snmbr, svalue) -> None:
         self.name: str = sname
