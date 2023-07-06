@@ -1,16 +1,17 @@
 """Platform for select integration."""
 from __future__ import annotations
+
 from enum import Enum
 
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.components.select import SelectEntity
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import DeviceInfo, EntityCategory
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .router import DaytimeMode, AlarmMode
+from .router import AlarmMode, DaytimeMode
 
 
 async def async_setup_entry(
@@ -62,10 +63,7 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
         super().__init__(coord, context=idx)
         self.idx = idx
         self._module = module
-        if isinstance(module, int):
-            self._mode = hbtnr.mode0
-        else:
-            self._mode = module.mode
+        self._mode = hbtnr.mode0 if isinstance(module, int) else module.mode
         self._mask = 0x03
         self._value = self._mode & self._mask
         self._current_option = ""
@@ -99,20 +97,17 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
 
     @property
     def options(self) -> list[str]:
-        """Return all mode names of enumeration type"""
-        all_modes = []
-        for mode in self._enum:
-            all_modes.append(mode.name)
-        return all_modes
+        """Return all mode names of enumeration type."""
+        return [mode.name for mode in self._enum]
 
     @property
     def current_option(self) -> str:
-        """Return the current mode name"""
+        """Return the current mode name."""
         return self._current_option
 
     @callback
     def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator, get current module mode"""
+        """Handle updated data from the coordinator, get current module mode."""
         if isinstance(self._module, int):
             self._mode = self.hbtnr.mode0
         else:
@@ -134,7 +129,7 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
 
 
 class HbtnSelectDaytimeMode(HbtnMode):
-    """Daytime mode object"""
+    """Daytime mode object."""
 
     def __init__(self, module, hbtnr, coord, idx) -> None:
         """Initialize daytime mode selector."""
@@ -166,7 +161,7 @@ class HbtnSelectDaytimeMode(HbtnMode):
 
 
 class HbtnSelectAlarmMode(HbtnMode):
-    """Daytime mode object"""
+    """Daytime mode object."""
 
     def __init__(self, module, hbtnr, coord, idx) -> None:
         """Initialize alarm mode selector."""
@@ -186,17 +181,14 @@ class HbtnSelectAlarmMode(HbtnMode):
 
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
-        if self._enum[option].value > 0:
-            set_val = 0x40  # turn alarm mode on
-        else:
-            set_val = 0x41  # turn alarm mode off
+        set_val = 0x40 if self._enum[option].value > 0 else 0x41
         await self._module.comm.async_set_group_mode(
             self._module.mod_addr, self._module.group, set_val
         )
 
 
 class HbtnSelectGroupMode(HbtnMode):
-    """Daytime mode object"""
+    """Daytime mode object."""
 
     def __init__(self, module, hbtnr, coord, idx) -> None:
         """Initialize group mode selector."""
@@ -209,10 +201,10 @@ class HbtnSelectGroupMode(HbtnMode):
         group_enum = Enum(
             value="group_enum",
             names=[
-                ("Absent", 16),
-                ("Present", 32),
-                ("Sleeping", 48),
-                ("Vacation", 80),
+                ("absent", 16),
+                ("present", 32),
+                ("sleeping", 48),
+                ("vacation", 80),
                 (self.hbtnr.user1_name, 96),
                 (self.hbtnr.user2_name, 112),
             ],

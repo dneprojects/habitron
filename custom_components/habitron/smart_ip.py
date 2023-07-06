@@ -64,7 +64,7 @@ class SmartIP:
         return "0.0.0"
 
     async def initialize(self, hass: HomeAssistant, config: ConfigEntry) -> bool:
-        """Initialization of SmartIP instance"""
+        """Initialization of SmartIP instance."""
         self._version = await self.get_version()
         # self._mac = self.comm.get_mac()
         self.router = hbtr(hass, config, self.comm)

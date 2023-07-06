@@ -2,15 +2,16 @@
 from __future__ import annotations
 
 import asyncio
+
 import voluptuous as vol
 
 from homeassistant import exceptions
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 
-from .const import DOMAIN, ROUTER_NMBR, RESTART_KEY_NMBR, FILE_MOD_NMBR, RESTART_ALL
-from .smart_ip import SmartIP
 from .communicate import TimeoutException
+from .const import DOMAIN, FILE_MOD_NMBR, RESTART_ALL, RESTART_KEY_NMBR, ROUTER_NMBR
+from .smart_ip import SmartIP
 
 # List of platforms to support. There should be a matching .py file for each
 PLATFORMS: list[str] = [
@@ -69,33 +70,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
         mod_nmbr = call.data.get(FILE_MOD_NMBR, 1)
         await smip.comm.save_smc_file(rtr_id + mod_nmbr)
-        return
 
     async def save_module_smg(call: ServiceCall):
         """Handle the service call."""
         rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
         mod_nmbr = call.data.get(FILE_MOD_NMBR, 1)
         await smip.comm.save_smg_file(rtr_id + mod_nmbr)
-        return
 
     async def save_router_smr(call: ServiceCall):
         """Handle the service call."""
         rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
         await smip.comm.save_smr_file(rtr_id)
-        return
 
     async def save_module_status(call: ServiceCall):
         """Handle the service call."""
         rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
         mod_nmbr = call.data.get(FILE_MOD_NMBR, 1)
         await smip.comm.save_module_status(rtr_id + mod_nmbr)
-        return
 
     async def save_router_status(call: ServiceCall):
         """Handle the service call."""
         rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
         await smip.comm.save_router_status(rtr_id)
-        return
 
     smip = SmartIP(hass, entry)
     try:
