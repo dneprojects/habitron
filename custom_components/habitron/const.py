@@ -15,19 +15,29 @@ RESTART_KEY_NMBR = "mod_nmbr"
 FILE_MOD_NMBR = "mod_nmbr"
 
 MODULE_CODES: Final[dict[str, str]] = {
-    "\x01\x02": "Smart Controller",
+    "\x01\x01": "Smart Controller XL-1",
+    "\x01\x02": "Smart Controller XL-2",
+    # "\x01\x0a": "Smart Controller X",
     "\x0a\x01": "Smart Out 8/R",
     "\x0a\x02": "Smart Out 8/T",
     "\x0a\x14": "Smart Dimm",
+    "\x0a\x15": "Smart Dimm-1",
+    "\x0a\x16": "Smart Dimm-2",
     "\x0a\x1e": "Smart UpM",  # Unterputzmodul
+    "\x0a\x32": "Smart Out 8/R-1",
+    "\x0a\x33": "Smart Out 8/R-2",
     "\x0b\x1e": "Smart In 8/24V",
+    "\x0b\x1f": "Smart In 8/24V-1",
     "\x0b\x01": "Smart In 8/230V",
     "\x14\x01": "Smart Nature",
-    "\x50\x64": "Smart Detect 180",
-    "\x50\x65": "Smart Detect 360",
     "\x1e\x01": "Fanekey",
     "\x1e\x03": "FanGSM",
     "\x1e\x04": "FanM-Bus",
+    "\x32\x01": "Smart Controller Mini",
+    # "\x32\x28": "Smart Sensors",
+    "\x50\x64": "Smart Detect 180",
+    "\x50\x65": "Smart Detect 360",
+    "\x50\x66": "Smart Detect 180-2",
 }
 
 
@@ -102,6 +112,7 @@ class MStatIdx:
     MOV = 30
     IR_H = 31  # General field 1
     IR_L = 32  # General field 2
+    KEY_ID = 31
     WIND = 31
     WINDP = 32
     ROLL_POS = 33  # 1..8: 33..40 bei SC: Roll 3..5

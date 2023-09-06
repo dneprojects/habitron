@@ -23,12 +23,14 @@ from .coordinator import HbtnCoordinator
 from .interfaces import TYPE_DIAG, CmdDescriptor, IfDescriptor, StateDescriptor
 from .module import (
     SmartController as hbtscm,
+    SmartControllerMini as hbtscmm,
     SmartDetect as hbtsdm,
     SmartDimm as hbtdimm,
     SmartInput as hbtinm,
     SmartNature as hbtsnm,
     SmartOutput as hbtoutm,
     SmartUpM as hbtupm,
+    SmartEKey as hbtkey,
 )
 
 
@@ -37,6 +39,7 @@ class DaytimeMode(Enum):
 
     day = 1
     night = 2
+    undefined = 3
 
 
 class AlarmMode(Enum):
@@ -52,6 +55,8 @@ class GroupMode(Enum):
     absent = 16
     present = 32
     sleeping = 48
+    update = 63
+    config = 64
     summer = 80
     user1 = 96
     user2 = 112
@@ -127,18 +132,16 @@ class HbtnRouter:
             via_device=(DOMAIN, 0),
         )
         # Further initialization of module instances
-        await self.comm.async_start_mirror(self.id)
+        # await self.comm.async_start_mirror(self.id)
         self.modules_desc = await self.get_modules(self.module_grp)
         await self.comm.async_system_update()  # Inital update
 
         for mod_desc in self.modules_desc:
-            if mod_desc.mtype == "Smart Controller":
-                self.modules.append(hbtscm(mod_desc, self.hass, self.config, self.comm))
-            elif mod_desc.mtype[:9] == "Smart Out":
+            if mod_desc.mtype[:9] == "Smart Out":
                 self.modules.append(
                     hbtoutm(mod_desc, self.hass, self.config, self.comm)
                 )
-            elif mod_desc.mtype[:9] == "Smart Dimm":
+            elif mod_desc.mtype[:10] == "Smart Dimm":
                 self.modules.append(
                     hbtdimm(mod_desc, self.hass, self.config, self.comm)
                 )
@@ -150,6 +153,14 @@ class HbtnRouter:
                 self.modules.append(hbtsdm(mod_desc, self.hass, self.config, self.comm))
             elif mod_desc.mtype == "Smart Nature":
                 self.modules.append(hbtsnm(mod_desc, self.hass, self.config, self.comm))
+            elif mod_desc.mtype == "Smart Controller Mini":
+                self.modules.append(
+                    hbtscmm(mod_desc, self.hass, self.config, self.comm)
+                )
+            elif mod_desc.mtype[:16] == "Smart Controller":
+                self.modules.append(hbtscm(mod_desc, self.hass, self.config, self.comm))
+            elif mod_desc.mtype == "Fanekey":
+                self.modules.append(hbtkey(mod_desc, self.hass, self.config, self.comm))
             else:
                 continue  # Prevent dealing with unknown modules
                 # self.modules.append(hbtm(mod_desc, self.hass, self.config, self.comm))
@@ -169,15 +180,17 @@ class HbtnRouter:
             count = self.smr[ptr]
             self.chan_list.append(sorted(self.smr[ptr + 1 : ptr + count + 1]))
             # pylint: disable-next=nested-min-max
-            max_mod_no = max(max_mod_no, *self.chan_list[ch_i])
+            if count > 0:
+                max_mod_no = max(max_mod_no, *self.chan_list[ch_i])
             ptr += 1 + count
         ptr += 2
-        self.max_group = max(list(self.smr[ptr : ptr + 64]))
+        grp_cnt = self.smr[ptr - 1]
+        self.max_group = max(list(self.smr[ptr : ptr + grp_cnt]))
         # self.group_list: list[int] = [[]] * (max_group + 1)
         for mod_i in range(max_mod_no):
             grp_no = int(self.smr[ptr + mod_i])
             self.module_grp.append(grp_no)
-        ptr += 129
+        ptr += 2 * grp_cnt + 1  # groups, group dependencies, timeout
         str_len = self.smr[ptr]
         self.name = self.smr[ptr + 1 : ptr + 1 + str_len].decode("iso8859-1").strip()
         ptr += str_len + 1
@@ -193,7 +206,7 @@ class HbtnRouter:
         ptr += str_len + 1
         str_len = self.smr[ptr]
         self.serial = self.smr[ptr + 1 : ptr + 1 + str_len].decode("iso8859-1").strip()
-        ptr += str_len + 71 + 1
+        ptr += str_len + 71  # Korr von Hand, vorher 71 + 1
         str_len = self.smr[ptr]
         self.version = self.smr[ptr + 1 : ptr + 1 + str_len].decode("iso8859-1").strip()
 
@@ -257,10 +270,12 @@ class HbtnRouter:
                         CmdDescriptor(entry_name, entry_no)
                     )
                 elif int(line[2]) == 5:
-                    # logic element
-                    self.modules[self.mod_reg[mod_addr]].logic[
-                        entry_no - 1
-                    ].name = entry_name  # counter
+                    # logic element, if needed to fix unexpected error
+                    l_nmbr = line[3] - 1
+                    for lgc in self.modules[self.mod_reg[mod_addr]].logic:
+                        if lgc.nmbr == l_nmbr:
+                            lgc.name = entry_name  # counter
+
                 # elif int(line[2]) == 7:
                 # Group name
             resp = resp[line_len:]
@@ -277,8 +292,10 @@ class HbtnRouter:
             self._skip_update -= 1
         else:
             # update not always
-            self._skip_update = ROUTER_SKIP_TIMES
             self.status = await self.comm.async_get_router_status(self.id)
+            if not (len(self.status) >= RoutIdx.MIRROR_STARTED):
+                return
+            self._skip_update = ROUTER_SKIP_TIMES
             self.mode0 = int(self.status[RoutIdx.MODE0])
             flags_state = int.from_bytes(
                 self.status[RoutIdx.FLAG_GLOB : RoutIdx.FLAG_GLOB + 2],
@@ -297,8 +314,18 @@ class HbtnRouter:
                     )
                     / 1000
                 )
-            self.voltages[0].value = self.status[RoutIdx.VOLTAGE_5] / 10
-            self.voltages[1].value = self.status[RoutIdx.VOLTAGE_24] / 10
+            self.voltages[0].value = (
+                int.from_bytes(
+                    self.status[RoutIdx.VOLTAGE_5 : RoutIdx.VOLTAGE_5 + 2], "little"
+                )
+                / 10
+            )
+            self.voltages[1].value = (
+                int.from_bytes(
+                    self.status[RoutIdx.VOLTAGE_24 : RoutIdx.VOLTAGE_24 + 2], "little"
+                )
+                / 10
+            )
             self._sys_ok = self.status[RoutIdx.ERR_SYSTEM] == FALSE_VAL
             self._mirror_started = self.status[RoutIdx.MIRROR_STARTED] == TRUE_VAL
             self.states[0].value = self._sys_ok
@@ -308,6 +335,7 @@ class HbtnRouter:
         if sys_status == b"":
             return  # No changes in module status
 
+        # Todo: Hier gibt es beim Setzen des Mode0 Fehler!
         self.sys_status = sys_status
         for m_idx in range(len(self.modules)):
             mod_status = self.sys_status[
