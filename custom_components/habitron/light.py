@@ -111,10 +111,13 @@ class DimmedOutput(SwitchedOutput):
         self._brightness = 255
         self._color_mode = ColorMode.BRIGHTNESS
         self._supported_color_modes = ColorMode.BRIGHTNESS
-        if module.mod_type == "Smart Controller":
+        self._out_offs = 0
+        if module.mod_type == "Smart Controller Mini":
+            pass
+        elif module.mod_type[:16] == "Smart Controller":
             self._out_offs = 10
         else:
-            self._out_offs = 0
+            pass
 
     @property
     def brightness(self) -> int:
@@ -143,9 +146,9 @@ class DimmedOutput(SwitchedOutput):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Instruct the light to turn on."""
-        await self._module.comm.async_set_output(
-            self._module.mod_addr, self._nmbr + 1, 1
-        )
+        # await self._module.comm.async_set_output(
+        #     self._module.mod_addr, self._nmbr + 1, 1
+        # )
         self._brightness = kwargs.get(ATTR_BRIGHTNESS, self._brightness)
         await self._module.comm.async_set_dimmval(
             self._module.mod_addr,

@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import socket
 import struct
+import yaml
 from typing import Final
 
 from pymodbus.utilities import computeCRC
@@ -27,6 +28,7 @@ SMIP_COMMANDS: Final[dict[str, str]] = {
     "GET_MODULE_STATUS": "\x0a\5\1<rtr><mod>\0\0",
     "GET_COMPACT_STATUS": "\x0a\5\2<rtr>\xff\0\0",  # compact status of all modules (0xFF)
     "GET_SMIP_BOOT_STATUS": "\x0a\6\1\0\0\0\0",
+    "GET_SMIP_INFO": "\x0a\6\2\0\0\0\0",
     "GET_GLOBAL_DESCRIPTIONS": "\x0a\7\1<rtr>\0\0\0",  # Flags, Command collections
     "GET_SMIP_STATUS": "\x14\0\0\0\0\0\0",
     "GET_SMIP_FIRMWARE": "\x14\x1e\0\0\0\0\0",
@@ -34,8 +36,8 @@ SMIP_COMMANDS: Final[dict[str, str]] = {
     "GET_GROUP_MODE0": "\x14\2\1<rtr>\0\0\0",
     "SET_GROUP_MODE": "\x14\2\2<rtr><mod>\3\0<rtr><mod><arg1>",  # <Group 0..><Mode>
     "GET_ROUTER_MODES": "\x14\2\3<rtr><mod>\3\0<rtr><mod>\0",
-    "START_MIRROR": "\x14\x28\1\0\0\0\0",
-    "STOP_MIRROR": "\x14\x28\2\0\0\0\0",
+    "START_MIRROR": "\x14\x28\1<rtr>\0\0\0",
+    "STOP_MIRROR": "\x14\x28\2<rtr>\0\0\0",
     "CHECK_COMM_STATUS": "\x14\x64\0\0\0\0\0",
     "SET_OUTPUT_ON": "\x1e\1\1<rtr><mod>\3\0<rtr><mod><arg1>",
     "SET_OUTPUT_OFF": "\x1e\1\2<rtr><mod>\3\0<rtr><mod><arg1>",
@@ -66,20 +68,20 @@ class HbtnComm:
         self._port = 7777
         self._hass = hass
         self._config = config
+        self._hostname = ""
+        self._hostip = ""
+        self._mac = ""
+        self._hwtype = ""
+        self._version = ""
         self.crc = 0
         self.router = []
         self.update_suspended = False
-        self.smart_ip_properties = query_smartip(self._host)
-        self._mac = self._mac = self.smart_ip_properties["mac"]
-        self._version = self.smart_ip_properties["version"]
-        self._hwtype = (
-            f"{self.smart_ip_properties['type']} {self.smart_ip_properties['serial']}"
-        )
+        self.info = self.get_smip_info()
 
     @property
     def com_ip(self) -> str:
         """IP of SmartIP."""
-        return self._host
+        return self._hostip
 
     @property
     def com_port(self) -> str:
@@ -117,6 +119,27 @@ class HbtnComm:
     async def get_smip_version(self) -> bytes:
         """Query of SmartIP firmware."""
         return await self.async_send_command(SMIP_COMMANDS["GET_SMIP_FIRMWARE"])
+
+    def get_smip_info(self):
+        """Get basic infos of SmartIP"""
+        sck = socket.socket()  # Create a socket object
+        try:
+            sck.connect((self._host, self._port))
+        except ConnectionRefusedError as exc:
+            raise ConnectionRefusedError from exc
+        sck.settimeout(15)  # 15 seconds
+        cmd_str = SMIP_COMMANDS["GET_SMIP_INFO"]
+        full_string = wrap_command(cmd_str)
+        resp_bytes = send_receive(sck, full_string)
+        sck.close()
+
+        info = yaml.load(resp_bytes.decode("iso8859-1"), Loader=yaml.Loader)
+        self._version = info["software"]["version"]
+        self._hwtype = info["hardware"]["type"]
+        self._hostip = info["hardware"]["network"]["ip"]
+        self._hostname = info["hardware"]["network"]["host"]
+        self._mac = info["hardware"]["network"]["mac"]
+        return info
 
     async def get_smr(self, rtr_id) -> bytes:
         """Get router SMR information."""
@@ -661,6 +684,7 @@ def query_smartip(smip_ip):
 
     :param smip_ip: ip address of a single smartip
     """
+
     smip_port = 30718
     timeout = 0.1
     try_info_api = False
