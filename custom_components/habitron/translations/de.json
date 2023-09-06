@@ -51,6 +51,8 @@
                 "on": "Aktiv",
                 "off": "Aus",
                 "day": "Tag",
+                "update": "Update",
+                "config": "Konfiguration",
                 "night": "Nacht",
                 "absent": "Abwesend",
                 "present": "Anwesend",
