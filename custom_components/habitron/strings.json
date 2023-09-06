@@ -51,6 +51,8 @@
           "on": "On",
           "off": "Off",
           "day": "Day",
+          "update": "Update",
+          "config": "Config",
           "night": "Night",
           "absent": "Absent",
           "present": "Present",

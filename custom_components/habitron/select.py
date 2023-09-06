@@ -25,7 +25,7 @@ async def async_setup_entry(
 
     new_devices = []
     for hbt_module in hbtn_rt.modules:
-        if hbt_module.mod_type == "Smart Controller":
+        if hbt_module.mod_type[:16] == "Smart Controller":
             # Mode setting is per group, entities linked to smart controllers only
             new_devices.append(
                 HbtnSelectDaytimeMode(hbt_module, hbtn_rt, hbtn_cord, len(new_devices))
@@ -115,17 +115,22 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
         self._value = self._mode & self._mask
         if self._value == 0:
             self._value = self.hbtnr.mode0 & self._mask
+        if self._mode == 73:
+            self._value = 63
         self._current_option = self._enum(self._value).name
         self.async_write_ha_state()
 
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
         mode_val = self._enum[option].value
-        self._mode = (self._module.mode & (0xFF - self._mask)) + mode_val
-        # self._module.mode = self._mode
-        await self._module.comm.async_set_group_mode(
-            self._module.mod_addr, self._module.group, self._mode
-        )
+        if isinstance(self._module, int):
+            self._mode = (self.hbtnr.mode0 & (0xFF - self._mask)) + mode_val
+            await self.hbtnr.comm.async_set_group_mode(self.hbtnr.id, 0, self._mode)
+        else:
+            self._mode = (self._module.mode & (0xFF - self._mask)) + mode_val
+            await self._module.comm.async_set_group_mode(
+                self._module.mod_addr, self._module.group, self._mode
+            )
 
 
 class HbtnSelectDaytimeMode(HbtnMode):
@@ -204,6 +209,8 @@ class HbtnSelectGroupMode(HbtnMode):
                 ("absent", 16),
                 ("present", 32),
                 ("sleeping", 48),
+                ("update", 63),
+                ("config", 64),
                 ("vacation", 80),
                 (self.hbtnr.user1_name, 96),
                 (self.hbtnr.user2_name, 112),
