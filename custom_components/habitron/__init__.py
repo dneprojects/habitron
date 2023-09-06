@@ -24,6 +24,7 @@ PLATFORMS: list[str] = [
     "binary_sensor",
     "select",
     "climate",
+    "text",
 ]
 SERVICE_MOD_RESTART_SCHEMA = vol.Schema(
     {

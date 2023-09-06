@@ -28,6 +28,8 @@
                     "absent": "Absent",
                     "day": "Day",
                     "night": "Night",
+                    "update": "Update",
+                    "config": "Config",
                     "off": "Off",
                     "on": "On",
                     "present": "Present",

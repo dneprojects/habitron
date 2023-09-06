@@ -32,6 +32,17 @@ class CmdDescriptor:
         self.nmbr: int = cnmbr
 
 
+class LgcDescriptor:
+    """Habitron logic descriptor."""
+
+    def __init__(self, lname, lidx, lnmbr, ltype, lvalue) -> None:
+        self.name: str = lname
+        self.idx: int = lidx
+        self.nmbr: int = lnmbr
+        self.type: int = ltype
+        self.value: int = lvalue
+
+
 class StateDescriptor:
     """Descriptor for modes and flags."""
 
