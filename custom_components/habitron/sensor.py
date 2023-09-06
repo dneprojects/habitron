@@ -62,10 +62,15 @@ async def async_setup_entry(
                         hbt_module, mod_sensor.nmbr, hbtn_cord, len(new_devices)
                     )
                 )
+            elif mod_sensor.name == "Identifier":
+                new_devices.append(
+                    EKeySensor(hbt_module, mod_sensor.nmbr, hbtn_cord, len(new_devices))
+                )
         for mod_logic in hbt_module.logic:
-            new_devices.append(
-                LogicSensor(hbt_module, mod_logic, hbtn_cord, len(new_devices))
-            )
+            if mod_logic.type > 0:
+                new_devices.append(
+                    LogicSensor(hbt_module, mod_logic, hbtn_cord, len(new_devices))
+                )
         for mod_diag in hbt_module.diags:
             if mod_diag.name == "Status":
                 new_devices.append(
@@ -170,6 +175,17 @@ class IlluminanceSensor(HbtnSensor):
         super().__init__(module, nmbr, coord, idx)
         self._attr_unique_id = f"{self._module.id}_illuminance"
         self._attr_name = "Illuminance"
+
+
+class EKeySensor(HbtnSensor):
+    """Representation of an ekey identifier sensor."""
+
+    def __init__(self, module, nmbr, coord, idx) -> None:
+        """Initialize the sensor."""
+        super().__init__(module, nmbr, coord, idx)
+        self._attr_unique_id = f"{self._module.id}_ekey_ident"
+        self._attr_name = "Identifier Value"
+        self._attr_icon = "mdi:fingerprint"
 
 
 class WindSensor(HbtnSensor):
@@ -289,6 +305,7 @@ class LogicSensor(HbtnSensor):
     def __init__(self, module, logic, coord, idx) -> None:
         """Initialize the sensor."""
         super().__init__(module, logic.nmbr, coord, idx)
+        self.idx = logic.idx
         self.nmbr = logic.nmbr
         self._attr_unique_id = f"{self._module.id}_logic_{logic.nmbr}"
         self._attr_name = f"Cnt{logic.nmbr + 1}: {logic.name}"
@@ -297,7 +314,7 @@ class LogicSensor(HbtnSensor):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        self._attr_native_value = self._module.logic[self.nmbr].value
+        self._attr_native_value = self._module.logic[self.idx].value
         self.async_write_ha_state()
 
 
