@@ -6,11 +6,15 @@ from typing import Final
 DOMAIN = "habitron"  # This is the internal name of the integration, it should also match the directory
 CONF_DEFAULT_HOST = "192.168.178.51"  # default DNS name of SmartIP
 CONF_DEFAULT_INTERVAL = 5  # default update interval
-CONF_MIN_INTERVAL = 2  # min update interval
-CONF_MAX_INTERVAL = 10  # max update interval
+CONF_MIN_INTERVAL = 4  # min update interval
+CONF_MAX_INTERVAL = 60  # max update interval
 RESTART_RTR = 0
 RESTART_ALL = 0xFF
 ROUTER_NMBR = "rtr_nmbr"
+MOD_NMBR = "mod_nmbr"
+EVNT_TYPE = "evnt_type"
+EVNT_ARG1 = "evnt_arg1"
+EVNT_ARG2 = "evnt_arg2"
 RESTART_KEY_NMBR = "mod_nmbr"
 FILE_MOD_NMBR = "mod_nmbr"
 
@@ -191,8 +195,8 @@ class MirrIdx:
     COUNTER = 187  # type, max_cnt, val;    logic 1..10
     COUNTER_TYP = 187  # type, 5 for counter
     COUNTER_MAX = 188  # max_cnt
-    COUNTER_VAL = 189  # cnt val
-    LOGIC_OUT = 217  # 1..8, 218 9..16
+    COUNTER_VAL = 189  # cnt val; input state if gate
+    LOGIC_OUT = 217  # 1..8, 218 9..10 for logic gates
     FLAG_LOC = 219  # 1..8, 220 9..16
     STAT_AD24_ACTIVE = 221  # in24 used as AD input
     END = 222
@@ -233,8 +237,9 @@ class SMirrIdx:
 class ModuleDescriptor:
     """Habitron modules descriptor."""
 
-    def __init__(self, uid, mtype, name, group) -> None:
-        self.uid: int = uid
+    def __init__(self, uid, addr, mtype, name, group) -> None:
+        self.uid: str = uid
+        self.addr: int = addr
         self.mtype: str = mtype
         self.name: str = name
         self.group: int = group

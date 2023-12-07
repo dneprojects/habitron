@@ -49,7 +49,7 @@ class CollCmdButton(ButtonEntity):
         self._module = module
         self._nmbr = coll_cmd.nmbr
         self._attr_name = f"Cmd {self._nmbr}: {coll_cmd.name}"
-        self._attr_unique_id = "Cmd_" + str(coll_cmd.nmbr) + "_" + coll_cmd.name
+        self._attr_unique_id = f"{module.b_uid}_Cmd_" + str(coll_cmd.nmbr) + "_" + coll_cmd.name
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -79,7 +79,7 @@ class DirCmdButton(ButtonEntity):
         self._nmbr = dir_cmd.nmbr
         self._attr_name = f"DirectCmd {self._nmbr}: {dir_cmd.name}"
         self._attr_unique_id = (
-            f"Mod_{self._module.mod_addr}_DCmd{self._nmbr}_{dir_cmd.name}"
+            f"Mod_{self._module.uid}_DCmd{self._nmbr}_{dir_cmd.name}"
         )
 
     @property
@@ -112,7 +112,7 @@ class VisCmdButton(ButtonEntity):
         no_lo = self._nmbr - no_hi * 256
         self._attr_name = f"VisCmd {no_hi}/{no_lo}: {vis_cmd.name}"
         self._attr_unique_id = (
-            f"Mod_{self._module.mod_addr}_VCmd{self._nmbr}_{vis_cmd.name}"
+            f"Mod_{self._module.uid}_VCmd{self._nmbr}_{vis_cmd.name}"
         )
 
     @property

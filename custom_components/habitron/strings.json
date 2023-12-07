@@ -15,7 +15,8 @@
       "user": {
         "data": {
           "habitron_host": "Host name or IP of SmartIP",
-          "update_interval": "Update interval [s]"
+          "update_interval": "Update interval [s]",
+          "websock_token": "Token for websocket authentification"
         },
         "title": "Setup communication"
       }
@@ -38,7 +39,8 @@
         "data": {
           "habitron_host": "Host name or IP of SmartIP",
           "update_interval": "Update interval [s]",
-          "updates_enabled": "Perform cyclic updates"
+          "updates_enabled": "Perform cyclic updates",
+          "websock_token": "Token for websocket authentification"
         },
         "title": "Setup communication"
       }
@@ -58,6 +60,16 @@
           "present": "Present",
           "sleeping": "Sleeping",
           "vacation": "Vacation"
+        }
+      },
+      "habitron_loglevel": {
+        "state": {
+          "notset": "Not Set",
+          "debug": "Debug",
+          "info": "Info",
+          "warning": "Warning",
+          "error": "Error",
+          "critical": "Critical"
         }
       }
     }

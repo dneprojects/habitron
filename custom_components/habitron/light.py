@@ -53,6 +53,7 @@ class SwitchedOutput(CoordinatorEntity, LightEntity):
     """Representation of habitron light entities."""
 
     _attr_has_entity_name = True
+    should_poll = True  # for push updates
 
     def __init__(self, output, module, coord, idx) -> None:
         """Initialize an HbtnLight, pass coordinator to CoordinatorEntity."""
@@ -60,14 +61,33 @@ class SwitchedOutput(CoordinatorEntity, LightEntity):
         self.idx = idx
         self._output = output
         self._module = module
-        self._attr_name = output.name
+        if output.name.strip() == "":
+            self._attr_name = f"Out {output.nmbr + 1}"
+        else:
+            self._attr_name = output.name
         self._nmbr = output.nmbr
         self._state = None
         self._brightness = None
-        self._attr_unique_id = f"{self._module.id}_{output.name}"
+        self._attr_unique_id = f"{self._module.uid}_{output.nmbr}"
         if output.type < 0:
             # Entity will not show up
             self._attr_entity_registry_enabled_default = False
+
+    async def async_added_to_hass(self) -> None:
+        """Run when this Entity has been added to HA."""
+        # Importantly for a push integration, the module that will be getting updates
+        # needs to notify HA of changes. The dummy device has a registercallback
+        # method, so to this we add the 'self.async_write_ha_state' method, to be
+        # called where ever there are changes.
+        # The call back registration is done once this entity is registered with HA
+        # (rather than in the __init__)
+        await super().async_added_to_hass()
+        self._output.register_callback(self.async_write_ha_state)
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Entity being removed from hass."""
+        # The opposite of async_added_to_hass. Remove any registered call backs here.
+        self._output.remove_callback(self.async_write_ha_state)
 
     # To link this entity to its device, this property must return an
     # identifiers value matching that used in the module
@@ -80,6 +100,11 @@ class SwitchedOutput(CoordinatorEntity, LightEntity):
     def name(self) -> str:
         """Return the display name of this light."""
         return self._attr_name
+
+    @property
+    def is_on(self) -> bool:
+        """Return status of output"""
+        return self._module.outputs[self._nmbr].value == 1
 
     @callback
     def _handle_coordinator_update(self) -> None:
