@@ -26,18 +26,14 @@ async def async_setup_entry(
     new_devices = []
     for hbt_module in hbtn_rt.modules:
         for mod_led in hbt_module.leds:
-            loc_led = IfDescriptor(
-                mod_led.name, mod_led.nmbr, mod_led.type, mod_led.value
-            )
-
             led_name = "LED red"
-            led_no = loc_led.nmbr + 1
-            if loc_led.name.strip() == "":
-                loc_led.name = f"{led_name} {led_no}"
+            led_no = mod_led.nmbr + 1
+            if mod_led.name.strip() == "":
+                mod_led.set_name(f"{led_name} {led_no}")
             else:
-                loc_led.name = f"{led_name} {led_no}: {loc_led.name}"
+                mod_led.set_name(f"{led_name} {led_no}: {mod_led.name}")
             new_devices.append(
-                SwitchedLed(loc_led, hbt_module, hbtn_cord, len(new_devices))
+                SwitchedLed(mod_led, hbt_module, hbtn_cord, len(new_devices))
             )
 
     if new_devices:
@@ -49,6 +45,7 @@ async def async_setup_entry(
 class SwitchedLed(CoordinatorEntity, SwitchEntity):
     """Module switch background LEDs."""
 
+    should_poll = False  # for push updates
     device_class = "switch"
     _attr_has_entity_name = True
 
@@ -62,8 +59,24 @@ class SwitchedLed(CoordinatorEntity, SwitchEntity):
         self._nmbr = led.nmbr
         self._state = None
         self._brightness = None
-        self._attr_unique_id = f"{self._module.id}_led_{self.idx}"
+        self._attr_unique_id = f"{self._module.uid}_led_{self.idx}"
         self._attr_icon = "mdi:circle-outline"
+
+    async def async_added_to_hass(self) -> None:
+        """Run when this Entity has been added to HA."""
+        # Importantly for a push integration, the module that will be getting updates
+        # needs to notify HA of changes. The dummy device has a registercallback
+        # method, so to this we add the 'self.async_write_ha_state' method, to be
+        # called where ever there are changes.
+        # The call back registration is done once this entity is registered with HA
+        # (rather than in the __init__)
+        await super().async_added_to_hass()
+        self._module.leds[self._nmbr].register_callback(self.async_write_ha_state)
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Entity being removed from hass."""
+        # The opposite of async_added_to_hass. Remove any registered call backs here.
+        self._module.leds[self._nmbr].remove_callback(self.async_write_ha_state)
 
     @property
     def device_info(self) -> None:
@@ -74,6 +87,16 @@ class SwitchedLed(CoordinatorEntity, SwitchEntity):
     def name(self) -> str:
         """Return the display name of this switch."""
         return self._attr_name
+
+    @property
+    def is_on(self) -> bool:
+        """Return status of output"""
+        self._attr_state = self._module.leds[self._nmbr].value == 1
+        if self._attr_state:
+            self._attr_icon = "mdi:circle-double"
+        else:
+            self._attr_icon = "mdi:circle-outline"
+        return self._attr_state
 
     @callback
     def _handle_coordinator_update(self) -> None:

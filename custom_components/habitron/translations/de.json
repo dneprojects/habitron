@@ -5,7 +5,8 @@
                 "title": "Einstellungen zur Kommunikation",
                 "data": {
                     "habitron_host": "Host-Name oder IP des SmartIP",
-                    "update_interval": "Update Intervall [s]"
+                    "update_interval": "Update Intervall [s]",
+                    "websock_token": "Token zur Websocket Authentifizierung"
                 }
             }
         },
@@ -28,7 +29,8 @@
                 "data": {
                     "habitron_host": "Host-Name oder IP des SmartIP",
                     "update_interval": "Update Intervall [s]",
-                    "updates_enabled": "Zyklische Updates ausführen"
+                    "updates_enabled": "Zyklische Updates ausführen",
+                    "websock_token": "Token zur Websocket Authentifizierung"
                 }
             }
         },
@@ -59,6 +61,16 @@
                 "sleeping": "Schlafen",
                 "vacation": "Urlaub"
             }
+        },
+        "habitron_loglevel": {
+          "state": {
+            "notset": "Not Set",
+            "debug": "Debug",
+            "info": "Info",
+            "warning": "Warning",
+            "error": "Error",
+            "critical": "Critical"
+          }
         }
       }
     }
