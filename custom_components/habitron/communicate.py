@@ -5,16 +5,18 @@ import os
 import socket
 import struct
 import yaml
+import asyncio
 from typing import Final
 
-from pymodbus.utilities import computeCRC
+from pymodbus.utilities import computeCRC, checkCRC
 import requests
 
 from homeassistant import exceptions
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.components.http.auth import async_sign_path
 
-from .const import DOMAIN, MirrIdx, ModuleDescriptor
+from .const import DOMAIN, MirrIdx, ModuleDescriptor, MStatIdx
 
 BASE_PATH_COMPONENT = "./homeassistant/components"
 BASE_PATH_CUSTOM_COMPONENT = "./custom_components"
@@ -39,6 +41,7 @@ SMIP_COMMANDS: Final[dict[str, str]] = {
     "START_MIRROR": "\x14\x28\1<rtr>\0\0\0",
     "STOP_MIRROR": "\x14\x28\2<rtr>\0\0\0",
     "CHECK_COMM_STATUS": "\x14\x64\0\0\0\0\0",
+    "SEND_NETWORK_INFO": "\x3c\x00\x04\0\0<len><iplen><ipv4><toklen><tok>",
     "SET_OUTPUT_ON": "\x1e\1\1<rtr><mod>\3\0<rtr><mod><arg1>",
     "SET_OUTPUT_OFF": "\x1e\1\2<rtr><mod>\3\0<rtr><mod><arg1>",
     "SET_DIMMER_VALUE": "\x1e\1\3<rtr><mod>\4\0<rtr><mod><arg1><arg2>",  # <Module><DimNo><DimVal>
@@ -48,6 +51,7 @@ SMIP_COMMANDS: Final[dict[str, str]] = {
     "CALL_VIS_COMMAND": "\x1e\3\1\0\0\4\0<rtr><mod><arg2><arg3>",  # <Module><VisNoL><VisNoH> not tested
     "CALL_COLL_COMMAND": "\x1e\4\1<rtr><arg2>\0\0",  # <CmdNo>
     "GET_LAST_IR_CODE": "\x32\2\1<rtr><mod>\0\0",
+    "SET_LOG_LEVEL": "\x3c\0\5<hdlr><lvl>\0\0",  # Set logging level of console/file handler
     "RESTART_FORWARD_TABLE": "\x3c\1\1<rtr>\0\0\0",  # Weiterleitungstabelle löschen und -automatik starten
     "GET_CURRENT_ERROR": "\x3c\1\2<rtr>\0\0\0",
     "GET_LAST_ERROR": "\x3c\1\3<rtr>\0\0\0",
@@ -73,6 +77,10 @@ class HbtnComm:
         self._mac = ""
         self._hwtype = ""
         self._version = ""
+        self._network_ip = hass.data["network"].adapters[0]["ipv4"][0]["address"]
+        # self._websck_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJjMWI1ZjgyNmUxMDg0MjFhYWFmNTZlYWQ0ZThkZGNiZSIsImlhdCI6MTY5NDUzNTczOCwiZXhwIjoyMDA5ODk1NzM4fQ.0YZWyuQn5DgbCAfEWZXbQZWaViNBsR4u__LjC4Zf2lY"
+        # self._websck_token = ""
+        self._loop = asyncio.get_event_loop()
         self.crc = 0
         self.router = []
         self.update_suspended = False
@@ -112,6 +120,30 @@ class HbtnComm:
         self._host = get_host_ip(self._host_conf)
         await self._hass.config_entries.async_reload(self._config.entry_id)
 
+    async def send_network_info(self, tok: str):
+        """Send home assistant ipv4"""
+        if tok == "":
+            return
+        cmd_str = SMIP_COMMANDS["SEND_NETWORK_INFO"]
+        ipv4 = self._network_ip
+        ip_len = len(ipv4)
+        tk_len = len(tok)
+        nmbrs = self._mac.split(":")
+        for i in range(len(nmbrs)):
+            idx = int("0x" + nmbrs[len(nmbrs) - i - 1], 0) & 0x7F
+            tok = tok[:idx] + tok[idx + 1 :] + tok[idx]
+        args_len = ip_len + tk_len + 2
+        len_l = args_len & 0xFF
+        len_h = args_len >> 8
+        cmd_str = (
+            cmd_str.replace("<len>", chr(len_l) + chr(len_h))
+            .replace("<iplen>", chr(ip_len))
+            .replace("<ipv4>", ipv4)
+            .replace("<toklen>", chr(tk_len))
+            .replace("<tok>", tok)
+        )
+        await self.async_send_command(cmd_str)
+
     def set_router(self, rtr) -> None:
         """Registers the router instance."""
         self.router = rtr
@@ -122,23 +154,36 @@ class HbtnComm:
 
     def get_smip_info(self):
         """Get basic infos of SmartIP"""
-        sck = socket.socket()  # Create a socket object
-        try:
-            sck.connect((self._host, self._port))
-        except ConnectionRefusedError as exc:
-            raise ConnectionRefusedError from exc
-        sck.settimeout(15)  # 15 seconds
-        cmd_str = SMIP_COMMANDS["GET_SMIP_INFO"]
-        full_string = wrap_command(cmd_str)
-        resp_bytes = send_receive(sck, full_string)
-        sck.close()
+        smip_info = query_smartip(self._host)  # get info from query port
+        if smip_info == "":
+            return ""
+        if smip_info["type"] == "E-5":
+            # Smart IP
+            info = smip_info
+            self._version = info["version"]
+            self._hwtype = info["type"]
+            self._hostip = info["ip"]
+            self._mac = info["mac"]
+            self._hostname = info["hostname"]
+        else:
+            # Smart Gateway
+            sck = socket.socket()  # Create a socket object
+            try:
+                sck.connect((self._host, self._port))
+            except ConnectionRefusedError as exc:
+                raise ConnectionRefusedError from exc
+            sck.settimeout(15)  # 15 seconds
+            cmd_str = SMIP_COMMANDS["GET_SMIP_INFO"]
+            full_string = wrap_command(cmd_str)
+            resp_bytes = send_receive(sck, full_string)
+            sck.close()
 
-        info = yaml.load(resp_bytes.decode("iso8859-1"), Loader=yaml.Loader)
-        self._version = info["software"]["version"]
-        self._hwtype = info["hardware"]["type"]
-        self._hostip = info["hardware"]["network"]["ip"]
-        self._hostname = info["hardware"]["network"]["host"]
-        self._mac = info["hardware"]["network"]["mac"]
+            info = yaml.load(resp_bytes.decode("iso8859-1"), Loader=yaml.Loader)
+            self._version = info["software"]["version"]
+            self._hwtype = info["hardware"]["platform"]["type"]
+            self._hostip = info["hardware"]["network"]["ip"]
+            self._hostname = info["hardware"]["network"]["host"]
+            self._mac = info["hardware"]["network"]["mac"]
         return info
 
     async def get_smr(self, rtr_id) -> bytes:
@@ -164,7 +209,7 @@ class HbtnComm:
         """General function for communication via SmartIP."""
         sck = socket.socket()  # Create a socket object
         sck.connect((self._host, self._port))
-        sck.settimeout(30)  # 30 seconds
+        sck.settimeout(20)  # 10 seconds
         full_string = wrap_command(cmd_string)
         res = await async_send_receive(sck, full_string)
         sck.close()
@@ -173,13 +218,16 @@ class HbtnComm:
 
     async def async_send_command_crc(self, cmd_string: str):
         """General function for communication via SmartIP, returns additional crc."""
-        sck = socket.socket()  # Create a socket object
-        sck.connect((self._host, self._port))
-        sck.settimeout(30)  # 30 seconds
-        full_string = wrap_command(cmd_string)
-        res = await async_send_receive(sck, full_string)
-        sck.close()
-        return res[0], res[1]
+        try:
+            sck = socket.socket()  # Create a socket object
+            sck.connect((self._host, self._port))
+            sck.settimeout(30)  # 30 seconds
+            full_string = wrap_command(cmd_string)
+            res = await async_send_receive(sck, full_string)
+            sck.close()
+            return res[0], res[1]
+        except TimeoutError as err_msg:
+            print(f"Error connecting to Smart IP: {err_msg}")
 
     async def async_get_router_status(self, rtr_id) -> bytes:
         """Get router status."""
@@ -230,6 +278,8 @@ class HbtnComm:
             return
         else:
             sys_status = await self.get_compact_status(self.router.id)
+        if sys_status == b"":
+            return
         await self.router.update_system_status(sys_status)
 
     async def async_set_group_mode(self, rtr_id, grp_no, mode) -> None:
@@ -239,6 +289,13 @@ class HbtnComm:
         cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
         cmd_str = cmd_str.replace("<mod>", chr(grp_no))
         cmd_str = cmd_str.replace("<arg1>", chr(mode))
+        self.send_only(cmd_str)
+
+    async def async_set_log_level(self, hdlr, level) -> None:
+        """Set new logging level."""
+        cmd_str = SMIP_COMMANDS["SET_LOG_LEVEL"]
+        cmd_str = cmd_str.replace("<hdlr>", chr(hdlr))
+        cmd_str = cmd_str.replace("<lvl>", chr(level))
         self.send_only(cmd_str)
 
     def set_output(self, mod_id, nmbr, val) -> None:
@@ -460,7 +517,7 @@ class HbtnComm:
         await self.save_config_data(file_name, str_data)
 
     async def save_smr_file(self, rtr_id) -> None:
-        """Get module settings (smg) and saves them to file."""
+        """Get router settings (smr) and saves them to file."""
         data = await self.get_smr(rtr_id)
         file_name = f"Router_{rtr_id}.smr"
         str_data = ""
@@ -496,6 +553,44 @@ class HbtnComm:
         cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
         self.send_only(cmd_str)
 
+    async def update_entity(self, rtr_id, mod_id, evnt, arg1, arg2):
+        """Event server handler to receive entity updates."""
+        inp_event_types = ["inactive", "single_press", "long_press", "long_press_end"]
+        module = self.router.get_module(mod_id)
+        if evnt == 1:
+            # Button pressed or released
+            await module.inputs[arg1 - 1].handle_upd_event(inp_event_types[arg2])
+            if arg2 in [1, 3]:
+                await module.inputs[arg1 - 1].handle_upd_event(inp_event_types[0])
+        elif evnt == 2:
+            # Switch input changed
+            module.inputs[arg1 - 1].value = arg2
+            await module.inputs[arg1 - 1].handle_upd_event()
+        elif evnt == 3:
+            # Output changed
+            if arg1 > 16:
+                # LED
+                module.leds[arg1 - 17].value = arg2
+                await module.leds[arg1 - 17].handle_upd_event()
+            else:
+                module.outputs[arg1 - 1].value = arg2
+                await module.outputs[arg1 - 1].handle_upd_event()
+                if (c_idx := module.get_cover_index(arg1)) >= 0:
+                    module.covers[c_idx].value = module.status[
+                        MStatIdx.ROLL_POS + c_idx
+                    ]
+                    module.covers[c_idx].tilt = module.status[MStatIdx.BLAD_POS + c_idx]
+                    await module.covers[c_idx].handle_upd_event()
+        elif evnt == 4:
+            # Ekey input detected
+            module.sensors[0].value = arg1
+            await module.sensors[0].handle_upd_event()
+            await module.fingers[0].handle_upd_event("finger", arg1)
+            await asyncio.sleep(0.2)
+            await module.fingers[0].handle_upd_event(
+                "inactive", 0
+            )  # set back to 'None'
+
 
 async def test_connection(host_name) -> bool:
     """Test connectivity to SmartIP is OK."""
@@ -516,7 +611,13 @@ async def test_connection(host_name) -> bool:
     resp_bytes = send_receive(sck, full_string)
     sck.close()
     resp_string = resp_bytes.decode("iso8859-1")
-    return bool(resp_string[0:2] == "OK")
+    conn_ok = resp_string[0:2] == "OK"
+    smip_info = query_smartip(host)
+    if conn_ok:
+        host_name = smip_info["name"]
+    else:
+        host_name = ""
+    return conn_ok, host_name
 
 
 def get_host_ip(host_name: str) -> str:
@@ -564,6 +665,12 @@ async def async_send_receive(sck, cmd_str: str) -> bytes:
     return resp_bytes, crc
 
 
+def check_crc(msg) -> bool:
+    """Check crc of message."""
+    msg_crc = int.from_bytes(msg[-3:-1], "little")
+    return checkCRC(msg[:-3], msg_crc)
+
+
 def wrap_command(cmd_string: str) -> str:
     """Take command and add prefix, crc, postfix."""
     cmd_prefix = "¨\0\0\x0bSmartConfig\x05michlS\x05"
@@ -593,54 +700,43 @@ def format_block_output(byte_str: bytes) -> str:
     return res_str
 
 
-def get_udp_broadcast_socket(timeout):
-    """Get a UDP broadcast socket with a specific timeout."""
+def get_own_ip():
+    """Return string of own ip"""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.connect(("8.8.8.8", 80))
+    own_ip = s.getsockname()[0]
+    s.close()
+    return own_ip
+
+
+def discover_smartips():
+    """Discover SmartIP and SmartServer hardware on the network."""
+    smip_port = 30718
+    own_ip = get_own_ip()
+    timeout = 2
+
+    req_header_data = [0x00, 0x00, 0x00, 0xF6]
+    req_header = struct.pack("B" * len(req_header_data), *req_header_data)
+    resp_header_data = [0x00, 0x00, 0x00, 0xF7]
+    resp_header = struct.pack("B" * len(resp_header_data), *resp_header_data)
 
     network_socket = socket.socket(
         socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP
     )
-
     network_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, True)
     network_socket.settimeout(timeout)
+    network_socket.bind((own_ip, 0))
 
-    return network_socket
-
-
-def discover_smartips(flg_one):
-    """Discover SmartIP and SmartServer hardware on the network.
-
-    :param address: string - The broadcast address to use.
-    :param port: int - The port to use for the broadcast.
-    :param timeout: int - The timeout to wait for answers.
-    :param bind_to: string - The network interface to bind to
-    :param try_info_api:  bool - Whether to try the HTTP info interface on
-                                 discovered SmartIPs.
-    :return:
-    """
-    smip_port = 30718
-    base_ip = "192.168.178.0"
-    lower_ip = 2
-    upper_ip = 255
-    timeout = 0.1
-    try_info_api = False
-
-    req_header_data = [0x00, 0x00, 0x00, 0xF6]
-    req_header = struct.pack("B" * len(req_header_data), *req_header_data)
-    network_socket = get_udp_broadcast_socket(timeout)
-
-    resp_header_data = [0x00, 0x00, 0x00, 0xF7]
-    resp_header = struct.pack("B" * len(resp_header_data), *resp_header_data)
+    network_socket.sendto(req_header, ("<broadcast>", smip_port))
 
     smartips = []
 
-    for ip in range(lower_ip, upper_ip):
-        try:
-            tst_address = base_ip.replace(".0", f".{ip}")
-            network_socket.sendto(req_header, (tst_address, smip_port))
+    try:
+        while True:
             response, address_info = network_socket.recvfrom(1024)
 
-            print(f"SmartIP found at address {tst_address}")
             smip_ip = address_info[0]
+            print(f"SmartIP found at address {smip_ip}")
 
             if response[0:4] == resp_header and smip_ip != "0.0.0.0":
                 smip_version = f"{response[7]}.{response[6]}.{response[5]}"
@@ -658,43 +754,35 @@ def discover_smartips(flg_one):
                 }
 
                 smartips.append(smartip_info)
-                if flg_one:
-                    break
 
             else:
                 print(("Response: %s (%d)" % ([response], len(response)), address_info))
 
-        except socket.timeout:
-            pass
+    except socket.timeout:
+        pass
 
     network_socket.close()
-
-    if try_info_api:
-        # starting with newer firmwares, we do have a JSON endpoint
-        # reporting some additional information
-        # @ /api/info (it's behind HTTP Digest Auth with admin/PASS
-
-        add_http_info(smartips)
-
     return smartips
 
 
 def query_smartip(smip_ip):
     """Read properties of identified SmartIP.
-
     :param smip_ip: ip address of a single smartip
     """
 
     smip_port = 30718
-    timeout = 0.1
-    try_info_api = False
+    timeout = 1
 
     req_header_data = [0x00, 0x00, 0x00, 0xF6]
     req_header = struct.pack("B" * len(req_header_data), *req_header_data)
-    network_socket = get_udp_broadcast_socket(timeout)
-
     resp_header_data = [0x00, 0x00, 0x00, 0xF7]
     resp_header = struct.pack("B" * len(resp_header_data), *resp_header_data)
+
+    network_socket = socket.socket(
+        socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP
+    )
+    network_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, True)
+    network_socket.settimeout(timeout)
 
     try:
         network_socket.sendto(req_header, (smip_ip, smip_port))
@@ -709,58 +797,31 @@ def query_smartip(smip_ip):
                 f"{response[20]:c}{response[21]:c}{response[22]:c}{response[23]:c}"
             )
             smip_type = f"{response[8]:c}-{response[9]:c}"
+            if smip_type == "E-5":
+                # Classic SmartIP
+                smip_name = f"SmartIP_{smip_mac.replace(':','')}"
+            else:
+                # Smart Gateway
+                smip_name = f"SmartGateway_{smip_mac.replace(':','')}"
+
             smartip_info = {
+                "name": smip_name,
+                "hostname": "",
                 "type": smip_type,
                 "version": smip_version,
                 "serial": smip_serial,
                 "mac": smip_mac,
                 "ip": smip_ip,
             }
-
-        else:
-            print(("Response: %s (%d)" % ([response], len(response)), address_info))
-
     except socket.timeout:
-        pass
+        smartip_info = ""
 
     network_socket.close()
-
-    if try_info_api:
-        # starting with newer firmwares, we do have a JSON endpoint
-        # reporting some additional information
-        # @ /api/info (it's behind HTTP Digest Auth with admin/PASS
-
-        add_http_info(smartip_info)
-
+    try:
+        smartip_info["hostname"] = socket.gethostbyaddr(smip_ip)[0].split(".")[0]
+    except Exception as err_msg:
+        pass
     return smartip_info
-
-
-def add_http_info(smartip_info):
-    """Request and annotate HTTP info for discovered SmartIPs."""
-
-    smartip_info_template = "http://{ip}/api/info"
-    auth_user = "admin"
-    auth_passwd = "PASS"
-
-    auth = requests.auth.HTTPDigestAuth(auth_user, auth_passwd)
-    url = smartip_info_template.format(**smartip_info)
-    response = requests.get(url, auth=auth, timeout=1)
-
-    if response.status_code == 200:
-        data = response.json()
-
-        if data.get("status", None) == "OK":
-            smartip_info.update(
-                {
-                    "firmware": data.get("version", None),
-                    "free_ram": data.get("free_ram", None),
-                }
-            )
-        else:
-            print("Info API call succeeded, but did not return status ok")
-
-    else:
-        print(f"Info API call failed with status code {response.status_code}")
 
 
 class TimeoutException(exceptions.HomeAssistantError):

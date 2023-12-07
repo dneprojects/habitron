@@ -58,7 +58,7 @@ class HbtnNumber(CoordinatorEntity, NumberEntity):
         self._module = module
         self._nmbr = setval.nmbr
         self._attr_name = setval.name
-        self._attr_unique_id = f"{self._module.id}_number_{48+setval.nmbr}"
+        self._attr_unique_id = f"{self._module.uid}_number_{48+setval.nmbr}"
         self._attr_native_value = setval.value
 
     @property
