@@ -1,5 +1,6 @@
 """Module modules."""
 from __future__ import annotations
+import math
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -19,24 +20,26 @@ class HbtnModule:
         mod_descriptor: ModuleDescriptor,
         hass: HomeAssistant,
         config: ConfigEntry,
+        b_uid: str,
         comm,
     ) -> None:
         """Init Habitron module."""
         self._hass = hass
         self._config = config
+        self.b_uid = b_uid
         self.name = mod_descriptor.name
         self.comm = comm
         self.sw_version = ""
         self.hw_version = ""
         self.uid = mod_descriptor.uid
-        self._addr = mod_descriptor.uid
-        self.raddr = self._addr - int(self.uid / 100)
+        self._addr = mod_descriptor.addr
+        self.raddr = self._addr - int(self._addr / 100) * 100
         self._type = mod_descriptor.mtype
         self.smc = ""
         self.status = ""
         self.mstatus = ""
         self.shutter_state = []
-        self.id = "Mod_" + f"{mod_descriptor.uid}"
+        self.id = f"Mod_{mod_descriptor.uid}_{self.b_uid}"
         self.group = mod_descriptor.group
         self.mode = 1
 
@@ -53,6 +56,7 @@ class HbtnModule:
         self.flags: list[IfDescriptor] = []
         self.logic: list[LgcDescriptor] = []
         self.diags = [IfDescriptor("", 0, 0, 0)]
+        self.diags.append(IfDescriptor("Status", 0, 1, 0))
 
     @property
     def mod_id(self) -> str:
@@ -77,6 +81,7 @@ class HbtnModule:
         self.status = self.extract_status(sys_status)
         device_registry.async_get_or_create(
             config_entry_id=self._config.entry_id,
+            configuration_url=f"http://{self.comm.com_ip}:7780/module-{self.raddr}",
             identifiers={(DOMAIN, self.uid)},
             manufacturer="Habitron GmbH",
             suggested_area="House",
@@ -87,6 +92,18 @@ class HbtnModule:
             via_device=(DOMAIN, self.comm.router.uid),
         )
         self.update(self.status)
+
+    def get_cover_index(self, out_no: int) -> int:
+        """Return cover index based on output number."""
+        if self.outputs[out_no - 1].type == -10:
+            c_idx = math.ceil(out_no / 2) - 1
+            # if self._type[:16] == "Smart Controller":
+            #     c_idx -= 2
+            #     if c_idx < 0:
+            #         c_idx += 5
+            return c_idx
+        else:
+            return -1
 
     async def get_names(self) -> bool:
         """Get summary of Habitron module."""
@@ -137,7 +154,7 @@ class HbtnModule:
                         elif arg_code in range(40, 50):
                             # Description of  Inputs
                             if self.mod_type == "Smart Controller Mini":
-                                if arg_code >= 44:
+                                if arg_code in range(44, 48):
                                     self.inputs[arg_code - 42] = IfDescriptor(
                                         text, arg_code - 42, 1, 0
                                     )
@@ -225,7 +242,7 @@ class HbtnModule:
         self.status = mod_status
         self.mode = self.status[MStatIdx.MODE]
 
-        # Todo: Andere Logikelemente in self.logic aufnehmen?
+        # Andere Logikelemente in self.logic aufnehmen?
         if len(self.logic) == 0:
             cnt_cnt = 0
             for l_idx in range(10):
@@ -275,10 +292,11 @@ class SmartController(HbtnModule):
         mod_descriptor: ModuleDescriptor,
         hass: HomeAssistant,
         config: ConfigEntry,
+        b_uid: str,
         comm,
     ) -> None:
         """Init Habitron SmartController module."""
-        super().__init__(mod_descriptor, hass, config, comm)
+        super().__init__(mod_descriptor, hass, config, b_uid, comm)
 
         self.inputs = [IfDescriptor("", i, 1, 0) for i in range(18)]
         self.outputs = [IfDescriptor("", i, 1, 0) for i in range(15)]
@@ -296,6 +314,7 @@ class SmartController(HbtnModule):
         self.sensors.append(IfDescriptor("Humidity", 3, 2, 0))
         self.sensors.append(IfDescriptor("Illuminance", 4, 2, 0))
         self.sensors.append(IfDescriptor("Airquality", 5, 2, 0))
+        self.diags.append(IfDescriptor("PowerTemp", 1, 1, 0))
 
     def update(self, mod_status) -> None:
         """Module specific update method reads and parses status."""
@@ -338,15 +357,14 @@ class SmartController(HbtnModule):
             "little",
         )
         for outpt in self.outputs:
-            self.outputs[outpt.nmbr].value = int((out_state & (0x01 << outpt.nmbr)) > 0)
+            outpt.value = int((out_state & (0x01 << outpt.nmbr)) > 0)
 
         self.dimmers[0].value = int(self.status[MStatIdx.DIM_1])
         self.dimmers[1].value = int(self.status[MStatIdx.DIM_2])
 
         led_state = int(self.status[MStatIdx.OUT_17_24])
-        for l_idx in range(8):
-            value = int((led_state & (0x01 << l_idx)) > 0)
-            self.leds[l_idx] = IfDescriptor(self.leds[l_idx].name, l_idx, 1, value)
+        for led in self.leds:
+            led.value = int((led_state & (0x01 << led.nmbr)) > 0)
 
         for cover in self.covers:
             if cover.nmbr >= 0:
@@ -371,16 +389,13 @@ class SmartController(HbtnModule):
         for flg in self.flags:
             flg.value = int((flags_state & (0x01 << flg.nmbr - 1)) > 0)
 
-        self.diags[0] = IfDescriptor("Status", 0, 1, self.status[MStatIdx.MODULE_STAT])
-        self.diags[1] = IfDescriptor(
-            "PowerTemp",
-            1,
-            1,
+        self.diags[0].value = self.status[MStatIdx.MODULE_STAT]
+        self.diags[1].value = (
             int.from_bytes(
                 self.status[MStatIdx.TEMP_PWR : MStatIdx.TEMP_PWR + 2],
                 "little",
             )
-            / 10,
+            / 10
         )
 
 
@@ -392,17 +407,18 @@ class SmartControllerMini(HbtnModule):
         mod_descriptor: ModuleDescriptor,
         hass: HomeAssistant,
         config: ConfigEntry,
+        b_uid: str,
         comm,
     ) -> None:
         """Init Habitron SmartController Mini module."""
-        super().__init__(mod_descriptor, hass, config, comm)
+        super().__init__(mod_descriptor, hass, config, b_uid, comm)
 
         self.inputs = [IfDescriptor("", i, 1, 0) for i in range(6)]
         self.outputs = [IfDescriptor("", i, 1, 0) for i in range(2)]
         self.covers = [IfDescriptorC("", -1, 0, 0, 0) for i in range(0)]
         self.dimmers = [IfDescriptor("", i, -1, 0) for i in range(0)]
         self.leds = [IfDescriptor("", i, 0, 0) for i in range(4)]
-        self.diags = [IfDescriptor("", i, 0, 0) for i in range(2)]
+        self.diags = [IfDescriptor("", i, 0, 0) for i in range(1)]
         self.setvalues = [IfDescriptor("Set temperature", 0, 2, 20.0)]
         self.setvalues.append(IfDescriptor("Set temperature 2", 1, 2, 20.0))
         self.auxheat_value = 0
@@ -446,15 +462,13 @@ class SmartControllerMini(HbtnModule):
             self.status[MStatIdx.OUT_1_8 : MStatIdx.OUT_1_8 + 2],
             "little",
         )
-
         for outpt in self.outputs:
-            self.outputs[outpt.nmbr].value = int((out_state & (0x01 << outpt.nmbr)) > 0)
+            outpt.value = int((out_state & (0x01 << outpt.nmbr)) > 0)
 
         # led_state = int(self.status[MStatIdx.OUT_17_24])
         led_state = out_state >> 4
-        for l_idx in range(4):
-            value = int((led_state & (0x01 << l_idx)) > 0)
-            self.leds[l_idx] = IfDescriptor(self.leds[l_idx].name, l_idx, 1, value)
+        for led in self.leds:
+            led.value = int((led_state & (0x01 << led.nmbr)) > 0)
 
         inp_state = int.from_bytes(
             self.status[MStatIdx.INP_1_8 : MStatIdx.INP_1_8 + 3],
@@ -471,7 +485,7 @@ class SmartControllerMini(HbtnModule):
         for flg in self.flags:
             flg.value = int((flags_state & (0x01 << flg.nmbr - 1)) > 0)
 
-        self.diags[0] = IfDescriptor("Status", 0, 1, self.status[MStatIdx.MODULE_STAT])
+        self.diags[0].value = self.status[MStatIdx.MODULE_STAT]
 
 
 class SmartOutput(HbtnModule):
@@ -482,21 +496,21 @@ class SmartOutput(HbtnModule):
         mod_descriptor: ModuleDescriptor,
         hass: HomeAssistant,
         config: ConfigEntry,
+        b_uid: str,
         comm,
     ) -> None:
         """Init Habitron SmartOutput module."""
-        super().__init__(mod_descriptor, hass, config, comm)
+        super().__init__(mod_descriptor, hass, config, b_uid, comm)
 
         self.outputs = [IfDescriptor("", i, 1, 0) for i in range(8)]
         self.covers = [IfDescriptorC("", -1, 0, 0, 0) for i in range(4)]
-        self.diags = [IfDescriptor("", 1, 0, 0)]
 
     def update(self, mod_status) -> None:
         """Module specific update method reads and parses status."""
         super().update(mod_status)
         out_state = int(self.status[MStatIdx.OUT_1_8])
-        for o_idx in range(8):
-            self.outputs[o_idx].value = int((out_state & (0x01 << o_idx)) > 0)
+        for outpt in self.outputs:
+            outpt.value = int((out_state & (0x01 << outpt.nmbr)) > 0)
 
         for cover in self.covers:
             c_idx = cover.nmbr
@@ -504,7 +518,7 @@ class SmartOutput(HbtnModule):
                 cover.value = self.status[MStatIdx.ROLL_POS + cover.nmbr]
                 cover.tilt = self.status[MStatIdx.BLAD_POS + cover.nmbr]
 
-        self.diags[0] = IfDescriptor("Status", 0, 1, self.status[MStatIdx.MODULE_STAT])
+        self.diags[0].value = self.status[MStatIdx.MODULE_STAT]
 
 
 class SmartDimm(HbtnModule):
@@ -515,10 +529,11 @@ class SmartDimm(HbtnModule):
         mod_descriptor: ModuleDescriptor,
         hass: HomeAssistant,
         config: ConfigEntry,
+        b_uid: str,
         comm,
     ) -> None:
         """Init Habitron SmartDimm module."""
-        super().__init__(mod_descriptor, hass, config, comm)
+        super().__init__(mod_descriptor, hass, config, b_uid, comm)
 
         self.outputs = [IfDescriptor("", i, 2, 0) for i in range(4)]
         for outp in self.outputs:
@@ -527,7 +542,7 @@ class SmartDimm(HbtnModule):
         # self.inputs = [IfDescriptor("", i, 1, 0) for i in range(4)]
         for mod_inp in self.inputs:
             mod_inp.name = f"DOut{mod_inp.nmbr}"
-        self.diags = [IfDescriptor("", i, 0, 0) for i in range(2)]
+        self.diags.append(IfDescriptor("PowerTemp", 1, 1, 0))
 
     def update(self, mod_status) -> None:
         """Module specific update method reads and parses status."""
@@ -540,18 +555,15 @@ class SmartDimm(HbtnModule):
         #         mod_inp.value = int((inp_state & (0x01 << i_idx)) > 0)
 
         out_state = int(self.status[MStatIdx.OUT_1_8])
-        for o_idx in range(4):
-            self.outputs[o_idx].value = int((out_state & (0x01 << o_idx)) > 0)
+        for outpt in self.outputs:
+            outpt.value = int((out_state & (0x01 << outpt.nmbr)) > 0)
         self.dimmers[0].value = int(self.status[MStatIdx.DIM_1])
         self.dimmers[1].value = int(self.status[MStatIdx.DIM_2])
         self.dimmers[2].value = int(self.status[MStatIdx.DIM_3])
         self.dimmers[3].value = int(self.status[MStatIdx.DIM_4])
 
-        self.diags[0] = IfDescriptor("Status", 0, 1, self.status[MStatIdx.MODULE_STAT])
-        self.diags[1] = IfDescriptor(
-            "PowerTemp",
-            1,
-            1,
+        self.diags[0].value = self.status[MStatIdx.MODULE_STAT]
+        self.diags[1].value = (
             int.from_bytes(
                 self.status[MStatIdx.TEMP_PWR : MStatIdx.TEMP_PWR + 2],
                 "little",
@@ -568,13 +580,15 @@ class SmartUpM(HbtnModule):
         mod_descriptor: ModuleDescriptor,
         hass: HomeAssistant,
         config: ConfigEntry,
+        b_uid: str,
         comm,
     ) -> None:
         """Init Habitron SmartOutput module."""
-        super().__init__(mod_descriptor, hass, config, comm)
+        super().__init__(mod_descriptor, hass, config, b_uid, comm)
 
         self.outputs = [IfDescriptor("", i, 1, 0) for i in range(2)]
         self.inputs = [IfDescriptor("", i, 1, 0) for i in range(2)]
+        self.diags = [IfDescriptor("", i, 0, 0) for i in range(1)]
         self.covers = [IfDescriptorC("", -1, 0, 0, 0)]
 
     def update(self, mod_status) -> None:
@@ -588,14 +602,14 @@ class SmartUpM(HbtnModule):
                 mod_inp.value = int((inp_state & (0x01 << i_idx)) > 0)
 
         out_state = int(self.status[MStatIdx.OUT_1_8])
-        for o_idx in range(2):
-            self.outputs[o_idx].value = int((out_state & (0x01 << o_idx)) > 0)
+        for outpt in self.outputs:
+            outpt.value = int((out_state & (0x01 << outpt.nmbr)) > 0)
 
         c_idx = self.covers[0].nmbr
         if c_idx >= 0:
             self.covers[0].value = self.status[MStatIdx.ROLL_POS - 1]
             self.covers[0].tilt = self.status[MStatIdx.BLAD_POS - 1]
-        self.diags[0] = IfDescriptor("Status", 0, 1, self.status[MStatIdx.MODULE_STAT])
+        self.diags[0].value = self.status[MStatIdx.MODULE_STAT]
 
 
 class SmartInput(HbtnModule):
@@ -606,10 +620,11 @@ class SmartInput(HbtnModule):
         mod_descriptor: ModuleDescriptor,
         hass: HomeAssistant,
         config: ConfigEntry,
+        b_uid: str,
         comm,
     ) -> None:
         """Init Habitron SmartInput module."""
-        super().__init__(mod_descriptor, hass, config, comm)
+        super().__init__(mod_descriptor, hass, config, b_uid, comm)
 
         self.inputs = [IfDescriptor("", i, 1, 0) for i in range(8)]
 
@@ -621,7 +636,7 @@ class SmartInput(HbtnModule):
             i_idx = mod_inp.nmbr
             if i_idx >= 0:
                 mod_inp.value = int((inp_state & (0x01 << i_idx)) > 0)
-        self.diags[0] = IfDescriptor("Status", 0, 1, self.status[MStatIdx.MODULE_STAT])
+        self.diags[0].value = self.status[MStatIdx.MODULE_STAT]
 
 
 class SmartDetect(HbtnModule):
@@ -632,10 +647,11 @@ class SmartDetect(HbtnModule):
         mod_descriptor: ModuleDescriptor,
         hass: HomeAssistant,
         config: ConfigEntry,
+        b_uid: str,
         comm,
     ) -> None:
         """Init Habitron SmartDetect module."""
-        super().__init__(mod_descriptor, hass, config, comm)
+        super().__init__(mod_descriptor, hass, config, b_uid, comm)
 
         self.sensors.append(IfDescriptor("Movement", 0, 2, 0))
         self.sensors.append(IfDescriptor("Illuminance", 1, 2, 0))
@@ -662,7 +678,7 @@ class SmartDetect(HbtnModule):
         super().update(mod_status)
         self.sensors[0].value = int(self.status[MStatIdx.MOV])  # movement
         self.sensors[1].value = int(self.status[MStatIdx.LUM]) * 10  # illuminance
-        self.diags[0] = IfDescriptor("Status", 0, 1, self.status[MStatIdx.MODULE_STAT])
+        self.diags[0].value = self.status[MStatIdx.MODULE_STAT]
 
 
 class SmartEKey(HbtnModule):
@@ -673,18 +689,21 @@ class SmartEKey(HbtnModule):
         mod_descriptor: ModuleDescriptor,
         hass: HomeAssistant,
         config: ConfigEntry,
+        b_uid: str,
         comm,
     ) -> None:
         """Init Habitron eKey module."""
-        super().__init__(mod_descriptor, hass, config, comm)
+        super().__init__(mod_descriptor, hass, config, b_uid, comm)
         self.ids: list[IfDescriptor] = []
         self.sensors.append(IfDescriptor("Identifier", 0, 2, 0))
+        self.fingers: list[IfDescriptor] = []
+        self.fingers.append(IfDescriptor("Finger", 0, 2, 0))
 
     def update(self, mod_status) -> None:
         """Module specific update method reads and parses status."""
         super().update(mod_status)
         self.sensors[0].value = int(self.status[MStatIdx.KEY_ID])  # last id
-        self.diags[0] = IfDescriptor("Status", 0, 1, self.status[MStatIdx.MODULE_STAT])
+        self.diags[0].value = self.status[MStatIdx.MODULE_STAT]
 
 
 class SmartNature(HbtnModule):
@@ -695,10 +714,11 @@ class SmartNature(HbtnModule):
         mod_descriptor: ModuleDescriptor,
         hass: HomeAssistant,
         config: ConfigEntry,
+        b_uid: str,
         comm,
     ) -> None:
         """Init Habitron SmartNature module."""
-        super().__init__(mod_descriptor, hass, config, comm)
+        super().__init__(mod_descriptor, hass, config, b_uid, comm)
 
         self.sensors.append(IfDescriptor("Temperature", 0, 2, 0))
         self.sensors.append(IfDescriptor("Humidity", 1, 2, 0))
@@ -741,4 +761,4 @@ class SmartNature(HbtnModule):
         self.sensors[3].value = int(self.status[MStatIdx.WINDP])  # wind
         self.sensors[4].value = int(self.status[MStatIdx.RAIN])  # rain
         self.sensors[5].value = int(self.status[MStatIdx.WINDP])  # wind peak
-        self.diags[0] = IfDescriptor("Status", 0, 1, self.status[MStatIdx.MODULE_STAT])
+        self.diags[0].value = self.status[MStatIdx.MODULE_STAT]

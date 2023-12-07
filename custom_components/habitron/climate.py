@@ -61,13 +61,12 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
         self.idx = idx
         self._module = module
         self._attr_name = "Climate"
-        self._attr_unique_id = f"{self._module.id}_climate"
         self._state = None
         self._curr_hvac_mode = HVACMode.OFF
         self._curr_temperature = module.sensors[1].value
         self._curr_humidity = module.sensors[2].value
         self._target_temperature = module.setvalues[0].value
-        self._attr_unique_id = f"{self._module.id}_{self._attr_name}"
+        self._attr_unique_id = f"{self._module.uid}_{self._attr_name}"
         self._attr_hvac_modes = HVACMode.HEAT
         self._attr_temperature_unit = UnitOfTemperature.CELSIUS
         self._attr_target_temperature_high = 25
