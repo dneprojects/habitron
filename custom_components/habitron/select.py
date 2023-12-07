@@ -12,6 +12,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .router import AlarmMode, DaytimeMode
+from .smart_ip import LoggingLevels
 
 
 async def async_setup_entry(
@@ -22,6 +23,7 @@ async def async_setup_entry(
     """Add input_select for passed config_entry in HA."""
     hbtn_rt = hass.data[DOMAIN][entry.entry_id].router
     hbtn_cord = hbtn_rt.coord
+    smip = hass.data[DOMAIN][entry.entry_id]
 
     new_devices = []
     for hbt_module in hbtn_rt.modules:
@@ -39,6 +41,10 @@ async def async_setup_entry(
     new_devices.append(HbtnSelectDaytimeMode(0, hbtn_rt, hbtn_cord, len(new_devices)))
     new_devices.append(HbtnSelectAlarmMode(0, hbtn_rt, hbtn_cord, len(new_devices)))
     new_devices.append(HbtnSelectGroupMode(0, hbtn_rt, hbtn_cord, len(new_devices)))
+    for log_level in smip.loglvl:
+        new_devices.append(
+            HbtnSelectLoggingLevel(smip, log_level, hbtn_cord, len(new_devices))
+        )
 
     # Fetch initial data so we have data when entities subscribe
     #
@@ -148,10 +154,10 @@ class HbtnSelectDaytimeMode(HbtnMode):
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
         if isinstance(self._module, int):
             self._attr_name = "Group 0 daytime"
-            self._attr_unique_id = "group_0_daytime_mode"
+            self._attr_unique_id = f"{self.hbtnr.b_uid}_group_0_daytime_mode"
         else:
             self._attr_name = f"Group {self._module.group} daytime"
-            self._attr_unique_id = f"{self._module.id}_daytime_mode"
+            self._attr_unique_id = f"{self._module.uid}_daytime_mode"
             self._attr_entity_registry_enabled_default = (
                 False  # Entity will initally be disabled
             )
@@ -160,13 +166,16 @@ class HbtnSelectDaytimeMode(HbtnMode):
         """Change the selected option."""
         mode_val = self._enum[option].value
         set_val = 0x41 + mode_val
-        await self._module.comm.async_set_group_mode(
-            self._module.mod_addr, self._module.group, set_val
-        )
+        if isinstance(self._module, int):
+            await self.hbtnr.comm.async_set_group_mode(self.hbtnr.id, 0, set_val)
+        else:
+            await self._module.comm.async_set_group_mode(
+                self._module.mod_addr, self._module.group, set_val
+            )
 
 
 class HbtnSelectAlarmMode(HbtnMode):
-    """Daytime mode object."""
+    """Alarm mode object."""
 
     def __init__(self, module, hbtnr, coord, idx) -> None:
         """Initialize alarm mode selector."""
@@ -179,21 +188,25 @@ class HbtnSelectAlarmMode(HbtnMode):
         self._current_option = self._enum(self._value).name
         if isinstance(self._module, int):
             self._attr_name = "Group 0 alarm"
-            self._attr_unique_id = "group_0_alarm_mode"
+            self._attr_unique_id = f"{self.hbtnr.b_uid}_group_0_alarm_mode"
         else:
             self._attr_name = f"Group {self._module.group} alarm"
-            self._attr_unique_id = f"{self._module.id}_alarm_mode"
+            self._attr_unique_id = f"{self._module.uid}_alarm_mode"
 
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
         set_val = 0x40 if self._enum[option].value > 0 else 0x41
-        await self._module.comm.async_set_group_mode(
-            self._module.mod_addr, self._module.group, set_val
-        )
+        if isinstance(self._module, int):
+            # router
+            await self.hbtnr.comm.async_set_group_mode(self.hbtnr.id, 0, set_val)
+        else:
+            await self._module.comm.async_set_group_mode(
+                self._module.mod_addr, self._module.group, set_val
+            )
 
 
 class HbtnSelectGroupMode(HbtnMode):
-    """Daytime mode object."""
+    """General mode object."""
 
     def __init__(self, module, hbtnr, coord, idx) -> None:
         """Initialize group mode selector."""
@@ -220,7 +233,83 @@ class HbtnSelectGroupMode(HbtnMode):
         self._current_option = self._enum(self._value).name
         if isinstance(self._module, int):
             self._attr_name = "Group 0 mode"
-            self._attr_unique_id = "group_0_mode"
+            self._attr_unique_id = f"{self.hbtnr.b_uid}_group_0_mode"
         else:
             self._attr_name = f"Group {self._module.group} mode"
-            self._attr_unique_id = f"{self._module.id}_group_mode"
+            self._attr_unique_id = f"{self._module.uid}_group_mode"
+
+    async def async_select_option(self, option: str) -> None:
+        """Change the selected option."""
+        set_val = self._enum[option].value
+        if isinstance(self._module, int):
+            # router
+            await self.hbtnr.comm.async_set_group_mode(self.hbtnr.id, 0, set_val)
+        else:
+            await self._module.comm.async_set_group_mode(
+                self._module.mod_addr, self._module.group, set_val
+            )
+
+
+class HbtnSelectLoggingLevel(CoordinatorEntity, SelectEntity):
+    """Logging level object."""
+
+    _attr_has_entity_name = True
+
+    def __init__(self, smip, level, coord, idx) -> None:
+        """Initialize a Habitron mode, pass coordinator to CoordinatorEntity."""
+        super().__init__(coord, context=idx)
+        self.idx = idx
+        self._level = level
+        self._nmbr = level.nmbr
+        self._value = level.value
+        self._smip = smip
+        self._current_option = ""
+        self._enum = LoggingLevels
+        self._attr_name = level.name
+        self._attr_unique_id = f"{self._smip.uid}_{level.name.replace(' ','')}"
+        self._attr_translation_key = "habitron_loglevel"
+
+    @property
+    def should_poll(self) -> bool:
+        return True
+
+    # This property is important to let HA know if this entity is online or not.
+    # If an entity is offline (return False), the UI will reflect this.
+    @property
+    def available(self) -> bool:
+        return True
+
+    # To link this entity to its device, this property must return an
+    # identifiers value matching that used in the module
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return information to link this entity with the correct device."""
+        return {"identifiers": {(DOMAIN, self._smip.uid)}}
+
+    @property
+    def name(self) -> str:
+        """Return the display name of this selector."""
+        return self._attr_name
+
+    @property
+    def options(self) -> list[str]:
+        """Return all mode names of enumeration type."""
+        return [level.name for level in self._enum]
+
+    @property
+    def current_option(self) -> str:
+        """Return the current mode name."""
+        return self._current_option
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator, get current module mode."""
+        self._value = int(self._level.value / 10)
+        self._current_option = self._enum(int(self._level.value / 10)).name
+        self.async_write_ha_state()
+
+    async def async_select_option(self, option: str) -> None:
+        """Change the selected option."""
+        self._value = self._enum[option].value
+        # nmbr used to select console/file handler
+        await self._smip.comm.async_set_log_level(self._nmbr, self._value * 10)
