@@ -35,12 +35,6 @@ async def async_setup_entry(
                 new_devices.append(
                     InputSwitch(mod_input, hbt_module, hbtn_cord, len(new_devices))
                 )
-            if abs(mod_input.type) == 1:  # pulse switch
-                new_devices.append(
-                    InputButton(mod_input, hbt_module, hbtn_cord, len(new_devices))
-                )
-                # new_devices.append(InputPressShort(mod_input, hbt_module))
-                # new_devices.append(InputPressLong(mod_input, hbt_module))
         for mod_flg in hbt_module.flags:
             new_devices.append(
                 HbtnFlag(mod_flg, hbt_module, hbtn_cord, len(new_devices))
@@ -68,6 +62,7 @@ async def async_setup_entry(
 class InputSwitch(CoordinatorEntity, BinarySensorEntity):
     """Representation of habitron switch input entities."""
 
+    should_poll = False  # for push updates
     _attr_has_entity_name = True
 
     def __init__(self, inpt, module, coord, idx) -> None:
@@ -79,10 +74,26 @@ class InputSwitch(CoordinatorEntity, BinarySensorEntity):
         self._attr_name = inpt.name
         self._nmbr = inpt.nmbr
         self._state = False
-        self._attr_unique_id = f"{self._module.id}_In{self._nmbr}"
+        self._attr_unique_id = f"{self._module.uid}_In{self._nmbr}"
         if inpt.type < 0:
             # Entity will not show up
             self._attr_entity_registry_enabled_default = False
+
+    async def async_added_to_hass(self) -> None:
+        """Run when this Entity has been added to HA."""
+        # Importantly for a push integration, the module that will be getting updates
+        # needs to notify HA of changes. The dummy device has a registercallback
+        # method, so to this we add the 'self.async_write_ha_state' method, to be
+        # called where ever there are changes.
+        # The call back registration is done once this entity is registered with HA
+        # (rather than in the __init__)
+        await super().async_added_to_hass()
+        self._input.register_callback(self._handle_coordinator_update)
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Entity being removed from hass."""
+        # The opposite of async_added_to_hass. Remove any registered call backs here.
+        self._input.remove_callback(self._handle_coordinator_update)
 
     # To link this entity to its device, this property must return an
     # identifiers value matching that used in the module
@@ -108,24 +119,10 @@ class InputSwitch(CoordinatorEntity, BinarySensorEntity):
         self.async_write_ha_state()
 
 
-class InputButton(InputSwitch):
-    """Representation of habitron button switch input."""
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self._attr_is_on = self._module.inputs[self._nmbr].value == 1
-        if self._attr_is_on:
-            self._attr_icon = "mdi:play"
-        else:
-            self._attr_icon = "mdi:stop"
-        self._state = self._attr_is_on
-        self.async_write_ha_state()
-
-
 class HbtnFlag(CoordinatorEntity, BinarySensorEntity):
     """Representation of habitron flag entities."""
 
+    should_poll = False  # for push updates
     _attr_has_entity_name = True
 
     def __init__(self, flag, module, coord, idx) -> None:
@@ -137,8 +134,24 @@ class HbtnFlag(CoordinatorEntity, BinarySensorEntity):
         self._idx = flag.idx
         self._nmbr = flag.nmbr
         self._state = False
-        self._attr_unique_id = f"{self._module.id}_flag_{flag.nmbr}"
+        self._attr_unique_id = f"{self._module.uid}_flag_{flag.nmbr}"
         self._attr_name = f"Flag {flag.nmbr} {flag.name}"
+
+    async def async_added_to_hass(self) -> None:
+        """Run when this Entity has been added to HA."""
+        # Importantly for a push integration, the module that will be getting updates
+        # needs to notify HA of changes. The dummy device has a registercallback
+        # method, so to this we add the 'self.async_write_ha_state' method, to be
+        # called where ever there are changes.
+        # The call back registration is done once this entity is registered with HA
+        # (rather than in the __init__)
+        await super().async_added_to_hass()
+        self._flag.register_callback(self._handle_coordinator_update)
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Entity being removed from hass."""
+        # The opposite of async_added_to_hass. Remove any registered call backs here.
+        self._flag.remove_callback(self._handle_coordinator_update)
 
     # To link this entity to its device, this property must return an
     # identifiers value matching that used in the module
@@ -184,7 +197,7 @@ class HbtnState(CoordinatorEntity, BinarySensorEntity):
         self._module = module
         self._nmbr = state.nmbr
         self._state = False
-        self._attr_unique_id = f"{self._module.id}_state_{state.nmbr}"
+        self._attr_unique_id = f"{self._module.uid}_state_{state.nmbr}"
         self._attr_name = state.name
         if state.type == TYPE_DIAG:
             self._attr_entity_category = EntityCategory.DIAGNOSTIC
@@ -235,7 +248,7 @@ class MotionSensor(CoordinatorEntity, BinarySensorEntity):
         self._module = module
         self._nmbr = sensor.nmbr
         self._state = False
-        self._attr_unique_id = f"{self._module.id}_motion"
+        self._attr_unique_id = f"{self._module.uid}_motion"
         self._attr_name = f"{self._module.name}: Motion"
         self._attr_icon = "mdi:motion-sensor"
 
@@ -282,7 +295,7 @@ class RainSensor(CoordinatorEntity, BinarySensorEntity):
         self._module = module
         self._nmbr = sensor.nmbr
         self._state = False
-        self._attr_unique_id = f"{self._module.id}_rain"
+        self._attr_unique_id = f"{self._module.uid}_rain"
         self._attr_name = f"{self._module.name}: Rain"
         self._attr_icon = "mdi:weather-rainy"
 

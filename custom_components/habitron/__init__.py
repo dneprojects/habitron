@@ -10,7 +10,17 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 
 from .communicate import TimeoutException
-from .const import DOMAIN, FILE_MOD_NMBR, RESTART_ALL, RESTART_KEY_NMBR, ROUTER_NMBR
+from .const import (
+    DOMAIN,
+    FILE_MOD_NMBR,
+    RESTART_ALL,
+    RESTART_KEY_NMBR,
+    ROUTER_NMBR,
+    MOD_NMBR,
+    EVNT_TYPE,
+    EVNT_ARG1,
+    EVNT_ARG2,
+)
 from .smart_ip import SmartIP
 
 # List of platforms to support. There should be a matching .py file for each
@@ -25,6 +35,7 @@ PLATFORMS: list[str] = [
     "select",
     "climate",
     "text",
+    "event",
 ]
 SERVICE_MOD_RESTART_SCHEMA = vol.Schema(
     {
@@ -46,6 +57,15 @@ SERVICE_RTR_FILE_SCHEMA = vol.Schema(
 SERVICE_RTR_RESTART_SCHEMA = vol.Schema(
     {
         vol.Required(ROUTER_NMBR, default=1): int,
+    }
+)
+SERVICE_UPDATE_ENTITY_SCHEMA = vol.Schema(
+    {
+        vol.Required(ROUTER_NMBR, default=1): int,
+        vol.Required(MOD_NMBR): int,
+        vol.Required(EVNT_TYPE): int,
+        vol.Required(EVNT_ARG1): int,
+        vol.Required(EVNT_ARG2): int,
     }
 )
 
@@ -94,6 +114,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
         await smip.comm.save_router_status(rtr_id)
 
+    async def update_entity(call: ServiceCall):
+        """Handle the update service call."""
+        rtr_id = call.data.get(ROUTER_NMBR, 1)
+        mod_id = call.data.get(MOD_NMBR)
+        evnt = call.data.get(EVNT_TYPE)
+        arg1 = call.data.get(EVNT_ARG1)
+        arg2 = call.data.get(EVNT_ARG2)
+        await smip.comm.update_entity(rtr_id, mod_id, evnt, arg1, arg2)
+
     smip = SmartIP(hass, entry)
     try:
         await smip.initialize(hass, entry)
@@ -127,6 +156,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.services.async_register(
         DOMAIN, "save_router_status", save_router_status, schema=SERVICE_RTR_FILE_SCHEMA
     )
+    hass.services.async_register(
+        DOMAIN, "update_entity", update_entity, schema=SERVICE_UPDATE_ENTITY_SCHEMA
+    )
 
     # This creates each HA object for each platform your device requires.
     # It's done by calling the `async_setup_entry` function in each platform module.
@@ -154,6 +186,7 @@ async def update_listener(hass: HomeAssistant, entry: ConfigEntry):
     hbtn_cord.set_update_interval(
         entry.options["update_interval"], entry.options["updates_enabled"]
     )
+    await hbtn_comm.send_network_info(entry.options["websock_token"])
 
 
 class ConfigEntryNotReady(exceptions.HomeAssistantError):
