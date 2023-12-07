@@ -2,6 +2,8 @@
 
 # Contains interface descriptors for single entities, e.g. outputs, sensors
 
+from collections.abc import Callable
+
 
 class IfDescriptor:
     """Habitron interface descriptor."""
@@ -11,46 +13,60 @@ class IfDescriptor:
         self.nmbr: int = inmbr
         self.type: int = itype
         self.value: int = ivalue
+        self._callbacks = set()
+
+    def register_callback(self, callback: Callable[[], None]) -> None:
+        """Register callback, called when entity changes state."""
+        self._callbacks.add(callback)
+
+    def remove_callback(self, callback: Callable[[], None]) -> None:
+        """Remove previously registered callback."""
+        self._callbacks.discard(callback)
+
+    async def handle_upd_event(self, *args) -> None:
+        """Schedule call all registered callbacks."""
+        for callback in self._callbacks:
+            if len(args) == 0:
+                callback()
+            elif len(args) == 1:
+                callback(args[0])
+            else:
+                callback(args[0], args[1])
+
+    def set_name(self, new_name: str):
+        """Setter for name property."""
+        self.name = new_name
 
 
-class IfDescriptorC:
+class IfDescriptorC(IfDescriptor):
     """Habitron cover interface descriptor."""
 
     def __init__(self, iname, inmbr, itype, ivalue, itilt) -> None:
-        self.name: str = iname
-        self.nmbr: int = inmbr
-        self.type: int = itype
-        self.value: int = ivalue
+        super().__init__(iname, inmbr, itype, ivalue)
         self.tilt: int = itilt
 
 
-class CmdDescriptor:
+class CmdDescriptor(IfDescriptor):
     """Habitron command descriptor."""
 
     def __init__(self, cname, cnmbr) -> None:
-        self.name: str = cname
-        self.nmbr: int = cnmbr
+        super().__init__(cname, cnmbr, 0, 0)
 
 
-class LgcDescriptor:
+class LgcDescriptor(IfDescriptor):
     """Habitron logic descriptor."""
 
     def __init__(self, lname, lidx, lnmbr, ltype, lvalue) -> None:
-        self.name: str = lname
+        super().__init__(lname, lnmbr, ltype, lvalue)
         self.idx: int = lidx
-        self.nmbr: int = lnmbr
-        self.type: int = ltype
-        self.value: int = lvalue
 
 
-class StateDescriptor:
+class StateDescriptor(IfDescriptor):
     """Descriptor for modes and flags."""
 
     def __init__(self, sname, sidx, snmbr, svalue) -> None:
-        self.name: str = sname
+        super().__init__(sname, snmbr, 0, svalue)
         self.idx: int = sidx
-        self.nmbr: int = snmbr
-        self.value: bool = svalue
 
 
 TYPE_DIAG = 10  # entity will not show up by default
