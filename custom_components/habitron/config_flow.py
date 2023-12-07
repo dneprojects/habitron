@@ -53,7 +53,7 @@ async def validate_input(hass: HomeAssistant, data: dict) -> dict[str, Any]:
     # The dummy smip provides a `test_connection` method to ensure it's working
     # as expected
     try:
-        result = await test_connection(data["habitron_host"])
+        result, host_name = await test_connection(data["habitron_host"])
     except socket.gaierror as exc:
         raise socket.gaierror from exc
     except ConnectionRefusedError as exc:
@@ -67,7 +67,7 @@ async def validate_input(hass: HomeAssistant, data: dict) -> dict[str, Any]:
     # "Title" is what is displayed to the user for this smip device
     # It is stored internally in HA as part of the device config.
     # See `async_step_user` below for how this is used
-    return {"title": "Habitron"}
+    return {"title": host_name}
 
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -112,6 +112,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     "update_interval",
                     default=default_interval,
                 ): int,
+                vol.Optional(
+                    "websock_token",
+                    default="",
+                ): str,
             }
         )
         # This goes through the steps to take the user through the setup process.
@@ -123,6 +127,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             try:
                 info = await validate_input(self.hass, user_input)
+                await self.async_set_unique_id(
+                    f"habitron_{user_input['habitron_host']}"
+                )
                 return self.async_create_entry(title=info["title"], data=user_input)
             except CannotConnect:
                 errors["base"] = "cannot_connect"
@@ -179,6 +186,10 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     "updates_enabled",
                     default=default_enablestate,
                 ): bool,
+                vol.Optional(
+                    "websock_token",
+                    default="",
+                ): str,
             }
         )
         errors = {}
