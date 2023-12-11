@@ -20,7 +20,7 @@ A second parameter is used to control the polling update interval.
 | Configuration parameter     | Optional  | Description  |
 | :-------------------------- | :-------- | :----------- |
 | `Host name or IP of SmartIP`| no        | Either the DNS host name of the SmartIP or its IP address.
-| `Update interval [s]`       | no        | Polling update interval in seconds, must be between 2 and 10 seconds.
+| `Update interval [s]`       | no        | Polling update interval in seconds, must be between 4 and 60 seconds.
 | `Perform cyclic updates`    | no        | Must be checked for nomal operation. Uncheck only to suspend polling for communication with SmartConfig software.
 
 These parameters can be changed after installation as well.
@@ -77,6 +77,10 @@ The habitron system offers modes for daylight, alarm, and other modes. These are
 ### Climate
 
 Based on the first temperature setpoint and the sensor temperature, a climate controller is implemented. It supports heating on/off actions and its state can be used as input for automations. A manual on or off command will change the automatic operation for 5 minutes.
+
+### Event
+
+Some entities, e.g. input buttons, output changes, etc. trigger an event, which is available independently from the polling interval.
 
 ### Diagnostic values
 
