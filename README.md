@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/github/v/release/dneprojects/habitron" alt="Current version">
 </p>
 
-The `habitron` implementation allows you to integrate your [Habitron](https://www.habitron.de/) devices in Home Assistant. It is implemented using a _polling_ model in _async_.
+The `habitron` implementation allows you to integrate your [Habitron](https://www.habitron.de/) devices in Home Assistant. It is implemented using a _polling_ model in _async_. Some events are triggered when inputs or other entities change their values.
 
 ## Installation
 
@@ -52,10 +52,11 @@ If the connection is established, the SmartIP, router and modules appear as devi
 For the habitron integration to work, the network interface SmartIP must be reachable via your local network. During configuration, the DNS hostname or the IP address has to given.
 A second parameter is used to control the polling update interval.
 
-| Configuration parameter | Optional  | Description  |
-| :---------------------- | :-------- | :----------- |
-| `host name`             | no        | Either the DNS host name of the SmartIP or its IP address.
-| `update interval`       | no        | Polling update interval in seconds, must be between 2 and 10 seconds.
+| Configuration parameter    | Optional  | Description  |
+| :------------------------- | :-------- | :----------- |
+| `host name`                | no        | Either the DNS host name of the SmartIP or its IP address.
+| `update interval`          | no        | Polling update interval in seconds, must be between 4 and 60 seconds.
+| `token for websocket auth` | yes       | Enter a "long-lived access token"  you created on your personal profile.
 
 These parameters can be changed after installation as well.
 
