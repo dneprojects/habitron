@@ -11,7 +11,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .module import IfDescriptor
 
 
 async def async_setup_entry(
@@ -90,7 +89,7 @@ class SwitchedLed(CoordinatorEntity, SwitchEntity):
 
     @property
     def is_on(self) -> bool:
-        """Return status of output"""
+        """Return status of output."""
         self._attr_state = self._module.leds[self._nmbr].value == 1
         if self._attr_state:
             self._attr_icon = "mdi:circle-double"

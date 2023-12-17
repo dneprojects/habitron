@@ -27,11 +27,11 @@ from .module import (
     SmartControllerMini as hbtscmm,
     SmartDetect as hbtsdm,
     SmartDimm as hbtdimm,
+    SmartEKey as hbtkey,
     SmartInput as hbtinm,
     SmartNature as hbtsnm,
     SmartOutput as hbtoutm,
     SmartUpM as hbtupm,
-    SmartEKey as hbtkey,
 )
 
 
@@ -135,39 +135,39 @@ class HbtnRouter:
         await self.comm.async_system_update()  # Inital update
 
         for mod_desc in self.modules_desc:
-            if mod_desc.mtype[:9] == "Smart Out":
+            if (mod_desc.mtype[0] == 10) & (mod_desc.mtype[1] in [1, 2, 50, 51]):
                 self.modules.append(
                     hbtoutm(mod_desc, self.hass, self.config, self.b_uid, self.comm)
                 )
-            elif mod_desc.mtype[:10] == "Smart Dimm":
+            elif (mod_desc.mtype[0] == 10) & (mod_desc.mtype[1] in [20, 21, 22]):
                 self.modules.append(
                     hbtdimm(mod_desc, self.hass, self.config, self.b_uid, self.comm)
                 )
-            elif mod_desc.mtype[:9] == "Smart UpM":
+            elif (mod_desc.mtype[0] == 10) & (mod_desc.mtype[1] in [30]):
                 self.modules.append(
                     hbtupm(mod_desc, self.hass, self.config, self.b_uid, self.comm)
                 )
-            elif mod_desc.mtype[:8] == "Smart In":
+            elif mod_desc.mtype[0] == 11:
                 self.modules.append(
                     hbtinm(mod_desc, self.hass, self.config, self.b_uid, self.comm)
                 )
-            elif mod_desc.mtype[:12] == "Smart Detect":
+            elif mod_desc.mtype[0] == 80:
                 self.modules.append(
                     hbtsdm(mod_desc, self.hass, self.config, self.b_uid, self.comm)
                 )
-            elif mod_desc.mtype == "Smart Nature":
+            elif mod_desc.mtype[0] == 20:
                 self.modules.append(
                     hbtsnm(mod_desc, self.hass, self.config, self.b_uid, self.comm)
                 )
-            elif mod_desc.mtype == "Smart Controller Mini":
+            elif mod_desc.mtype[0] == 50:
                 self.modules.append(
                     hbtscmm(mod_desc, self.hass, self.config, self.b_uid, self.comm)
                 )
-            elif mod_desc.mtype[:16] == "Smart Controller":
+            elif mod_desc.mtype[0] == 1:
                 self.modules.append(
                     hbtscm(mod_desc, self.hass, self.config, self.b_uid, self.comm)
                 )
-            elif mod_desc.mtype == "Fanekey":
+            elif (mod_desc.mtype[0] == 30) & (mod_desc.mtype[1] == 1):
                 self.modules.append(
                     hbtkey(mod_desc, self.hass, self.config, self.b_uid, self.comm)
                 )
@@ -221,7 +221,7 @@ class HbtnRouter:
         self.version = self.smr[ptr + 1 : ptr + 1 + str_len].decode("iso8859-1").strip()
 
     def get_module(self, mod_addr) -> HbtnModule:
-        """Return module based on id"""
+        """Return module based on id."""
         for module in self.modules:
             if module.raddr == mod_addr:
                 return module
@@ -236,12 +236,12 @@ class HbtnRouter:
         while len(resp) > 0:
             mod_uid = self.b_uid + f"{resp[0]}"
             mod_addr = resp[0] + self.id
-            mod_type = MODULE_CODES.get(mod_string[1:3], "Unknown Controller")
+            mod_typ = resp[1:3]
             name_len = int(resp[3])
             mod_name = mod_string[4 : 4 + name_len]
             mod_group = mod_groups[resp[0] - 1]
             desc.append(
-                ModuleDescriptor(mod_uid, mod_addr, mod_type, mod_name, mod_group)
+                ModuleDescriptor(mod_uid, mod_addr, mod_typ, mod_name, mod_group)
             )
             addr_dict[mod_addr] = len(desc) - 1
             mod_string = mod_string[4 + name_len : len(resp)]

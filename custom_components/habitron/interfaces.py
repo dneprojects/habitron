@@ -9,6 +9,7 @@ class IfDescriptor:
     """Habitron interface descriptor."""
 
     def __init__(self, iname, inmbr, itype, ivalue) -> None:
+        """Initialize interface."""
         self.name: str = iname
         self.nmbr: int = inmbr
         self.type: int = itype
@@ -42,6 +43,7 @@ class IfDescriptorC(IfDescriptor):
     """Habitron cover interface descriptor."""
 
     def __init__(self, iname, inmbr, itype, ivalue, itilt) -> None:
+        """Initialize interface."""
         super().__init__(iname, inmbr, itype, ivalue)
         self.tilt: int = itilt
 
@@ -50,6 +52,7 @@ class CmdDescriptor(IfDescriptor):
     """Habitron command descriptor."""
 
     def __init__(self, cname, cnmbr) -> None:
+        """Initialize interface."""
         super().__init__(cname, cnmbr, 0, 0)
 
 
@@ -57,6 +60,7 @@ class LgcDescriptor(IfDescriptor):
     """Habitron logic descriptor."""
 
     def __init__(self, lname, lidx, lnmbr, ltype, lvalue) -> None:
+        """Initialize interface."""
         super().__init__(lname, lnmbr, ltype, lvalue)
         self.idx: int = lidx
 
@@ -65,6 +69,7 @@ class StateDescriptor(IfDescriptor):
     """Descriptor for modes and flags."""
 
     def __init__(self, sname, sidx, snmbr, svalue) -> None:
+        """Initialize interface."""
         super().__init__(sname, snmbr, 0, svalue)
         self.idx: int = sidx
 

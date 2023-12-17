@@ -1,12 +1,13 @@
 """Module modules."""
 from __future__ import annotations
+
 import math
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
-from .const import DOMAIN, ModuleDescriptor, MSetIdx, MStatIdx
+from .const import DOMAIN, MODULE_CODES, ModuleDescriptor, MSetIdx, MStatIdx
 from .interfaces import IfDescriptor, IfDescriptorC, LgcDescriptor
 
 
@@ -31,14 +32,16 @@ class HbtnModule:
         self.comm = comm
         self.sw_version = ""
         self.hw_version = ""
-        self.uid = mod_descriptor.uid
+        self.uid = f"Mod_{mod_descriptor.uid}_{self.b_uid}"
         self._addr = mod_descriptor.addr
         self.raddr = self._addr - int(self._addr / 100) * 100
-        self._type = mod_descriptor.mtype
+        self._typ: bytes = mod_descriptor.mtype
+        self._type: str = MODULE_CODES[self._typ]
         self.smc = ""
         self.status = ""
         self.mstatus = ""
         self.shutter_state = []
+        self.climate_settings = 0
         self.id = f"Mod_{mod_descriptor.uid}_{self.b_uid}"
         self.group = mod_descriptor.group
         self.mode = 1
@@ -170,7 +173,7 @@ class HbtnModule:
                         else:
                             # Description of outputs
                             self.outputs[arg_code - 60].name = text
-                    except:
+                    except:  # noqa: E722
                         pass
 
             resp = resp[line_len : len(resp)]  # Strip processed line
@@ -197,6 +200,7 @@ class HbtnModule:
         self.sw_version = (
             resp[MSetIdx.SW_VERS : MSetIdx.SW_VERS_].decode("iso8859-1").strip()
         )
+        self.climate_settings = int(resp[MSetIdx.CLIM_MODE])
         inp_state = int.from_bytes(
             resp[MSetIdx.INP_STATE : MSetIdx.INP_STATE + 3], "little"
         )
@@ -253,7 +257,7 @@ class HbtnModule:
                     cnt_cnt += 1
         if len(self.logic) == 0:
             # No counter found, set 1st element inactive
-            self.logic.append(LgcDescriptor(f"NotAvailable", 0, 0, -5, 0))
+            self.logic.append(LgcDescriptor("NotAvailable", 0, 0, -5, 0))
         for lgc in self.logic:
             lgc.value = self.status[MStatIdx.COUNTER_VAL + 3 * lgc.nmbr]
 
@@ -268,7 +272,7 @@ class HbtnModule:
         return sys_status[m_idx * stat_len : (m_idx + 1) * stat_len]
 
     def set_default_names(self, mod_entities, def_name: str) -> None:
-        """Sets default names for entities."""
+        """Set default names for entities."""
         e_idx = 0
         # pylint: disable-next=consider-using-enumerate
         for e_idx in range(len(mod_entities)):
@@ -317,7 +321,7 @@ class SmartController(HbtnModule):
         self.diags.append(IfDescriptor("PowerTemp", 1, 1, 0))
 
     def update(self, mod_status) -> None:
-        """Module specific update method reads and parses status."""
+        """Update with module specific method. Reads and parses status."""
         super().update(mod_status)
         self.sensors[0].value = int(self.status[MStatIdx.MOV])  # movement?
         self.sensors[1].value = (
@@ -431,7 +435,7 @@ class SmartControllerMini(HbtnModule):
         self.sensors.append(IfDescriptor("Airquality", 3, 2, 0))
 
     def update(self, mod_status) -> None:
-        """Module specific update method reads and parses status."""
+        """Update with module specific method. Reads and parses status."""
         super().update(mod_status)
         self.sensors[0].value = int(self.status[MStatIdx.MOV])  # movement?
         self.sensors[1].value = (
@@ -506,7 +510,7 @@ class SmartOutput(HbtnModule):
         self.covers = [IfDescriptorC("", -1, 0, 0, 0) for i in range(4)]
 
     def update(self, mod_status) -> None:
-        """Module specific update method reads and parses status."""
+        """Update with module specific method. Reads and parses status."""
         super().update(mod_status)
         out_state = int(self.status[MStatIdx.OUT_1_8])
         for outpt in self.outputs:
@@ -545,7 +549,7 @@ class SmartDimm(HbtnModule):
         self.diags.append(IfDescriptor("PowerTemp", 1, 1, 0))
 
     def update(self, mod_status) -> None:
-        """Module specific update method reads and parses status."""
+        """Update with module specific method. Reads and parses status."""
         super().update(mod_status)
 
         # inp_state = int(self.status[MStatIdx.INP_1_8])
@@ -592,7 +596,7 @@ class SmartUpM(HbtnModule):
         self.covers = [IfDescriptorC("", -1, 0, 0, 0)]
 
     def update(self, mod_status) -> None:
-        """Module specific update method reads and parses status."""
+        """Update with module specific method. Reads and parses status."""
         super().update(mod_status)
 
         inp_state = int(self.status[MStatIdx.INP_1_8])
@@ -629,7 +633,7 @@ class SmartInput(HbtnModule):
         self.inputs = [IfDescriptor("", i, 1, 0) for i in range(8)]
 
     def update(self, mod_status) -> None:
-        """Module specific update method reads and parses status."""
+        """Update with module specific method. Reads and parses status."""
         super().update(mod_status)
         inp_state = int(self.status[MStatIdx.INP_1_8])
         for mod_inp in self.inputs:
@@ -657,6 +661,7 @@ class SmartDetect(HbtnModule):
         self.sensors.append(IfDescriptor("Illuminance", 1, 2, 0))
 
     async def initialize(self, sys_status) -> None:
+        """Initialize SmartDetect."""
         # No name and settings initialization needed
         device_registry = dr.async_get(self._hass)
         self.status = self.extract_status(sys_status)
@@ -674,7 +679,7 @@ class SmartDetect(HbtnModule):
         self.update(self.status)
 
     def update(self, mod_status) -> None:
-        """Module specific update method reads and parses status."""
+        """Update with module specific method. Reads and parses status."""
         super().update(mod_status)
         self.sensors[0].value = int(self.status[MStatIdx.MOV])  # movement
         self.sensors[1].value = int(self.status[MStatIdx.LUM]) * 10  # illuminance
@@ -700,7 +705,7 @@ class SmartEKey(HbtnModule):
         self.fingers.append(IfDescriptor("Finger", 0, 2, 0))
 
     def update(self, mod_status) -> None:
-        """Module specific update method reads and parses status."""
+        """Update with module specific method. Reads and parses status."""
         super().update(mod_status)
         self.sensors[0].value = int(self.status[MStatIdx.KEY_ID])  # last id
         self.diags[0].value = self.status[MStatIdx.MODULE_STAT]
@@ -728,6 +733,7 @@ class SmartNature(HbtnModule):
         self.sensors.append(IfDescriptor("Windpeak", 5, 2, 0))
 
     async def initialize(self, sys_status) -> None:
+        """Initialize SmartNature."""
         # No name and settings initialization needed
         device_registry = dr.async_get(self._hass)
         self.status = self.extract_status(sys_status)
@@ -745,7 +751,7 @@ class SmartNature(HbtnModule):
         self.update(self.status)
 
     def update(self, mod_status) -> None:
-        """Module specific update method reads and parses status."""
+        """Update with module specific method. Reads and parses status."""
         self.sensors[0].value = (
             int.from_bytes(
                 self.status[MStatIdx.TEMP_ROOM : MStatIdx.TEMP_ROOM + 2],

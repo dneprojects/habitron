@@ -31,6 +31,8 @@ async def async_setup_entry(
         new_devices.append(CollCmdButton(coll_cmd, hbtn_rt))
     new_devices.append(RestartButton(hbtn_rt))
     new_devices.append(RestartAllButton(hbtn_rt))
+    new_devices.append(RestartHubButton(hbtn_rt))
+    new_devices.append(RebootHubButton(hbtn_rt))
 
     if new_devices:
         async_add_entities(new_devices)
@@ -133,12 +135,12 @@ class VisCmdButton(ButtonEntity):
 
 
 class RestartButton(ButtonEntity):
-    """Representation of a button to trigger a visualization command."""
+    """Representation of a button to trigger a router restart command."""
 
     _attr_has_entity_name = True
 
     def __init__(self, module) -> None:
-        """Initialize an VisCommand."""
+        """Initialize an restart button."""
         self._name = "restart"
         self._module = module
         self._attr_unique_id = f"Mod_{self._module.uid}_{self._name}"
@@ -158,12 +160,12 @@ class RestartButton(ButtonEntity):
 
 
 class RestartAllButton(ButtonEntity):
-    """Representation of a button to trigger a visualization command."""
+    """Representation of a button to trigger a all modules restart command."""
 
     _attr_has_entity_name = True
 
     def __init__(self, router) -> None:
-        """Initialize an VisCommand."""
+        """Initialize restart all button."""
         self._name = "restart_all"
         self._router = router
         self._attr_unique_id = f"Mod_{self._router.uid}_{self._name}"
@@ -180,3 +182,52 @@ class RestartAllButton(ButtonEntity):
     async def async_press(self) -> None:
         """Handle the button press."""
         await self._router.async_reset_all_modules()
+
+class RestartHubButton(ButtonEntity):
+    """Representation of a button to trigger a hub restart."""
+
+    _attr_has_entity_name = True
+
+    def __init__(self, router) -> None:
+        """Initialize an hub restart button."""
+        self._name = "restart"
+        self._router = router
+        self._attr_unique_id = f"Hub_{self._router.b_uid}_{self._name}"
+        self._attr_name = "Restart Hub"
+        self._attr_entity_category = EntityCategory.CONFIG
+
+    # To link this entity to its device, this property must return an
+    # identifiers value matching that used in the module
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return information to link this entity with the correct device."""
+        return {"identifiers": {(DOMAIN, self._router.b_uid)}}
+
+    async def async_press(self) -> None:
+        """Handle the button press."""
+        await self._router.smip.restart(self._router.id)
+
+
+class RebootHubButton(ButtonEntity):
+    """Representation of a button to trigger a hub reboot."""
+
+    _attr_has_entity_name = True
+
+    def __init__(self, router) -> None:
+        """Initialize an hub reboot button."""
+        self._name = "reboot"
+        self._router = router
+        self._attr_unique_id = f"Hub_{self._router.b_uid}_{self._name}"
+        self._attr_name = "Reboot Hub"
+        self._attr_entity_category = EntityCategory.CONFIG
+
+    # To link this entity to its device, this property must return an
+    # identifiers value matching that used in the module
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return information to link this entity with the correct device."""
+        return {"identifiers": {(DOMAIN, self._router.b_uid)}}
+
+    async def async_press(self) -> None:
+        """Handle the button press."""
+        await self._router.smip.reboot()
