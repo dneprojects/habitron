@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 from homeassistant.components.climate import (
@@ -32,7 +32,7 @@ async def async_setup_entry(
 
     new_devices = []
     for hbt_module in hbtn_rt.modules:
-        if hbt_module.mod_type == "Smart Controller":
+        if hbt_module.mod_type[:16] == "Smart Controller":
             new_devices.append(HbtnClimate(hbt_module, hbtn_cord, len(new_devices)))
     # Fetch initial data so we have data when entities subscribe
     #
@@ -61,18 +61,32 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
         self.idx = idx
         self._module = module
         self._attr_name = "Climate"
+        self._attr_fan_mode = None
+        self._attr_fan_modes = None
+        self._attr_is_aux_heat = None
+        self._attr_preset_mode = None
+        self._attr_preset_modes = None
+        self._attr_swing_mode = None
+        self._attr_swing_modes = None
         self._state = None
         self._curr_hvac_mode = HVACMode.OFF
         self._curr_temperature = module.sensors[1].value
         self._curr_humidity = module.sensors[2].value
         self._target_temperature = module.setvalues[0].value
         self._attr_unique_id = f"{self._module.uid}_{self._attr_name}"
-        self._attr_hvac_modes = HVACMode.HEAT
+        if self._module.climate_settings == 1:
+            self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
+        elif self._module.climate_settings == 2:
+            self._attr_hvac_modes = [HVACMode.OFF, HVACMode.COOL]
+        elif self._module.climate_settings == 3:
+            self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT_COOL]
+        elif self._module.climate_settings == 4:
+            self._attr_hvac_modes = [HVACMode.OFF]
         self._attr_temperature_unit = UnitOfTemperature.CELSIUS
         self._attr_target_temperature_high = 25
         self._attr_target_temperature_low = 15
         self._attr_target_temperature_step = 0.5
-        self._attr_hvac_mode = HVACMode.HEAT
+        self._attr_hvac_mode = HVACMode.OFF
         self._manual_hvac_since = datetime(2000, 1, 11, 0, 00, 00)
         self.manual_minutes = 5
 
@@ -106,7 +120,7 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
     @property
     def hvac_modes(self) -> list[HVACMode]:
         """Return the list of available hvac operation modes."""
-        return [HVACMode.HEAT, HVACMode.OFF]
+        return self._attr_hvac_modes
 
     @property
     def current_temperature(self) -> float:
@@ -120,26 +134,61 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
 
     @property
     def target_temperature(self) -> float:
+        """Return target temperature."""
         return self._target_temperature
 
     @property
     def hvac_action(self) -> HVACAction:
+        """Return attribute."""
         return self._attr_hvac_action
+
+    def update_action(self):
+        """Implement thermostat action."""
+        self._attr_hvac_action = HVACAction.IDLE
+        match self._curr_hvac_mode:
+            case HVACMode.OFF:
+                self._attr_hvac_action = HVACAction.OFF
+            case HVACMode.HEAT:
+                if self._attr_hvac_action == HVACAction.IDLE:
+                    if self._curr_temperature < self._target_temperature - 1:
+                        self._attr_hvac_action = HVACAction.HEATING
+                elif self._attr_hvac_action == HVACAction.HEATING:
+                    if self._curr_temperature >= self._target_temperature:
+                        self._attr_hvac_action = HVACAction.IDLE
+            case HVACMode.COOL:
+                if self._attr_hvac_action == HVACAction.IDLE:
+                    if self._curr_temperature > self._target_temperature + 1:
+                        self._attr_hvac_action = HVACAction.COOLING
+                elif self._attr_hvac_action == HVACAction.COOLING:
+                    if self._curr_temperature <= self._target_temperature:
+                        self._attr_hvac_action = HVACAction.IDLE
+            case HVACMode.HEAT_COOL:
+                if self._attr_hvac_action == HVACAction.IDLE:
+                    if self._curr_temperature > self._target_temperature + 1:
+                        self._attr_hvac_action = HVACAction.COOLING
+                    elif self._curr_temperature < self._target_temperature - 1:
+                        self._attr_hvac_action = HVACAction.HEATING
+                elif self._attr_hvac_action == HVACAction.COOLING:
+                    if self._curr_temperature <= self._target_temperature:
+                        self._attr_hvac_action = HVACAction.IDLE
+                elif self._attr_hvac_action == HVACAction.HEATING:
+                    if self._curr_temperature >= self._target_temperature:
+                        self._attr_hvac_action = HVACAction.IDLE
 
     @property
     def hvac_mode(self) -> HVACMode:
         """Return hvac operation ie. heat, cool mode."""
-        if datetime.now() > self._manual_hvac_since + timedelta(
-            minutes=self.manual_minutes
-        ):
-            # manual mode inactive
-            if self._target_temperature <= self._curr_temperature + 0.5:
-                self._curr_hvac_mode = HVACMode.OFF
-                self._attr_hvac_action = HVACAction.OFF
-                return self._curr_hvac_mode
-            self._curr_hvac_mode = HVACMode.HEAT
-            self._attr_hvac_action = HVACAction.HEATING
-            return self._curr_hvac_mode
+        # if datetime.now() > self._manual_hvac_since + timedelta(
+        #     minutes=self.manual_minutes
+        # ):
+        #     # manual mode inactive
+        #     if self._target_temperature <= self._curr_temperature + 0.5:
+        #         self._curr_hvac_mode = HVACMode.OFF
+        #         self._attr_hvac_action = HVACAction.OFF
+        #         return self._curr_hvac_mode
+        #     self._curr_hvac_mode = HVACMode.HEAT
+        #     self._attr_hvac_action = HVACAction.HEATING
+        #     return self._curr_hvac_mode
         return self._curr_hvac_mode
 
     @callback
@@ -148,6 +197,7 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
         self._curr_temperature = self._module.sensors[1].value
         self._curr_humidity = self._module.sensors[2].value
         self._target_temperature = self._module.setvalues[0].value
+        self.update_action()
         self.async_write_ha_state()
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
@@ -161,8 +211,8 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Set new target hvac mode."""
         self._curr_hvac_mode = hvac_mode
-        self._manual_hvac_since = datetime.now()
-        if hvac_mode == HVACMode.HEAT:
-            self._attr_hvac_action = HVACAction.HEATING
-        else:
-            self._attr_hvac_action = HVACAction.OFF
+        # self._manual_hvac_since = datetime.now()
+        # if hvac_mode == HVACMode.HEAT:
+        #     self._attr_hvac_action = HVACAction.HEATING
+        # else:
+        #     self._attr_hvac_action = HVACAction.OFF

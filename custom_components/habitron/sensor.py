@@ -16,7 +16,7 @@ from .interfaces import TYPE_DIAG
 # Note how both entities for each module sensor (battry and illuminance) are added at
 # the same time to the same list. This way only a single async_add_devices call is
 # required.
-async def async_setup_entry(
+async def async_setup_entry(  # noqa: C901
     hass: HomeAssistant,
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
