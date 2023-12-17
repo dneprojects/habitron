@@ -164,7 +164,7 @@ class HbtnFlag(CoordinatorEntity, BinarySensorEntity):
 
     @property
     def available(self) -> bool:
-        """Return True if module and smip is available."""
+        """Return True if module and smhub is available."""
         return True
 
     @property
@@ -216,7 +216,7 @@ class HbtnState(CoordinatorEntity, BinarySensorEntity):
 
     @property
     def available(self) -> bool:
-        """Return True if module and smip is available."""
+        """Return True if module and smhub is available."""
         return True
 
     @property
@@ -240,8 +240,10 @@ class MotionSensor(CoordinatorEntity, BinarySensorEntity):
     """Representation of habitron button switch input."""
 
     _attr_device_class = BinarySensorDeviceClass.MOTION
+    should_poll = True  # for push updates
 
     def __init__(self, sensor, module, coord, idx) -> None:
+        """Initialize motion sensor."""
         super().__init__(coord, context=idx)
         self.idx = idx
         self._sensor = sensor
@@ -251,6 +253,22 @@ class MotionSensor(CoordinatorEntity, BinarySensorEntity):
         self._attr_unique_id = f"{self._module.uid}_motion"
         self._attr_name = f"{self._module.name}: Motion"
         self._attr_icon = "mdi:motion-sensor"
+
+    async def async_added_to_hass(self) -> None:
+        """Run when this Entity has been added to HA."""
+        # Importantly for a push integration, the module that will be getting updates
+        # needs to notify HA of changes. The dummy device has a registercallback
+        # method, so to this we add the 'self.async_write_ha_state' method, to be
+        # called where ever there are changes.
+        # The call back registration is done once this entity is registered with HA
+        # (rather than in the __init__)
+        await super().async_added_to_hass()
+        self._sensor.register_callback(self._handle_coordinator_update)
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Entity being removed from hass."""
+        # The opposite of async_added_to_hass. Remove any registered call backs here.
+        self._sensor.remove_callback(self._handle_coordinator_update)
 
     # To link this entity to its device, this property must return an
     # identifiers value matching that used in the module
@@ -263,7 +281,7 @@ class MotionSensor(CoordinatorEntity, BinarySensorEntity):
 
     @property
     def available(self) -> bool:
-        """Return True if module and smip is available."""
+        """Return True if module and smhub is available."""
         return True
 
     @property
@@ -289,6 +307,7 @@ class RainSensor(CoordinatorEntity, BinarySensorEntity):
     _attr_device_class = BinarySensorDeviceClass.MOISTURE
 
     def __init__(self, sensor, module, coord, idx) -> None:
+        """Initialize rain sensor."""
         super().__init__(coord, context=idx)
         self.idx = idx
         self._sensor = sensor
@@ -310,7 +329,7 @@ class RainSensor(CoordinatorEntity, BinarySensorEntity):
 
     @property
     def available(self) -> bool:
-        """Return True if module and smip is available."""
+        """Return True if module and smhub is available."""
         return True
 
     @property

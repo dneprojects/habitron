@@ -12,16 +12,17 @@ from homeassistant.core import HomeAssistant, ServiceCall
 from .communicate import TimeoutException
 from .const import (
     DOMAIN,
+    EVNT_ARG1,
+    EVNT_ARG2,
+    EVNT_TYPE,
     FILE_MOD_NMBR,
+    HUB_UID,
+    MOD_NMBR,
     RESTART_ALL,
     RESTART_KEY_NMBR,
     ROUTER_NMBR,
-    MOD_NMBR,
-    EVNT_TYPE,
-    EVNT_ARG1,
-    EVNT_ARG2,
 )
-from .smart_ip import SmartIP
+from .smart_hub import SmartHub
 
 # List of platforms to support. There should be a matching .py file for each
 PLATFORMS: list[str] = [
@@ -37,6 +38,15 @@ PLATFORMS: list[str] = [
     "text",
     "event",
 ]
+SERVICE_HUB_RESTART_SCHEMA = vol.Schema(
+    {
+        vol.Required(ROUTER_NMBR, default=1): int,
+    }
+)
+SERVICE_HUB_REBOOT_SCHEMA = vol.Schema(
+    {
+    }
+)
 SERVICE_MOD_RESTART_SCHEMA = vol.Schema(
     {
         vol.Required(ROUTER_NMBR, default=1): int,
@@ -61,6 +71,7 @@ SERVICE_RTR_RESTART_SCHEMA = vol.Schema(
 )
 SERVICE_UPDATE_ENTITY_SCHEMA = vol.Schema(
     {
+        vol.Required(HUB_UID): str,
         vol.Required(ROUTER_NMBR, default=1): int,
         vol.Required(MOD_NMBR): int,
         vol.Required(EVNT_TYPE): int,
@@ -74,6 +85,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Habitron from a config entry."""
     # Store an instance of the "connecting" class that does the work of speaking
     # with your actual devices.
+
+    async def restart_hub(call: ServiceCall):
+        """Handle the service call."""
+        rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
+        await smip.comm.hub_restart(rtr_id)
+
+    async def reboot_hub(call: ServiceCall):
+        """Handle the service call."""
+        await smip.comm.hub_reboot()
 
     async def restart_module(call: ServiceCall):
         """Handle the service call."""
@@ -116,14 +136,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     async def update_entity(call: ServiceCall):
         """Handle the update service call."""
+        hub_id = call.data.get(HUB_UID)
         rtr_id = call.data.get(ROUTER_NMBR, 1)
         mod_id = call.data.get(MOD_NMBR)
         evnt = call.data.get(EVNT_TYPE)
         arg1 = call.data.get(EVNT_ARG1)
         arg2 = call.data.get(EVNT_ARG2)
-        await smip.comm.update_entity(rtr_id, mod_id, evnt, arg1, arg2)
+        for hub in smip._hass.data["habitron"]:
+            if smip._hass.data["habitron"][hub]._host == hub_id:
+                await smip._hass.data["habitron"][hub].comm.update_entity(hub_id, rtr_id, mod_id, evnt, arg1, arg2)
+                break
 
-    smip = SmartIP(hass, entry)
+    smip = SmartHub(hass, entry)
     try:
         await smip.initialize(hass, entry)
     except (asyncio.TimeoutError, TimeoutException) as ex:
@@ -131,10 +155,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = smip
 
+    # Ensure every device associated with this config entry is still in the list of
+    # habitron devices, otherwise remove the device (and thus entities).
+    # for device_entry in dr.async_entries_for_config_entry(
+    #     device_registry, entry.entry_id
+    # ):
+    #     for identifier in device_entry.identifiers:
+    #         if identifier in inbound_camera:
+    #             break
+    #     else:
+    #         device_registry.async_remove_device(device_entry.id)
+
     # Register update handler for runtime configuration of Habitron integration
     entry.async_on_unload(entry.add_update_listener(update_listener))
 
     # Register services
+    hass.services.async_register(
+        DOMAIN, "hub_restart", restart_hub, schema=SERVICE_HUB_RESTART_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN, "hub_reboot", reboot_hub, schema=SERVICE_HUB_REBOOT_SCHEMA
+    )
     hass.services.async_register(
         DOMAIN, "mod_restart", restart_module, schema=SERVICE_MOD_RESTART_SCHEMA
     )

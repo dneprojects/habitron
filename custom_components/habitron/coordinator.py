@@ -1,9 +1,8 @@
 """Example integration using DataUpdateCoordinator."""
 
+import asyncio
 from datetime import timedelta
 import logging
-
-import async_timeout
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
@@ -31,7 +30,7 @@ class HbtnCoordinator(DataUpdateCoordinator):
         self.rtr_id = 1
 
     def set_update_interval(self, interval: int, updates: bool):
-        """Updating interval for integration re-configuration."""
+        """Update interval for integration re-configuration."""
         self.update_interval = timedelta(seconds=interval)
         self.comm.update_suspended = not (updates)
 
@@ -39,7 +38,7 @@ class HbtnCoordinator(DataUpdateCoordinator):
         """Fetch data from Habitron comm endpoint, preprocess and store for lookup."""
         # Note: asyncio.TimeoutError and aiohttp.ClientError are already
         # handled by the data update coordinator.
-        async with async_timeout.timeout(10):
+        async with asyncio.timeout(10):
             # Grab active context variables to limit data required to be fetched from API
             # Note: using context is not required if there is no need or ability to limit
             # data retrieved from API.

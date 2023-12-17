@@ -10,6 +10,7 @@ CONF_MIN_INTERVAL = 4  # min update interval
 CONF_MAX_INTERVAL = 60  # max update interval
 RESTART_RTR = 0
 RESTART_ALL = 0xFF
+HUB_UID = "hub_uid"
 ROUTER_NMBR = "rtr_nmbr"
 MOD_NMBR = "mod_nmbr"
 EVNT_TYPE = "evnt_type"
@@ -19,29 +20,29 @@ RESTART_KEY_NMBR = "mod_nmbr"
 FILE_MOD_NMBR = "mod_nmbr"
 
 MODULE_CODES: Final[dict[str, str]] = {
-    "\x01\x01": "Smart Controller XL-1",
-    "\x01\x02": "Smart Controller XL-2",
-    # "\x01\x0a": "Smart Controller X",
-    "\x0a\x01": "Smart Out 8/R",
-    "\x0a\x02": "Smart Out 8/T",
-    "\x0a\x14": "Smart Dimm",
-    "\x0a\x15": "Smart Dimm-1",
-    "\x0a\x16": "Smart Dimm-2",
-    "\x0a\x1e": "Smart UpM",  # Unterputzmodul
-    "\x0a\x32": "Smart Out 8/R-1",
-    "\x0a\x33": "Smart Out 8/R-2",
-    "\x0b\x1e": "Smart In 8/24V",
-    "\x0b\x1f": "Smart In 8/24V-1",
-    "\x0b\x01": "Smart In 8/230V",
-    "\x14\x01": "Smart Nature",
-    "\x1e\x01": "Fanekey",
-    "\x1e\x03": "FanGSM",
-    "\x1e\x04": "FanM-Bus",
-    "\x32\x01": "Smart Controller Mini",
-    # "\x32\x28": "Smart Sensors",
-    "\x50\x64": "Smart Detect 180",
-    "\x50\x65": "Smart Detect 360",
-    "\x50\x66": "Smart Detect 180-2",
+    b"\x01\x01": "Smart Controller XL-1",
+    b"\x01\x02": "Smart Controller XL-2",
+    # b"\x01\x0a": "Smart Controller X",
+    b"\x0a\x01": "Smart Out 8/R",
+    b"\x0a\x02": "Smart Out 8/T",
+    b"\x0a\x14": "Smart Dimm",
+    b"\x0a\x15": "Smart Dimm-1",
+    b"\x0a\x16": "Smart Dimm-2",
+    b"\x0a\x1e": "Smart UpM",  # Unterputzmodul
+    b"\x0a\x32": "Smart Out 8/R-1",
+    b"\x0a\x33": "Smart Out 8/R-2",
+    b"\x0b\x1e": "Smart In 8/24V",
+    b"\x0b\x1f": "Smart In 8/24V-1",
+    b"\x0b\x01": "Smart In 8/230V",
+    b"\x14\x01": "Smart Nature",
+    b"\x1e\x01": "Fanekey",
+    b"\x1e\x03": "FanGSM",
+    b"\x1e\x04": "FanM-Bus",
+    b"\x32\x01": "Smart Controller Mini",
+    # b"\x32\x28": "Smart Sensors",
+    b"\x50\x64": "Smart Detect 180",
+    b"\x50\x65": "Smart Detect 360",
+    b"\x50\x66": "Smart Detect 180-2",
 }
 
 
@@ -79,6 +80,7 @@ class MSetIdx:
     SHUTTER_TIMES = 4
     TILT_TIMES = 20
     INP_STATE = 39  # 3 bytes
+    CLIM_MODE = 48
     HW_VERS = 83
     HW_VERS_ = 100
     SW_VERS = 100
@@ -183,6 +185,7 @@ class MirrIdx:
     SWMOD_17_24 = 71
     T_SETP_1 = 72
     T_SETP_2 = 74
+    CLIM_MODE = 76
     T_LIM = 76
     RAIN = 79
     USER_CNT = 89
@@ -238,8 +241,28 @@ class ModuleDescriptor:
     """Habitron modules descriptor."""
 
     def __init__(self, uid, addr, mtype, name, group) -> None:
+        """Initialize descrptor."""
         self.uid: str = uid
         self.addr: int = addr
-        self.mtype: str = mtype
+        self.mtype: bytes = mtype
         self.name: str = name
         self.group: int = group
+
+
+class HaEvents:
+    """Identifier for home assistant events, e.g. input changes."""
+
+    BUTTON = 1
+    SWITCH = 2
+    OUTPUT = 3
+    COV_VAL = 4
+    BLD_VAL = 5
+    DIM_VAL = 6
+    FINGER = 7
+    IR_CMD = 8
+    FLAG = 9
+    CNT_VAL = 10
+    PERCNT = 11
+    DIR_CMD = 12
+    MOVE = 13
+    SYS_ERR = 16

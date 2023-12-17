@@ -12,7 +12,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .router import AlarmMode, DaytimeMode
-from .smart_ip import LoggingLevels
+from .smart_hub import LoggingLevels
 
 
 async def async_setup_entry(
@@ -63,6 +63,7 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
     """Representation of a input select for Habitron modes."""
 
     _attr_has_entity_name = True
+    should_poll = True  # for push updates
 
     def __init__(self, module, hbtnr, coord, idx) -> None:
         """Initialize a Habitron mode, pass coordinator to CoordinatorEntity."""
@@ -77,14 +78,10 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
         self.hbtnr = hbtnr
         self._attr_translation_key = "habitron_mode"
 
-    @property
-    def should_poll(self) -> bool:
-        return True
 
-    # This property is important to let HA know if this entity is online or not.
-    # If an entity is offline (return False), the UI will reflect this.
     @property
     def available(self) -> bool:
+        """Set true to let HA know that this entity is online."""
         return True
 
     # To link this entity to its device, this property must return an
@@ -118,11 +115,17 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
             self._mode = self.hbtnr.mode0
         else:
             self._mode = self._module.mode
+        if self._mode == 0:
+            # should not be the case
+            return
         self._value = self._mode & self._mask
         if self._value == 0:
             self._value = self.hbtnr.mode0 & self._mask
         if self._mode == 73:
             self._value = 63
+            list(map(int, self._enum))
+        if not (self._value in self._enum._value2member_map_):
+            return
         self._current_option = self._enum(self._value).name
         self.async_write_ha_state()
 
@@ -254,6 +257,7 @@ class HbtnSelectLoggingLevel(CoordinatorEntity, SelectEntity):
     """Logging level object."""
 
     _attr_has_entity_name = True
+    should_poll = True  # for push updates
 
     def __init__(self, smip, level, coord, idx) -> None:
         """Initialize a Habitron mode, pass coordinator to CoordinatorEntity."""
@@ -269,14 +273,11 @@ class HbtnSelectLoggingLevel(CoordinatorEntity, SelectEntity):
         self._attr_unique_id = f"{self._smip.uid}_{level.name.replace(' ','')}"
         self._attr_translation_key = "habitron_loglevel"
 
-    @property
-    def should_poll(self) -> bool:
-        return True
 
-    # This property is important to let HA know if this entity is online or not.
-    # If an entity is offline (return False), the UI will reflect this.
+
     @property
     def available(self) -> bool:
+        """Set true to let HA know that this entity is online."""
         return True
 
     # To link this entity to its device, this property must return an

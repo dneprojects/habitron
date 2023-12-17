@@ -1,4 +1,4 @@
-"""Platform for button integration."""
+"""Platform for events integration."""
 
 from __future__ import annotations
 
@@ -11,9 +11,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .interfaces import TYPE_DIAG
-
-# from homeassistant.helpers.entity import Entity
 
 
 async def async_setup_entry(
@@ -21,7 +18,7 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Add event entities for Habitron buttons."""
+    """Add event entities for Habitron system."""
     hbtn_rt = hass.data[DOMAIN][entry.entry_id].router
     hbtn_cord = hbtn_rt.coord
 
