@@ -44,11 +44,15 @@ class SmartHub:
 
         self._host = self.comm.com_ip
         self._port = self.comm.com_port
+        if len(self._host) == 0:
+            conf_url = None
+        else:
+            conf_url = f"http://{self.comm.com_ip}:7780/hub"
 
         device_registry = dr.async_get(hass)
         device_registry.async_get_or_create(
             config_entry_id=config.entry_id,
-            configuration_url=f"http://{self.comm.com_ip}:7780/hub",
+            configuration_url=conf_url,
             connections={(dr.CONNECTION_NETWORK_MAC, self._mac)},
             identifiers={(DOMAIN, self.uid)},
             manufacturer="Habitron GmbH",
@@ -112,7 +116,8 @@ class SmartHub:
 
     async def initialize(self, hass: HomeAssistant, config: ConfigEntry) -> bool:
         """Initialize SmartHub instance."""
-        await self.comm.send_network_info(config.data["websock_token"])
+        if self._type == "Smart Hub":
+            await self.comm.send_network_info(config.data["websock_token"])
         await self.comm.async_stop_mirror(1)
         self.router = hbtr(hass, config, self)
         await self.router.initialize()
