@@ -205,12 +205,14 @@ class EKeySensor(HbtnSensor):
         # The call back registration is done once this entity is registered with HA
         # (rather than in the __init__)
         await super().async_added_to_hass()
-        self.sensor.register_callback(self._handle_coordinator_update)
+        if self._module.comm.is_smhub:
+            self.sensor.register_callback(self._handle_coordinator_update)
 
     async def async_will_remove_from_hass(self) -> None:
         """Entity being removed from hass."""
         # The opposite of async_added_to_hass. Remove any registered call backs here.
-        self.sensor.remove_callback(self._handle_coordinator_update)
+        if self._module.comm.is_smhub:
+            self.sensor.remove_callback(self._handle_coordinator_update)
 
 
 class WindSensor(HbtnSensor):
@@ -317,6 +319,30 @@ class LogicSensor(HbtnSensor):
         """Handle updated data from the coordinator."""
         self._attr_native_value = self._module.logic[self.idx].value
         self.async_write_ha_state()
+
+
+class LogicSensorPush(HbtnSensor):
+    """Representation of a logic state sensor for push update."""
+
+    should_poll = True  # for push updates
+
+    async def async_added_to_hass(self) -> None:
+        """Run when this Entity has been added to HA."""
+        # Importantly for a push integration, the module that will be getting updates
+        # needs to notify HA of changes. The dummy device has a registercallback
+        # method, so to this we add the 'self.async_write_ha_state' method, to be
+        # called where ever there are changes.
+        # The call back registration is done once this entity is registered with HA
+        # (rather than in the __init__)
+        await super().async_added_to_hass()
+        if self._module.comm.is_smhub:
+            self.logic.register_callback(self._handle_coordinator_update)
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Entity being removed from hass."""
+        # The opposite of async_added_to_hass. Remove any registered call backs here.
+        if self._module.comm.is_smhub:
+            self.logic.remove_callback(self._handle_coordinator_update)
 
 
 class CurrSensor(HbtnSensor):

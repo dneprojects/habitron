@@ -2,23 +2,14 @@
 from __future__ import annotations
 
 from enum import Enum
+import logging
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
-from .communicate import HbtnComm
-
 # for more information.
-from .const import (
-    DOMAIN,
-    FALSE_VAL,
-    MODULE_CODES,
-    TRUE_VAL,
-    ModuleDescriptor,
-    MStatIdx,
-    RoutIdx,
-)
+from .const import DOMAIN, FALSE_VAL, TRUE_VAL, ModuleDescriptor, MStatIdx, RoutIdx
 from .coordinator import HbtnCoordinator
 from .interfaces import TYPE_DIAG, CmdDescriptor, IfDescriptor, StateDescriptor
 from .module import (
@@ -68,17 +59,18 @@ class HbtnRouter:
 
     manufacturer = "Habitron GmbH"
 
-    def __init__(self, hass: HomeAssistant, config: ConfigEntry, smip) -> None:
+    def __init__(self, hass: HomeAssistant, config: ConfigEntry, smhub) -> None:
         """Init habitron router."""
         self.id = 100  # to be adapted for more routers
-        self.b_uid = smip.uid
+        self.b_uid = smhub.uid
         self.uid = f"rt_{self.b_uid}"
         self.hass = hass
         self.config = config
-        self.smip = smip
-        self.comm = smip.comm
+        self.smhub = smhub
+        self.comm = smhub.comm
+        self.logger = logging.getLogger(__name__)
         self.coord = HbtnCoordinator(hass, self.comm)
-        self.name = f"Router {smip.uid}"
+        self.name = f"Router {smhub.uid}"
         self.version = ""
         self.serial = ""
         self.status = ""
@@ -127,10 +119,11 @@ class HbtnRouter:
             model="Smart Router",
             sw_version=self.version,
             hw_version=self.serial,
-            via_device=(DOMAIN, self.smip.uid),
+            via_device=(DOMAIN, self.smhub.uid),
         )
         # Further initialization of module instances
-        # await self.comm.async_start_mirror(self.id)
+        if not self.comm.is_smhub:
+            await self.comm.async_start_mirror(self.id)
         self.modules_desc = await self.get_modules(self.module_grp)
         await self.comm.async_system_update()  # Inital update
 
@@ -168,6 +161,10 @@ class HbtnRouter:
                     hbtscm(mod_desc, self.hass, self.config, self.b_uid, self.comm)
                 )
             elif (mod_desc.mtype[0] == 30) & (mod_desc.mtype[1] == 1):
+                self.modules.append(
+                    hbtkey(mod_desc, self.hass, self.config, self.b_uid, self.comm)
+                )
+            elif (mod_desc.mtype[0] == 30): # only ekey: & (mod_desc.mtype[1] == 1)
                 self.modules.append(
                     hbtkey(mod_desc, self.hass, self.config, self.b_uid, self.comm)
                 )
@@ -218,7 +215,7 @@ class HbtnRouter:
         self.serial = self.smr[ptr + 1 : ptr + 1 + str_len].decode("iso8859-1").strip()
         ptr += str_len + 71  # Korr von Hand, vorher 71 + 1
         str_len = self.smr[ptr]
-        self.version = self.smr[ptr + 1 : ptr + 1 + str_len].decode("iso8859-1").strip()
+        self.version = self.smr[-22:].decode("iso8859-1").strip()
 
     def get_module(self, mod_addr) -> HbtnModule:
         """Return module based on id."""
@@ -318,7 +315,7 @@ class HbtnRouter:
     async def update_system_status(self, sys_status) -> None:
         """Distribute module status to all modules and update self status."""
         # update not always
-        self.smip.update()
+        self.smhub.update()
         self.status = await self.comm.async_get_router_status(self.id)
         if not (len(self.status) >= RoutIdx.MIRROR_STARTED):
             return
