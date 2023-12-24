@@ -38,8 +38,8 @@
             "cannot_connect": "Keine Verbindung zum SmartIP",
             "host_not_found": "Hostname nicht gefunden, evtl. IP eingeben",
             "invalid_interval": "Intervall Eingabe ungültig",
-            "interval_too_short": "Intervall zu kurz, mind. 2 s",
-            "interval_too_long": "Intervall zu lang, max. 10 s",
+            "interval_too_short": "Intervall zu kurz, mind. 4 s",
+            "interval_too_long": "Intervall zu lang, max. 60 s",
             "unknown": "Unbekannter Fehler"
         },
         "abort": {

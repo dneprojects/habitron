@@ -124,7 +124,7 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
         if self._mode == 73:
             self._value = 63
             list(map(int, self._enum))
-        if not (self._value in self._enum._value2member_map_):
+        if self._value not in self._enum._value2member_map_:
             return
         self._current_option = self._enum(self._value).name
         self.async_write_ha_state()
@@ -153,17 +153,26 @@ class HbtnSelectDaytimeMode(HbtnMode):
         if self._value == 0:
             self._value = self.hbtnr.mode0 & self._mask
         self._enum = DaytimeMode
-        self._current_option = self._enum(self._value).name
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
         if isinstance(self._module, int):
             self._attr_name = "Group 0 daytime"
             self._attr_unique_id = f"{self.hbtnr.b_uid}_group_0_daytime_mode"
+            if self._value == 0:
+                # hot fix: why is mode 0?
+                hbtnr.logger.warning("Enum value 0 for router")
+                self._value = 1
+            self._current_option = self._enum(self._value).name
         else:
             self._attr_name = f"Group {self._module.group} daytime"
             self._attr_unique_id = f"{self._module.uid}_daytime_mode"
             self._attr_entity_registry_enabled_default = (
                 False  # Entity will initally be disabled
             )
+            if self._value == 0:
+                # hot fix: why is mode 0?
+                module.logger.warning("Enum value 0 for module %d", module.raddr)
+                self._value = 1
+            self._current_option = self._enum(self._value).name
 
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
