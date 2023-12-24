@@ -84,6 +84,7 @@ class HbtnComm:
         self.crc = 0
         self.router = []
         self.update_suspended = False
+        self.is_smhub = False  # will be set in get_smhub_info()
         self.info = self.get_smhub_info()
 
     @property
@@ -157,10 +158,12 @@ class HbtnComm:
         smhub_info = query_smarthub(self._host)  # get info from query port
         if smhub_info == "":
             return ""
-        if smhub_info["type"] == "E-5":
+        self.is_smhub = smhub_info["type"] == "2-0"
+        if not self.is_smhub:
             # Smart IP
             info = smhub_info
             self._version = info["version"]
+            self._serial = info["serial"]
             self._hwtype = info["type"]
             self._hostip = info["ip"]
             self._mac = info["mac"]
@@ -209,7 +212,7 @@ class HbtnComm:
         """General function for communication via SmartIP."""
         sck = socket.socket()  # Create a socket object
         sck.connect((self._host, self._port))
-        sck.settimeout(20)  # 10 seconds
+        sck.settimeout(5)  # 5 seconds
         full_string = wrap_command(cmd_string)
         res = await async_send_receive(sck, full_string)
         sck.close()
@@ -229,6 +232,7 @@ class HbtnComm:
         except TimeoutError as err_msg:  # noqa: F841
             # print(f"Error connecting to Smart IP: {err_msg}")
             pass
+
 
     async def async_get_router_status(self, rtr_id) -> bytes:
         """Get router status."""
@@ -268,8 +272,15 @@ class HbtnComm:
         """Start mirror on specified router."""
         rtr_nmbr = int(rtr_id / 100)
         cmd_str = SMHUB_COMMANDS["START_MIRROR"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        await self.async_send_command(cmd_str)
+        if self.is_smhub:
+            cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        else:
+            cmd_str = cmd_str.replace("<rtr>", "\0")
+        if self.router.version.split("/")[1] == "2024":
+            # Quick fix for problems with router-fw
+            self.send_only(cmd_str)
+        else:
+            await self.async_send_command(cmd_str)
 
     async def async_stop_mirror(self, rtr_id) -> None:
         """Start mirror on specified router."""
@@ -581,54 +592,57 @@ class HbtnComm:
         if self._hostip != hub_id:
             return
         module = self.router.get_module(mod_id)
-        if evnt == HaEvents.BUTTON:
-            # Button pressed or released
-            await module.inputs[arg1 - 1].handle_upd_event(inp_event_types[arg2])
-            if arg2 in [1, 3]:
-                await module.inputs[arg1 - 1].handle_upd_event(inp_event_types[0])
-        elif evnt == HaEvents.SWITCH:
-            # Switch input changed
-            module.inputs[arg1 - 1].value = arg2
-            await module.inputs[arg1 - 1].handle_upd_event()
-        elif evnt == HaEvents.OUTPUT:
-            # Output changed
-            if arg1 > 16:
-                # LED
-                module.leds[arg1 - 17].value = arg2
-                await module.leds[arg1 - 17].handle_upd_event()
-            else:
-                module.outputs[arg1 - 1].value = arg2
-                await module.outputs[arg1 - 1].handle_upd_event()
-                if (c_idx := module.get_cover_index(arg1)) >= 0:
-                    module.covers[c_idx].value = module.status[
-                        MStatIdx.ROLL_POS + c_idx
-                    ]
-                    module.covers[c_idx].tilt = module.status[MStatIdx.BLAD_POS + c_idx]
-                    await module.covers[c_idx].handle_upd_event()
-        elif evnt == HaEvents.FINGER:
-            # Ekey input detected
-            module.sensors[0].value = arg1
-            await module.sensors[0].handle_upd_event()
-            await module.fingers[0].handle_upd_event("finger", arg1)
-            await asyncio.sleep(0.2)
-            await module.fingers[0].handle_upd_event(
-                "inactive", 0
-            )  # set back to 'None'
-        elif evnt == HaEvents.DIM_VAL:
-            module.dimmers[arg1].value = arg2
-            await module.dimmers[arg1].handle_upd_event()
-        elif evnt == HaEvents.COV_VAL:
-            module.covers[arg1].value = arg2
-            await module.covers[arg1].handle_upd_event()
-        elif evnt == HaEvents.BLD_VAL:
-            module.covers[arg1].tilt = arg2
-            await module.covers[arg1].handle_upd_event()
-        elif evnt == HaEvents.MOVE:
-            module.sensors[arg1].value = int(arg2 > 0)
-            await module.sensors[arg1].handle_upd_event()
-        elif evnt == HaEvents.FLAG:
-            module.flags[arg1].value = int(arg2 > 0)
-            await module.flags[arg1].handle_upd_event()
+        try:
+            if evnt == HaEvents.BUTTON:
+                # Button pressed or released
+                await module.inputs[arg1 - 1].handle_upd_event(inp_event_types[arg2])
+                if arg2 in [1, 3]:
+                    await module.inputs[arg1 - 1].handle_upd_event(inp_event_types[0])
+            elif evnt == HaEvents.SWITCH:
+                # Switch input changed
+                module.inputs[arg1 - 1].value = arg2
+                await module.inputs[arg1 - 1].handle_upd_event()
+            elif evnt == HaEvents.OUTPUT:
+                # Output changed
+                if arg1 > 16:
+                    # LED
+                    module.leds[arg1 - 17].value = arg2
+                    await module.leds[arg1 - 17].handle_upd_event()
+                else:
+                    module.outputs[arg1 - 1].value = arg2
+                    await module.outputs[arg1 - 1].handle_upd_event()
+                    if (c_idx := module.get_cover_index(arg1)) >= 0:
+                        module.covers[c_idx].value = module.status[
+                            MStatIdx.ROLL_POS + c_idx
+                        ]
+                        module.covers[c_idx].tilt = module.status[MStatIdx.BLAD_POS + c_idx]
+                        await module.covers[c_idx].handle_upd_event()
+            elif evnt == HaEvents.FINGER:
+                # Ekey input detected
+                module.sensors[0].value = arg1
+                await module.sensors[0].handle_upd_event()
+                await module.fingers[0].handle_upd_event("finger", arg1)
+                await asyncio.sleep(0.2)
+                await module.fingers[0].handle_upd_event(
+                    "inactive", 0
+                )  # set back to 'None'
+            elif evnt == HaEvents.DIM_VAL:
+                module.dimmers[arg1].value = arg2
+                await module.dimmers[arg1].handle_upd_event()
+            elif evnt == HaEvents.COV_VAL:
+                module.covers[arg1].value = arg2
+                await module.covers[arg1].handle_upd_event()
+            elif evnt == HaEvents.BLD_VAL:
+                module.covers[arg1].tilt = arg2
+                await module.covers[arg1].handle_upd_event()
+            elif evnt == HaEvents.MOVE:
+                module.sensors[arg1].value = int(arg2 > 0)
+                await module.sensors[arg1].handle_upd_event()
+            elif evnt == HaEvents.FLAG:
+                module.flags[arg1].value = int(arg2 > 0)
+                await module.flags[arg1].handle_upd_event()
+        except Exception as err_msg:
+            print(f"Error handling habitron event: {err_msg}")
 
 
 

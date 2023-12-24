@@ -1,6 +1,7 @@
 """Module modules."""
 from __future__ import annotations
 
+import logging
 import math
 
 from homeassistant.config_entries import ConfigEntry
@@ -30,6 +31,7 @@ class HbtnModule:
         self.b_uid = b_uid
         self.name = mod_descriptor.name
         self.comm = comm
+        self.logger = logging.getLogger(__name__)
         self.sw_version = ""
         self.hw_version = ""
         self.uid = f"Mod_{mod_descriptor.uid}_{self.b_uid}"

@@ -8,7 +8,6 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 
@@ -23,18 +22,20 @@ async def async_setup_entry(
     hbtn_cord = hbtn_rt.coord
 
     new_devices = []
-    for hbt_module in hbtn_rt.modules:
-        for mod_input in hbt_module.inputs:
-            if abs(mod_input.type) == 1:  # pulse switch
+    if hbtn_rt.smhub.is_smhub:
+        # Event support restricted to SmartHub
+        for hbt_module in hbtn_rt.modules:
+            for mod_input in hbt_module.inputs:
+                if abs(mod_input.type) == 1:  # pulse switch
+                    new_devices.append(
+                        InputPressed(mod_input, hbt_module, hbtn_cord, len(new_devices))
+                    )
+            if hbt_module.mod_type == "Fanekey":
                 new_devices.append(
-                    InputPressed(mod_input, hbt_module, hbtn_cord, len(new_devices))
+                    FingerDetected(
+                        hbt_module.fingers[0], hbt_module, hbtn_cord, len(new_devices)
+                    )
                 )
-        if hbt_module.mod_type == "Fanekey":
-            new_devices.append(
-                FingerDetected(
-                    hbt_module.fingers[0], hbt_module, hbtn_cord, len(new_devices)
-                )
-            )
 
     if new_devices:
         await hbtn_cord.async_config_entry_first_refresh()

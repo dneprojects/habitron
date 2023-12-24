@@ -8,6 +8,8 @@ import voluptuous as vol
 from homeassistant import exceptions
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.device_registry import DeviceEntry
 
 from .communicate import TimeoutException
 from .const import (
@@ -89,50 +91,50 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     async def restart_hub(call: ServiceCall):
         """Handle the service call."""
         rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
-        await smip.comm.hub_restart(rtr_id)
+        await smhub.comm.hub_restart(rtr_id)
 
     async def reboot_hub(call: ServiceCall):
         """Handle the service call."""
-        await smip.comm.hub_reboot()
+        await smhub.comm.hub_reboot()
 
     async def restart_module(call: ServiceCall):
         """Handle the service call."""
         rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
         mod_nmbr = call.data.get(RESTART_KEY_NMBR, RESTART_ALL)
-        await smip.comm.module_restart(rtr_id, rtr_id + mod_nmbr)
+        await smhub.comm.module_restart(rtr_id, rtr_id + mod_nmbr)
 
     async def restart_router(call: ServiceCall):
         """Handle the service call."""
         rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
-        await smip.comm.module_restart(rtr_id, 0)
+        await smhub.comm.module_restart(rtr_id, 0)
 
     async def save_module_smc(call: ServiceCall):
         """Handle the service call."""
         rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
         mod_nmbr = call.data.get(FILE_MOD_NMBR, 1)
-        await smip.comm.save_smc_file(rtr_id + mod_nmbr)
+        await smhub.comm.save_smc_file(rtr_id + mod_nmbr)
 
     async def save_module_smg(call: ServiceCall):
         """Handle the service call."""
         rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
         mod_nmbr = call.data.get(FILE_MOD_NMBR, 1)
-        await smip.comm.save_smg_file(rtr_id + mod_nmbr)
+        await smhub.comm.save_smg_file(rtr_id + mod_nmbr)
 
     async def save_router_smr(call: ServiceCall):
         """Handle the service call."""
         rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
-        await smip.comm.save_smr_file(rtr_id)
+        await smhub.comm.save_smr_file(rtr_id)
 
     async def save_module_status(call: ServiceCall):
         """Handle the service call."""
         rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
         mod_nmbr = call.data.get(FILE_MOD_NMBR, 1)
-        await smip.comm.save_module_status(rtr_id + mod_nmbr)
+        await smhub.comm.save_module_status(rtr_id + mod_nmbr)
 
     async def save_router_status(call: ServiceCall):
         """Handle the service call."""
         rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
-        await smip.comm.save_router_status(rtr_id)
+        await smhub.comm.save_router_status(rtr_id)
 
     async def update_entity(call: ServiceCall):
         """Handle the update service call."""
@@ -142,26 +144,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         evnt = call.data.get(EVNT_TYPE)
         arg1 = call.data.get(EVNT_ARG1)
         arg2 = call.data.get(EVNT_ARG2)
-        for hub in smip._hass.data["habitron"]:
-            if smip._hass.data["habitron"][hub]._host == hub_id:
-                await smip._hass.data["habitron"][hub].comm.update_entity(hub_id, rtr_id, mod_id, evnt, arg1, arg2)
+        for hub in smhub.hass.data["habitron"]:
+            if smhub.hass.data["habitron"][hub].host == hub_id:
+                await smhub.hass.data["habitron"][hub].comm.update_entity(hub_id, rtr_id, mod_id, evnt, arg1, arg2)
                 break
 
-    smip = SmartHub(hass, entry)
+    smhub = SmartHub(hass, entry)
     try:
-        await smip.initialize(hass, entry)
+        await smhub.initialize(hass, entry)
     except (asyncio.TimeoutError, TimeoutException) as ex:
         raise ConfigEntryNotReady("Timeout while connecting to SmartIP") from ex
 
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = smip
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = smhub
 
     # Ensure every device associated with this config entry is still in the list of
     # habitron devices, otherwise remove the device (and thus entities).
+    # device_registry = dr.async_get(hass)
     # for device_entry in dr.async_entries_for_config_entry(
     #     device_registry, entry.entry_id
     # ):
     #     for identifier in device_entry.identifiers:
-    #         if identifier in inbound_camera:
+    #         set_of_ids = [DOMAIN]
+    #         if identifier in set_of_ids:
     #             break
     #     else:
     #         device_registry.async_remove_device(device_entry.id)
@@ -170,12 +174,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry.async_on_unload(entry.add_update_listener(update_listener))
 
     # Register services
-    hass.services.async_register(
-        DOMAIN, "hub_restart", restart_hub, schema=SERVICE_HUB_RESTART_SCHEMA
-    )
-    hass.services.async_register(
-        DOMAIN, "hub_reboot", reboot_hub, schema=SERVICE_HUB_REBOOT_SCHEMA
-    )
+    if smhub.is_smhub:
+        hass.services.async_register(
+            DOMAIN, "hub_restart", restart_hub, schema=SERVICE_HUB_RESTART_SCHEMA
+        )
+        hass.services.async_register(
+            DOMAIN, "hub_reboot", reboot_hub, schema=SERVICE_HUB_REBOOT_SCHEMA
+        )
     hass.services.async_register(
         DOMAIN, "mod_restart", restart_module, schema=SERVICE_MOD_RESTART_SCHEMA
     )
@@ -197,13 +202,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.services.async_register(
         DOMAIN, "save_router_status", save_router_status, schema=SERVICE_RTR_FILE_SCHEMA
     )
-    hass.services.async_register(
-        DOMAIN, "update_entity", update_entity, schema=SERVICE_UPDATE_ENTITY_SCHEMA
-    )
+    if smhub.is_smhub:
+        hass.services.async_register(
+            DOMAIN, "update_entity", update_entity, schema=SERVICE_UPDATE_ENTITY_SCHEMA
+        )
 
     # This creates each HA object for each platform your device requires.
     # It's done by calling the `async_setup_entry` function in each platform module.
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    return True
+
+
+async def async_remove_config_entry_device(
+    hass: HomeAssistant, config_entry: ConfigEntry, device_entry: DeviceEntry
+) -> bool:
+    """Remove a config entry from a device."""
     return True
 
 
