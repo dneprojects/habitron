@@ -82,6 +82,8 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
             self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT_COOL]
         elif self._module.climate_settings == 4:
             self._attr_hvac_modes = [HVACMode.OFF]
+        else:
+            self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
         self._attr_temperature_unit = UnitOfTemperature.CELSIUS
         self._attr_target_temperature_high = 25
         self._attr_target_temperature_low = 15

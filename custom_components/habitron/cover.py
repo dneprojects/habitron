@@ -99,12 +99,14 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
         # The call back registration is done once this entity is registered with HA
         # (rather than in the __init__)
         await super().async_added_to_hass()
-        self._cover.register_callback(self._handle_coordinator_update)
+        if self._module.comm.is_smhub:
+            self._cover.register_callback(self._handle_coordinator_update)
 
     async def async_will_remove_from_hass(self) -> None:
         """Entity being removed from hass."""
         # The opposite of async_added_to_hass. Remove any registered call backs here.
-        self._cover.remove_callback(self._handle_coordinator_update)
+        if self._module.comm.is_smhub:
+            self._cover.remove_callback(self._handle_coordinator_update)
 
     # To link this entity to its device, this property must return an
     # identifiers value matching that used in the module
@@ -226,12 +228,14 @@ class HbtnBlind(HbtnShutter):
         # The call back registration is done once this entity is registered with HA
         # (rather than in the __init__)
         await super().async_added_to_hass()
-        self._cover.register_callback(self._handle_coordinator_update)
+        if self._module.comm.is_smhub:
+            self._cover.register_callback(self._handle_coordinator_update)
 
     async def async_will_remove_from_hass(self) -> None:
         """Entity being removed from hass."""
         # The opposite of async_added_to_hass. Remove any registered call backs here.
-        self._cover.remove_callback(self._handle_coordinator_update)
+        if self._module.comm.is_smhub:
+            self._cover.remove_callback(self._handle_coordinator_update)
 
     @property
     def current_cover_tilt_position(self) -> int:

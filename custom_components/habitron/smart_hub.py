@@ -31,7 +31,7 @@ class SmartHub:
 
     def __init__(self, hass: HomeAssistant, config: ConfigEntry) -> None:
         """Init SmartHub."""
-        self._hass = hass
+        self.hass = hass
         self.config: config
         self._name = config.title
         self.comm = hbtn_com(hass, config)
@@ -40,11 +40,12 @@ class SmartHub:
         self.uid = self._mac.replace(":", "")
         self._version = self.comm.com_version
         self._type = self.comm.com_hwtype
+        self.is_smhub = self._type == "2-0"
         self.router = []
 
-        self._host = self.comm.com_ip
+        self.host = self.comm.com_ip
         self._port = self.comm.com_port
-        if len(self._host) == 0:
+        if len(self.host) == 0:
             conf_url = None
         else:
             conf_url = f"http://{self.comm.com_ip}:7780/hub"
@@ -82,12 +83,12 @@ class SmartHub:
 
     def update(self) -> None:
         """Update in a module specific method. Reads and parses status."""
-        if self.comm.com_hwtype == "E-5":
+        if not self.is_smhub:
             return
         info = self.comm.get_smhub_info()
         if info == "":
             return
-        if self._type[:12] == "Raspberry Pi":
+        if self.is_smhub:
             self.diags[0].value = float(
                 info["hardware"]["cpu"]["frequency current"].replace("MHz", "")
             )
@@ -116,7 +117,7 @@ class SmartHub:
 
     async def initialize(self, hass: HomeAssistant, config: ConfigEntry) -> bool:
         """Initialize SmartHub instance."""
-        if self._type == "Smart Hub":
+        if self.is_smhub:
             await self.comm.send_network_info(config.data["websock_token"])
         await self.comm.async_stop_mirror(1)
         self.router = hbtr(hass, config, self)
@@ -124,8 +125,10 @@ class SmartHub:
 
     async def restart(self, rt_id):
         """Restart hub."""
-        await self.comm.hub_restart(rt_id)
+        if self.is_smhub:
+            await self.comm.hub_restart(rt_id)
 
     async def reboot(self):
         """Reboot hub."""
-        await self.comm.hub_reboot()
+        if self.is_smhub:
+            await self.comm.hub_reboot()
