@@ -158,7 +158,7 @@ class HbtnComm:
         smhub_info = query_smarthub(self._host)  # get info from query port
         if smhub_info == "":
             return ""
-        self.is_smhub = smhub_info["type"] == "2-0"
+        self.is_smhub = smhub_info["serial"] == "RBPI"
         if not self.is_smhub:
             # Smart IP
             info = smhub_info
