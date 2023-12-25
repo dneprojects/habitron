@@ -40,7 +40,7 @@ class SmartHub:
         self.uid = self._mac.replace(":", "")
         self._version = self.comm.com_version
         self._type = self.comm.com_hwtype
-        self.is_smhub = self._type == "2-0"
+        self.is_smhub = self.comm.is_smhub
         self.router = []
 
         self.host = self.comm.com_ip
