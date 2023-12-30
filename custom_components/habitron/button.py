@@ -205,7 +205,7 @@ class RestartHubButton(ButtonEntity):
 
     async def async_press(self) -> None:
         """Handle the button press."""
-        await self._router.smip.restart(self._router.id)
+        await self._router.smhub.restart(self._router.id)
 
 
 class RebootHubButton(ButtonEntity):
@@ -230,4 +230,4 @@ class RebootHubButton(ButtonEntity):
 
     async def async_press(self) -> None:
         """Handle the button press."""
-        await self._router.smip.reboot()
+        await self._router.smhub.reboot()
