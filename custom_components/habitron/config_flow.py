@@ -50,7 +50,7 @@ async def validate_input(hass: HomeAssistant, data: dict) -> dict[str, Any]:
     if data["update_interval"] > CONF_MAX_INTERVAL:
         raise IntervalTooLong
 
-    # The dummy smip provides a `test_connection` method to ensure it's working
+    # The dummy smhub provides a `test_connection` method to ensure it's working
     # as expected
     try:
         result, host_name = await test_connection(data["habitron_host"])
@@ -64,7 +64,7 @@ async def validate_input(hass: HomeAssistant, data: dict) -> dict[str, Any]:
         raise CannotConnect
 
     # Return info that you want to store in the config entry.
-    # "Title" is what is displayed to the user for this smip device
+    # "Title" is what is displayed to the user for this smhub device
     # It is stored internally in HA as part of the device config.
     # See `async_step_user` below for how this is used
     return {"title": host_name}
@@ -76,7 +76,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
     # Pick one of the available connection classes in homeassistant/config_entries.py
     # This tells HA if it should be asking for updates, or it'll be notified of updates
-    # automatically. This example uses PUSH, as the dummy smip will notify HA of
+    # automatically. This example uses PUSH, as the dummy smhub will notify HA of
     # changes.
     CONNECTION_CLASS = config_entries.CONN_CLASS_LOCAL_POLL
 
