@@ -24,29 +24,29 @@ async def async_setup_entry(  # noqa: C901
     """Add sensors for passed config_entry in HA."""
     hbtn_rt = hass.data[DOMAIN][entry.entry_id].router
     hbtn_cord = hbtn_rt.coord
-    smip = hass.data[DOMAIN][entry.entry_id]
+    smhub = hass.data[DOMAIN][entry.entry_id]
 
     new_devices = []
-    for smip_sensor in smip.sensors:
-        if smip_sensor.name == "Memory free":
+    for smhub_sensor in smhub.sensors:
+        if smhub_sensor.name == "Memory free":
             new_devices.append(
-                PercSensor(smip, smip_sensor, hbtn_cord, len(new_devices))
+                PercSensor(smhub, smhub_sensor, hbtn_cord, len(new_devices))
             )
-        if smip_sensor.name == "Disk free":
+        if smhub_sensor.name == "Disk free":
             new_devices.append(
-                PercSensor(smip, smip_sensor, hbtn_cord, len(new_devices))
+                PercSensor(smhub, smhub_sensor, hbtn_cord, len(new_devices))
             )
-    for smip_diag in smip.diags:
-        if smip_diag.name == "CPU Frequency":
+    for smhub_diag in smhub.diags:
+        if smhub_diag.name == "CPU Frequency":
             new_devices.append(
-                FrequencySensor(smip, smip_diag, hbtn_cord, len(new_devices))
+                FrequencySensor(smhub, smhub_diag, hbtn_cord, len(new_devices))
             )
-        if smip_diag.name == "CPU load":
-            new_devices.append(PercSensor(smip, smip_diag, hbtn_cord, len(new_devices)))
+        if smhub_diag.name == "CPU load":
+            new_devices.append(PercSensor(smhub, smhub_diag, hbtn_cord, len(new_devices)))
 
-        if smip_diag.name == "CPU Temperature":
+        if smhub_diag.name == "CPU Temperature":
             new_devices.append(
-                TemperatureDSensor(smip, smip_diag, hbtn_cord, len(new_devices))
+                TemperatureDSensor(smhub, smhub_diag, hbtn_cord, len(new_devices))
             )
     for hbt_module in hbtn_rt.modules:
         for mod_sensor in hbt_module.sensors:
