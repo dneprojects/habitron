@@ -23,7 +23,7 @@ async def async_setup_entry(
     """Add input_select for passed config_entry in HA."""
     hbtn_rt = hass.data[DOMAIN][entry.entry_id].router
     hbtn_cord = hbtn_rt.coord
-    smip = hass.data[DOMAIN][entry.entry_id]
+    smhub = hass.data[DOMAIN][entry.entry_id]
 
     new_devices = []
     for hbt_module in hbtn_rt.modules:
@@ -41,9 +41,9 @@ async def async_setup_entry(
     new_devices.append(HbtnSelectDaytimeMode(0, hbtn_rt, hbtn_cord, len(new_devices)))
     new_devices.append(HbtnSelectAlarmMode(0, hbtn_rt, hbtn_cord, len(new_devices)))
     new_devices.append(HbtnSelectGroupMode(0, hbtn_rt, hbtn_cord, len(new_devices)))
-    for log_level in smip.loglvl:
+    for log_level in smhub.loglvl:
         new_devices.append(
-            HbtnSelectLoggingLevel(smip, log_level, hbtn_cord, len(new_devices))
+            HbtnSelectLoggingLevel(smhub, log_level, hbtn_cord, len(new_devices))
         )
 
     # Fetch initial data so we have data when entities subscribe
@@ -268,18 +268,18 @@ class HbtnSelectLoggingLevel(CoordinatorEntity, SelectEntity):
     _attr_has_entity_name = True
     should_poll = True  # for push updates
 
-    def __init__(self, smip, level, coord, idx) -> None:
+    def __init__(self, smhub, level, coord, idx) -> None:
         """Initialize a Habitron mode, pass coordinator to CoordinatorEntity."""
         super().__init__(coord, context=idx)
         self.idx = idx
         self._level = level
         self._nmbr = level.nmbr
         self._value = level.value
-        self._smip = smip
+        self._smhub = smhub
         self._current_option = ""
         self._enum = LoggingLevels
         self._attr_name = level.name
-        self._attr_unique_id = f"{self._smip.uid}_{level.name.replace(' ','')}"
+        self._attr_unique_id = f"{self._smhub.uid}_{level.name.replace(' ','')}"
         self._attr_translation_key = "habitron_loglevel"
 
 
@@ -294,7 +294,7 @@ class HbtnSelectLoggingLevel(CoordinatorEntity, SelectEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._smip.uid)}}
+        return {"identifiers": {(DOMAIN, self._smhub.uid)}}
 
     @property
     def name(self) -> str:
@@ -322,4 +322,4 @@ class HbtnSelectLoggingLevel(CoordinatorEntity, SelectEntity):
         """Change the selected option."""
         self._value = self._enum[option].value
         # nmbr used to select console/file handler
-        await self._smip.comm.async_set_log_level(self._nmbr, self._value * 10)
+        await self._smhub.comm.async_set_log_level(self._nmbr, self._value * 10)
