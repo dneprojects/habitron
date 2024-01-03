@@ -76,19 +76,19 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
         self._attr_unique_id = f"{self._module.uid}_{self._attr_name}"
         if self._module.climate_settings == 1:
             self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
-            self._attr_hvac_mode = HVACMode.HEAT
+            self._curr_hvac_mode = HVACMode.HEAT
         elif self._module.climate_settings == 2:
             self._attr_hvac_modes = [HVACMode.OFF, HVACMode.COOL]
-            self._attr_hvac_mode = HVACMode.COOL
+            self._curr_hvac_mode = HVACMode.COOL
         elif self._module.climate_settings == 3:
             self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT_COOL]
-            self._attr_hvac_mode = HVACMode.HEAT_COOL
+            self._curr_hvac_mode = HVACMode.HEAT_COOL
         elif self._module.climate_settings == 4:
             self._attr_hvac_modes = [HVACMode.OFF]
-            self._attr_hvac_mode = HVACMode.OFF
+            self._curr_hvac_mode = HVACMode.OFF
         else:
             self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
-            self._attr_hvac_mode = HVACMode.HEAT
+            self._curr_hvac_mode = HVACMode.HEAT
 
         self._attr_temperature_unit = UnitOfTemperature.CELSIUS
         self._attr_target_temperature_high = 25
