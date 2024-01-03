@@ -76,21 +76,24 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
         self._attr_unique_id = f"{self._module.uid}_{self._attr_name}"
         if self._module.climate_settings == 1:
             self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
+            self._attr_hvac_mode = HVACMode.HEAT
         elif self._module.climate_settings == 2:
             self._attr_hvac_modes = [HVACMode.OFF, HVACMode.COOL]
+            self._attr_hvac_mode = HVACMode.COOL
         elif self._module.climate_settings == 3:
             self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT_COOL]
+            self._attr_hvac_mode = HVACMode.HEAT_COOL
         elif self._module.climate_settings == 4:
             self._attr_hvac_modes = [HVACMode.OFF]
+            self._attr_hvac_mode = HVACMode.OFF
         else:
             self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
+            self._attr_hvac_mode = HVACMode.HEAT
+
         self._attr_temperature_unit = UnitOfTemperature.CELSIUS
         self._attr_target_temperature_high = 25
         self._attr_target_temperature_low = 15
         self._attr_target_temperature_step = 0.5
-        self._attr_hvac_mode = HVACMode.OFF
-        self._manual_hvac_since = datetime(2000, 1, 11, 0, 00, 00)
-        self.manual_minutes = 5
 
     # To link this entity to its device, this property must return an
     # identifiers value matching that used in the module
@@ -180,17 +183,6 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
     @property
     def hvac_mode(self) -> HVACMode:
         """Return hvac operation ie. heat, cool mode."""
-        # if datetime.now() > self._manual_hvac_since + timedelta(
-        #     minutes=self.manual_minutes
-        # ):
-        #     # manual mode inactive
-        #     if self._target_temperature <= self._curr_temperature + 0.5:
-        #         self._curr_hvac_mode = HVACMode.OFF
-        #         self._attr_hvac_action = HVACAction.OFF
-        #         return self._curr_hvac_mode
-        #     self._curr_hvac_mode = HVACMode.HEAT
-        #     self._attr_hvac_action = HVACAction.HEATING
-        #     return self._curr_hvac_mode
         return self._curr_hvac_mode
 
     @callback
@@ -207,14 +199,7 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
         self._target_temperature = kwargs.get(ATTR_TEMPERATURE)
         int_val = int(self._target_temperature * 10)
         await self._module.comm.async_set_setpoint(self._module.mod_addr, 1, int_val)
-        # Update the data
-        # await self.coordinator.async_request_refresh()
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Set new target hvac mode."""
         self._curr_hvac_mode = hvac_mode
-        # self._manual_hvac_since = datetime.now()
-        # if hvac_mode == HVACMode.HEAT:
-        #     self._attr_hvac_action = HVACAction.HEATING
-        # else:
-        #     self._attr_hvac_action = HVACAction.OFF
