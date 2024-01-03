@@ -151,17 +151,17 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
         self._position = 100 - self._module.covers[self._nmbr].value
         self._moving = 0
         if self._module.outputs[self._out_up].value > 0:
-            if self._position == 100:
-                self._module.comm.set_output(self._module.mod_addr, self._out_up + 1, 0)
-            else:
-                self._moving = 1
+            # if self._position == 100:
+            #     self._module.comm.set_output(self._module.mod_addr, self._out_up + 1, 0)
+            # else:
+            self._moving = 1
         if self._module.outputs[self._out_down].value > 0:
-            if self._position == 0:
-                self._module.comm.set_output(
-                    self._module.mod_addr, self._out_down + 1, 0
-                )
-            else:
-                self._moving = -1
+            # if self._position == 0:
+            #     self._module.comm.set_output(
+            #         self._module.mod_addr, self._out_down + 1, 0
+            #     )
+            # else:
+            self._moving = -1
         self.async_write_ha_state()
 
     # These methods allow HA to tell the actual device what to do. In this case, move
@@ -250,17 +250,17 @@ class HbtnBlind(HbtnShutter):
         self._moving = 0
 
         if self._module.outputs[self._out_up].value > 0:
-            if self._position == 100:
-                self._module.comm.set_output(self._module.mod_addr, self._out_up + 1, 0)
-            else:
-                self._moving = 1
+            # if self._position == 100:
+            #     self._module.comm.set_output(self._module.mod_addr, self._out_up + 1, 0)
+            # else:
+            self._moving = 1
         if self._module.outputs[self._out_down].value > 0:
-            if self._position == 0:
-                self._module.comm.set_output(
-                    self._module.mod_addr, self._out_down + 1, 0
-                )
-            else:
-                self._moving = -1
+            # if self._position == 0:
+            #     self._module.comm.set_output(
+            #         self._module.mod_addr, self._out_down + 1, 0
+            #     )
+            # else:
+            self._moving = -1
         self.async_write_ha_state()
 
     async def async_set_cover_tilt_position(self, **kwargs: Any) -> None:
