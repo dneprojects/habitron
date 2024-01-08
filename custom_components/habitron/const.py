@@ -18,6 +18,9 @@ EVNT_ARG1 = "evnt_arg1"
 EVNT_ARG2 = "evnt_arg2"
 RESTART_KEY_NMBR = "mod_nmbr"
 FILE_MOD_NMBR = "mod_nmbr"
+LOC_FLAG_OFFS = 100
+GLOB_FLAG_OFFS = 132
+LOGIC_INP_OFFS = 164
 
 MODULE_CODES: Final[dict[str, str]] = {
     b"\x01\x01": "Smart Controller XL-1",
