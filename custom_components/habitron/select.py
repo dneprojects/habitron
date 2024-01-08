@@ -156,7 +156,7 @@ class HbtnSelectDaytimeMode(HbtnMode):
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
         if isinstance(self._module, int):
             self._attr_name = "Group 0 daytime"
-            self._attr_unique_id = f"{self.hbtnr.b_uid}_group_0_daytime_mode"
+            self._attr_unique_id = f"{self.hbtnr.uid}_group_0_daytime_mode"
             if self._value == 0:
                 # hot fix: why is mode 0?
                 hbtnr.logger.warning("Enum value 0 for router")
@@ -200,7 +200,7 @@ class HbtnSelectAlarmMode(HbtnMode):
         self._current_option = self._enum(self._value).name
         if isinstance(self._module, int):
             self._attr_name = "Group 0 alarm"
-            self._attr_unique_id = f"{self.hbtnr.b_uid}_group_0_alarm_mode"
+            self._attr_unique_id = f"{self.hbtnr.uid}_group_0_alarm_mode"
         else:
             self._attr_name = f"Group {self._module.group} alarm"
             self._attr_unique_id = f"{self._module.uid}_alarm_mode"
@@ -245,7 +245,7 @@ class HbtnSelectGroupMode(HbtnMode):
         self._current_option = self._enum(self._value).name
         if isinstance(self._module, int):
             self._attr_name = "Group 0 mode"
-            self._attr_unique_id = f"{self.hbtnr.b_uid}_group_0_mode"
+            self._attr_unique_id = f"{self.hbtnr.uid}_group_0_mode"
         else:
             self._attr_name = f"Group {self._module.group} mode"
             self._attr_unique_id = f"{self._module.uid}_group_mode"
