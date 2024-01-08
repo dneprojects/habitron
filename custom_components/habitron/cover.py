@@ -88,7 +88,10 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
             self._out_down = self._nmbr * 2
         self._position = 0
         self._moving = 0
-        self._attr_unique_id = f"{self._module.uid}_cover_{48+cover.nmbr}"
+        self.open_cnt = 0
+        self.closed_cnt = 0
+        self.max_cnt = 2
+        self._attr_unique_id = f"{self._module.uid}_cover_{cover.nmbr}"
 
     async def async_added_to_hass(self) -> None:
         """Run when this Entity has been added to HA."""
@@ -128,12 +131,12 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
     @property
     def is_closed(self) -> bool:
         """Return if the cover is closed, same as position 0."""
-        return self._position == 0
+        return (self._position == 0) & (self._moving == 0)
 
     @property
     def is_open(self) -> bool:
         """Return if the cover is closed, same as position 0."""
-        return self._position == 100
+        return (self._position == 100) & (self._moving == 0)
 
     @property
     def is_closing(self) -> bool:
@@ -151,16 +154,24 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
         self._position = 100 - self._module.covers[self._nmbr].value
         self._moving = 0
         if self._module.outputs[self._out_up].value > 0:
-            # if self._position == 100:
+            # if (self._position == 100) & (self.open_cnt >= self.max_cnt):
             #     self._module.comm.set_output(self._module.mod_addr, self._out_up + 1, 0)
+            # elif self._position == 100:
+            #     self.open_cnt += 1
+            #     self._moving = 1
             # else:
+            #     self.open_cnt = 0
             self._moving = 1
         if self._module.outputs[self._out_down].value > 0:
-            # if self._position == 0:
+            # if (self._position == 0) & (self.closed_cnt >= self.max_cnt):
             #     self._module.comm.set_output(
             #         self._module.mod_addr, self._out_down + 1, 0
             #     )
+            # elif self._position == 0:
+            #     self.closed_cnt += 1
+            #     self._moving = -1
             # else:
+            #     self.closed_cnt = 0
             self._moving = -1
         self.async_write_ha_state()
 
@@ -219,24 +230,6 @@ class HbtnBlind(HbtnShutter):
         super().__init__(cover, module, coord, idx)
         self._tilt_position = 0
 
-    async def async_added_to_hass(self) -> None:
-        """Run when this Entity has been added to HA."""
-        # Importantly for a push integration, the module that will be getting updates
-        # needs to notify HA of changes. The dummy device has a registercallback
-        # method, so to this we add the 'self.async_write_ha_state' method, to be
-        # called where ever there are changes.
-        # The call back registration is done once this entity is registered with HA
-        # (rather than in the __init__)
-        await super().async_added_to_hass()
-        if self._module.comm.is_smhub:
-            self._cover.register_callback(self._handle_coordinator_update)
-
-    async def async_will_remove_from_hass(self) -> None:
-        """Entity being removed from hass."""
-        # The opposite of async_added_to_hass. Remove any registered call backs here.
-        if self._module.comm.is_smhub:
-            self._cover.remove_callback(self._handle_coordinator_update)
-
     @property
     def current_cover_tilt_position(self) -> int:
         """Return the current tilt position of the cover."""
@@ -250,16 +243,24 @@ class HbtnBlind(HbtnShutter):
         self._moving = 0
 
         if self._module.outputs[self._out_up].value > 0:
-            # if self._position == 100:
+            # if (self._position == 100) & (self.open_cnt >= self.max_cnt):
             #     self._module.comm.set_output(self._module.mod_addr, self._out_up + 1, 0)
+            # elif self._position == 100:
+            #     self.open_cnt += 1
+            #     self._moving = 1
             # else:
+            #     self.open_cnt = 0
             self._moving = 1
         if self._module.outputs[self._out_down].value > 0:
-            # if self._position == 0:
+            # if (self._position == 0) & (self.closed_cnt >= self.max_cnt):
             #     self._module.comm.set_output(
             #         self._module.mod_addr, self._out_down + 1, 0
             #     )
+            # elif self._position == 0:
+            #     self.closed_cnt += 1
+            #     self._moving = -1
             # else:
+            #     self.closed_cnt = 0
             self._moving = -1
         self.async_write_ha_state()
 

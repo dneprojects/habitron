@@ -58,6 +58,11 @@ SMHUB_COMMANDS: Final[dict[str, str]] = {
     "READ_MODULE_MIRR_STATUS": "\x64\1\5<rtr><mod>\0\0",  # <Module>
     "RESTART_HUB": "\x3c\0\2<rtr>\0\0\0",
     "REBOOT_HUB": "\x3c\0\3\0\0\0\0",
+    "SET_FLAG_OFF": "\x1e\x0f\0<rtr><mod>\1\0<fno>",
+    "SET_FLAG_ON": "\x1e\x0f\1<rtr><mod>\1\0<fno>",
+    "COUNTR_UP": "\x1e\x10\2<rtr><mod>\1\0<cno>",
+    "COUNTR_DOWN": "\x1e\x10\3<rtr><mod>\1\0<cno>",
+    "COUNTR_VAL": "\x1e\x10\4<rtr><mod>\2\0<cno><val>",
 }
 
 
@@ -376,6 +381,33 @@ class HbtnComm:
         cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
         cmd_str = cmd_str.replace("<arg1>", chr(nmbr))
         cmd_str = cmd_str.replace("<arg2>", chr(val))
+        self.send_only(cmd_str)
+
+    async def async_set_flag(self, mod_id, nmbr, val) -> None:
+        """Send flag on/flag off command."""
+        rtr_nmbr = int(mod_id / 100)
+        mod_addr = int(mod_id - 100 * rtr_nmbr)
+        # if zero, global flag
+        if val:
+            cmd_str = SMHUB_COMMANDS["SET_FLAG_ON"]
+        else:
+            cmd_str = SMHUB_COMMANDS["SET_FLAG_OFF"]
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
+        cmd_str = cmd_str.replace("<fno>", chr(nmbr))
+        self.send_only(cmd_str)
+
+    async def async_inc_dec_counter(self, mod_id, nmbr, val) -> None:
+        """Send flag on/flag off command."""
+        rtr_nmbr = int(mod_id / 100)
+        mod_addr = int(mod_id - 100 * rtr_nmbr)
+        if val == 1:
+            cmd_str = SMHUB_COMMANDS["COUNTR_UP"]
+        else:
+            cmd_str = SMHUB_COMMANDS["COUNTR_DOWN"]
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
+        cmd_str = cmd_str.replace("<cno>", chr(nmbr))
         self.send_only(cmd_str)
 
     async def async_set_setpoint(self, mod_id, nmbr, val) -> None:
