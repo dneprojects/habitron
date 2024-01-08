@@ -78,7 +78,7 @@ class SwitchedOutput(CoordinatorEntity, LightEntity):
         self._nmbr = output.nmbr
         self._state = None
         self._brightness = None
-        self._attr_unique_id = f"{self._module.uid}_{output.nmbr}"
+        self._attr_unique_id = f"{self._module.uid}_out_{output.nmbr}"
         if output.type < 0:
             # Entity will not show up
             self._attr_entity_registry_enabled_default = False

@@ -69,11 +69,11 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
         self._attr_swing_mode = None
         self._attr_swing_modes = None
         self._state = None
-        self._curr_hvac_mode = HVACMode.OFF
+        self._curr_hvac_mode = HVACMode.HEAT
         self._curr_temperature = module.sensors[1].value
         self._curr_humidity = module.sensors[2].value
         self._target_temperature = module.setvalues[0].value
-        self._attr_unique_id = f"{self._module.uid}_{self._attr_name}"
+        self._attr_unique_id = f"{self._module.uid}_climate"
         if self._module.climate_settings == 1:
             self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
             self._curr_hvac_mode = HVACMode.HEAT
@@ -89,7 +89,6 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
         else:
             self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
             self._curr_hvac_mode = HVACMode.HEAT
-
         self._attr_temperature_unit = UnitOfTemperature.CELSIUS
         self._attr_target_temperature_high = 25
         self._attr_target_temperature_low = 15
@@ -141,6 +140,11 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
     def target_temperature(self) -> float:
         """Return target temperature."""
         return self._target_temperature
+
+    @property
+    def current_hvac_mode(self) -> HVACMode:
+        """Return current hvac mode."""
+        return self._curr_hvac_mode
 
     @property
     def hvac_action(self) -> HVACAction:

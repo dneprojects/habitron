@@ -451,7 +451,7 @@ class PercSensor(HbtnSensor):
 
 
 class FrequencySensor(HbtnSensor):
-    """Representation of a percentage sensor."""
+    """Representation of a frequency sensor."""
 
     _attr_native_unit_of_measurement = "Hz"
     _attr_unit_of_measurement = "Hz"
