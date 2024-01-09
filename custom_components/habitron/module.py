@@ -247,6 +247,7 @@ class HbtnModule:
         """General update for Habitron modules."""
         self.status = mod_status
         self.mode = self.status[MStatIdx.MODE]
+        self.comm.grp_modes[self.group] = self.mode
 
         # Andere Logikelemente in self.logic aufnehmen?
         if len(self.logic) == 0:
