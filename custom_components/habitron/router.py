@@ -320,6 +320,7 @@ class HbtnRouter:
         if not (len(self.status) >= RoutIdx.MIRROR_STARTED):
             return
         self.mode0 = int(self.status[RoutIdx.MODE0])
+        self.comm.grp_modes[0] = self.mode0
         flags_state = int.from_bytes(
             self.status[RoutIdx.FLAG_GLOB : RoutIdx.FLAG_GLOB + 2],
             "little",

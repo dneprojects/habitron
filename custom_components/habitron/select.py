@@ -71,10 +71,7 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
         self.idx = idx
         self._module = module
         self._mode = hbtnr.mode0 if isinstance(module, int) else module.mode
-        self._mask = 0x03
-        self._value = self._mode & self._mask
         self._current_option = ""
-        self._enum = DaytimeMode
         self.hbtnr = hbtnr
         self._attr_translation_key = "habitron_mode"
 
@@ -119,11 +116,6 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
             # should not be the case
             return
         self._value = self._mode & self._mask
-        if self._value == 0:
-            self._value = self.hbtnr.mode0 & self._mask
-        if self._mode == 73:
-            self._value = 63
-            list(map(int, self._enum))
         if self._value not in self._enum._value2member_map_:
             return
         self._current_option = self._enum(self._value).name
@@ -149,10 +141,8 @@ class HbtnSelectDaytimeMode(HbtnMode):
         """Initialize daytime mode selector."""
         super().__init__(module, hbtnr, coord, idx)
         self._mask = 0x03
-        self._value = self._mode & self._mask
-        if self._value == 0:
-            self._value = self.hbtnr.mode0 & self._mask
         self._enum = DaytimeMode
+        self._value = self._mode & self._mask
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
         if isinstance(self._module, int):
             self._attr_name = "Group 0 daytime"
@@ -177,12 +167,11 @@ class HbtnSelectDaytimeMode(HbtnMode):
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
         mode_val = self._enum[option].value
-        set_val = 0x41 + mode_val
         if isinstance(self._module, int):
-            await self.hbtnr.comm.async_set_group_mode(self.hbtnr.id, 0, set_val)
+            await self.hbtnr.comm.async_set_daytime_mode(self.hbtnr.id, 0, mode_val)
         else:
             await self._module.comm.async_set_group_mode(
-                self._module.mod_addr, self._module.group, set_val
+                self._module.mod_addr, self._module.group, mode_val
             )
 
 
@@ -193,10 +182,8 @@ class HbtnSelectAlarmMode(HbtnMode):
         """Initialize alarm mode selector."""
         super().__init__(module, hbtnr, coord, idx)
         self._mask = 0x04
-        self._value = self._mode & self._mask
-        if self._value == 0:
-            self._value = self.hbtnr.mode0 & self._mask
         self._enum = AlarmMode
+        self._value = self._mode & self._mask
         self._current_option = self._enum(self._value).name
         if isinstance(self._module, int):
             self._attr_name = "Group 0 alarm"
@@ -207,12 +194,12 @@ class HbtnSelectAlarmMode(HbtnMode):
 
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
-        set_val = 0x40 if self._enum[option].value > 0 else 0x41
+        set_val = (self._enum[option].value > 0)
         if isinstance(self._module, int):
             # router
-            await self.hbtnr.comm.async_set_group_mode(self.hbtnr.id, 0, set_val)
+            await self.hbtnr.comm.async_set_alarm_mode(self.hbtnr.id, 0, set_val)
         else:
-            await self._module.comm.async_set_group_mode(
+            await self._module.comm.async_set_alarm_mode(
                 self._module.mod_addr, self._module.group, set_val
             )
 
@@ -224,10 +211,6 @@ class HbtnSelectGroupMode(HbtnMode):
         """Initialize group mode selector."""
         super().__init__(module, hbtnr, coord, idx)
         self._mask = 0xF0
-        self._value = self._mode & self._mask
-        if self._value == 0:
-            self._value = self.hbtnr.mode0 & self._mask
-
         group_enum = Enum(
             value="group_enum",
             names=[
@@ -242,6 +225,7 @@ class HbtnSelectGroupMode(HbtnMode):
             ],
         )
         self._enum = group_enum
+        self._value = self._mode & self._mask
         self._current_option = self._enum(self._value).name
         if isinstance(self._module, int):
             self._attr_name = "Group 0 mode"
