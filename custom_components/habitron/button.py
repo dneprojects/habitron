@@ -27,7 +27,7 @@ async def async_setup_entry(
         for vis_cmd in hbt_module.vis_commands:
             new_devices.append(VisCmdButton(vis_cmd, hbt_module))
         for mod_logic in hbt_module.logic:
-            if mod_logic.type > 0:
+            if mod_logic.type == 5:
                 new_devices.append(
                     CountUpButton(mod_logic, hbt_module)
                 )
@@ -253,9 +253,9 @@ class CountUpButton(ButtonEntity):
     def __init__(self, counter, module) -> None:
         """Initialize an Count button."""
         self._module = module
-        self._nmbr = counter.nmbr
+        self._nmbr = counter.nmbr + 1
         self._attr_name = f"Count up {self._nmbr}: {counter.name}"
-        self._attr_unique_id = f"{module.b_uid}_Cntup_" + str(counter.nmbr)
+        self._attr_unique_id = f"{module.uid}_Cntup_{self._nmbr}"
         self._attr_icon = "mdi:chevron-up-box-outline"
 
     @property
@@ -271,7 +271,7 @@ class CountUpButton(ButtonEntity):
     async def async_press(self) -> None:
         """Handle the button press."""
         await self._module.comm.async_inc_dec_counter(
-            self._module.mod_addr, self._nmbr+1, 1)
+            self._module.mod_addr, self._nmbr, 1)
 
 class CountDownButton(ButtonEntity):
     """Representation of a button to trigger a counter increment command."""
@@ -281,9 +281,9 @@ class CountDownButton(ButtonEntity):
     def __init__(self, counter, module) -> None:
         """Initialize an Count button."""
         self._module = module
-        self._nmbr = counter.nmbr
+        self._nmbr = counter.nmbr + 1
         self._attr_name = f"Count down {self._nmbr}: {counter.name}"
-        self._attr_unique_id = f"{module.b_uid}_Cntdown_" + str(counter.nmbr)
+        self._attr_unique_id = f"{module.uid}_Cntdown_{self._nmbr}"
         self._attr_icon = "mdi:chevron-down-box-outline"
 
 
@@ -300,4 +300,4 @@ class CountDownButton(ButtonEntity):
     async def async_press(self) -> None:
         """Handle the button press."""
         await self._module.comm.async_inc_dec_counter(
-            self._module.mod_addr, self._nmbr+1, 2)
+            self._module.mod_addr, self._nmbr, 2)
