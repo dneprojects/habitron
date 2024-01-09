@@ -91,6 +91,7 @@ class HbtnComm:
         self.update_suspended = False
         self.is_smhub = False  # will be set in get_smhub_info()
         self.info = self.get_smhub_info()
+        self.grp_modes = {}
 
     @property
     def com_ip(self) -> str:
@@ -217,7 +218,7 @@ class HbtnComm:
         """General function for communication via SmartIP."""
         sck = socket.socket()  # Create a socket object
         sck.connect((self._host, self._port))
-        sck.settimeout(5)  # 5 seconds
+        sck.settimeout(8)  # 8 seconds
         full_string = wrap_command(cmd_string)
         res = await async_send_receive(sck, full_string)
         sck.close()
@@ -229,7 +230,7 @@ class HbtnComm:
         try:
             sck = socket.socket()  # Create a socket object
             sck.connect((self._host, self._port))
-            sck.settimeout(30)  # 30 seconds
+            sck.settimeout(8)  # 8 seconds
             full_string = wrap_command(cmd_string)
             res = await async_send_receive(sck, full_string)
             sck.close()
@@ -308,9 +309,37 @@ class HbtnComm:
             return
         await self.router.update_system_status(sys_status)
 
-    async def async_set_group_mode(self, rtr_id, grp_no, mode) -> None:
+    async def async_set_group_mode(self, rtr_id, grp_no, new_mode) -> None:
         """Set mode for given group."""
         rtr_nmbr = int(rtr_id / 100)
+        cmd_str = SMHUB_COMMANDS["SET_GROUP_MODE"]
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        cmd_str = cmd_str.replace("<mod>", chr(grp_no))
+        cmd_str = cmd_str.replace("<arg1>", chr(new_mode))
+        self.send_only(cmd_str)
+
+    async def async_set_daytime_mode(self, rtr_id, grp_no, new_mode) -> None:
+        """Set mode for given group."""
+        rtr_nmbr = int(rtr_id / 100)
+        if new_mode == 1:
+            mode = 0x42
+        elif new_mode == 2:
+            mode = 0x43
+        else:
+            return
+        cmd_str = SMHUB_COMMANDS["SET_GROUP_MODE"]
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        cmd_str = cmd_str.replace("<mod>", chr(grp_no))
+        cmd_str = cmd_str.replace("<arg1>", chr(mode))
+        self.send_only(cmd_str)
+
+    async def async_set_alarm_mode(self, rtr_id, grp_no, alarm_mode) -> None:
+        """Set mode for given group."""
+        rtr_nmbr = int(rtr_id / 100)
+        if alarm_mode:
+            mode = 0x40
+        else:
+            mode = 0x41
         cmd_str = SMHUB_COMMANDS["SET_GROUP_MODE"]
         cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
         cmd_str = cmd_str.replace("<mod>", chr(grp_no))
