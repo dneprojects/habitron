@@ -74,7 +74,7 @@ class CollCmdButton(ButtonEntity):
     async def async_press(self) -> None:
         """Handle the button press."""
         await self._module.comm.async_call_coll_command(
-            self._module.mod_addr, self._nmbr
+            self._module.id, self._nmbr
         )
 
 
