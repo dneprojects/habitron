@@ -63,6 +63,9 @@ SMHUB_COMMANDS: Final[dict[str, str]] = {
     "COUNTR_UP": "\x1e\x10\2<rtr><mod>\1\0<cno>",
     "COUNTR_DOWN": "\x1e\x10\3<rtr><mod>\1\0<cno>",
     "COUNTR_VAL": "\x1e\x10\4<rtr><mod>\2\0<cno><val>",
+    "SET_RGB_OFF": "\x1e\x0c\x00<rtr><mod>\1\0<lno>",
+    "SET_RGB_ON": "\x1e\x0c\x01<rtr><mod>\1\0<lno>",
+    "SET_RGB_COL": "\x1e\x0c\x04<rtr><mod>\4\0<lno><rd><gn><bl>",
 }
 
 
@@ -388,6 +391,33 @@ class HbtnComm:
         cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
         cmd_str = cmd_str.replace("<arg1>", chr(nmbr))
         cmd_str = cmd_str.replace("<arg2>", chr(val))
+        self.send_only(cmd_str)
+
+    async def async_set_rgb_output(self, mod_id, nmbr, val) -> None:
+        """Turn RGB light on/off."""
+        rtr_nmbr = int(mod_id / 100)
+        mod_addr = int(mod_id - 100 * rtr_nmbr)
+        if val:
+            cmd_str = SMHUB_COMMANDS["SET_RGB_ON"]
+        else:
+            cmd_str = SMHUB_COMMANDS["SET_RGB_OFF"]
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
+        cmd_str = cmd_str.replace("<lno>", chr(nmbr))
+        self.send_only(cmd_str)
+        await self.async_set_output(mod_id, nmbr + 2, val)
+
+    async def async_set_rgbval(self, mod_id, nmbr, val) -> None:
+        """Send value to dimm output."""
+        rtr_nmbr = int(mod_id / 100)
+        mod_addr = int(mod_id - 100 * rtr_nmbr)
+        cmd_str = SMHUB_COMMANDS["SET_RGB_COL"]
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
+        cmd_str = cmd_str.replace("<lno>", chr(nmbr))
+        cmd_str = cmd_str.replace("<rd>", chr(val[0]))
+        cmd_str = cmd_str.replace("<gn>", chr(val[1]))
+        cmd_str = cmd_str.replace("<bl>", chr(val[2]))
         self.send_only(cmd_str)
 
     async def async_set_shutterpos(self, mod_id, nmbr, val) -> None:

@@ -25,15 +25,16 @@ async def async_setup_entry(
     new_devices = []
     for hbt_module in hbtn_rt.modules:
         for mod_led in hbt_module.leds:
-            led_name = "LED red"
-            led_no = mod_led.nmbr + 1
-            if mod_led.name.strip() == "":
-                mod_led.set_name(f"{led_name} {led_no}")
-            else:
-                mod_led.set_name(f"{led_name} {led_no}: {mod_led.name}")
-            new_devices.append(
-                SwitchedLed(mod_led, hbt_module, hbtn_cord, len(new_devices))
-            )
+            if mod_led.type == 0:
+                led_name = "LED red"
+                led_no = mod_led.nmbr + 1
+                if mod_led.name.strip() == "":
+                    mod_led.set_name(f"{led_name} {led_no}")
+                else:
+                    mod_led.set_name(f"{led_name} {led_no}: {mod_led.name}")
+                new_devices.append(
+                    SwitchedLed(mod_led, hbt_module, hbtn_cord, len(new_devices))
+                )
         flg_idx = 0
         for mod_flg in hbt_module.flags:
             if hbt_module.comm.is_smhub:
