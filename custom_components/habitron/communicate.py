@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import socket
 import struct
@@ -39,7 +40,6 @@ SMHUB_COMMANDS: Final[dict[str, str]] = {
     "START_MIRROR": "\x14\x28\1<rtr>\0\0\0",
     "STOP_MIRROR": "\x14\x28\2<rtr>\0\0\0",
     "CHECK_COMM_STATUS": "\x14\x64\0\0\0\0\0",
-    "SEND_NETWORK_INFO": "\x3c\x00\x04\0\0<len><iplen><ipv4><toklen><tok>",
     "SET_OUTPUT_ON": "\x1e\1\1<rtr><mod>\3\0<rtr><mod><arg1>",
     "SET_OUTPUT_OFF": "\x1e\1\2<rtr><mod>\3\0<rtr><mod><arg1>",
     "SET_DIMMER_VALUE": "\x1e\1\3<rtr><mod>\4\0<rtr><mod><arg1><arg2>",  # <Module><DimNo><DimVal>
@@ -48,16 +48,7 @@ SMHUB_COMMANDS: Final[dict[str, str]] = {
     "SET_SETPOINT_VALUE": "\x1e\2\1<rtr>\0\5\0<rtr><mod><arg1><arg2><arg3>",  # <Module><ValNo><ValL><ValH>
     "CALL_VIS_COMMAND": "\x1e\3\1\0\0\4\0<rtr><mod><arg2><arg3>",  # <Module><VisNoL><VisNoH> not tested
     "CALL_COLL_COMMAND": "\x1e\4\1<rtr><arg2>\0\0",  # <CmdNo>
-    "GET_LAST_IR_CODE": "\x32\2\1<rtr><mod>\0\0",
-    "SET_LOG_LEVEL": "\x3c\0\5<hdlr><lvl>\0\0",  # Set logging level of console/file handler
-    "RESTART_FORWARD_TABLE": "\x3c\1\1<rtr>\0\0\0",  # Weiterleitungstabelle löschen und -automatik starten
-    "GET_CURRENT_ERROR": "\x3c\1\2<rtr>\0\0\0",
-    "GET_LAST_ERROR": "\x3c\1\3<rtr>\0\0\0",
-    "REBOOT_ROUTER": "\x3c\1\4<rtr>\0\0\0",  #
-    "REBOOT_MODULE": "\x3c\3\1<rtr><mod>\0\0",  # <Module> or 0xFF for all modules
     "READ_MODULE_MIRR_STATUS": "\x64\1\5<rtr><mod>\0\0",  # <Module>
-    "RESTART_HUB": "\x3c\0\2<rtr>\0\0\0",
-    "REBOOT_HUB": "\x3c\0\3\0\0\0\0",
     "SET_FLAG_OFF": "\x1e\x0f\0<rtr><mod>\1\0<fno>",
     "SET_FLAG_ON": "\x1e\x0f\1<rtr><mod>\1\0<fno>",
     "COUNTR_UP": "\x1e\x10\2<rtr><mod>\1\0<cno>",
@@ -66,6 +57,17 @@ SMHUB_COMMANDS: Final[dict[str, str]] = {
     "SET_RGB_OFF": "\x1e\x0c\x00<rtr><mod>\1\0<lno>",
     "SET_RGB_ON": "\x1e\x0c\x01<rtr><mod>\1\0<lno>",
     "SET_RGB_COL": "\x1e\x0c\x04<rtr><mod>\4\0<lno><rd><gn><bl>",
+    "GET_LAST_IR_CODE": "\x32\2\1<rtr><mod>\0\0",
+    "REINIT_HUB": "\x3c\x00\x00<rtr><opr>\0\0",
+    "RESTART_HUB": "\x3c\x00\x02<rtr>\0\0\0",
+    "REBOOT_HUB": "\x3c\x00\x03\0\0\0\0",
+    "SEND_NETWORK_INFO": "\x3c\x00\x04\0\0<len><iplen><ipv4><toklen><tok>",
+    "SET_LOG_LEVEL": "\x3c\x00\x05<hdlr><lvl>\0\0",  # Set logging level of console/file handler
+    "RESTART_FORWARD_TABLE": "\x3c\x01\x01<rtr>\0\0\0",  # Weiterleitungstabelle löschen und -automatik starten
+    "GET_CURRENT_ERROR": "\x3c\x01\x02<rtr>\0\0\0",
+    "GET_LAST_ERROR": "\x3c\x01\x03<rtr>\0\0\0",
+    "REBOOT_ROUTER": "\x3c\x01\x04<rtr>\0\0\0",  #
+    "REBOOT_MODULE": "\x3c\x03\x01<rtr><mod>\0\0",  # <Module> or 0xFF for all modules
 }
 
 
@@ -76,8 +78,11 @@ class HbtnComm:
         """Init CommTest for connection test."""
         self._name = "HbtnComm"
         self._host_conf = config.data.__getitem__("habitron_host")
+        self.logger = logging.getLogger(__name__)
         self._host = get_host_ip(self._host_conf)
+        self.logger.info(f"Initializing hub, got own ip: {self._host}")  # noqa: G004
         self._port = 7777
+
         self._hass = hass
         self._config = config
         self._hostname = ""
@@ -86,6 +91,7 @@ class HbtnComm:
         self._hwtype = ""
         self._version = ""
         self._network_ip = hass.data["network"].adapters[0]["ipv4"][0]["address"]
+        self.logger.info(f"Got network ip: {self._network_ip}")  # noqa: G004
         # self._websck_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJjMWI1ZjgyNmUxMDg0MjFhYWFmNTZlYWQ0ZThkZGNiZSIsImlhdCI6MTY5NDUzNTczOCwiZXhwIjoyMDA5ODk1NzM4fQ.0YZWyuQn5DgbCAfEWZXbQZWaViNBsR4u__LjC4Zf2lY"
         # self._websck_token = ""
         self._loop = asyncio.get_event_loop()
@@ -153,6 +159,16 @@ class HbtnComm:
             .replace("<tok>", tok)
         )
         await self.async_send_command(cmd_str)
+        self.logger.info(f"Sent network info to hub (ip and token) - ip: {ipv4}")  # noqa: G004
+
+    async def reinit_hub(self, rtr_id, mode):
+        """Restart event server on hub."""
+        rtr_nmbr = int(rtr_id / 100)
+        cmd_str = SMHUB_COMMANDS["REINIT_HUB"].replace("<rtr>", chr(rtr_nmbr))
+        self.send_only(cmd_str.replace("<opr>", chr(mode)))
+        self.logger.info("Re-initialized hub")
+        return "OK"
+
 
     def set_router(self, rtr) -> None:
         """Register the router instance."""
@@ -178,7 +194,7 @@ class HbtnComm:
             self._mac = info["mac"]
             self._hostname = info["hostname"]
         else:
-            # Smart Gateway
+            # Smart Hub
             sck = socket.socket()  # Create a socket object
             try:
                 sck.connect((self._host, self._port))
@@ -196,6 +212,10 @@ class HbtnComm:
             self._hostip = info["hardware"]["network"]["ip"]
             self._hostname = info["hardware"]["network"]["host"]
             self._mac = info["hardware"]["network"]["lan mac"]
+        self.logger.debug(f"SmartHub info - host name: {self._hostname}")  # noqa: G004
+        self.logger.debug(f"SmartHub info - ip: {self._hostip}")  # noqa: G004
+        self.logger.debug(f"SmartHub info - version: {self._version}")  # noqa: G004
+        self.logger.debug(f"SmartHub info - hw type: {self._hwtype}")  # noqa: G004
         return info
 
     async def get_smr(self, rtr_id) -> bytes:

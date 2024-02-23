@@ -374,10 +374,12 @@ class ColorLed(CoordinatorEntity, LightEntity):
         self._rgb_color = kwargs.get(ATTR_RGB_COLOR, self._rgb_color)
         self._output.value = [1, self._rgb_color[0], self._rgb_color[1], self._rgb_color[2]]
         self._brightness = kwargs.get(ATTR_BRIGHTNESS, self._brightness)
+        dimmed_col = self._rgb_color
+        dimmed_col = round(dimmed_col[0] * self._brightness / 256), round(dimmed_col[1] * self._brightness / 256), round(dimmed_col[2] * self._brightness / 256)
         await self._module.comm.async_set_rgbval(
             self._module.mod_addr,
             self._nmbr - self._out_offs + 1,
-            self._rgb_color,
+            dimmed_col,
         )
         await self._module.comm.async_set_rgb_output(
             self._module.mod_addr, self._nmbr + 1, 1
