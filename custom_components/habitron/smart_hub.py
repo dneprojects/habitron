@@ -118,10 +118,14 @@ class SmartHub:
     async def initialize(self, hass: HomeAssistant, config: ConfigEntry) -> bool:
         """Initialize SmartHub instance."""
         if self.is_smhub:
+            await self.comm.reinit_hub(100, 0)  # force Opr mode to stop
             await self.comm.send_network_info(config.data["websock_token"])
-        await self.comm.async_stop_mirror(1)
+        else:
+            await self.comm.async_stop_mirror(1)
         self.router = hbtr(hass, config, self)
         await self.router.initialize()
+        if self.is_smhub:
+            await self.comm.reinit_hub(100, 1)  # restart event server
 
     async def restart(self, rt_id):
         """Restart hub."""
