@@ -164,7 +164,7 @@ class HbtnRouter:
                 self.modules.append(
                     hbtkey(mod_desc, self.hass, self.config, self.b_uid, self.comm)
                 )
-            elif (mod_desc.mtype[0] == 30): # only ekey: & (mod_desc.mtype[1] == 1)
+            elif mod_desc.mtype[0] == 30:  # only ekey: & (mod_desc.mtype[1] == 1)
                 self.modules.append(
                     hbtkey(mod_desc, self.hass, self.config, self.b_uid, self.comm)
                 )
@@ -314,10 +314,12 @@ class HbtnRouter:
 
     async def update_system_status(self, sys_status) -> None:
         """Distribute module status to all modules and update self status."""
+        self.sys_status = sys_status
         # update not always
         self.smhub.update()
         self.status = await self.comm.async_get_router_status(self.id)
         if not (len(self.status) >= RoutIdx.MIRROR_STARTED):
+            self.logger.warning(f"Router status too short, length: {len(self.status)}")  # noqa: G004
             return
         self.mode0 = int(self.status[RoutIdx.MODE0])
         self.comm.grp_modes[0] = self.mode0
@@ -357,7 +359,6 @@ class HbtnRouter:
         if not (self._mirror_started):
             await self.comm.async_start_mirror(self.id)
 
-        self.sys_status = sys_status
         for m_idx in range(len(self.modules)):
             mod_status = self.sys_status[
                 m_idx * MStatIdx.END : (m_idx + 1) * MStatIdx.END
