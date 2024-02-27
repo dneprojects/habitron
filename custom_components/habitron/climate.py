@@ -52,7 +52,11 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
 
     _attr_has_entity_name = True
 
-    _attr_supported_features = ClimateEntityFeature.TARGET_TEMPERATURE
+    _attr_supported_features = [
+        ClimateEntityFeature.TURN_ON,
+        ClimateEntityFeature.TURN_OFF,
+        ClimateEntityFeature.TARGET_TEMPERATURE,
+    ]
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
 
     def __init__(self, module, coord, idx) -> None:

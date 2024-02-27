@@ -275,7 +275,11 @@ class HbtnModule:
         m_addr = self._addr - int(self._addr / 100) * 100
         for m_idx in range(no_mods):
             if int(sys_status[m_idx * stat_len + MStatIdx.ADDR]) == m_addr:
+                self.logger.info(f"Found module {m_addr}, extracting status")  # noqa: G004
                 break
+        self.logger.info(
+            f"Extract status could not find module {m_addr}: status length: {len(sys_status)}"  # noqa: G004
+        )
         return sys_status[m_idx * stat_len : (m_idx + 1) * stat_len]
 
     def set_default_names(self, mod_entities, def_name: str) -> None:
