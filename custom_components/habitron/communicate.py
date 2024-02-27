@@ -166,9 +166,8 @@ class HbtnComm:
         rtr_nmbr = int(rtr_id / 100)
         cmd_str = SMHUB_COMMANDS["REINIT_HUB"].replace("<rtr>", chr(rtr_nmbr))
         self.send_only(cmd_str.replace("<opr>", chr(mode)))
-        self.logger.info("Re-initialized hub")
+        self.logger.info(f"Re-initialized hub with mode {mode}")  # noqa: G004
         return "OK"
-
 
     def set_router(self, rtr) -> None:
         """Register the router instance."""
@@ -262,7 +261,6 @@ class HbtnComm:
             # print(f"Error connecting to Smart IP: {err_msg}")
             pass
 
-
     async def async_get_router_status(self, rtr_id) -> bytes:
         """Get router status."""
         rtr_nmbr = int(rtr_id / 100)
@@ -327,8 +325,12 @@ class HbtnComm:
         else:
             sys_status = await self.get_compact_status(self.router.id)
         if sys_status == b"":
+            # self.logger.debug("No changes in compact system status, update skipped")
             return
         elif len(sys_status) < 10:
+            self.logger.warning(
+                f"Received compact system status too short, length: {len(sys_status)}"  # noqa: G004
+            )
             return
         await self.router.update_system_status(sys_status)
 
@@ -726,7 +728,9 @@ class HbtnComm:
                         module.covers[c_idx].value = module.status[
                             MStatIdx.ROLL_POS + c_idx
                         ]
-                        module.covers[c_idx].tilt = module.status[MStatIdx.BLAD_POS + c_idx]
+                        module.covers[c_idx].tilt = module.status[
+                            MStatIdx.BLAD_POS + c_idx
+                        ]
                         await module.covers[c_idx].handle_upd_event()
             elif evnt == HaEvents.FINGER:
                 # Ekey input detected
@@ -754,7 +758,6 @@ class HbtnComm:
                 await module.flags[arg1].handle_upd_event()
         except Exception as err_msg:
             print(f"Error handling habitron event: {err_msg}")
-
 
 
 async def test_connection(host_name) -> bool:
