@@ -164,10 +164,6 @@ class HbtnRouter:
                 self.modules.append(
                     hbtkey(mod_desc, self.hass, self.config, self.b_uid, self.comm)
                 )
-            elif mod_desc.mtype[0] == 30:  # only ekey: & (mod_desc.mtype[1] == 1)
-                self.modules.append(
-                    hbtkey(mod_desc, self.hass, self.config, self.b_uid, self.comm)
-                )
             else:
                 continue  # Prevent dealing with unknown modules
                 # self.modules.append(hbtm(mod_desc, self.hass, self.config, self.comm))
