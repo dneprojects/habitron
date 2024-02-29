@@ -46,8 +46,8 @@ SMHUB_COMMANDS: Final[dict[str, str]] = {
     "SET_SHUTTER_POSITION": "\x1e\1\4<rtr>\0\5\0<rtr><mod>\1<arg1><arg2>",  # <Module><RollNo><RolVal>
     "SET_BLIND_TILT": "\x1e\1\4<rtr>\0\5\0<rtr><mod>\2<arg1><arg2>",
     "SET_SETPOINT_VALUE": "\x1e\2\1<rtr>\0\5\0<rtr><mod><arg1><arg2><arg3>",  # <Module><ValNo><ValL><ValH>
-    "CALL_VIS_COMMAND": "\x1e\3\1\0\0\4\0<rtr><mod><arg2><arg3>",  # <Module><VisNoL><VisNoH> not tested
-    "CALL_COLL_COMMAND": "\x1e\4\1<rtr><arg2>\0\0",  # <CmdNo>
+    "CALL_VIS_COMMAND": "\x1e\3\1\0\0\4\0<rtr><mod><visl><vish>",  # <Module><VisNoL><VisNoH> not tested
+    "CALL_COLL_COMMAND": "\x1e\4\1<rtr><cno>\0\0",  # <CmdNo>
     "READ_MODULE_MIRR_STATUS": "\x64\1\5<rtr><mod>\0\0",  # <Module>
     "SET_FLAG_OFF": "\x1e\x0f\0<rtr><mod>\1\0<fno>",
     "SET_FLAG_ON": "\x1e\x0f\1<rtr><mod>\1\0<fno>",
@@ -104,27 +104,27 @@ class HbtnComm:
 
     @property
     def com_ip(self) -> str:
-        """IP of SmartIP."""
+        """IP of SmartHub."""
         return self._hostip
 
     @property
     def com_port(self) -> str:
-        """Port for SmartIP."""
+        """Port for SmartHub."""
         return self._port
 
     @property
     def com_mac(self) -> str:
-        """Mac address for SmartIP."""
+        """Mac address for SmartHub."""
         return self._mac
 
     @property
     def com_version(self) -> str:
-        """Firmware version of SmartIP."""
+        """Firmware version of SmartHub."""
         return self._version
 
     @property
     def com_hwtype(self) -> str:
-        """Firmware version of SmartIP."""
+        """Firmware version of SmartHub."""
         return self._hwtype
 
     async def set_host(self, host: str):
@@ -174,17 +174,17 @@ class HbtnComm:
         self.router = rtr
 
     async def get_smhub_version(self) -> bytes:
-        """Query of SmartIP firmware."""
+        """Query of SmartHub firmware."""
         return await self.async_send_command(SMHUB_COMMANDS["GET_SMHUB_FIRMWARE"])
 
     def get_smhub_info(self):
-        """Get basic infos of SmartIP."""
+        """Get basic infos of SmartHub."""
         smhub_info = query_smarthub(self._host)  # get info from query port
         if smhub_info == "":
             return ""
         self.is_smhub = smhub_info["serial"] == "RBPI"
         if not self.is_smhub:
-            # Smart IP
+            # Smart Hub
             info = smhub_info
             self._version = info["version"]
             self._serial = info["serial"]
@@ -237,18 +237,22 @@ class HbtnComm:
         sck.close()
 
     async def async_send_command(self, cmd_string: str) -> bytes:
-        """General function for communication via SmartIP."""
-        sck = socket.socket()  # Create a socket object
-        sck.connect((self._host, self._port))
-        sck.settimeout(8)  # 8 seconds
-        full_string = wrap_command(cmd_string)
-        res = await async_send_receive(sck, full_string)
-        sck.close()
-        resp_bytes = res[0]
-        return resp_bytes
+        """General function for communication via SmartHub."""
+        try:
+            sck = socket.socket()  # Create a socket object
+            sck.connect((self._host, self._port))
+            sck.settimeout(8)  # 8 seconds
+            full_string = wrap_command(cmd_string)
+            res = await async_send_receive(sck, full_string)
+            sck.close()
+            resp_bytes = res[0]
+            return resp_bytes
+        except TimeoutError as err_msg:  # noqa: F841
+            sck.close()
+            self.logger.error(f"Error connecting to Smart Hub: {err_msg}")  # noqa: G004
 
     async def async_send_command_crc(self, cmd_string: str):
-        """General function for communication via SmartIP, returns additional crc."""
+        """General function for communication via SmartHub, returns additional crc."""
         try:
             sck = socket.socket()  # Create a socket object
             sck.connect((self._host, self._port))
@@ -258,8 +262,8 @@ class HbtnComm:
             sck.close()
             return res[0], res[1]
         except TimeoutError as err_msg:  # noqa: F841
-            # print(f"Error connecting to Smart IP: {err_msg}")
-            pass
+            sck.close()
+            self.logger.error(f"Error connecting to Smart Hub: {err_msg}")  # noqa: G004
 
     async def async_get_router_status(self, rtr_id) -> bytes:
         """Get router status."""
@@ -514,8 +518,8 @@ class HbtnComm:
         lo_no = nmbr - 256 * hi_no
         cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
         cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
-        cmd_str = cmd_str.replace("<arg2>", chr(hi_no))
-        cmd_str = cmd_str.replace("<arg3>", chr(lo_no))
+        cmd_str = cmd_str.replace("<vish>", chr(hi_no))
+        cmd_str = cmd_str.replace("<visl>", chr(lo_no))
         self.send_only(cmd_str)
 
     async def async_call_coll_command(self, rtr_id, nmbr) -> None:
@@ -523,7 +527,7 @@ class HbtnComm:
         rtr_nmbr = int(rtr_id / 100)
         cmd_str = SMHUB_COMMANDS["CALL_COLL_COMMAND"]
         cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        cmd_str = cmd_str.replace("<arg1>", chr(nmbr))
+        cmd_str = cmd_str.replace("<cno>", chr(nmbr))
         self.send_only(cmd_str)
 
     async def get_mirror_status(self, mod_desc) -> bytes:
@@ -684,9 +688,8 @@ class HbtnComm:
         cmd_str = SMHUB_COMMANDS["REBOOT_HUB"]
         self.send_only(cmd_str)
 
-    async def module_restart(self, rtr_id, mod_nmbr: int) -> None:
+    async def module_restart(self, rtr_nmbr: int, mod_nmbr: int) -> None:
         """Restart a single module or all with arg 0xFF or router if arg 0."""
-        rtr_nmbr = int(rtr_id / 100)
         if mod_nmbr > 0:
             # module restart
             cmd_str = SMHUB_COMMANDS["REBOOT_MODULE"]
@@ -757,11 +760,11 @@ class HbtnComm:
                 module.flags[arg1].value = int(arg2 > 0)
                 await module.flags[arg1].handle_upd_event()
         except Exception as err_msg:
-            print(f"Error handling habitron event: {err_msg}")
+            self.logger.warning(f"Error handling habitron event: {err_msg}")  # noqa: G004
 
 
 async def test_connection(host_name) -> bool:
-    """Test connectivity to SmartIP is OK."""
+    """Test connectivity to SmartHub is OK."""
     port = 7777
     try:
         host = get_host_ip(host_name)
@@ -795,7 +798,7 @@ def get_host_ip(host_name: str) -> str:
 
 
 def send_receive(sck, cmd_str: str) -> bytes:
-    """Send string to SmartIP and wait for response with timeout."""
+    """Send string to SmartHub and wait for response with timeout."""
     try:
         sck.send(cmd_str.encode("iso8859-1"))  # Send command
 
@@ -814,7 +817,7 @@ def send_receive(sck, cmd_str: str) -> bytes:
 
 
 async def async_send_receive(sck, cmd_str: str) -> bytes:
-    """Send string to SmartIP and wait for response with timeout."""
+    """Send string to SmartHub and wait for response with timeout."""
     try:
         sck.send(cmd_str.encode("iso8859-1"))  # Send command
 
@@ -878,10 +881,11 @@ def get_own_ip():
 
 
 def discover_smarthubs():
-    """Discover SmartIP and SmartServer hardware on the network."""
+    """Discover SmartHub and SmartServer hardware on the network."""
     smhub_port = 30718
     own_ip = get_own_ip()
     timeout = 2
+    logger = logging.getLogger(__name__)
 
     req_header_data = [0x00, 0x00, 0x00, 0xF6]
     req_header = struct.pack("B" * len(req_header_data), *req_header_data)
@@ -904,7 +908,7 @@ def discover_smarthubs():
             response, address_info = network_socket.recvfrom(1024)
 
             smhub_ip = address_info[0]
-            # print(f"SmartIP found at address {smhub_ip}")
+            logger.info(f"SmartHub found at address {smhub_ip}")  # noqa: G004
 
             if response[0:4] == resp_header and smhub_ip != "0.0.0.0":
                 smhub_version = f"{response[7]}.{response[6]}.{response[5]}"
@@ -925,9 +929,8 @@ def discover_smarthubs():
 
             else:
                 pass
-                # print(("Response: %s (%d)" % ([response], len(response)), address_info))
 
-    except socket.timeout:
+    except TimeoutError:
         pass
 
     network_socket.close()
@@ -983,7 +986,7 @@ def query_smarthub(smhub_ip):
                 "mac": smhub_mac,
                 "ip": smhub_ip,
             }
-    except socket.timeout:
+    except TimeoutError:
         smartip_info = ""
 
     network_socket.close()

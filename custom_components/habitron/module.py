@@ -296,7 +296,8 @@ class HbtnModule:
 
     async def async_reset(self) -> None:
         """Call reset command for self."""
-        self.comm.module_restart(self._addr)
+        rt_nmbr = int(self._addr / 100)
+        await self.comm.module_restart(rt_nmbr, self.raddr)
 
 
 class SmartController(HbtnModule):
