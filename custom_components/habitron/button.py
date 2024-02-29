@@ -7,7 +7,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, LOGIC_INP_OFFS
+from .const import DOMAIN
 
 
 async def async_setup_entry(
@@ -17,7 +17,6 @@ async def async_setup_entry(
 ) -> None:
     """Add button for passed config_entry in HA."""
     hbtn_rt = hass.data[DOMAIN][entry.entry_id].router
-    hbtn_cord = hbtn_rt.coord
 
     new_devices = []
 
@@ -28,11 +27,8 @@ async def async_setup_entry(
             new_devices.append(VisCmdButton(vis_cmd, hbt_module))
         for mod_logic in hbt_module.logic:
             if mod_logic.type == 5:
-                new_devices.append(
-                    CountUpButton(mod_logic, hbt_module)
-                )
-                new_devices.append(
-                    CountDownButton(mod_logic, hbt_module))
+                new_devices.append(CountUpButton(mod_logic, hbt_module))
+                new_devices.append(CountDownButton(mod_logic, hbt_module))
         new_devices.append(RestartButton(hbt_module))
     # Add router commands as buttons
     for coll_cmd in hbtn_rt.coll_commands:
@@ -73,9 +69,7 @@ class CollCmdButton(ButtonEntity):
 
     async def async_press(self) -> None:
         """Handle the button press."""
-        await self._module.comm.async_call_coll_command(
-            self._module.id, self._nmbr
-        )
+        await self._module.comm.async_call_coll_command(self._module.id, self._nmbr)
 
 
 class DirCmdButton(ButtonEntity):
@@ -84,13 +78,11 @@ class DirCmdButton(ButtonEntity):
     _attr_has_entity_name = True
 
     def __init__(self, dir_cmd, module) -> None:
-        """Initialize an VisCommand."""
+        """Initialize an DirectCommand."""
         self._module = module
         self._nmbr = dir_cmd.nmbr
         self._attr_name = f"DirectCmd {self._nmbr}: {dir_cmd.name}"
-        self._attr_unique_id = (
-            f"Mod_{self._module.uid}_DCmd_{self._nmbr}"
-        )
+        self._attr_unique_id = f"Mod_{self._module.uid}_DCmd_{self._nmbr}"
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -121,9 +113,7 @@ class VisCmdButton(ButtonEntity):
         no_hi = int(self._nmbr / 256)
         no_lo = self._nmbr - no_hi * 256
         self._attr_name = f"VisCmd {no_hi}/{no_lo}: {vis_cmd.name}"
-        self._attr_unique_id = (
-            f"Mod_{self._module.uid}_VCmd_{self._nmbr}"
-        )
+        self._attr_unique_id = f"Mod_{self._module.uid}_VCmd_{self._nmbr}"
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -192,6 +182,7 @@ class RestartAllButton(ButtonEntity):
     async def async_press(self) -> None:
         """Handle the button press."""
         await self._router.async_reset_all_modules()
+
 
 class RestartHubButton(ButtonEntity):
     """Representation of a button to trigger a hub restart."""
@@ -271,7 +262,9 @@ class CountUpButton(ButtonEntity):
     async def async_press(self) -> None:
         """Handle the button press."""
         await self._module.comm.async_inc_dec_counter(
-            self._module.mod_addr, self._nmbr, 1)
+            self._module.mod_addr, self._nmbr, 1
+        )
+
 
 class CountDownButton(ButtonEntity):
     """Representation of a button to trigger a counter increment command."""
@@ -286,7 +279,6 @@ class CountDownButton(ButtonEntity):
         self._attr_unique_id = f"{module.uid}_Cntdown_{self._nmbr}"
         self._attr_icon = "mdi:chevron-down-box-outline"
 
-
     @property
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
@@ -300,4 +292,5 @@ class CountDownButton(ButtonEntity):
     async def async_press(self) -> None:
         """Handle the button press."""
         await self._module.comm.async_inc_dec_counter(
-            self._module.mod_addr, self._nmbr, 2)
+            self._module.mod_addr, self._nmbr, 2
+        )
