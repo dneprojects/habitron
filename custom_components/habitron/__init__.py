@@ -1,14 +1,11 @@
 """The Habitron integration."""
 from __future__ import annotations
 
-import asyncio
-
 import voluptuous as vol
 
 from homeassistant import exceptions
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceEntry
 
 from .communicate import TimeoutException
@@ -45,10 +42,7 @@ SERVICE_HUB_RESTART_SCHEMA = vol.Schema(
         vol.Required(ROUTER_NMBR, default=1): int,
     }
 )
-SERVICE_HUB_REBOOT_SCHEMA = vol.Schema(
-    {
-    }
-)
+SERVICE_HUB_REBOOT_SCHEMA = vol.Schema({})
 SERVICE_MOD_RESTART_SCHEMA = vol.Schema(
     {
         vol.Required(ROUTER_NMBR, default=1): int,
@@ -146,13 +140,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         arg2 = call.data.get(EVNT_ARG2)
         for hub in smhub.hass.data["habitron"]:
             if smhub.hass.data["habitron"][hub].host == hub_id:
-                await smhub.hass.data["habitron"][hub].comm.update_entity(hub_id, rtr_id, mod_id, evnt, arg1, arg2)
+                await smhub.hass.data["habitron"][hub].comm.update_entity(
+                    hub_id, rtr_id, mod_id, evnt, arg1, arg2
+                )
                 break
 
     smhub = SmartHub(hass, entry)
     try:
         await smhub.initialize(hass, entry)
-    except (asyncio.TimeoutError, TimeoutException) as ex:
+    except (TimeoutError, TimeoutException) as ex:
         raise ConfigEntryNotReady("Timeout while connecting to SmartIP") from ex
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = smhub

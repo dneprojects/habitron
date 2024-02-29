@@ -165,9 +165,10 @@ class HbtnComm:
         """Restart event server on hub."""
         rtr_nmbr = int(rtr_id / 100)
         cmd_str = SMHUB_COMMANDS["REINIT_HUB"].replace("<rtr>", chr(rtr_nmbr))
-        self.send_only(cmd_str.replace("<opr>", chr(mode)))
+        cmd_str = cmd_str.replace("<opr>", chr(mode))
+        resp = await self.async_send_command(cmd_str)
         self.logger.info(f"Re-initialized hub with mode {mode}")  # noqa: G004
-        return "OK"
+        return resp
 
     def set_router(self, rtr) -> None:
         """Register the router instance."""
