@@ -166,7 +166,7 @@ class HbtnComm:
         rtr_nmbr = int(rtr_id / 100)
         cmd_str = SMHUB_COMMANDS["REINIT_HUB"].replace("<rtr>", chr(rtr_nmbr))
         cmd_str = cmd_str.replace("<opr>", chr(mode))
-        resp = await self.async_send_command(cmd_str, 15)  # extended time-out 15 s
+        resp = await self.async_send_command(cmd_str, 20)  # extended time-out 20 s
         self.logger.info(f"Re-initialized hub with mode {mode}")  # noqa: G004
         return resp
 
