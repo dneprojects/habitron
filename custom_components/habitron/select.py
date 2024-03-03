@@ -219,9 +219,9 @@ class HbtnSelectGroupMode(HbtnMode):
                 ("sleeping", 48),
                 ("update", 63),
                 ("config", 64),
-                ("vacation", 80),
-                (self.hbtnr.user1_name, 96),
-                (self.hbtnr.user2_name, 112),
+                (self.hbtnr.user1_name, 80),
+                (self.hbtnr.user2_name, 96),
+                ("vacation", 112),
             ],
         )
         self._enum = group_enum
