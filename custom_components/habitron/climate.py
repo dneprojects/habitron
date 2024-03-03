@@ -51,13 +51,13 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
     """Representation of habitron climate entities."""
 
     _attr_has_entity_name = True
-
-    _attr_supported_features = [
-        ClimateEntityFeature.TURN_ON,
-        ClimateEntityFeature.TURN_OFF,
-        ClimateEntityFeature.TARGET_TEMPERATURE,
-    ]
+    _attr_supported_features = (
+        ClimateEntityFeature.TURN_ON
+        | ClimateEntityFeature.TURN_OFF
+        | ClimateEntityFeature.TARGET_TEMPERATURE
+    )
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
+    _enable_turn_on_off_backwards_compatibility = False
 
     def __init__(self, module, coord, idx) -> None:
         """Initialize an HbtnLight, pass coordinator to CoordinatorEntity."""

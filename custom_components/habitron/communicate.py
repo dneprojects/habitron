@@ -166,7 +166,7 @@ class HbtnComm:
         rtr_nmbr = int(rtr_id / 100)
         cmd_str = SMHUB_COMMANDS["REINIT_HUB"].replace("<rtr>", chr(rtr_nmbr))
         cmd_str = cmd_str.replace("<opr>", chr(mode))
-        resp = await self.async_send_command(cmd_str)
+        resp = await self.async_send_command(cmd_str, 15)  # extended time-out 15 s
         self.logger.info(f"Re-initialized hub with mode {mode}")  # noqa: G004
         return resp
 
@@ -237,12 +237,12 @@ class HbtnComm:
         sck.send(full_string.encode("iso8859-1"))  # Send command
         sck.close()
 
-    async def async_send_command(self, cmd_string: str) -> bytes:
+    async def async_send_command(self, cmd_string: str, time_out_sec=8) -> bytes:
         """General function for communication via SmartHub."""
         try:
             sck = socket.socket()  # Create a socket object
             sck.connect((self._host, self._port))
-            sck.settimeout(8)  # 8 seconds
+            sck.settimeout(time_out_sec)  # 8 seconds
             full_string = wrap_command(cmd_string)
             res = await async_send_receive(sck, full_string)
             sck.close()
