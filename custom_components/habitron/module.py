@@ -318,7 +318,7 @@ class SmartController(HbtnModule):
         self.outputs = [IfDescriptor("", i, 1, 0) for i in range(15)]
         self.covers = [IfDescriptorC("", -1, 0, 0, 0) for i in range(5)]
         self.dimmers = [IfDescriptor("", i, -1, 0) for i in range(2)]
-        self.leds = [IfDescriptor("", i, 0, 0) for i in range(8)]
+        self.leds = [IfDescriptor("", i, 0, 0) for i in range(9)]
         self.diags = [IfDescriptor("", i, 0, 0) for i in range(2)]
         self.setvalues = [IfDescriptor("Set temperature", 0, 2, 20.0)]
         self.setvalues.append(IfDescriptor("Set temperature 2", 1, 2, 20.0))
@@ -378,7 +378,7 @@ class SmartController(HbtnModule):
         self.dimmers[0].value = int(self.status[MStatIdx.DIM_1])
         self.dimmers[1].value = int(self.status[MStatIdx.DIM_2])
 
-        led_state = int(self.status[MStatIdx.OUT_17_24])
+        led_state = out_state >> 15
         for led in self.leds:
             led.value = int((led_state & (0x01 << led.nmbr)) > 0)
 
@@ -482,7 +482,7 @@ class SmartControllerMini(HbtnModule):
             outpt.value = int((out_state & (0x01 << outpt.nmbr)) > 0)
 
         # led_state = int(self.status[MStatIdx.OUT_17_24])
-        led_state = out_state >> 2
+        led_state = out_state >> 2  # Led corner 1 = out 3
         for led in self.leds:
             led.value[0] = int((led_state & (0x01 << led.nmbr)) > 0)
 

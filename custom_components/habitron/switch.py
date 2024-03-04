@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, GLOB_FLAG_OFFS, LOC_FLAG_OFFS
+from .const import DOMAIN
 
 
 async def async_setup_entry(
@@ -26,8 +26,12 @@ async def async_setup_entry(
     for hbt_module in hbtn_rt.modules:
         for mod_led in hbt_module.leds:
             if mod_led.type == 0:
-                led_name = "LED red"
-                led_no = mod_led.nmbr + 1
+                if mod_led.nmbr == 0:
+                    led_name = "LED light"
+                    led_no = ""
+                else:
+                    led_name = "LED red"
+                    led_no = mod_led.nmbr
                 if mod_led.name.strip() == "":
                     mod_led.set_name(f"{led_name} {led_no}")
                 else:
@@ -42,9 +46,7 @@ async def async_setup_entry(
                     HbtnFlagPush(mod_flg, hbt_module, hbtn_cord, flg_idx)
                 )
             else:
-                new_devices.append(
-                    HbtnFlag(mod_flg, hbt_module, hbtn_cord, flg_idx)
-                )
+                new_devices.append(HbtnFlag(mod_flg, hbt_module, hbtn_cord, flg_idx))
             flg_idx += 1
     flg_idx = 0
     for rt_flg in hbtn_rt.flags:
@@ -78,7 +80,10 @@ class SwitchedLed(CoordinatorEntity, SwitchEntity):
         self._state = None
         self._brightness = None
         self._attr_unique_id = f"{self._module.uid}_led_{self.idx}"
-        self._attr_icon = "mdi:circle-outline"
+        if led.nmbr == 0:
+            self._attr_icon = "mdi:circle-medium"
+        else:
+            self._attr_icon = "mdi:circle-outline"
 
     async def async_added_to_hass(self) -> None:
         """Run when this Entity has been added to HA."""
@@ -111,9 +116,14 @@ class SwitchedLed(CoordinatorEntity, SwitchEntity):
         """Return status of output."""
         self._attr_state = self._module.leds[self._nmbr].value == 1
         if self._attr_state:
-            self._attr_icon = "mdi:circle-double"
-        else:
+            if self.nmbr:
+                self._attr_icon = "mdi:circle-double"
+            else:
+                self._attr_icon = "mdi:white-balance-sunny"
+        elif self.nmbr:
             self._attr_icon = "mdi:circle-outline"
+        else:
+            self._attr_icon = "mdi:circle-medium"
         return self._attr_state
 
     @callback
@@ -122,22 +132,28 @@ class SwitchedLed(CoordinatorEntity, SwitchEntity):
         self._attr_is_on = self._module.leds[self._nmbr].value == 1
         self._attr_state = self._attr_is_on
         if self._attr_is_on:
-            self._attr_icon = "mdi:circle-double"
-        else:
+            if self.nmbr:
+                self._attr_icon = "mdi:circle-double"
+            else:
+                self._attr_icon = "mdi:white-balance-sunny"
+        elif self.nmbr:
             self._attr_icon = "mdi:circle-outline"
+        else:
+            self._attr_icon = "mdi:circle-medium"
         self.async_write_ha_state()
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Instruct the led to turn on."""
         await self._module.comm.async_set_output(
-            self._module.mod_addr, self._nmbr + len(self._module.outputs) + 2, 1
+            self._module.mod_addr, self._nmbr + len(self._module.outputs) + 1, 1
         )
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Instruct the led to turn off."""
         await self._module.comm.async_set_output(
-            self._module.mod_addr, self._nmbr + len(self._module.outputs) + 2, 0
+            self._module.mod_addr, self._nmbr + len(self._module.outputs) + 1, 0
         )
+
 
 class HbtnFlag(CoordinatorEntity, SwitchEntity):
     """Module switch local flag."""
@@ -204,6 +220,7 @@ class HbtnFlag(CoordinatorEntity, SwitchEntity):
         else:
             mod_addr = self._module.mod_addr
         await self._module.comm.async_set_flag(mod_addr, self._nmbr, 0)
+
 
 class HbtnFlagPush(HbtnFlag):
     """Representation of habitron flag entities for push update."""
