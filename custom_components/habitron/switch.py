@@ -27,7 +27,7 @@ async def async_setup_entry(
         for mod_led in hbt_module.leds:
             if mod_led.type == 0:
                 if mod_led.nmbr == 0:
-                    led_name = "LED light"
+                    led_name = "LED white"
                     led_no = ""
                 else:
                     led_name = "LED red"
@@ -116,11 +116,11 @@ class SwitchedLed(CoordinatorEntity, SwitchEntity):
         """Return status of output."""
         self._attr_state = self._module.leds[self._nmbr].value == 1
         if self._attr_state:
-            if self.nmbr:
+            if self._nmbr:
                 self._attr_icon = "mdi:circle-double"
             else:
                 self._attr_icon = "mdi:white-balance-sunny"
-        elif self.nmbr:
+        elif self._nmbr:
             self._attr_icon = "mdi:circle-outline"
         else:
             self._attr_icon = "mdi:circle-medium"
@@ -132,11 +132,11 @@ class SwitchedLed(CoordinatorEntity, SwitchEntity):
         self._attr_is_on = self._module.leds[self._nmbr].value == 1
         self._attr_state = self._attr_is_on
         if self._attr_is_on:
-            if self.nmbr:
+            if self._nmbr:
                 self._attr_icon = "mdi:circle-double"
             else:
                 self._attr_icon = "mdi:white-balance-sunny"
-        elif self.nmbr:
+        elif self._nmbr:
             self._attr_icon = "mdi:circle-outline"
         else:
             self._attr_icon = "mdi:circle-medium"
