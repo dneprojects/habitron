@@ -200,7 +200,7 @@ class HbtnComm:
                 sck.connect((self._host, self._port))
             except ConnectionRefusedError as exc:
                 raise ConnectionRefusedError from exc
-            sck.settimeout(15)  # 15 seconds
+            sck.settimeout(8)  # 8 seconds
             cmd_str = SMHUB_COMMANDS["GET_SMHUB_INFO"]
             full_string = wrap_command(cmd_str)
             resp_bytes = send_receive(sck, full_string)

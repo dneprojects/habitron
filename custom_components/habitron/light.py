@@ -35,20 +35,28 @@ async def async_setup_entry(
             if abs(mod_output.type) == 1:  # standard
                 if hbt_module.comm.is_smhub:
                     new_devices.append(
-                        SwitchedOutputPush(mod_output, hbt_module, hbtn_cord, len(new_devices))
+                        SwitchedOutputPush(
+                            mod_output, hbt_module, hbtn_cord, len(new_devices)
+                        )
                     )
                 else:
                     new_devices.append(
-                        SwitchedOutput(mod_output, hbt_module, hbtn_cord, len(new_devices))
+                        SwitchedOutput(
+                            mod_output, hbt_module, hbtn_cord, len(new_devices)
+                        )
                     )
             if abs(mod_output.type) == 2:  # dimmer
                 if hbt_module.comm.is_smhub:
                     new_devices.append(
-                        DimmedOutputPush(mod_output, hbt_module, hbtn_cord, len(new_devices))
+                        DimmedOutputPush(
+                            mod_output, hbt_module, hbtn_cord, len(new_devices)
+                        )
                     )
                 else:
                     new_devices.append(
-                        DimmedOutput(mod_output, hbt_module, hbtn_cord, len(new_devices))
+                        DimmedOutput(
+                            mod_output, hbt_module, hbtn_cord, len(new_devices)
+                        )
                     )
         for mod_led in hbt_module.leds:
             if mod_led.type == 4:
@@ -97,7 +105,6 @@ class SwitchedOutput(CoordinatorEntity, LightEntity):
         if output.type < 0:
             # Entity will not show up
             self._attr_entity_registry_enabled_default = False
-
 
     # To link this entity to its device, this property must return an
     # identifiers value matching that used in the module
@@ -270,6 +277,7 @@ class DimmedOutputPush(SwitchedOutputPush):
             int(self._brightness * 100.0 / 255),
         )
 
+
 class ColorLed(CoordinatorEntity, LightEntity):
     """Representation of habitron light entities."""
 
@@ -324,6 +332,7 @@ class ColorLed(CoordinatorEntity, LightEntity):
         """Entity being removed from hass."""
         # The opposite of async_added_to_hass. Remove any registered call backs here.
         self._output.remove_callback(self.async_write_ha_state)
+
     # To link this entity to its device, this property must return an
     # identifiers value matching that used in the module
     @property
@@ -354,7 +363,7 @@ class ColorLed(CoordinatorEntity, LightEntity):
         return color_modes
 
     @property
-    def rgb_color(self) -> int:
+    def rgb_color(self) -> tuple[int, int, int] | None:
         """Return the brightness of the light."""
         return self._rgb_color
 
@@ -372,17 +381,23 @@ class ColorLed(CoordinatorEntity, LightEntity):
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Instruct the light to turn on."""
         self._rgb_color = kwargs.get(ATTR_RGB_COLOR, self._rgb_color)
-        self._output.value = [1, self._rgb_color[0], self._rgb_color[1], self._rgb_color[2]]
+        self._output.value = [
+            1,
+            self._rgb_color[0],
+            self._rgb_color[1],
+            self._rgb_color[2],
+        ]
         self._brightness = kwargs.get(ATTR_BRIGHTNESS, self._brightness)
         dimmed_col = self._rgb_color
-        dimmed_col = round(dimmed_col[0] * self._brightness / 256), round(dimmed_col[1] * self._brightness / 256), round(dimmed_col[2] * self._brightness / 256)
+        dimmed_col = (
+            round(dimmed_col[0] * self._brightness / 256),
+            round(dimmed_col[1] * self._brightness / 256),
+            round(dimmed_col[2] * self._brightness / 256),
+        )
         await self._module.comm.async_set_rgbval(
             self._module.mod_addr,
             self._nmbr - self._out_offs + 1,
             dimmed_col,
-        )
-        await self._module.comm.async_set_rgb_output(
-            self._module.mod_addr, self._nmbr + 1, 1
         )
 
     async def async_turn_off(self, **kwargs: Any) -> None:
@@ -391,4 +406,3 @@ class ColorLed(CoordinatorEntity, LightEntity):
         await self._module.comm.async_set_rgb_output(
             self._module.mod_addr, self._nmbr + 1, 0
         )
-
