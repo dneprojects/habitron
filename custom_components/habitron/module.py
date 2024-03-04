@@ -153,8 +153,8 @@ class HbtnModule:
                             )
                         elif arg_code in range(18, 26):
                             # Description of module LEDs
-                            self.leds[arg_code - 18] = IfDescriptor(
-                                text, arg_code - 18, 0, 0
+                            self.leds[arg_code - 17] = IfDescriptor(
+                                text, arg_code - 17, 0, 0
                             )
                         elif arg_code in range(40, 50):
                             # Description of  Inputs
@@ -186,6 +186,8 @@ class HbtnModule:
             for led in self.leds:
                 led.value = [0, 0, 0, 0]
                 led.type = 4
+        elif self._typ[0] == 0:
+            self.leds[0].name = "Light"
             return True
         if self.mod_type[:16] == "Smart Controller":
             self.dimmers[0] = IfDescriptor(self.outputs[10].name, 0, 2, 0)
