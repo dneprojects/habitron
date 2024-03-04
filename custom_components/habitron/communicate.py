@@ -721,10 +721,10 @@ class HbtnComm:
                 await module.inputs[arg1 - 1].handle_upd_event()
             elif evnt == HaEvents.OUTPUT:
                 # Output changed
-                if arg1 > 16:
+                if arg1 > 15:
                     # LED
-                    module.leds[arg1 - 17].value = arg2
-                    await module.leds[arg1 - 17].handle_upd_event()
+                    module.leds[arg1 - 16].value = arg2
+                    await module.leds[arg1 - 16].handle_upd_event()
                 else:
                     module.outputs[arg1 - 1].value = arg2
                     await module.outputs[arg1 - 1].handle_upd_event()
