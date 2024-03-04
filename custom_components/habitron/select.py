@@ -75,7 +75,6 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
         self.hbtnr = hbtnr
         self._attr_translation_key = "habitron_mode"
 
-
     @property
     def available(self) -> bool:
         """Set true to let HA know that this entity is online."""
@@ -194,7 +193,7 @@ class HbtnSelectAlarmMode(HbtnMode):
 
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
-        set_val = (self._enum[option].value > 0)
+        set_val = self._enum[option].value > 0
         if isinstance(self._module, int):
             # router
             await self.hbtnr.comm.async_set_alarm_mode(self.hbtnr.id, 0, set_val)
@@ -265,8 +264,6 @@ class HbtnSelectLoggingLevel(CoordinatorEntity, SelectEntity):
         self._attr_name = level.name
         self._attr_unique_id = f"{self._smhub.uid}_{level.name.replace(' ','')}"
         self._attr_translation_key = "habitron_loglevel"
-
-
 
     @property
     def available(self) -> bool:
