@@ -74,6 +74,7 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
         self._current_option = ""
         self.hbtnr = hbtnr
         self._attr_translation_key = "habitron_mode"
+        self._value = 0
 
     @property
     def available(self) -> bool:
@@ -116,6 +117,7 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
             return
         self._value = self._mode & self._mask
         if self._value not in self._enum._value2member_map_:
+            self.hbtnr.logger(f"Could not find {self._value} in mode enum")
             return
         self._current_option = self._enum(self._value).name
         self.async_write_ha_state()
@@ -158,7 +160,7 @@ class HbtnSelectDaytimeMode(HbtnMode):
                 False  # Entity will initally be disabled
             )
             if self._value == 0:
-                # hot fix: why is mode 0?
+                # Not clear, inherit mode of group 0?
                 module.logger.warning("Enum value 0 for module %d", module.raddr)
                 self._value = 1
             self._current_option = self._enum(self._value).name

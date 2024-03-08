@@ -31,16 +31,16 @@ class SmartHub:
 
     def __init__(self, hass: HomeAssistant, config: ConfigEntry) -> None:
         """Init SmartHub."""
-        self.hass = hass
-        self.config: config
+        self.hass: HomeAssistant = hass
+        self.config: ConfigEntry = config
         self._name = config.title
         self.comm = hbtn_com(hass, config)
-        self.online = True
-        self._mac = self.comm.com_mac
-        self.uid = self._mac.replace(":", "")
-        self._version = self.comm.com_version
-        self._type = self.comm.com_hwtype
-        self.is_smhub = self.comm.is_smhub
+        self.online: bool = True
+        self._mac: str = self.comm.com_mac
+        self.uid: str = self._mac.replace(":", "")
+        self._version: str = self.comm.com_version
+        self._type: str = self.comm.com_hwtype
+        self.is_smhub: bool = self.comm.is_smhub
         self.router = []
 
         self.host = self.comm.com_ip
@@ -115,14 +115,14 @@ class SmartHub:
             return ver_string[9 : len(ver_string)]
         return "0.0.0"
 
-    async def initialize(self, hass: HomeAssistant, config: ConfigEntry) -> bool:
+    async def async_setup(self) -> bool:
         """Initialize SmartHub instance."""
         if self.is_smhub:
             await self.comm.reinit_hub(100, 0)  # force Opr mode to stop
-            await self.comm.send_network_info(config.data["websock_token"])
+            await self.comm.send_network_info(self.config.data["websock_token"])
         else:
             await self.comm.async_stop_mirror(1)
-        self.router = hbtr(hass, config, self)
+        self.router = hbtr(self.hass, self.config, self)
         await self.router.initialize()
         if self.is_smhub:
             await self.comm.reinit_hub(100, 1)  # restart event server

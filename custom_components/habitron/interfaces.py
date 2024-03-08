@@ -39,7 +39,7 @@ class IfDescriptor:
         self.name = new_name
 
 
-class IfDescriptorC(IfDescriptor):
+class CovDescriptor(IfDescriptor):
     """Habitron cover interface descriptor."""
 
     def __init__(self, iname, inmbr, itype, ivalue, itilt) -> None:
