@@ -1,15 +1,14 @@
 """Platform for sensor integration."""
 
 
-from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
+from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity import DeviceInfo, EntityCategory
+from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .interfaces import TYPE_DIAG
 
 
 # See cover.py for more details.
@@ -23,7 +22,7 @@ async def async_setup_entry(
 ) -> None:
     """Add sensors for passed config_entry in HA."""
     hbtn_rt = hass.data[DOMAIN][entry.entry_id].router
-    hbtn_cord = hbtn_rt.coord
+    hbtn_cord: CoordinatorEntity = hbtn_rt.coord
 
     new_devices = []
     for hbt_module in hbtn_rt.modules:

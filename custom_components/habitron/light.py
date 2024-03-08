@@ -61,7 +61,7 @@ async def async_setup_entry(
         for mod_led in hbt_module.leds:
             if mod_led.type == 4:
                 led_name = "RGB LED"
-                led_no = mod_led.nmbr + 1
+                led_no = mod_led.nmbr
                 if mod_led.name.strip() == "":
                     mod_led.set_name(f"{led_name} {led_no}")
                 else:
@@ -285,37 +285,37 @@ class ColorLed(CoordinatorEntity, LightEntity):
     _attr_color_mode = True
     should_poll = True  # for push updates
 
-    def __init__(self, output, module, coord, idx) -> None:
+    def __init__(self, led, module, coord, idx) -> None:
         """Initialize an HbtnLight, pass coordinator to CoordinatorEntity."""
         super().__init__(coord, context=idx)
         self._color_mode = ColorMode.RGB
         self._supported_color_modes = ColorMode.RGB
         self.idx = idx
-        self._output = output
+        self._led = led
         self._module = module
-        if output.name.strip() == "":
-            self._attr_name = f"CLED {output.nmbr + 1}"
+        if led.name.strip() == "":
+            self._attr_name = f"CLED {led.nmbr}"
         else:
-            self._attr_name = output.name
-        self._nmbr = output.nmbr
+            self._attr_name = led.name
+        self._nmbr = led.nmbr
         self._out_offs = 0
         self._state = None
         self._brightness = 255
         self._rgb_color = [50, 50, 50]
-        self._attr_unique_id = f"{self._module.uid}_rgbled_{output.nmbr}"
-        if output.type < 0:
+        self._attr_unique_id = f"{self._module.uid}_rgbled_{led.nmbr}"
+        if led.type < 0:
             # Entity will not show up
             self._attr_entity_registry_enabled_default = False
-        if output.nmbr == 0:
-            self._attr_icon = "mdi:arrow-top-left-bold-box-outline"
-        if output.nmbr == 1:
-            self._attr_icon = "mdi:arrow-top-right-bold-box-outline"
-        if output.nmbr == 2:
-            self._attr_icon = "mdi:arrow-bottom-left-bold-box-outline"
-        if output.nmbr == 3:
-            self._attr_icon = "mdi:arrow-bottom-right-bold-box-outline"
-        if output.nmbr == 4:
+        if led.nmbr == 0:
             self._attr_icon = "mdi:square-outline"
+        if led.nmbr == 1:
+            self._attr_icon = "mdi:arrow-top-left-bold-box-outline"
+        if led.nmbr == 2:
+            self._attr_icon = "mdi:arrow-top-right-bold-box-outline"
+        if led.nmbr == 3:
+            self._attr_icon = "mdi:arrow-bottom-left-bold-box-outline"
+        if led.nmbr == 4:
+            self._attr_icon = "mdi:arrow-bottom-right-bold-box-outline"
 
     async def async_added_to_hass(self) -> None:
         """Run when this Entity has been added to HA."""
@@ -326,12 +326,12 @@ class ColorLed(CoordinatorEntity, LightEntity):
         # The call back registration is done once this entity is registered with HA
         # (rather than in the __init__)
         await super().async_added_to_hass()
-        self._output.register_callback(self.async_write_ha_state)
+        self._led.register_callback(self.async_write_ha_state)
 
     async def async_will_remove_from_hass(self) -> None:
         """Entity being removed from hass."""
         # The opposite of async_added_to_hass. Remove any registered call backs here.
-        self._output.remove_callback(self.async_write_ha_state)
+        self._led.remove_callback(self.async_write_ha_state)
 
     # To link this entity to its device, this property must return an
     # identifiers value matching that used in the module
@@ -381,7 +381,7 @@ class ColorLed(CoordinatorEntity, LightEntity):
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Instruct the light to turn on."""
         self._rgb_color = kwargs.get(ATTR_RGB_COLOR, self._rgb_color)
-        self._output.value = [
+        self._led.value = [
             1,
             self._rgb_color[0],
             self._rgb_color[1],
@@ -396,13 +396,13 @@ class ColorLed(CoordinatorEntity, LightEntity):
         )
         await self._module.comm.async_set_rgbval(
             self._module.mod_addr,
-            self._nmbr - self._out_offs + 1,
+            self._nmbr,
             dimmed_col,
         )
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Instruct the light to turn off."""
-        self._output.value[0] = 0
+        self._led.value[0] = 0
         await self._module.comm.async_set_rgb_output(
-            self._module.mod_addr, self._nmbr + 1, 0
+            self._module.mod_addr, self._nmbr, 0
         )
