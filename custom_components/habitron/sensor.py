@@ -42,7 +42,9 @@ async def async_setup_entry(  # noqa: C901
                 FrequencySensor(smhub, smhub_diag, hbtn_cord, len(new_devices))
             )
         if smhub_diag.name == "CPU load":
-            new_devices.append(PercSensor(smhub, smhub_diag, hbtn_cord, len(new_devices)))
+            new_devices.append(
+                PercSensor(smhub, smhub_diag, hbtn_cord, len(new_devices))
+            )
 
         if smhub_diag.name == "CPU Temperature":
             new_devices.append(
@@ -66,11 +68,7 @@ async def async_setup_entry(  # noqa: C901
                         hbt_module, mod_sensor, hbtn_cord, len(new_devices)
                     )
                 )
-            elif mod_sensor.name == "Wind":
-                new_devices.append(
-                    WindSensor(hbt_module, mod_sensor, hbtn_cord, len(new_devices))
-                )
-            elif mod_sensor.name == "Windpeak":
+            elif mod_sensor.name in ("Wind", "Windpeak"):
                 new_devices.append(
                     WindSensor(hbt_module, mod_sensor, hbtn_cord, len(new_devices))
                 )
