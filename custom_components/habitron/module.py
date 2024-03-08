@@ -9,7 +9,13 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
 from .const import DOMAIN, MODULE_CODES, ModuleDescriptor, MSetIdx, MStatIdx
-from .interfaces import IfDescriptor, IfDescriptorC, LgcDescriptor
+from .interfaces import (
+    CmdDescriptor,
+    CovDescriptor,
+    IfDescriptor,
+    LgcDescriptor,
+    StateDescriptor,
+)
 
 
 class HbtnModule:
@@ -37,8 +43,8 @@ class HbtnModule:
         self.uid = f"Mod_{mod_descriptor.uid}_{self.b_uid}"
         self._addr = mod_descriptor.addr
         self.raddr = self._addr - int(self._addr / 100) * 100
-        self._typ: bytes = mod_descriptor.mtype
-        self._type: str = MODULE_CODES[self._typ]
+        self.typ: bytes = mod_descriptor.mtype
+        self.type: str = MODULE_CODES[self.typ]
         self.smc = ""
         self.status = ""
         self.mstatus = ""
@@ -51,14 +57,14 @@ class HbtnModule:
         self.inputs: list[IfDescriptor] = []
         self.outputs: list[IfDescriptor] = []
         self.dimmers: list[IfDescriptor] = []
-        self.covers: list[IfDescriptor] = []
+        self.covers: list[CovDescriptor] = []
         self.sensors: list[IfDescriptor] = []
         self.leds: list[IfDescriptor] = []
-        self.messages: list[IfDescriptor] = []
-        self.dir_commands: list[IfDescriptor] = []
-        self.vis_commands: list[IfDescriptor] = []
+        self.messages: list[CmdDescriptor] = []
+        self.dir_commands: list[CmdDescriptor] = []
+        self.vis_commands: list[CmdDescriptor] = []
         self.setvalues: list[IfDescriptor] = []
-        self.flags: list[IfDescriptor] = []
+        self.flags: list[StateDescriptor] = []
         self.logic: list[LgcDescriptor] = []
         self.diags = [IfDescriptor("", 0, 0, 0)]
         self.diags.append(IfDescriptor("Status", 0, 1, 0))
@@ -76,7 +82,7 @@ class HbtnModule:
     @property
     def mod_type(self) -> str:
         """Type of module."""
-        return self._type
+        return self.type
 
     async def initialize(self, sys_status) -> None:
         """Initialize module instance."""
@@ -91,7 +97,7 @@ class HbtnModule:
             manufacturer="Habitron GmbH",
             suggested_area="House",
             name=self.name,
-            model=self._type,
+            model=self.type,
             sw_version=self.sw_version,
             hw_version=self.hw_version,
             via_device=(DOMAIN, self.comm.router.uid),
@@ -102,21 +108,17 @@ class HbtnModule:
         """Return cover index based on output number."""
         if self.outputs[out_no - 1].type == -10:
             c_idx = math.ceil(out_no / 2) - 1
-            # if self._type[:16] == "Smart Controller":
-            #     c_idx -= 2
-            #     if c_idx < 0:
-            #         c_idx += 5
             return c_idx
         else:
             return -1
 
-    async def get_names(self) -> bool:
+    async def get_names(self) -> bool:  # noqa: C901
         """Get summary of Habitron module."""
         resp = await self.comm.async_get_module_definitions(self._addr)
         if resp == "":
             return False
 
-        if self._type == "Smart Controller":
+        if self.type == "Smart Controller":
             no_lines = int.from_bytes(resp[0:2], "little")
             resp = resp[4 : len(resp)]  # Strip 4 header bytes
         else:
@@ -140,10 +142,10 @@ class HbtnModule:
                     self.ids.append(IfDescriptor(text, arg_code, 0, 0))
                 elif int(line[0]) == 253:
                     # Description of commands
-                    self.dir_commands.append(IfDescriptor(text, arg_code, 0, 0))
+                    self.dir_commands.append(CmdDescriptor(text, arg_code))
                 elif int(line[0]) == 254:
                     # Description of messages
-                    self.messages.append(IfDescriptor(text, arg_code, 0, 0))
+                    self.messages.append(CmdDescriptor(text, arg_code))
                 elif int(line[0]) == 255:
                     try:
                         if arg_code in range(10, 18):
@@ -167,6 +169,26 @@ class HbtnModule:
                                 self.inputs[arg_code - 32] = IfDescriptor(
                                     text, arg_code - 32, 1, 0
                                 )
+                        elif arg_code in range(110, 120):
+                            # Description of logic units
+                            for lgc in self.logic:
+                                if lgc.nmbr == arg_code - 109:
+                                    lgc.name = text
+                                    break
+                        elif arg_code in range(120, 136):
+                            # Description of flags
+                            self.flags.append(
+                                StateDescriptor(
+                                    text, len(self.flags), arg_code - 119, 0
+                                )
+                            )
+                        elif arg_code in range(140, 173):
+                            # Description of vis commands (max 32)
+                            self.vis_commands.append(
+                                CmdDescriptor(
+                                    text[2:], ord(text[1]) * 256 + ord(text[0])
+                                )
+                            )
                         elif self.mod_type[0:9] == "Smart Out":
                             # Description of outputs in Out modules
                             self.outputs[arg_code - 60] = IfDescriptor(
@@ -182,11 +204,12 @@ class HbtnModule:
         self.set_default_names(self.inputs, "Inp")
         self.set_default_names(self.outputs, "Out")
         if self.mod_type == "Smart Controller Mini":
-            self.leds[4].name = "Ambient"
+            self.leds[0].name = "Ambient"
             for led in self.leds:
                 led.value = [0, 0, 0, 0]
                 led.type = 4
-        elif self._typ[0] == 0:
+            return True
+        elif self.typ[0] == 0:
             self.leds[0].name = "Light"
             return True
         if self.mod_type[:16] == "Smart Controller":
@@ -244,7 +267,7 @@ class HbtnModule:
                 cname = cname.replace("ab", "")
                 cname = cname.replace("auf", "")
                 cname = cname.replace("zu", "")
-                self.covers[c_idx] = IfDescriptorC(cname.strip(), c_idx, pol, 0, 0)
+                self.covers[c_idx] = CovDescriptor(cname.strip(), c_idx, pol, 0, 0)
                 self.outputs[2 * c_idx].type = -10  # disable light output
                 self.outputs[2 * c_idx + 1].type = -10
         return True
@@ -318,7 +341,7 @@ class SmartController(HbtnModule):
 
         self.inputs = [IfDescriptor("", i, 1, 0) for i in range(18)]
         self.outputs = [IfDescriptor("", i, 1, 0) for i in range(15)]
-        self.covers = [IfDescriptorC("", -1, 0, 0, 0) for i in range(5)]
+        self.covers = [CovDescriptor("", -1, 0, 0, 0) for i in range(5)]
         self.dimmers = [IfDescriptor("", i, -1, 0) for i in range(2)]
         self.leds = [IfDescriptor("", i, 0, 0) for i in range(9)]
         self.diags = [IfDescriptor("", i, 0, 0) for i in range(2)]
@@ -371,7 +394,7 @@ class SmartController(HbtnModule):
         )
 
         out_state = int.from_bytes(
-            self.status[MStatIdx.OUT_1_8 : MStatIdx.OUT_1_8 + 2],
+            self.status[MStatIdx.OUT_1_8 : MStatIdx.OUT_1_8 + 3],
             "little",
         )
         for outpt in self.outputs:
@@ -433,9 +456,9 @@ class SmartControllerMini(HbtnModule):
 
         self.inputs = [IfDescriptor("", i, 1, 0) for i in range(6)]
         self.outputs = [IfDescriptor("", i, 1, 0) for i in range(2)]
-        self.covers = [IfDescriptorC("", -1, 0, 0, 0) for i in range(0)]
+        self.covers = [CovDescriptor("", -1, 0, 0, 0) for i in range(0)]
         self.dimmers = [IfDescriptor("", i, -1, 0) for i in range(0)]
-        self.leds = [IfDescriptor("", i, 0, 0) for i in range(5)]
+        self.leds = [IfDescriptor("", i, 4, 0) for i in range(5)]
         self.diags = [IfDescriptor("", i, 0, 0) for i in range(1)]
         self.setvalues = [IfDescriptor("Set temperature", 0, 2, 20.0)]
         self.setvalues.append(IfDescriptor("Set temperature 2", 1, 2, 20.0))
@@ -477,16 +500,16 @@ class SmartControllerMini(HbtnModule):
         )
 
         out_state = int.from_bytes(
-            self.status[MStatIdx.OUT_1_8 : MStatIdx.OUT_1_8 + 2],
+            self.status[MStatIdx.OUT_1_8 : MStatIdx.OUT_1_8 + 3],
             "little",
         )
         for outpt in self.outputs:
             outpt.value = int((out_state & (0x01 << outpt.nmbr)) > 0)
 
-        # led_state = int(self.status[MStatIdx.OUT_17_24])
-        led_state = out_state >> 2  # Led corner 1 = out 3
         for led in self.leds:
-            led.value[0] = int((led_state & (0x01 << led.nmbr)) > 0)
+            #  led.value[0] = int((out_state & (0x01 << led.nmbr + 16)) > 0)
+            #  quick fix: use outputs 2..6, change also in communicate line 728 and SmartHub actions_hdlr.py
+            led.value[0] = int((out_state & (0x01 << led.nmbr + 2)) > 0)
 
         inp_state = int.from_bytes(
             self.status[MStatIdx.INP_1_8 : MStatIdx.INP_1_8 + 3],
@@ -521,7 +544,7 @@ class SmartOutput(HbtnModule):
         super().__init__(mod_descriptor, hass, config, b_uid, comm)
 
         self.outputs = [IfDescriptor("", i, 1, 0) for i in range(8)]
-        self.covers = [IfDescriptorC("", -1, 0, 0, 0) for i in range(4)]
+        self.covers = [CovDescriptor("", -1, 0, 0, 0) for i in range(4)]
 
     def update(self, mod_status) -> None:
         """Update with module specific method. Reads and parses status."""
@@ -607,7 +630,7 @@ class SmartUpM(HbtnModule):
         self.outputs = [IfDescriptor("", i, 1, 0) for i in range(2)]
         self.inputs = [IfDescriptor("", i, 1, 0) for i in range(2)]
         self.diags = [IfDescriptor("", i, 0, 0) for i in range(1)]
-        self.covers = [IfDescriptorC("", -1, 0, 0, 0)]
+        self.covers = [CovDescriptor("", -1, 0, 0, 0)]
 
     def update(self, mod_status) -> None:
         """Update with module specific method. Reads and parses status."""
@@ -685,7 +708,7 @@ class SmartDetect(HbtnModule):
             manufacturer="Habitron GmbH",
             suggested_area="House",
             name=self.name,
-            model=self._type,
+            model=self.type,
             sw_version=self.sw_version,
             hw_version=self.hw_version,
             via_device=(DOMAIN, self.comm.router.uid),
@@ -757,7 +780,7 @@ class SmartNature(HbtnModule):
             manufacturer="Habitron GmbH",
             suggested_area="House",
             name=self.name,
-            model=self._type,
+            model=self.type,
             sw_version=self.sw_version,
             hw_version=self.hw_version,
             via_device=(DOMAIN, self.comm.router.uid),

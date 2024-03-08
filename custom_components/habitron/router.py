@@ -64,12 +64,12 @@ class HbtnRouter:
         self.id = 100  # to be adapted for more routers
         self.b_uid = smhub.uid
         self.uid = f"rt_{self.b_uid}"
-        self.hass = hass
-        self.config = config
+        self.hass: HomeAssistant = hass
+        self.config: ConfigEntry = config
         self.smhub = smhub
         self.comm = smhub.comm
         self.logger = logging.getLogger(__name__)
-        self.coord = HbtnCoordinator(hass, self.comm)
+        self.coord: HbtnCoordinator = HbtnCoordinator(hass, self.comm)
         self.name = f"Router {smhub.uid}"
         self.version = ""
         self.serial = ""
@@ -275,28 +275,38 @@ class HbtnRouter:
                 if mod_found:
                     if int(line[2]) == 1:
                         # local flag (Merker)
-                        self.modules[self.mod_reg[mod_addr]].flags.append(
-                            StateDescriptor(
-                                entry_name,
-                                len(self.modules[self.mod_reg[mod_addr]].flags),
-                                entry_no,
-                                0,
+                        if self.unit_not_exists(
+                            self.modules[self.mod_reg[mod_addr]].flags, entry_name
+                        ):
+                            self.modules[self.mod_reg[mod_addr]].flags.append(
+                                StateDescriptor(
+                                    entry_name,
+                                    len(self.modules[self.mod_reg[mod_addr]].flags),
+                                    entry_no,
+                                    0,
+                                )
                             )
-                        )
                     # elif int(line[2]) == 2:
                     # global flag (Merker)
                     elif int(line[2]) == 4:
                         # local visualization command
-                        entry_no = int.from_bytes(resp[3:5], "little")
-                        self.modules[self.mod_reg[mod_addr]].vis_commands.append(
-                            CmdDescriptor(entry_name, entry_no)
-                        )
+                        if self.unit_not_exists(
+                            self.modules[self.mod_reg[mod_addr]].vis_commands,
+                            entry_name,
+                        ):
+                            entry_no = int.from_bytes(resp[3:5], "little")
+                            self.modules[self.mod_reg[mod_addr]].vis_commands.append(
+                                CmdDescriptor(entry_name, entry_no)
+                            )
                     elif int(line[2]) == 5:
                         # logic element, if needed to fix unexpected error
-                        l_nmbr = line[3] - 1
-                        for lgc in self.modules[self.mod_reg[mod_addr]].logic:
-                            if lgc.nmbr == l_nmbr:
-                                lgc.name = entry_name  # counter
+                        if self.unit_not_exists(
+                            self.modules[self.mod_reg[mod_addr]].logic, entry_name
+                        ):
+                            l_nmbr = line[3] - 1
+                            for lgc in self.modules[self.mod_reg[mod_addr]].logic:
+                                if lgc.nmbr == l_nmbr:
+                                    lgc.name = entry_name  # counter
 
                     # elif int(line[2]) == 7:
                     # Group name
@@ -372,3 +382,10 @@ class HbtnRouter:
     async def async_reset_all_modules(self) -> None:
         """Call reset command for all modules."""
         self.comm.module_restart(self.id, 0xFF)
+
+    def unit_not_exists(self, mod_units: IfDescriptor, entry_name: str) -> bool:
+        """Check for existing unit based on name."""
+        for exist_unit in mod_units:
+            if exist_unit.name == entry_name:
+                return False
+        return True

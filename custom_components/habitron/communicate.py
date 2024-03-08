@@ -166,7 +166,7 @@ class HbtnComm:
         rtr_nmbr = int(rtr_id / 100)
         cmd_str = SMHUB_COMMANDS["REINIT_HUB"].replace("<rtr>", chr(rtr_nmbr))
         cmd_str = cmd_str.replace("<opr>", chr(mode))
-        resp = await self.async_send_command(cmd_str, 20)  # extended time-out 20 s
+        resp = await self.async_send_command(cmd_str, 12)  # extended time-out 12 s
         self.logger.info(f"Re-initialized hub with mode {mode}")  # noqa: G004
         return resp
 
@@ -432,7 +432,6 @@ class HbtnComm:
         cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
         cmd_str = cmd_str.replace("<lno>", chr(nmbr))
         self.send_only(cmd_str)
-        await self.async_set_output(mod_id, nmbr + 2, val)
 
     async def async_set_rgbval(self, mod_id, nmbr, val) -> None:
         """Send value to dimm output."""
@@ -725,6 +724,8 @@ class HbtnComm:
                     # LED
                     module.leds[arg1 - 16].value = arg2
                     await module.leds[arg1 - 16].handle_upd_event()
+                elif (module.typ[0] == 50) & (arg1 > 2):
+                    await module.leds[arg1 - 2 - 1].handle_upd_event()
                 else:
                     module.outputs[arg1 - 1].value = arg2
                     await module.outputs[arg1 - 1].handle_upd_event()
@@ -758,10 +759,14 @@ class HbtnComm:
                 module.sensors[arg1].value = int(arg2 > 0)
                 await module.sensors[arg1].handle_upd_event()
             elif evnt == HaEvents.FLAG:
-                module.flags[arg1].value = int(arg2 > 0)
-                await module.flags[arg1].handle_upd_event()
+                for flg in module.flags:
+                    if flg.nmbr == arg1 + 1:
+                        flg.value = int(arg2 > 0)
+                        await flg.handle_upd_event()
         except Exception as err_msg:
-            self.logger.warning(f"Error handling habitron event: {err_msg}")  # noqa: G004
+            self.logger.warning(
+                f"Error handling habitron event {evnt} with arg1 {arg1} of module {mod_id}: {err_msg}"  # noqa: G004
+            )
 
 
 async def test_connection(host_name) -> bool:
@@ -988,13 +993,14 @@ def query_smarthub(smhub_ip):
                 "ip": smhub_ip,
             }
     except TimeoutError:
-        smartip_info = ""
+        network_socket.close()
+        return ""
 
     network_socket.close()
     try:  # noqa: SIM105
         smartip_info["hostname"] = socket.gethostbyaddr(smhub_ip)[0].split(".")[0]
     except:  # noqa: E722
-        pass
+        smartip_info["hostname"] = ""
     return smartip_info
 
 
