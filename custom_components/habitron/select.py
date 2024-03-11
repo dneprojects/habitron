@@ -116,8 +116,8 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
             # should not be the case
             return
         self._value = self._mode & self._mask
-        if self._value not in self._enum._value2member_map_:
-            self.hbtnr.logger(f"Could not find {self._value} in mode enum")
+        if self._value not in [c.value for c in self._enum]:
+            self.hbtnr.logger.warning(f"Could not find {self._value} in mode enum")  # noqa: G004
             return
         self._current_option = self._enum(self._value).name
         self.async_write_ha_state()

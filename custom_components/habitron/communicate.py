@@ -83,10 +83,10 @@ class HbtnComm:
         self.logger.info(f"Initializing hub, got own ip: {self._host}")  # noqa: G004
         self._port = 7777
 
-        self._hass = hass
-        self._config = config
+        self._hass: HomeAssistant = hass
+        self._config: ConfigEntry = config
         self._hostname = ""
-        self._hostip = ""
+        self._hostip = self._host
         self._mac = ""
         self._hwtype = ""
         self._version = ""
@@ -129,7 +129,9 @@ class HbtnComm:
 
     async def set_host(self, host: str):
         """Update host information for integration re-configuration."""
-        self._config.data = self._config.options
+        self._hass.config_entries.async_update_entry(
+            self._config, data=self._config.options
+        )
         if self._host_conf == host:
             return
         self._host_conf = host
@@ -166,7 +168,9 @@ class HbtnComm:
         rtr_nmbr = int(rtr_id / 100)
         cmd_str = SMHUB_COMMANDS["REINIT_HUB"].replace("<rtr>", chr(rtr_nmbr))
         cmd_str = cmd_str.replace("<opr>", chr(mode))
-        resp = await self.async_send_command(cmd_str, 12)  # extended time-out 12 s
+        resp = await self.async_send_command(
+            cmd_str, time_out_sec=12
+        )  # extended time-out 12 s
         self.logger.info(f"Re-initialized hub with mode {mode}")  # noqa: G004
         return resp
 
@@ -223,7 +227,7 @@ class HbtnComm:
         rtr_nmbr = int(rtr_id / 100)
         cmd_str = SMHUB_COMMANDS["GET_ROUTER_SMR"]
         cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        resp = await self.async_send_command(cmd_str)
+        resp = await self.async_send_command(cmd_str, time_out_sec=15)
         router_string = resp.decode("iso8859-1")
         if router_string[0:5] == "Error":
             return b""
@@ -237,7 +241,7 @@ class HbtnComm:
         sck.send(full_string.encode("iso8859-1"))  # Send command
         sck.close()
 
-    async def async_send_command(self, cmd_string: str, time_out_sec=8) -> bytes:
+    async def async_send_command(self, cmd_string: str, time_out_sec=10) -> bytes:
         """General function for communication via SmartHub."""
         try:
             sck = socket.socket()  # Create a socket object
@@ -252,12 +256,12 @@ class HbtnComm:
             sck.close()
             self.logger.error(f"Error connecting to Smart Hub: {err_msg}")  # noqa: G004
 
-    async def async_send_command_crc(self, cmd_string: str):
+    async def async_send_command_crc(self, cmd_string: str, time_out_sec=10):
         """General function for communication via SmartHub, returns additional crc."""
         try:
             sck = socket.socket()  # Create a socket object
             sck.connect((self._host, self._port))
-            sck.settimeout(8)  # 8 seconds
+            sck.settimeout(time_out_sec)  # 8 seconds
             full_string = wrap_command(cmd_string)
             res = await async_send_receive(sck, full_string)
             sck.close()
@@ -545,7 +549,7 @@ class HbtnComm:
             cmd_str = SMHUB_COMMANDS["READ_MODULE_MIRR_STATUS"]
             cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
             cmd_str = cmd_str.replace("<mod>", chr(desc.uid - 100 * rtr_nmbr))
-            [resp, crc] = await self.async_send_command_crc(cmd_str)
+            [resp, crc] = await self.async_send_command_crc(cmd_str, time_out_sec=15)
             status = (
                 (chr(91) + chr(1)).encode("iso8859-1")
                 + resp[0 : MirrIdx.LED_I]
@@ -571,7 +575,7 @@ class HbtnComm:
         rtr_nmbr = int(rtr_id / 100)
         cmd_str = SMHUB_COMMANDS["GET_COMPACT_STATUS"]
         cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        [resp_bytes, crc] = await self.async_send_command_crc(cmd_str)
+        [resp_bytes, crc] = await self.async_send_command_crc(cmd_str, time_out_sec=15)
         if crc == self.crc:
             return b""
         else:
@@ -585,7 +589,7 @@ class HbtnComm:
         cmd_str = SMHUB_COMMANDS["GET_MODULE_STATUS"]
         cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
         cmd_str = cmd_str.replace("<mod>", chr(mod_nmbr))
-        [resp_bytes, crc] = await self.async_send_command_crc(cmd_str)
+        [resp_bytes, crc] = await self.async_send_command_crc(cmd_str, time_out_sec=15)
         if crc == self.crc:
             return b""
         else:
