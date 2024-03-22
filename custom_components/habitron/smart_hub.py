@@ -33,7 +33,7 @@ class SmartHub:
         """Init SmartHub."""
         self.hass: HomeAssistant = hass
         self.config: ConfigEntry = config
-        self._name = config.title
+        self._name: str = config.title
         self.comm = hbtn_com(hass, config)
         self.online: bool = True
         self._mac: str = self.comm.com_mac
@@ -41,7 +41,7 @@ class SmartHub:
         self._version: str = self.comm.com_version
         self._type: str = self.comm.com_hwtype
         self.is_smhub: bool = self.comm.is_smhub
-        self.router = []
+        self.router: hbtr
 
         self.host = self.comm.com_ip
         self._port = self.comm.com_port
@@ -64,8 +64,8 @@ class SmartHub:
             hw_version=self._type,
         )
         self.sensors: list[IfDescriptor] = []
-        self.diags: IfDescriptor = []
-        self.loglvl: IfDescriptor = []
+        self.diags: list[IfDescriptor] = []
+        self.loglvl: list[IfDescriptor] = []
         if self._type[:12] == "Raspberry Pi":
             self.diags.append(IfDescriptor("CPU Frequency", 0, 10, 0))
             self.diags.append(IfDescriptor("CPU load", 1, 10, 0))
@@ -74,7 +74,7 @@ class SmartHub:
             self.sensors.append(IfDescriptor("Disk free", 1, 2, 0))
             self.loglvl.append(IfDescriptor("Logging level console", 0, 2, 0))
             self.loglvl.append(IfDescriptor("Logging level file", 1, 2, 0))
-            self.update()
+        self.update()
 
     @property
     def smhub_version(self) -> str:
@@ -85,27 +85,24 @@ class SmartHub:
         """Update in a module specific method. Reads and parses status."""
         if not self.is_smhub:
             return
-        info = self.comm.get_smhub_info()
+        info = self.comm.get_smhub_update()
         if info == "":
             return
-        if self.is_smhub:
-            self.diags[0].value = float(
-                info["hardware"]["cpu"]["frequency current"].replace("MHz", "")
-            )
-            self.diags[1].value = float(
-                info["hardware"]["cpu"]["load"].replace("%", "")
-            )
-            self.diags[2].value = float(
-                info["hardware"]["cpu"]["temperature"].replace("°C", "")
-            )
-            self.sensors[0].value = float(
-                info["hardware"]["memory"]["percent"].replace("%", "")
-            )
-            self.sensors[1].value = float(
-                info["hardware"]["disk"]["percent"].replace("%", "")
-            )
-            self.loglvl[0].value = int(info["software"]["loglevel"]["console"])
-            self.loglvl[1].value = int(info["software"]["loglevel"]["file"])
+        self.diags[0].value = float(
+            info["hardware"]["cpu"]["frequency current"].replace("MHz", "")
+        )
+        self.diags[1].value = float(info["hardware"]["cpu"]["load"].replace("%", ""))
+        self.diags[2].value = float(
+            info["hardware"]["cpu"]["temperature"].replace("°C", "")
+        )
+        self.sensors[0].value = float(
+            info["hardware"]["memory"]["percent"].replace("%", "")
+        )
+        self.sensors[1].value = float(
+            info["hardware"]["disk"]["percent"].replace("%", "")
+        )
+        self.loglvl[0].value = int(info["software"]["loglevel"]["console"])
+        self.loglvl[1].value = int(info["software"]["loglevel"]["file"])
 
     async def get_version(self) -> str:
         """Test connectivity to SmartHub is OK."""
@@ -115,7 +112,7 @@ class SmartHub:
             return ver_string[9 : len(ver_string)]
         return "0.0.0"
 
-    async def async_setup(self) -> bool:
+    async def async_setup(self) -> None:
         """Initialize SmartHub instance."""
         if self.is_smhub:
             await self.comm.reinit_hub(100, 0)  # force Opr mode to stop
@@ -127,12 +124,12 @@ class SmartHub:
         if self.is_smhub:
             await self.comm.reinit_hub(100, 1)  # restart event server
 
-    async def restart(self, rt_id):
+    async def restart(self, rt_id) -> None:
         """Restart hub."""
         if self.is_smhub:
             await self.comm.hub_restart(rt_id)
 
-    async def reboot(self):
+    async def reboot(self) -> None:
         """Reboot hub."""
         if self.is_smhub:
             await self.comm.hub_reboot()

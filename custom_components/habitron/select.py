@@ -8,10 +8,14 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.update_coordinator import (
+    CoordinatorEntity,
+    DataUpdateCoordinator,
+)
 
 from .const import DOMAIN
-from .router import AlarmMode, DaytimeMode
+from .module import HbtnModule
+from .router import AlarmMode, DaytimeMode, HbtnRouter
 from .smart_hub import LoggingLevels
 
 
@@ -21,8 +25,8 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Add input_select for passed config_entry in HA."""
-    hbtn_rt = hass.data[DOMAIN][entry.entry_id].router
-    hbtn_cord = hbtn_rt.coord
+    hbtn_rt: HbtnRouter = hass.data[DOMAIN][entry.entry_id].router
+    hbtn_cord: DataUpdateCoordinator = hbtn_rt.coord
     smhub = hass.data[DOMAIN][entry.entry_id]
 
     new_devices = []
@@ -63,9 +67,15 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
     """Representation of a input select for Habitron modes."""
 
     _attr_has_entity_name = True
-    should_poll = True  # for push updates
+    _attr_should_poll = True  # for poll updates
 
-    def __init__(self, module, hbtnr, coord, idx) -> None:
+    def __init__(
+        self,
+        module: int | HbtnModule,
+        hbtnr: HbtnRouter,
+        coord: DataUpdateCoordinator,
+        idx: int,
+    ) -> None:
         """Initialize a Habitron mode, pass coordinator to CoordinatorEntity."""
         super().__init__(coord, context=idx)
         self.idx = idx
@@ -75,6 +85,8 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
         self.hbtnr = hbtnr
         self._attr_translation_key = "habitron_mode"
         self._value = 0
+        self._enum = DaytimeMode
+        self._mask: int = 0
 
     @property
     def available(self) -> bool:
@@ -91,7 +103,7 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
         return {"identifiers": {(DOMAIN, self._module.uid)}}
 
     @property
-    def name(self) -> str:
+    def name(self) -> str | None:
         """Return the display name of this selector."""
         return self._attr_name
 
@@ -138,7 +150,13 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
 class HbtnSelectDaytimeMode(HbtnMode):
     """Daytime mode object."""
 
-    def __init__(self, module, hbtnr, coord, idx) -> None:
+    def __init__(
+        self,
+        module: int | HbtnModule,
+        hbtnr: HbtnRouter,
+        coord: DataUpdateCoordinator,
+        idx: int,
+    ) -> None:
         """Initialize daytime mode selector."""
         super().__init__(module, hbtnr, coord, idx)
         self._mask = 0x03
@@ -161,7 +179,7 @@ class HbtnSelectDaytimeMode(HbtnMode):
             )
             if self._value == 0:
                 # Not clear, inherit mode of group 0?
-                module.logger.warning("Enum value 0 for module %d", module.raddr)
+                hbtnr.logger.warning("Enum value 0 for router daytime mode")
                 self._value = 1
             self._current_option = self._enum(self._value).name
 
@@ -179,7 +197,13 @@ class HbtnSelectDaytimeMode(HbtnMode):
 class HbtnSelectAlarmMode(HbtnMode):
     """Alarm mode object."""
 
-    def __init__(self, module, hbtnr, coord, idx) -> None:
+    def __init__(
+        self,
+        module: int | HbtnModule,
+        hbtnr: HbtnRouter,
+        coord: DataUpdateCoordinator,
+        idx: int,
+    ) -> None:
         """Initialize alarm mode selector."""
         super().__init__(module, hbtnr, coord, idx)
         self._mask = 0x04
@@ -251,7 +275,7 @@ class HbtnSelectLoggingLevel(CoordinatorEntity, SelectEntity):
     """Logging level object."""
 
     _attr_has_entity_name = True
-    should_poll = True  # for push updates
+    _attr_should_poll = True  # for push updates
 
     def __init__(self, smhub, level, coord, idx) -> None:
         """Initialize a Habitron mode, pass coordinator to CoordinatorEntity."""
@@ -280,7 +304,7 @@ class HbtnSelectLoggingLevel(CoordinatorEntity, SelectEntity):
         return {"identifiers": {(DOMAIN, self._smhub.uid)}}
 
     @property
-    def name(self) -> str:
+    def name(self) -> str | None:
         """Return the display name of this selector."""
         return self._attr_name
 
