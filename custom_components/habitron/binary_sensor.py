@@ -9,14 +9,17 @@ from homeassistant.components.binary_sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity import EntityCategory
+from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.update_coordinator import (
+    CoordinatorEntity,
+    DataUpdateCoordinator,
+)
 
 from .const import DOMAIN
-from .interfaces import TYPE_DIAG
-
-# from homeassistant.helpers.entity import Entity
+from .interfaces import TYPE_DIAG, IfDescriptor, StateDescriptor
+from .module import HbtnModule
+from .router import HbtnRouter
 
 
 async def async_setup_entry(
@@ -25,7 +28,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Add binary sensors for Habitron inputs."""
-    hbtn_rt = hass.data[DOMAIN][entry.entry_id].router
+    hbtn_rt: HbtnRouter = hass.data[DOMAIN][entry.entry_id].router
     hbtn_cord = hbtn_rt.coord
 
     new_devices = []
@@ -34,7 +37,9 @@ async def async_setup_entry(
             if abs(mod_input.type) == 2:  # switch
                 if hbt_module.comm.is_smhub:
                     new_devices.append(
-                        InputSwitchPush(mod_input, hbt_module, hbtn_cord, len(new_devices))
+                        InputSwitchPush(
+                            mod_input, hbt_module, hbtn_cord, len(new_devices)
+                        )
                     )
                 else:
                     new_devices.append(
@@ -44,11 +49,15 @@ async def async_setup_entry(
             if mod_sensor.name == "Movement":
                 if hbt_module.comm.is_smhub:
                     new_devices.append(
-                        MotionSensorPush(mod_sensor, hbt_module, hbtn_cord, len(new_devices))
+                        MotionSensorPush(
+                            mod_sensor, hbt_module, hbtn_cord, len(new_devices)
+                        )
                     )
                 else:
                     new_devices.append(
-                        MotionSensor(mod_sensor, hbt_module, hbtn_cord, len(new_devices))
+                        MotionSensor(
+                            mod_sensor, hbt_module, hbtn_cord, len(new_devices)
+                        )
                     )
             elif mod_sensor.name == "Rain":
                 new_devices.append(
@@ -63,29 +72,35 @@ async def async_setup_entry(
         async_add_entities(new_devices)
 
 
-class InputSwitch(CoordinatorEntity, BinarySensorEntity):
+class HbtnBinSensor(CoordinatorEntity, BinarySensorEntity):
     """Representation of habitron switch input entities."""
 
     _attr_has_entity_name = True
+    _attr_should_poll = True
 
-    def __init__(self, inpt, module, coord, idx) -> None:
+    def __init__(
+        self,
+        sens_or_inpt: IfDescriptor,
+        module: HbtnModule,
+        coord: DataUpdateCoordinator,
+        idx: int,
+    ) -> None:
         """Initialize an InputSwitch, pass coordinator to CoordinatorEntity."""
         super().__init__(coord, context=idx)
-        self.idx = idx
-        self._input = inpt
-        self._module = module
-        self._attr_name = inpt.name
-        self._nmbr = inpt.nmbr
-        self._state = False
-        self._attr_unique_id = f"{self._module.uid}_In{self._nmbr}"
-        if inpt.type < 0:
+        self.idx: int = idx
+        self._sens_or_inpt: IfDescriptor = sens_or_inpt
+        self._module: HbtnModule = module
+        self._attr_name: str = sens_or_inpt.name
+        self._nmbr: int = sens_or_inpt.nmbr
+        self._on_state: bool = False
+        if sens_or_inpt.type < 0:
             # Entity will not show up
             self._attr_entity_registry_enabled_default = False
 
     # To link this entity to its device, this property must return an
     # identifiers value matching that used in the module
     @property
-    def device_info(self) -> None:
+    def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
         return {"identifiers": {(DOMAIN, self._module.uid)}}
 
@@ -94,21 +109,46 @@ class InputSwitch(CoordinatorEntity, BinarySensorEntity):
         """Return the display name of this switch."""
         return self._attr_name
 
+    @property
+    def is_on(self) -> bool:
+        """Return status of output."""
+        return self._on_state
+
+
+class InputSwitch(HbtnBinSensor):
+    """Representation of habitron switch input entities."""
+
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        inpt: IfDescriptor,
+        module: HbtnModule,
+        coord: DataUpdateCoordinator,
+        idx: int,
+    ) -> None:
+        """Initialize an InputSwitch, pass coordinator to CoordinatorEntity."""
+        super().__init__(inpt, module, coord, idx)
+        self._attr_unique_id: str = f"{self._module.uid}_In{self._nmbr}"
+
+    @property
+    def icon(self) -> str:
+        """Icon of the led, based on number and state."""
+        if self.is_on:
+            return "mdi:toggle-switch-variant"
+        return "mdi:toggle-switch-variant-off"
+
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        self._attr_is_on = self._module.inputs[self._nmbr].value == 1
-        if self._attr_is_on:
-            self._attr_icon = "mdi:toggle-switch-variant"
-        else:
-            self._attr_icon = "mdi:toggle-switch-variant-off"
-        self._state = self._attr_is_on
+        self._on_state = self._module.inputs[self._nmbr].value == 1
         self.async_write_ha_state()
+
 
 class InputSwitchPush(InputSwitch):
     """Representation of habitron switch input entities for push update."""
 
-    should_poll = True  # for push updates
+    _attr_should_poll = True  # for push updates, poll anyway
 
     async def async_added_to_hass(self) -> None:
         """Run when this Entity has been added to HA."""
@@ -119,119 +159,49 @@ class InputSwitchPush(InputSwitch):
         # The call back registration is done once this entity is registered with HA
         # (rather than in the __init__)
         await super().async_added_to_hass()
-        self._input.register_callback(self._handle_coordinator_update)
+        self._sens_or_inpt.register_callback(self._handle_coordinator_update)
 
     async def async_will_remove_from_hass(self) -> None:
         """Entity being removed from hass."""
         # The opposite of async_added_to_hass. Remove any registered call backs here.
-        self._input.remove_callback(self._handle_coordinator_update)
+        self._sens_or_inpt.remove_callback(self._handle_coordinator_update)
 
 
-class HbtnState(CoordinatorEntity, BinarySensorEntity):
-    """Representation of habitron state entities."""
-
-    _attr_has_entity_name = True
-
-    def __init__(self, state, module, coord, idx) -> None:
-        """Initialize an Hbtnstate, pass coordinator to CoordinatorEntity."""
-        super().__init__(coord, context=idx)
-        self.idx = idx
-        self._state = state
-        self._module = module
-        self._nmbr = state.nmbr
-        self._state = False
-        self._attr_unique_id = f"{self._module.uid}_state_{state.nmbr}"
-        self._attr_name = state.name
-        if state.type == TYPE_DIAG:
-            self._attr_entity_category = EntityCategory.DIAGNOSTIC
-            self._attr_entity_registry_enabled_default = (
-                False  # Entity will initally be disabled
-            )
-
-    # To link this entity to its device, this property must return an
-    # identifiers value matching that used in the module
-    @property
-    def device_info(self) -> None:
-        """Return information to link this entity with the correct device."""
-        if isinstance(self._module.id, int):
-            return {"identifiers": {(DOMAIN, self._module.uid)}}  # router
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
-
-    @property
-    def available(self) -> bool:
-        """Return True if module and smhub is available."""
-        return True
-
-    @property
-    def name(self) -> str:
-        """Return the display name of this state."""
-        return self._attr_name
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self._attr_is_on = self._module.states[self._nmbr].value == 1
-        if self._attr_is_on:
-            self._attr_icon = "mdi:checkbox-marked-circle-outline"
-        else:
-            self._attr_icon = "mdi:alert-circle-outline"
-        self._state = self._attr_is_on
-        self.async_write_ha_state()
-
-
-class MotionSensor(CoordinatorEntity, BinarySensorEntity):
+class MotionSensor(HbtnBinSensor):
     """Representation of habitron button switch input."""
 
     _attr_device_class = BinarySensorDeviceClass.MOTION
-    should_poll = True  # for push updates
 
-    def __init__(self, sensor, module, coord, idx) -> None:
+    def __init__(
+        self,
+        sensor: IfDescriptor,
+        module: HbtnModule,
+        coord: DataUpdateCoordinator,
+        idx: int,
+    ) -> None:
         """Initialize motion sensor."""
-        super().__init__(coord, context=idx)
-        self.idx = idx
-        self._sensor = sensor
-        self._module = module
-        self._nmbr = sensor.nmbr
-        self._state = False
+        super().__init__(sensor, module, coord, idx)
         self._attr_unique_id = f"{self._module.uid}_motion"
         self._attr_name = f"{self._module.name}: Motion"
-        self._attr_icon = "mdi:motion-sensor"
-
-    # To link this entity to its device, this property must return an
-    # identifiers value matching that used in the module
-    @property
-    def device_info(self) -> None:
-        """Return information to link this entity with the correct device."""
-        if isinstance(self._module.id, int):
-            return {"identifiers": {(DOMAIN, self._module.uid)}}  # router
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
 
     @property
-    def available(self) -> bool:
-        """Return True if module and smhub is available."""
-        return True
-
-    @property
-    def name(self) -> str:
-        """Return the display name of this flag."""
-        return self._attr_name
+    def icon(self) -> str:
+        """Icon of the led, based on number and state."""
+        if self.is_on:
+            return "mdi:motion-sensor"
+        return "mdi:motion-sensor-off"
 
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        self._attr_is_on = self._module.sensors[self._nmbr].value > 0
-        if self._attr_is_on:
-            self._attr_icon = "mdi:motion-sensor"
-        else:
-            self._attr_icon = "mdi:motion-sensor-off"
-        self._state = self._attr_is_on
+        self._on_state = self._module.sensors[self._nmbr].value > 0
         self.async_write_ha_state()
 
 
 class MotionSensorPush(MotionSensor):
     """Representation of habitron button switch input for push update."""
 
-    should_poll = True  # for push updates
+    _attr_should_poll = False  # for push updates
 
     async def async_added_to_hass(self) -> None:
         """Run when this Entity has been added to HA."""
@@ -242,57 +212,103 @@ class MotionSensorPush(MotionSensor):
         # The call back registration is done once this entity is registered with HA
         # (rather than in the __init__)
         await super().async_added_to_hass()
-        self._sensor.register_callback(self._handle_coordinator_update)
+        self._sens_or_inpt.register_callback(self._handle_coordinator_update)
 
     async def async_will_remove_from_hass(self) -> None:
         """Entity being removed from hass."""
         # The opposite of async_added_to_hass. Remove any registered call backs here.
-        self._sensor.remove_callback(self._handle_coordinator_update)
+        self._sens_or_inpt.remove_callback(self._handle_coordinator_update)
 
 
-class RainSensor(CoordinatorEntity, BinarySensorEntity):
+class RainSensor(HbtnBinSensor):
     """Representation of habitron button switch input."""
 
     _attr_device_class = BinarySensorDeviceClass.MOISTURE
 
-    def __init__(self, sensor, module, coord, idx) -> None:
+    def __init__(
+        self,
+        sensor: IfDescriptor,
+        module: HbtnModule,
+        coord: DataUpdateCoordinator,
+        idx: int,
+    ) -> None:
         """Initialize rain sensor."""
+        super().__init__(sensor, module, coord, idx)
+        self._attr_unique_id: str = f"{self._module.uid}_rain"
+        self._attr_name: str = f"{self._module.name}: Rain"
+        self._attr_icon: str = "mdi:weather-rainy"
+
+    @property
+    def icon(self) -> str:
+        """Icon of the led, based on number and state."""
+        if self.is_on:
+            return "mdi:weather-rainy"
+        return "mdi:weather-partly-cloudy"
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self._on_state = self._module.sensors[self._nmbr].value == 74
+        self.async_write_ha_state()
+
+
+class HbtnState(CoordinatorEntity, BinarySensorEntity):
+    """Representation of habitron state entities."""
+
+    _attr_has_entity_name = True
+    _attr_should_poll = True
+
+    def __init__(
+        self,
+        state: StateDescriptor,
+        module: HbtnModule | HbtnRouter,
+        coord: DataUpdateCoordinator,
+        idx: int,
+    ) -> None:
+        """Initialize an Hbtnstate, pass coordinator to CoordinatorEntity."""
         super().__init__(coord, context=idx)
-        self.idx = idx
-        self._sensor = sensor
-        self._module = module
-        self._nmbr = sensor.nmbr
-        self._state = False
-        self._attr_unique_id = f"{self._module.uid}_rain"
-        self._attr_name = f"{self._module.name}: Rain"
-        self._attr_icon = "mdi:weather-rainy"
+        self.idx: int = idx
+        self._state: StateDescriptor = state
+        self._module: HbtnModule | HbtnRouter = module
+        self._nmb: int = state.nmbr
+        self._on_state: bool = False
+        self._attr_unique_id: str = f"{self._module.uid}_state_{state.nmbr}"
+        self._attr_name: str = state.name
+        if state.type == TYPE_DIAG:
+            self._attr_entity_category = EntityCategory.DIAGNOSTIC
+            self._attr_entity_registry_enabled_default = False  # initally be disabled
+        if state.type < 0:
+            # Entity will not show up
+            self._attr_entity_registry_enabled_default = False
 
     # To link this entity to its device, this property must return an
     # identifiers value matching that used in the module
     @property
-    def device_info(self) -> None:
+    def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
         if isinstance(self._module.id, int):
             return {"identifiers": {(DOMAIN, self._module.uid)}}  # router
         return {"identifiers": {(DOMAIN, self._module.uid)}}
 
     @property
-    def available(self) -> bool:
-        """Return True if module and smhub is available."""
-        return True
+    def name(self) -> str:
+        """Return the display name of this switch."""
+        return self._attr_name
 
     @property
-    def name(self) -> str:
-        """Return the display name of this flag."""
-        return self._attr_name
+    def is_on(self) -> bool:
+        """Return status of output."""
+        return self._on_state
+
+    @property
+    def icon(self) -> str:
+        """Icon of the led, based on number and state."""
+        if self.is_on:
+            return "mdi:checkbox-marked-circle-outline"
+        return "mdi:alert-circle-outline"
 
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        self._attr_is_on = self._module.sensors[self._nmbr].value == 74
-        if self._attr_is_on:
-            self._attr_icon = "mdi:weather-rainy"
-        else:
-            self._attr_icon = "mdi:weather-partly-cloudy"
-        self._state = self._attr_is_on
+        self._on_state = self._state.value == 1
         self.async_write_ha_state()

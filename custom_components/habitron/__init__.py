@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import voluptuous as vol
 
-from homeassistant import exceptions
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.device_registry import DeviceEntry
 
 from .communicate import TimeoutException
@@ -39,36 +39,36 @@ PLATFORMS: list[str] = [
 ]
 SERVICE_HUB_RESTART_SCHEMA = vol.Schema(
     {
-        vol.Required(ROUTER_NMBR, default=1): int,
+        vol.Required(ROUTER_NMBR, default=1): int,  # type: ignore
     }
 )
 SERVICE_HUB_REBOOT_SCHEMA = vol.Schema({})
 SERVICE_MOD_RESTART_SCHEMA = vol.Schema(
     {
-        vol.Required(ROUTER_NMBR, default=1): int,
-        vol.Optional(RESTART_KEY_NMBR, default=1): int,
+        vol.Required(ROUTER_NMBR, default=1): int,  # type: ignore
+        vol.Optional(RESTART_KEY_NMBR, default=1): int,  # type: ignore
     }
 )
 SERVICE_MOD_FILE_SCHEMA = vol.Schema(
     {
-        vol.Required(ROUTER_NMBR, default=1): int,
-        vol.Required(FILE_MOD_NMBR, default=1): int,
+        vol.Required(ROUTER_NMBR, default=1): int,  # type: ignore
+        vol.Required(FILE_MOD_NMBR, default=1): int,  # type: ignore
     }
 )
 SERVICE_RTR_FILE_SCHEMA = vol.Schema(
     {
-        vol.Required(ROUTER_NMBR, default=1): int,
+        vol.Required(ROUTER_NMBR, default=1): int,  # type: ignore
     }
 )
 SERVICE_RTR_RESTART_SCHEMA = vol.Schema(
     {
-        vol.Required(ROUTER_NMBR, default=1): int,
+        vol.Required(ROUTER_NMBR, default=1): int,  # type: ignore
     }
 )
 SERVICE_UPDATE_ENTITY_SCHEMA = vol.Schema(
     {
         vol.Required(HUB_UID): str,
-        vol.Required(ROUTER_NMBR, default=1): int,
+        vol.Required(ROUTER_NMBR, default=1): int,  # type: ignore
         vol.Required(MOD_NMBR): int,
         vol.Required(EVNT_TYPE): int,
         vol.Required(EVNT_ARG1): int,
@@ -145,10 +145,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 )
                 break
 
-    smhub = SmartHub(hass, entry)
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = smhub
-
     try:
+        smhub = SmartHub(hass, entry)
+        hass.data.setdefault(DOMAIN, {})[entry.entry_id] = smhub
         await smhub.async_setup()
     except (TimeoutError, TimeoutException) as ex:
         raise ConfigEntryNotReady("Timeout while connecting to SmartHub") from ex
@@ -246,7 +245,3 @@ async def update_listener(hass: HomeAssistant, entry: ConfigEntry):
         entry.options["update_interval"], entry.options["updates_enabled"]
     )
     await hbtn_comm.send_network_info(entry.options["websock_token"])
-
-
-class ConfigEntryNotReady(exceptions.HomeAssistantError):
-    """Error to indicate timeout or other error during setup."""
