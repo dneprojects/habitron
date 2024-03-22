@@ -6,9 +6,14 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.update_coordinator import (
+    CoordinatorEntity,
+    DataUpdateCoordinator,
+)
 
 from .const import DOMAIN
+from .module import HbtnModule
+from .router import HbtnRouter
 
 
 # See cover.py for more details.
@@ -21,8 +26,8 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Add sensors for passed config_entry in HA."""
-    hbtn_rt = hass.data[DOMAIN][entry.entry_id].router
-    hbtn_cord: CoordinatorEntity = hbtn_rt.coord
+    hbtn_rt: HbtnRouter = hass.data[DOMAIN][entry.entry_id].router
+    hbtn_cord: DataUpdateCoordinator = hbtn_rt.coord
 
     new_devices = []
     for hbt_module in hbtn_rt.modules:
@@ -37,19 +42,28 @@ async def async_setup_entry(
         async_add_entities(new_devices)
 
 
-class HbtnText(CoordinatorEntity, SensorEntity):
-    """Base representation of a Habitron sensor."""
+class EKeySensor(CoordinatorEntity, SensorEntity):
+    """Representation of a Habitron ekey finger print sensor."""
 
     _attr_has_entity_name = True
-    should_poll = True  # for push updates
+    _attr_should_poll = True  # for pull updates
 
-    def __init__(self, module, nmbr, coord, idx) -> None:
+    def __init__(
+        self,
+        module: HbtnModule,
+        nmbr: int,
+        coord: DataUpdateCoordinator,
+        idx: int,
+    ) -> None:
         """Initialize a Habitron text entity, pass coordinator to CoordinatorEntity."""
         super().__init__(coord, context=idx)
         self.idx = idx
         self._module = module
-        self._sensor_idx = nmbr
-        self._attr_native_value = ""
+        self._nmbr = nmbr
+        self._attr_unique_id = f"{self._module.uid}_ekey_ident"
+        self._attr_name = "Identifier Name"
+        self._attr_icon = "mdi:fingerprint"
+        self._attr_native_value = "None"
 
     async def async_added_to_hass(self) -> None:
         """Run when this Entity has been added to HA."""
@@ -60,14 +74,14 @@ class HbtnText(CoordinatorEntity, SensorEntity):
         # The call back registration is done once this entity is registered with HA
         # (rather than in the __init__)
         await super().async_added_to_hass()
-        self._module.sensors[self._sensor_idx].register_callback(
+        self._module.sensors[self._nmbr].register_callback(
             self._handle_coordinator_update
         )
 
     async def async_will_remove_from_hass(self) -> None:
         """Entity being removed from hass."""
         # The opposite of async_added_to_hass. Remove any registered call backs here.
-        self._module.sensors[self._sensor_idx].remove_callback(
+        self._module.sensors[self._nmbr].remove_callback(
             self._handle_coordinator_update
         )
 
@@ -79,14 +93,14 @@ class HbtnText(CoordinatorEntity, SensorEntity):
         return {"identifiers": {(DOMAIN, self._module.uid)}}
 
     @property
-    def name(self) -> str:
+    def name(self) -> str | None:
         """Return the display name of this sensor."""
         return self._attr_name
 
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        id_val = self._module.sensors[self._sensor_idx].value
+        id_val = int(self._module.sensors[self._nmbr].value)
         if id_val == 0:
             self._attr_native_value = "None"
         elif id_val == 255:
@@ -96,14 +110,3 @@ class HbtnText(CoordinatorEntity, SensorEntity):
         else:
             self._attr_native_value = "Unknown"
         self.async_write_ha_state()
-
-
-class EKeySensor(HbtnText):
-    """Representation of an ekey identifier sensor."""
-
-    def __init__(self, module, nmbr, coord, idx) -> None:
-        """Initialize the sensor."""
-        super().__init__(module, nmbr, coord, idx)
-        self._attr_unique_id = f"{self._module.uid}_ekey_ident"
-        self._attr_name = "Identifier Name"
-        self._attr_icon = "mdi:fingerprint"

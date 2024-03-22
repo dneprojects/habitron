@@ -10,6 +10,7 @@ from homeassistant.helpers import device_registry as dr
 
 from .const import DOMAIN, MODULE_CODES, ModuleDescriptor, MSetIdx, MStatIdx
 from .interfaces import (
+    CLedDescriptor,
     CmdDescriptor,
     CovDescriptor,
     IfDescriptor,
@@ -32,27 +33,27 @@ class HbtnModule:
         comm,
     ) -> None:
         """Init Habitron module."""
-        self._hass = hass
-        self._config = config
-        self.b_uid = b_uid
-        self.name = mod_descriptor.name
+        self._hass: HomeAssistant = hass
+        self._config: ConfigEntry = config
+        self.b_uid: str = b_uid
+        self.name: str = mod_descriptor.name
         self.comm = comm
         self.logger = logging.getLogger(__name__)
-        self.sw_version = ""
-        self.hw_version = ""
+        self.sw_version: str = ""
+        self.hw_version: str = ""
         self.uid = f"Mod_{mod_descriptor.uid}_{self.b_uid}"
-        self._addr = mod_descriptor.addr
-        self.raddr = self._addr - int(self._addr / 100) * 100
+        self._addr: int = mod_descriptor.addr
+        self.raddr: int = self._addr - int(self._addr / 100) * 100
         self.typ: bytes = mod_descriptor.mtype
         self.type: str = MODULE_CODES[self.typ]
-        self.smc = ""
-        self.status = ""
+        self.smc: str = ""
+        self.status: bytes = b""
         self.mstatus = ""
         self.shutter_state = []
-        self.climate_settings = 0
-        self.id = f"Mod_{mod_descriptor.uid}_{self.b_uid}"
-        self.group = mod_descriptor.group
-        self.mode = 1
+        self.climate_settings: int = 0
+        self.id: str = f"Mod_{mod_descriptor.uid}_{self.b_uid}"
+        self.group: int = mod_descriptor.group
+        self.mode: int = 1
 
         self.inputs: list[IfDescriptor] = []
         self.outputs: list[IfDescriptor] = []
@@ -60,12 +61,14 @@ class HbtnModule:
         self.covers: list[CovDescriptor] = []
         self.sensors: list[IfDescriptor] = []
         self.leds: list[IfDescriptor] = []
+        self.ids: list[IfDescriptor] = []
         self.messages: list[CmdDescriptor] = []
         self.dir_commands: list[CmdDescriptor] = []
         self.vis_commands: list[CmdDescriptor] = []
         self.setvalues: list[IfDescriptor] = []
         self.flags: list[StateDescriptor] = []
         self.logic: list[LgcDescriptor] = []
+        self.fingers: list[IfDescriptor] = []
         self.diags = [IfDescriptor("", 0, 0, 0)]
         self.diags.append(IfDescriptor("Status", 0, 1, 0))
 
@@ -75,7 +78,7 @@ class HbtnModule:
         return self.id
 
     @property
-    def mod_addr(self) -> str:
+    def mod_addr(self) -> int:
         """Address of module."""
         return self._addr
 
@@ -155,9 +158,7 @@ class HbtnModule:
                             )
                         elif arg_code in range(18, 26):
                             # Description of module LEDs
-                            self.leds[arg_code - 17] = IfDescriptor(
-                                text, arg_code - 17, 0, 0
-                            )
+                            self.leds[arg_code - 17].name = text
                         elif arg_code in range(40, 50):
                             # Description of  Inputs
                             if self.mod_type == "Smart Controller Mini":
@@ -206,11 +207,7 @@ class HbtnModule:
         if self.mod_type == "Smart Controller Mini":
             self.leds[0].name = "Ambient"
             for led in self.leds:
-                led.value = [0, 0, 0, 0]
                 led.type = 4
-            return True
-        elif self.typ[0] == 0:
-            self.leds[0].name = "Light"
             return True
         if self.mod_type[:16] == "Smart Controller":
             self.dimmers[0] = IfDescriptor(self.outputs[10].name, 0, 2, 0)
@@ -458,7 +455,9 @@ class SmartControllerMini(HbtnModule):
         self.outputs = [IfDescriptor("", i, 1, 0) for i in range(2)]
         self.covers = [CovDescriptor("", -1, 0, 0, 0) for i in range(0)]
         self.dimmers = [IfDescriptor("", i, -1, 0) for i in range(0)]
-        self.leds = [IfDescriptor("", i, 4, 0) for i in range(5)]
+        self.leds: list[CLedDescriptor] = [
+            CLedDescriptor("", i, 4, [0, 0, 0, 0]) for i in range(5)
+        ]
         self.diags = [IfDescriptor("", i, 0, 0) for i in range(1)]
         self.setvalues = [IfDescriptor("Set temperature", 0, 2, 20.0)]
         self.setvalues.append(IfDescriptor("Set temperature 2", 1, 2, 20.0))
@@ -578,11 +577,11 @@ class SmartDimm(HbtnModule):
 
         self.outputs = [IfDescriptor("", i, 2, 0) for i in range(4)]
         for outp in self.outputs:
-            outp.name = f"DOut{outp.nmbr}"
+            outp.name = f"DOut{outp.nmbr + 1}"
         self.dimmers = [IfDescriptor("", i, 1, 0) for i in range(4)]
         # self.inputs = [IfDescriptor("", i, 1, 0) for i in range(4)]
         for mod_inp in self.inputs:
-            mod_inp.name = f"DOut{mod_inp.nmbr}"
+            mod_inp.name = f"DIn{mod_inp.nmbr}"
         self.diags.append(IfDescriptor("PowerTemp", 1, 1, 0))
 
     def update(self, mod_status) -> None:
@@ -604,7 +603,7 @@ class SmartDimm(HbtnModule):
         self.dimmers[3].value = int(self.status[MStatIdx.DIM_4])
 
         self.diags[0].value = self.status[MStatIdx.MODULE_STAT]
-        self.diags[1].value = (
+        self.diags[1].value = round(
             int.from_bytes(
                 self.status[MStatIdx.TEMP_PWR : MStatIdx.TEMP_PWR + 2],
                 "little",
@@ -738,7 +737,6 @@ class SmartEKey(HbtnModule):
         super().__init__(mod_descriptor, hass, config, b_uid, comm)
         self.ids: list[IfDescriptor] = []
         self.sensors.append(IfDescriptor("Identifier", 0, 2, 0))
-        self.fingers: list[IfDescriptor] = []
         self.fingers.append(IfDescriptor("Finger", 0, 2, 0))
 
     def update(self, mod_status) -> None:

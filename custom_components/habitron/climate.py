@@ -14,10 +14,16 @@ from homeassistant.components.climate import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.update_coordinator import (
+    CoordinatorEntity,
+    DataUpdateCoordinator,
+)
 
 from .const import DOMAIN
+from .module import HbtnModule
+from .router import HbtnRouter
 
 
 async def async_setup_entry(
@@ -26,8 +32,8 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Add climate units for passed config_entry in HA."""
-    hbtn_rt = hass.data[DOMAIN][entry.entry_id].router
-    hbtn_cord = hbtn_rt.coord
+    hbtn_rt: HbtnRouter = hass.data[DOMAIN][entry.entry_id].router
+    hbtn_cord: DataUpdateCoordinator = hbtn_rt.coord
 
     new_devices = []
     for hbt_module in hbtn_rt.modules:
@@ -58,11 +64,16 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _enable_turn_on_off_backwards_compatibility = False
 
-    def __init__(self, module, coord, idx) -> None:
+    def __init__(
+        self,
+        module: HbtnModule,
+        coord: DataUpdateCoordinator,
+        idx: int,
+    ) -> None:
         """Initialize an HbtnLight, pass coordinator to CoordinatorEntity."""
         super().__init__(coord, context=idx)
-        self.idx = idx
-        self._module = module
+        self.idx: int = idx
+        self._module: HbtnModule = module
         self._attr_name = "Climate"
         self._attr_fan_mode = None
         self._attr_fan_modes = None
@@ -93,19 +104,19 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
             self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
             self._curr_hvac_mode = HVACMode.HEAT
         self._attr_temperature_unit = UnitOfTemperature.CELSIUS
-        self._attr_target_temperature_high = 25
-        self._attr_target_temperature_low = 15
-        self._attr_target_temperature_step = 0.5
+        self._attr_target_temperature_high: float = 25
+        self._attr_target_temperature_low: float = 15
+        self._attr_target_temperature_step: float = 0.5
 
     # To link this entity to its device, this property must return an
     # identifiers value matching that used in the module
     @property
-    def device_info(self) -> None:
+    def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
         return {"identifiers": {(DOMAIN, self._module.uid)}}
 
     @property
-    def name(self) -> str:
+    def name(self) -> str | None:
         """Return the display name of this climate unit."""
         return self._attr_name
 
@@ -135,13 +146,17 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
         return self._curr_temperature
 
     @property
-    def current_humidity(self) -> int:
+    def current_humidity(self) -> int | None:
         """Return the current humidity."""
-        return self._curr_humidity
+        if self._curr_humidity is None:
+            return None
+        return round(self._curr_humidity)
 
     @property
-    def target_temperature(self) -> float:
+    def target_temperature(self) -> int | float:
         """Return target temperature."""
+        if self._target_temperature is None:
+            return 20.0
         return self._target_temperature
 
     @property
@@ -150,7 +165,7 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
         return self._curr_hvac_mode
 
     @property
-    def hvac_action(self) -> HVACAction:
+    def hvac_action(self) -> HVACAction | None:
         """Return attribute."""
         return self._attr_hvac_action
 
@@ -162,29 +177,29 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
                 self._attr_hvac_action = HVACAction.OFF
             case HVACMode.HEAT:
                 if self._attr_hvac_action == HVACAction.IDLE:
-                    if self._curr_temperature < self._target_temperature - 1:
+                    if self._curr_temperature < self.target_temperature - 1:
                         self._attr_hvac_action = HVACAction.HEATING
                 elif self._attr_hvac_action == HVACAction.HEATING:
-                    if self._curr_temperature >= self._target_temperature:
+                    if self._curr_temperature >= self.target_temperature:
                         self._attr_hvac_action = HVACAction.IDLE
             case HVACMode.COOL:
                 if self._attr_hvac_action == HVACAction.IDLE:
-                    if self._curr_temperature > self._target_temperature + 1:
+                    if self._curr_temperature > self.target_temperature + 1:
                         self._attr_hvac_action = HVACAction.COOLING
                 elif self._attr_hvac_action == HVACAction.COOLING:
-                    if self._curr_temperature <= self._target_temperature:
+                    if self._curr_temperature <= self.target_temperature:
                         self._attr_hvac_action = HVACAction.IDLE
             case HVACMode.HEAT_COOL:
                 if self._attr_hvac_action == HVACAction.IDLE:
-                    if self._curr_temperature > self._target_temperature + 1:
+                    if self._curr_temperature > self.target_temperature + 1:
                         self._attr_hvac_action = HVACAction.COOLING
-                    elif self._curr_temperature < self._target_temperature - 1:
+                    elif self._curr_temperature < self.target_temperature - 1:
                         self._attr_hvac_action = HVACAction.HEATING
                 elif self._attr_hvac_action == HVACAction.COOLING:
-                    if self._curr_temperature <= self._target_temperature:
+                    if self._curr_temperature <= self.target_temperature:
                         self._attr_hvac_action = HVACAction.IDLE
                 elif self._attr_hvac_action == HVACAction.HEATING:
-                    if self._curr_temperature >= self._target_temperature:
+                    if self._curr_temperature >= self.target_temperature:
                         self._attr_hvac_action = HVACAction.IDLE
 
     @property
@@ -204,7 +219,7 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
     async def async_set_temperature(self, **kwargs: Any) -> None:
         """Set new target temperature."""
         self._target_temperature = kwargs.get(ATTR_TEMPERATURE)
-        int_val = int(self._target_temperature * 10)
+        int_val = int(self.target_temperature * 10)
         await self._module.comm.async_set_setpoint(self._module.mod_addr, 1, int_val)
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:

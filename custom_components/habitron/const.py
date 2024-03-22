@@ -22,7 +22,7 @@ LOC_FLAG_OFFS = 100
 GLOB_FLAG_OFFS = 132
 LOGIC_INP_OFFS = 164
 
-MODULE_CODES: Final[dict[str, str]] = {
+MODULE_CODES: Final[dict[bytes, str]] = {
     b"\x01\x01": "Smart Controller XL-1",
     b"\x01\x02": "Smart Controller XL-2",
     # b"\x01\x0a": "Smart Controller X",
@@ -244,7 +244,14 @@ class ModuleDescriptor:
     """Habitron modules descriptor."""
 
     def __init__(self, uid, addr, mtype, name, group) -> None:
-        """Initialize descrptor."""
+        """Initialize descriptor.
+
+        uid: unique id string, derived from hub's mac + rt uid
+        addr: rt id * 100 + mod raw addr
+        mtype: two bytes code for module type
+        name: module name
+        group: int of group
+        """
         self.uid: str = uid
         self.addr: int = addr
         self.mtype: bytes = mtype

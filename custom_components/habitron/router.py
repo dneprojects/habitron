@@ -78,10 +78,10 @@ class HbtnRouter:
         self.chan_list = []
         self.module_grp = []
         self.max_group = 0
-        self.modules_desc = []
-        self.modules = []
+        self.modules_desc = list
+        self.modules: list[HbtnModule] = []
         self.coll_commands: list[CmdDescriptor] = []
-        self.flags: list[CmdDescriptor] = []
+        self.flags: list[StateDescriptor] = []
         self.chan_timeouts = [
             IfDescriptor(f"Timeouts channel {i+1}", i, TYPE_DIAG, 0) for i in range(4)
         ]
@@ -91,7 +91,7 @@ class HbtnRouter:
         self.voltages = [IfDescriptor("", i, TYPE_DIAG, 0) for i in range(2)]
         self.voltages[0].name = "Voltage 5V"
         self.voltages[1].name = "Voltage 24V"
-        self.states = [IfDescriptor("", i, TYPE_DIAG, True) for i in range(2)]
+        self.states = [StateDescriptor("", i, TYPE_DIAG, True) for i in range(2)]
         self.states[0].name = "System OK"
         self.states[1].name = "Mirror started"
         self.user1_name = "user1"
@@ -213,12 +213,12 @@ class HbtnRouter:
         str_len = self.smr[ptr]
         self.version = self.smr[-22:].decode("iso8859-1").strip()
 
-    def get_module(self, mod_addr) -> HbtnModule:
+    def get_module(self, mod_addr) -> HbtnModule | None:
         """Return module based on id."""
         for module in self.modules:
             if module.raddr == mod_addr:
                 return module
-        return []
+        return None
 
     async def get_modules(self, mod_groups) -> list[ModuleDescriptor]:
         """Get summary of all Habitron modules."""
@@ -316,7 +316,10 @@ class HbtnRouter:
         """Get current communication errors."""
         resp = await self.comm.async_get_error_status(self.id)
         err_cnt = resp[0]
-        return [{resp[2 * e_idx + 1], resp[2 * e_idx + 2]} for e_idx in range(err_cnt)]
+        ret_bytes = b""
+        for e_idx in range(err_cnt):
+            ret_bytes += resp[2 * e_idx + 1] + resp[2 * e_idx + 2]
+        return ret_bytes
 
     async def update_system_status(self, sys_status) -> None:
         """Distribute module status to all modules and update self status."""
@@ -383,7 +386,7 @@ class HbtnRouter:
         """Call reset command for all modules."""
         self.comm.module_restart(self.id, 0xFF)
 
-    def unit_not_exists(self, mod_units: IfDescriptor, entry_name: str) -> bool:
+    def unit_not_exists(self, mod_units: list[IfDescriptor], entry_name: str) -> bool:
         """Check for existing unit based on name."""
         for exist_unit in mod_units:
             if exist_unit.name == entry_name:
