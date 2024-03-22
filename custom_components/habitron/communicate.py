@@ -8,7 +8,6 @@ import socket
 import struct
 from typing import Final
 
-from pymodbus.utilities import checkCRC, computeCRC
 import yaml
 
 from homeassistant.config_entries import ConfigEntry
@@ -187,7 +186,7 @@ class HbtnComm:
     def get_smhub_info(self) -> dict[str, str]:
         """Get basic infos of SmartHub."""
         smhub_info = query_smarthub(self._host)  # get info from query port
-        if smhub_info == {}:
+        if not smhub_info:
             raise (TimeoutError)
         self.is_smhub = smhub_info["serial"] == "RBPI"
         if not self.is_smhub:
@@ -761,7 +760,7 @@ class HbtnComm:
                         if flg.nmbr == arg1 + 1:
                             flg.value = int(arg2 > 0)
                             await flg.handle_upd_event()
-            except Exception as err_msg:
+            except Exception as err_msg:  # pylint: disable=broad-exception-caught
                 self.logger.warning(
                     f"Error handling habitron event {evnt} with arg1 {arg1} of module {mod_id}: {err_msg}"  # noqa: G004
                 )
@@ -840,10 +839,38 @@ async def async_send_receive(sck, cmd_str: str) -> tuple[bytes, int]:
     return resp_bytes, crc
 
 
+def init_crc16_tbl() -> list[int]:
+    """Prepare the crc16 table."""
+    res: list[int] = []
+    for byte in range(256):
+        crc = 0x0000
+        for _ in range(8):
+            if (byte ^ crc) & 0x0001:
+                crc = (crc >> 1) ^ 0xA001
+            else:
+                crc >>= 1
+            byte >>= 1
+        res.append(crc)
+    return res
+
+
+__crc16_tbl: list[int] = init_crc16_tbl()
+
+
+def calc_crc(data: bytes) -> int:
+    """Calculate a crc16 for the given byte string."""
+    crc = 0xFFFF
+    for byt in data:
+        idx = __crc16_tbl[(crc ^ int(byt)) & 0xFF]
+        crc = ((crc >> 8) & 0xFF) ^ idx
+    crc_res = ((crc << 8) & 0xFF00) | ((crc >> 8) & 0x00FF)
+    return crc_res
+
+
 def check_crc(msg) -> bool:
     """Check crc of message."""
     msg_crc = int.from_bytes(msg[-3:-1], "little")
-    return checkCRC(msg[:-3], msg_crc)
+    return calc_crc(msg[:-3]) == msg_crc
 
 
 def wrap_command(cmd_string: str) -> str:
@@ -853,7 +880,7 @@ def wrap_command(cmd_string: str) -> str:
     full_string = cmd_prefix + cmd_string
     cmd_len = len(full_string) + 3
     full_string = full_string[0] + chr(cmd_len) + full_string[2 : cmd_len - 3]
-    cmd_crc = computeCRC(full_string.encode("iso8859-1"))
+    cmd_crc = calc_crc(full_string.encode("iso8859-1"))
     crc_low = cmd_crc & 0xFF
     crc_high = (cmd_crc - crc_low) >> 8
     cmd_postfix = chr(crc_high) + chr(crc_low) + cmd_postfix
