@@ -6,6 +6,7 @@ from typing import Any
 from homeassistant.components.cover import (
     ATTR_POSITION,
     ATTR_TILT_POSITION,
+    CoverDeviceClass,
     CoverEntity,
     CoverEntityFeature,
 )
@@ -13,9 +14,15 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.update_coordinator import (
+    CoordinatorEntity,
+    DataUpdateCoordinator,
+)
 
 from .const import DOMAIN
+from .interfaces import CovDescriptor
+from .module import HbtnModule
+from .router import HbtnRouter
 
 
 async def async_setup_entry(
@@ -24,8 +31,8 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Add covers for passed config_entry in HA."""
-    hbtn_rt = hass.data[DOMAIN][entry.entry_id].router
-    hbtn_cord = hbtn_rt.coord
+    hbtn_rt: HbtnRouter = hass.data[DOMAIN][entry.entry_id].router
+    hbtn_cord: DataUpdateCoordinator = hbtn_rt.coord
 
     new_devices = []
     for hbt_module in hbtn_rt.modules:
@@ -40,13 +47,6 @@ async def async_setup_entry(
                         HbtnBlind(mod_cover, hbt_module, hbtn_cord, len(new_devices))
                     )
 
-    # Fetch initial data so we have data when entities subscribe
-    #
-    # If the refresh fails, async_config_entry_first_refresh will
-    # raise ConfigEntryNotReady and setup will try again later
-    #
-    # If you do not want to retry setup on failure, use
-    # coordinator.async_refresh() instead
     if new_devices:
         await hbtn_cord.async_config_entry_first_refresh()
         hbtn_cord.data = new_devices
@@ -60,6 +60,9 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
     """Representation of a shutter cover."""
 
     _attr_has_entity_name = True
+    _attr_device_class = CoverDeviceClass.SHUTTER
+    _attr_has_entity_name = True
+    _attr_should_poll = True  # for push updates
 
     supported_features = (
         CoverEntityFeature.SET_POSITION
@@ -67,31 +70,34 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
         | CoverEntityFeature.CLOSE
         | CoverEntityFeature.STOP
     )
-    device_class = "shutter"
-    has_entity_name = True
-    should_poll = True  # for push updates
 
-    def __init__(self, cover, module, coord, idx) -> None:
+    def __init__(
+        self,
+        cover: CovDescriptor,
+        module: HbtnModule,
+        coord: DataUpdateCoordinator,
+        idx: int,
+    ) -> None:
         """Initialize an HbtnShutter, pass coordinator to CoordinatorEntity."""
         super().__init__(coord, context=idx)
-        self.idx = idx
-        self._cover = cover
-        self._module = module
-        self._attr_name = cover.name
-        self._nmbr = cover.nmbr
-        self._polarity = cover.type > 0
+        self.idx: int = idx
+        self._cover: CovDescriptor = cover
+        self._module: HbtnModule = module
+        self._attr_name: str = cover.name
+        self._nmbr: int = cover.nmbr
+        self._polarity: bool = cover.type > 0
         if self._polarity:
             self._out_up = self._nmbr * 2
             self._out_down = self._nmbr * 2 + 1
         else:
             self._out_up = self._nmbr * 2 + 1
             self._out_down = self._nmbr * 2
-        self._position = 0
-        self._moving = 0
-        self.open_cnt = 0
-        self.closed_cnt = 0
-        self.max_cnt = 2
-        self._attr_unique_id = f"{self._module.uid}_cover_{cover.nmbr}"
+        self._position: int = 0
+        self._moving: int = 0
+        # self.open_cnt = 0
+        # self.closed_cnt = 0
+        # self.max_cnt = 2
+        self._attr_unique_id: str = f"{self._module.uid}_cover_{cover.nmbr}"
 
     async def async_added_to_hass(self) -> None:
         """Run when this Entity has been added to HA."""
@@ -151,7 +157,7 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        self._position = 100 - self._module.covers[self._nmbr].value
+        self._position = 100 - int(self._cover.value)
         self._moving = 0
         if self._module.outputs[self._out_up].value > 0:
             # if (self._position == 100) & (self.open_cnt >= self.max_cnt):
@@ -200,7 +206,7 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
 
     async def async_set_cover_position(self, **kwargs: Any) -> None:
         """Move the cover to position."""
-        tmp_position = kwargs.get(ATTR_POSITION)
+        tmp_position = int(kwargs.get(ATTR_POSITION))
         sh_nmbr = self._nmbr + 1
         if self._module.mod_type[:16] == "Smart Controller":
             sh_nmbr -= 2  # map #3..5 to 1..3
@@ -223,7 +229,7 @@ class HbtnBlind(HbtnShutter):
         | CoverEntityFeature.STOP
         | CoverEntityFeature.SET_TILT_POSITION
     )
-    device_class = "blind"
+    _attr_device_class = CoverDeviceClass.BLIND
 
     def __init__(self, cover, module, coord, idx) -> None:
         """Initialize an HbtnShutterTilt."""
@@ -238,7 +244,7 @@ class HbtnBlind(HbtnShutter):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        self._position = 100 - self._module.covers[self._nmbr].value
+        self._position = 100 - int(self._module.covers[self._nmbr].value)
         self._tilt_position = 100 - self._module.covers[self._nmbr].tilt
         self._moving = 0
 
@@ -266,7 +272,7 @@ class HbtnBlind(HbtnShutter):
 
     async def async_set_cover_tilt_position(self, **kwargs: Any) -> None:
         """Set the tilt angle."""
-        tmp_tilt_position = kwargs.get(ATTR_TILT_POSITION)
+        tmp_tilt_position = int(kwargs.get(ATTR_TILT_POSITION))
         sh_nmbr = self._nmbr + 1
         if self._module.mod_type == "Smart Controller":
             sh_nmbr -= 2  # map #3..5 to 1..3

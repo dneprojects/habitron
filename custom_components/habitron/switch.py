@@ -4,13 +4,20 @@ from __future__ import annotations
 
 from typing import Any
 
-from homeassistant.components.switch import SwitchEntity
+from homeassistant.components.switch import SwitchDeviceClass, SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.update_coordinator import (
+    CoordinatorEntity,
+    DataUpdateCoordinator,
+)
 
 from .const import DOMAIN
+from .interfaces import IfDescriptor, StateDescriptor
+from .module import HbtnModule
+from .router import HbtnRouter
 
 
 async def async_setup_entry(
@@ -19,7 +26,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Add switches for passed config_entry in HA."""
-    hbtn_rt = hass.data[DOMAIN][entry.entry_id].router
+    hbtn_rt: HbtnRouter = hass.data[DOMAIN][entry.entry_id].router
     hbtn_cord = hbtn_rt.coord
 
     new_devices = []
@@ -65,25 +72,26 @@ async def async_setup_entry(
 class SwitchedLed(CoordinatorEntity, SwitchEntity):
     """Module switch background LEDs."""
 
-    should_poll = False  # for push updates
-    device_class = "switch"
+    _attr_should_poll = False  # for push updates
+    _attr_device_class = SwitchDeviceClass.SWITCH
     _attr_has_entity_name = True
 
-    def __init__(self, led, module, coord, idx) -> None:
+    def __init__(
+        self,
+        led: IfDescriptor,
+        module: HbtnModule,
+        coord: DataUpdateCoordinator,
+        idx: int,
+    ) -> None:
         """Initialize an HbtnLED, pass coordinator to CoordinatorEntity."""
         super().__init__(coord, context=idx)
-        self.idx = idx
-        self._led = led
-        self._module = module
-        self._attr_name = led.name
-        self._nmbr = led.nmbr
-        self._state = None
-        self._brightness = None
-        self._attr_unique_id = f"{self._module.uid}_led_{self.idx}"
-        if led.nmbr == 0:
-            self._attr_icon = "mdi:circle-medium"
-        else:
-            self._attr_icon = "mdi:circle-outline"
+        self.idx: int = idx
+        self._led: IfDescriptor = led
+        self._module: HbtnModule = module
+        self._attr_name: str = led.name
+        self._nmbr: int = led.nmbr
+        self._state: bool = False
+        self._attr_unique_id: str = f"{self._module.uid}_led_{self.idx}"
 
     async def async_added_to_hass(self) -> None:
         """Run when this Entity has been added to HA."""
@@ -102,44 +110,35 @@ class SwitchedLed(CoordinatorEntity, SwitchEntity):
         self._module.leds[self._nmbr].remove_callback(self.async_write_ha_state)
 
     @property
-    def device_info(self) -> None:
+    def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
         return {"identifiers": {(DOMAIN, self._module.uid)}}
 
     @property
-    def name(self) -> str:
+    def name(self) -> str | None:
         """Return the display name of this switch."""
         return self._attr_name
 
     @property
     def is_on(self) -> bool:
         """Return status of output."""
-        self._attr_state = self._module.leds[self._nmbr].value == 1
-        if self._attr_state:
-            if self._nmbr:
-                self._attr_icon = "mdi:circle-double"
-            else:
-                self._attr_icon = "mdi:white-balance-sunny"
-        elif self._nmbr:
-            self._attr_icon = "mdi:circle-outline"
-        else:
-            self._attr_icon = "mdi:circle-medium"
-        return self._attr_state
+        return self._state
+
+    @property
+    def icon(self) -> str:
+        """Icon of the led, based on number and state."""
+        if (self._nmbr > 0) & self.is_on:
+            return "mdi:circle-double"
+        if (self._nmbr > 0) & (not self.is_on):
+            return "mdi:circle-outline"
+        if self.is_on:
+            return "mdi:white-balance-sunny"
+        return "mdi:circle-medium"
 
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        self._attr_is_on = self._module.leds[self._nmbr].value == 1
-        self._attr_state = self._attr_is_on
-        if self._attr_is_on:
-            if self._nmbr:
-                self._attr_icon = "mdi:circle-double"
-            else:
-                self._attr_icon = "mdi:white-balance-sunny"
-        elif self._nmbr:
-            self._attr_icon = "mdi:circle-outline"
-        else:
-            self._attr_icon = "mdi:circle-medium"
+        self._state = self._led.value == 1
         self.async_write_ha_state()
 
     async def async_turn_on(self, **kwargs: Any) -> None:
@@ -147,85 +146,90 @@ class SwitchedLed(CoordinatorEntity, SwitchEntity):
         await self._module.comm.async_set_output(
             self._module.mod_addr, self._nmbr + len(self._module.outputs) + 1, 1
         )
+        self._state = True
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Instruct the led to turn off."""
         await self._module.comm.async_set_output(
             self._module.mod_addr, self._nmbr + len(self._module.outputs) + 1, 0
         )
+        self._state = False
 
 
 class HbtnFlag(CoordinatorEntity, SwitchEntity):
     """Module switch local flag."""
 
-    device_class = "switch"
+    _attr_device_class = SwitchDeviceClass.SWITCH
     _attr_has_entity_name = True
 
-    def __init__(self, flag, module, coord, idx) -> None:
+    def __init__(
+        self,
+        flag: StateDescriptor,
+        module: HbtnRouter | HbtnModule,
+        coord: DataUpdateCoordinator,
+        idx: int,
+    ) -> None:
         """Initialize an HbtnFlag, pass coordinator to CoordinatorEntity."""
         super().__init__(coord, context=idx)
-        self.idx = idx
-        self._flag = flag
-        self._module = module
-        self._attr_name = flag.name
-        self._nmbr = flag.nmbr
-        self._state = None
-        self._brightness = None
-        self._attr_unique_id = f"{self._module.uid}_flag_{self._nmbr}"
-        self._attr_icon = "mdi:bookmark-outline"
+        self.idx: int = idx
+        self._flag: StateDescriptor = flag
+        self._module: HbtnRouter | HbtnModule = module
+        self._attr_name: str = flag.name
+        self._nmbr: int = flag.nmbr
+        self._state: bool = False
+        self._attr_unique_id: str = f"{self._module.uid}_flag_{self._nmbr}"
 
     @property
-    def device_info(self) -> None:
+    def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
         return {"identifiers": {(DOMAIN, self._module.uid)}}
 
     @property
-    def name(self) -> str:
+    def name(self) -> str | None:
         """Return the display name of this switch."""
         return self._attr_name
 
     @property
     def is_on(self) -> bool:
         """Return status of output."""
-        self._attr_state = self._module.flags[self.idx].value == 1
-        if self._attr_state:
-            self._attr_icon = "mdi:bookmark-check"
-        else:
-            self._attr_icon = "mdi:bookmark-outline"
-        return self._attr_state
+        return self._state
+
+    @property
+    def icon(self) -> str:
+        """Icon of the led, based on number and state."""
+        if self.is_on:
+            return "mdi:bookmark-check"
+        return "mdi:bookmark-outline"
 
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        self._attr_is_on = self._module.flags[self.idx].value == 1
-        if self._attr_is_on:
-            self._attr_icon = "mdi:bookmark-check"
-        else:
-            self._attr_icon = "mdi:bookmark-outline"
-        self._state = self._attr_is_on
+        self._state = self._flag.value == 1
         self.async_write_ha_state()
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Instruct the flag to turn on."""
-        if isinstance(self._module.id, int):
-            mod_addr = self._module.id
-        else:
+        if isinstance(self._module, HbtnModule):
             mod_addr = self._module.mod_addr
+        else:
+            mod_addr = self._module.id
         await self._module.comm.async_set_flag(mod_addr, self._nmbr, 1)
+        self._state = True
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Instruct the flag to turn off."""
-        if isinstance(self._module.id, int):
-            mod_addr = self._module.id
-        else:
+        if isinstance(self._module, HbtnModule):
             mod_addr = self._module.mod_addr
+        else:
+            mod_addr = self._module.id
         await self._module.comm.async_set_flag(mod_addr, self._nmbr, 0)
+        self._state = False
 
 
 class HbtnFlagPush(HbtnFlag):
     """Representation of habitron flag entities for push update."""
 
-    should_poll = True  # for push updates
+    _attr_should_poll = False  # for push updates
 
     async def async_added_to_hass(self) -> None:
         """Run when this Entity has been added to HA."""

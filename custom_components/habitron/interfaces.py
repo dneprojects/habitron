@@ -13,7 +13,7 @@ class IfDescriptor:
         self.name: str = iname
         self.nmbr: int = inmbr
         self.type: int = itype
-        self.value: int = ivalue
+        self.value: int | float = ivalue
         self._callbacks = set()
 
     def register_callback(self, callback: Callable[[], None]) -> None:
@@ -37,6 +37,15 @@ class IfDescriptor:
     def set_name(self, new_name: str):
         """Setter for name property."""
         self.name = new_name
+
+
+class CLedDescriptor(IfDescriptor):
+    """Habitron cover interface descriptor."""
+
+    def __init__(self, iname, inmbr, itype, ivalue) -> None:
+        """Initialize interface."""
+        super().__init__(iname, inmbr, itype, ivalue)
+        self.value: list[int] = ivalue
 
 
 class CovDescriptor(IfDescriptor):

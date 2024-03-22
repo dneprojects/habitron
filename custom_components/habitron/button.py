@@ -8,6 +8,7 @@ from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
+from .router import HbtnRouter
 
 
 async def async_setup_entry(
@@ -16,7 +17,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Add button for passed config_entry in HA."""
-    hbtn_rt = hass.data[DOMAIN][entry.entry_id].router
+    hbtn_rt: HbtnRouter = hass.data[DOMAIN][entry.entry_id].router
 
     new_devices = []
 
@@ -63,7 +64,7 @@ class CollCmdButton(ButtonEntity):
         return {"identifiers": {(DOMAIN, self._module.uid)}}
 
     @property
-    def name(self) -> str:
+    def name(self) -> str | None:
         """Return the display name of this button."""
         return self._attr_name
 
@@ -90,7 +91,7 @@ class DirCmdButton(ButtonEntity):
         return {"identifiers": {(DOMAIN, self._module.uid)}}
 
     @property
-    def name(self) -> str:
+    def name(self) -> str | None:
         """Return the display name of this button."""
         return self._attr_name
 
@@ -121,7 +122,7 @@ class VisCmdButton(ButtonEntity):
         return {"identifiers": {(DOMAIN, self._module.uid)}}
 
     @property
-    def name(self) -> str:
+    def name(self) -> str | None:
         """Return the display name of this button."""
         return self._attr_name
 
@@ -255,7 +256,7 @@ class CountUpButton(ButtonEntity):
         return {"identifiers": {(DOMAIN, self._module.uid)}}
 
     @property
-    def name(self) -> str:
+    def name(self) -> str | None:
         """Return the display name of this button."""
         return self._attr_name
 
@@ -285,7 +286,7 @@ class CountDownButton(ButtonEntity):
         return {"identifiers": {(DOMAIN, self._module.uid)}}
 
     @property
-    def name(self) -> str:
+    def name(self) -> str | None:
         """Return the display name of this button."""
         return self._attr_name
 
