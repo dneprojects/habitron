@@ -180,7 +180,7 @@ class HbtnModule:
                             # Description of flags
                             self.flags.append(
                                 StateDescriptor(
-                                    text, len(self.flags), arg_code - 119, 0
+                                    text, len(self.flags), arg_code - 119, 0, False
                                 )
                             )
                         elif arg_code in range(140, 173):
@@ -578,7 +578,7 @@ class SmartDimm(HbtnModule):
         self.outputs = [IfDescriptor("", i, 2, 0) for i in range(4)]
         for outp in self.outputs:
             outp.name = f"DOut{outp.nmbr + 1}"
-        self.dimmers = [IfDescriptor("", i, 1, 0) for i in range(4)]
+        self.dimmers = [IfDescriptor("", i, 2, 0) for i in range(4)]
         # self.inputs = [IfDescriptor("", i, 1, 0) for i in range(4)]
         for mod_inp in self.inputs:
             mod_inp.name = f"DIn{mod_inp.nmbr}"
