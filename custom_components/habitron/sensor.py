@@ -1,8 +1,20 @@
 """Platform for sensor integration."""
 
-
-from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorStateClass,
+)
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import (
+    LIGHT_LUX,
+    PERCENTAGE,
+    UnitOfElectricCurrent,
+    UnitOfElectricPotential,
+    UnitOfFrequency,
+    UnitOfSpeed,
+    UnitOfTemperature,
+)
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -84,9 +96,16 @@ async def async_setup_entry(  # noqa: C901
                 )
         for mod_logic in hbt_module.logic:
             if mod_logic.type > 0:
-                new_devices.append(
-                    LogicSensor(hbt_module, mod_logic, hbtn_cord, len(new_devices))
-                )
+                if hbt_module.comm.is_smhub:
+                    new_devices.append(
+                        LogicSensorPush(
+                            hbt_module, mod_logic, hbtn_cord, len(new_devices)
+                        )
+                    )
+                else:
+                    new_devices.append(
+                        LogicSensor(hbt_module, mod_logic, hbtn_cord, len(new_devices))
+                    )
         for mod_diag in hbt_module.diags:
             if mod_diag.name == "Status":
                 new_devices.append(
@@ -117,7 +136,7 @@ class HbtnSensor(CoordinatorEntity, SensorEntity):
     """Base representation of a Habitron sensor."""
 
     _attr_has_entity_name = True
-    state_class = "measurement"
+    _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, module, sensor, coord, idx) -> None:
         """Initialize a Habitron sensor, pass coordinator to CoordinatorEntity."""
@@ -125,7 +144,7 @@ class HbtnSensor(CoordinatorEntity, SensorEntity):
         self.idx = idx
         self._module = module
         self._sensor_idx = sensor.nmbr
-        self._attr_state = 0
+        self._attr_state: float | int
         self._value = 0
         self._attr_unique_id = f"{self._module.uid}_{sensor.name.lower()}"
         self._attr_name = sensor.name
@@ -138,7 +157,7 @@ class HbtnSensor(CoordinatorEntity, SensorEntity):
         return {"identifiers": {(DOMAIN, self._module.uid)}}
 
     @property
-    def name(self) -> str:
+    def name(self) -> str | None:
         """Return the display name of this sensor."""
         return self._attr_name
 
@@ -152,9 +171,8 @@ class HbtnSensor(CoordinatorEntity, SensorEntity):
 class TemperatureSensor(HbtnSensor):
     """Representation of a Sensor."""
 
-    device_class = SensorDeviceClass.TEMPERATURE
-    _attr_native_unit_of_measurement = "°C"
-    _attr_unit_of_measurement = "°C"
+    _attr_device_class = SensorDeviceClass.TEMPERATURE
+    _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
 
     def __init__(self, module, sensor, coord, idx) -> None:
         """Initialize the sensor."""
@@ -168,23 +186,21 @@ class TemperatureSensor(HbtnSensor):
 class HumiditySensor(HbtnSensor):
     """Representation of a Sensor."""
 
-    device_class = SensorDeviceClass.HUMIDITY
-    _attr_native_unit_of_measurement = "%"
-    _attr_unit_of_measurement = "%"
+    _attr_device_class = SensorDeviceClass.HUMIDITY
+    _attr_native_unit_of_measurement = PERCENTAGE
 
 
 class IlluminanceSensor(HbtnSensor):
     """Representation of an illuminance sensor."""
 
-    device_class = SensorDeviceClass.ILLUMINANCE
-    _attr_native_unit_of_measurement = "lx"
-    _attr_unit_of_measurement = "lx"
+    _attr_device_class = SensorDeviceClass.ILLUMINANCE
+    _attr_native_unit_of_measurement = LIGHT_LUX
 
 
 class EKeySensor(HbtnSensor):
     """Representation of an ekey identifier sensor."""
 
-    should_poll = True  # for push updates
+    _attr_should_poll = True  # for push updates
 
     def __init__(self, module, sensor, coord, idx) -> None:
         """Initialize the sensor."""
@@ -216,9 +232,8 @@ class EKeySensor(HbtnSensor):
 class WindSensor(HbtnSensor):
     """Representation of a wind sensor."""
 
-    # device_class = SensorDeviceClass.WIND_SPEED
-    _attr_native_unit_of_measurement = "m/s"
-    _attr_unit_of_measurement = "m/s"
+    _attr_device_class = SensorDeviceClass.WIND_SPEED
+    _attr_native_unit_of_measurement = UnitOfSpeed.METERS_PER_SECOND
 
     def __init__(self, module, sensor, coord, idx) -> None:
         """Initialize the sensor."""
@@ -229,11 +244,13 @@ class WindSensor(HbtnSensor):
 class AirqualitySensor(HbtnSensor):
     """Representation of a airquality sensor."""
 
-    device_class = SensorDeviceClass.AQI
+    _attr_device_class = SensorDeviceClass.AQI
 
 
 class HbtnDiagSensor(CoordinatorEntity, SensorEntity):
     """Base representation of a Habitron sensor."""
+
+    _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, module, diag, coord, idx) -> None:
         """Initialize a Habitron sensor, pass coordinator to CoordinatorEntity."""
@@ -241,7 +258,7 @@ class HbtnDiagSensor(CoordinatorEntity, SensorEntity):
         self.idx = idx
         self._module = module
         self._diag_idx = diag.nmbr
-        self._attr_state = 0
+        self._attr_state: float | int
         self._value = 0
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
         self._attr_entity_registry_enabled_default = (
@@ -265,11 +282,8 @@ class HbtnDiagSensor(CoordinatorEntity, SensorEntity):
 class TemperatureDSensor(HbtnDiagSensor):
     """Representation of a Sensor."""
 
-    device_class = SensorDeviceClass.TEMPERATURE
-    state_class = "measurement"
-
-    _attr_native_unit_of_measurement = "°C"
-    _attr_unit_of_measurement = "°C"
+    _attr_device_class = SensorDeviceClass.TEMPERATURE
+    _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
 
     def __init__(self, module, diag, coord, idx) -> None:
         """Initialize the sensor."""
@@ -302,12 +316,13 @@ class LogicSensor(HbtnSensor):
     """Representation of a logic state sensor."""
 
     _attr_native_unit_of_measurement = ""
-    _attr_unit_of_measurement = ""
+    _attr_should_poll = True  # for push updates
 
     def __init__(self, module, logic, coord, idx) -> None:
         """Initialize the sensor."""
         super().__init__(module, logic, coord, idx)
         self.idx = logic.idx
+        self.logic = logic
         self._attr_unique_id = f"{self._module.uid}_logic_{logic.nmbr}"
         self._attr_name = f"Cnt{logic.nmbr + 1}: {logic.name}"
         self._attr_icon = "mdi:counter"
@@ -319,10 +334,8 @@ class LogicSensor(HbtnSensor):
         self.async_write_ha_state()
 
 
-class LogicSensorPush(HbtnSensor):
+class LogicSensorPush(LogicSensor):
     """Representation of a logic state sensor for push update."""
-
-    should_poll = True  # for push updates
 
     async def async_added_to_hass(self) -> None:
         """Run when this Entity has been added to HA."""
@@ -333,22 +346,19 @@ class LogicSensorPush(HbtnSensor):
         # The call back registration is done once this entity is registered with HA
         # (rather than in the __init__)
         await super().async_added_to_hass()
-        if self._module.comm.is_smhub:
-            self.logic.register_callback(self._handle_coordinator_update)
+        self.logic.register_callback(self._handle_coordinator_update)
 
     async def async_will_remove_from_hass(self) -> None:
         """Entity being removed from hass."""
         # The opposite of async_added_to_hass. Remove any registered call backs here.
-        if self._module.comm.is_smhub:
-            self.logic.remove_callback(self._handle_coordinator_update)
+        self.logic.remove_callback(self._handle_coordinator_update)
 
 
 class CurrSensor(HbtnSensor):
     """Representation of a current sensor."""
 
-    device_class = SensorDeviceClass.CURRENT
-    _attr_native_unit_of_measurement = "A"
-    _attr_unit_of_measurement = "A"
+    _attr_device_class = SensorDeviceClass.CURRENT
+    _attr_native_unit_of_measurement = UnitOfElectricCurrent.AMPERE
 
     def __init__(self, module, sensor, coord, idx) -> None:
         """Initialize the sensor."""
@@ -369,9 +379,8 @@ class CurrSensor(HbtnSensor):
 class VoltSensor(HbtnSensor):
     """Representation of a voltage sensor."""
 
-    device_class = SensorDeviceClass.VOLTAGE
-    _attr_native_unit_of_measurement = "V"
-    _attr_unit_of_measurement = "V"
+    _attr_device_class = SensorDeviceClass.VOLTAGE
+    _attr_native_unit_of_measurement = UnitOfElectricPotential.VOLT
 
     def __init__(self, module, sensor, coord, idx) -> None:
         """Initialize the sensor."""
@@ -393,7 +402,6 @@ class TimeOutSensor(HbtnSensor):
     """Representation of a timeout count sensor."""
 
     _attr_native_unit_of_measurement = ""
-    _attr_unit_of_measurement = ""
 
     def __init__(self, module, timeout, coord, idx) -> None:
         """Initialize the sensor."""
@@ -415,19 +423,18 @@ class TimeOutSensor(HbtnSensor):
 class PercSensor(HbtnSensor):
     """Representation of a percentage sensor."""
 
-    _attr_native_unit_of_measurement = "%"
-    _attr_unit_of_measurement = "%"
+    _attr_native_unit_of_measurement = PERCENTAGE
 
     def __init__(self, module, perctg, coord, idx) -> None:
         """Initialize the sensor."""
         super().__init__(module, perctg, coord, idx)
         self.type = perctg.type
         self._attr_unique_id = f"{self._module.uid}_perc_{perctg.nmbr}"
-        if self._attr_name[:6].lower() == "memory":
+        if self._attr_name[:6].lower() == "memory":  # type: ignore
             self._attr_icon = "mdi:memory"
-        elif self._attr_name[:4].lower() == "disk":
+        elif self._attr_name[:4].lower() == "disk":  # type: ignore
             self._attr_icon = "mdi:harddisk"
-        elif self._attr_name.lower() == "cpu load":
+        elif self._attr_name.lower() == "cpu load":  # type: ignore
             self._attr_icon = "mdi:timer-alert-outline"
         else:
             self._attr_icon = "mdi:percent-circle-outline"
@@ -451,14 +458,14 @@ class PercSensor(HbtnSensor):
 class FrequencySensor(HbtnSensor):
     """Representation of a frequency sensor."""
 
-    _attr_native_unit_of_measurement = "Hz"
-    _attr_unit_of_measurement = "Hz"
+    _attr_device_class = SensorDeviceClass.FREQUENCY
+    _attr_native_unit_of_measurement = UnitOfFrequency.HERTZ
 
     def __init__(self, module, freq, coord, idx) -> None:
         """Initialize the sensor."""
         super().__init__(module, freq, coord, idx)
         self.type = freq.type
-        if self._attr_name.lower() == "cpu frequency":
+        if self._attr_name.lower() == "cpu frequency":  # type: ignore
             self._attr_icon = "mdi:clock-fast"
         else:
             self._attr_icon = "mdi:sine-wave"
