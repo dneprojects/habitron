@@ -91,8 +91,9 @@ class HbtnRouter:
         self.voltages = [IfDescriptor("", i, TYPE_DIAG, 0) for i in range(2)]
         self.voltages[0].name = "Voltage 5V"
         self.voltages[1].name = "Voltage 24V"
-        self.states = [StateDescriptor("", i, TYPE_DIAG, True) for i in range(2)]
+        self.states = [StateDescriptor("", i, i, TYPE_DIAG, True) for i in range(2)]
         self.states[0].name = "System OK"
+        self.states[0].type = 0  # not diag, shows up always
         self.states[1].name = "Mirror started"
         self.user1_name = "user1"
         self.user2_name = "user2"
@@ -258,7 +259,7 @@ class HbtnRouter:
             entry_name = line[9:line_len].decode("iso8859-1").strip()
             if content_code == 767:  # FF 02: global flg (Merker)
                 self.flags.append(
-                    StateDescriptor(entry_name, len(self.flags), entry_no, 0)
+                    StateDescriptor(entry_name, len(self.flags), entry_no, 0, False)
                 )
             elif content_code == 1023:  # FF 03: collective commands (Sammelbefehle)
                 self.coll_commands.append(CmdDescriptor(entry_name, entry_no))
@@ -284,6 +285,7 @@ class HbtnRouter:
                                     len(self.modules[self.mod_reg[mod_addr]].flags),
                                     entry_no,
                                     0,
+                                    False,
                                 )
                             )
                     # elif int(line[2]) == 2:
@@ -380,11 +382,11 @@ class HbtnRouter:
 
     async def async_reset(self) -> None:
         """Call reset command for self."""
-        self.comm.module_restart(self.id, 0)
+        await self.comm.module_restart(self.id, 0)
 
     async def async_reset_all_modules(self) -> None:
         """Call reset command for all modules."""
-        self.comm.module_restart(self.id, 0xFF)
+        await self.comm.module_restart(self.id, 0xFF)
 
     def unit_not_exists(self, mod_units: list[IfDescriptor], entry_name: str) -> bool:
         """Check for existing unit based on name."""

@@ -74,13 +74,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for habitron."""
 
     VERSION = 1
-    # Pick one of the available connection classes in homeassistant/config_entries.py
-    # This tells HA if it should be asking for updates, or it'll be notified of updates
-    # automatically. This example uses PUSH, as the dummy smhub will notify HA of
-    # changes.
+
     CONNECTION_CLASS = config_entries.CONN_CLASS_LOCAL_POLL
 
-    @staticmethod
+    @staticmethod  # type: ignore
     @callback
     def async_get_options_flow(
         config_entry: config_entries.ConfigEntry,
@@ -106,15 +103,15 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             {
                 vol.Required(
                     "habitron_host",
-                    default=default_host,
+                    default=default_host,  # type: ignore
                 ): str,
                 vol.Required(
                     "update_interval",
-                    default=default_interval,
+                    default=default_interval,  # type: ignore
                 ): int,
                 vol.Optional(
                     "websock_token",
-                    default="",
+                    default="",  # type: ignore
                 ): str,
             }
         )
@@ -184,11 +181,11 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 ): int,
                 vol.Required(
                     "updates_enabled",
-                    default=default_enablestate,
+                    default=default_enablestate,  # type: ignore
                 ): bool,
                 vol.Optional(
                     "websock_token",
-                    default="",
+                    default="",  # type: ignore
                 ): str,
             }
         )

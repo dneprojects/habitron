@@ -77,9 +77,9 @@ class LgcDescriptor(IfDescriptor):
 class StateDescriptor(IfDescriptor):
     """Descriptor for modes and flags."""
 
-    def __init__(self, sname, sidx, snmbr, svalue) -> None:
+    def __init__(self, sname, sidx, snmbr, stype, svalue) -> None:
         """Initialize interface."""
-        super().__init__(sname, snmbr, 0, svalue)
+        super().__init__(sname, snmbr, stype, svalue)
         self.idx: int = sidx
 
 

@@ -143,9 +143,7 @@ class SwitchedLed(CoordinatorEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Instruct the led to turn on."""
-        await self._module.comm.async_set_output(
-            self._module.mod_addr, self._nmbr + len(self._module.outputs) + 1, 1
-        )
+        await self._module.comm.async_set_led_outp(self._module.mod_addr, self._nmbr, 1)
         self._state = True
 
     async def async_turn_off(self, **kwargs: Any) -> None:
