@@ -433,6 +433,17 @@ class HbtnComm:
         cmd_str = cmd_str.replace("<arg1>", chr(nmbr))
         await self.async_send_command(cmd_str)
 
+    async def async_set_led_outp(self, mod_id, nmbr, val) -> None:
+        """Translate led nmbr to output nmbr and send on/off command."""
+        rtr_nmbr = int(mod_id / 100)
+        mod_addr = int(mod_id - 100 * rtr_nmbr)
+        mod = self.router.get_module(mod_addr)
+        await self.async_set_output(
+            mod_id,
+            nmbr + len(mod.outputs) + 1,  # type: ignore
+            val,
+        )
+
     async def async_set_dimmval(self, mod_id, nmbr, val) -> None:
         """Send value to dimm output."""
         rtr_nmbr = int(mod_id / 100)
@@ -760,6 +771,9 @@ class HbtnComm:
                         if flg.nmbr == arg1 + 1:
                             flg.value = int(arg2 > 0)
                             await flg.handle_upd_event()
+                elif evnt == HaEvents.CNT_VAL:
+                    module.logic[arg1].value = arg2
+                    await module.logic[arg1].handle_upd_event()
             except Exception as err_msg:  # pylint: disable=broad-exception-caught
                 self.logger.warning(
                     f"Error handling habitron event {evnt} with arg1 {arg1} of module {mod_id}: {err_msg}"  # noqa: G004
