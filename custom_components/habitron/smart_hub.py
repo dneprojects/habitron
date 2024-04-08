@@ -1,8 +1,11 @@
 """SmartHub class."""
+
 from __future__ import annotations
 
 from enum import Enum
+from pathlib import Path
 
+from homeassistant.components.frontend import add_extra_js_url
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
@@ -63,6 +66,15 @@ class SmartHub:
             sw_version=self._version,
             hw_version=self._type,
         )
+        # Habitron iconset
+        should_cache = False
+        files_path = Path(__file__).parent / "icons"
+        hass.http.register_static_path(
+            "/api/habitron/icons/hbt-icons.js",
+            str(files_path / "hbt-icons.js"),
+            should_cache,
+        )
+        add_extra_js_url(hass, "/api/habitron/icons/hbt-icons.js")
         self.sensors: list[IfDescriptor] = []
         self.diags: list[IfDescriptor] = []
         self.loglvl: list[IfDescriptor] = []
