@@ -1,4 +1,5 @@
 """Communicate class for Habitron system."""
+
 from __future__ import annotations
 
 import asyncio
@@ -14,11 +15,13 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 import homeassistant.exceptions as HAexceptions
 
-from .const import DOMAIN, HaEvents, MStatIdx
+from .const import DOMAIN, HaEvents
 from .router import HbtnRouter
 
 BASE_PATH_COMPONENT = "./homeassistant/components"
 BASE_PATH_CUSTOM_COMPONENT = "./custom_components"
+DATA_FILES_ADDON_DIR = "/addon_configs/"
+DEF_TOKEN_FILE = "def_token.set"
 
 SMHUB_COMMANDS: Final[dict[str, str]] = {
     "GET_MODULES": "\x0a\1\2<rtr>\0\0\0",
@@ -100,6 +103,7 @@ class HbtnComm:
         self.router: HbtnRouter
         self.update_suspended: bool = False
         self.is_smhub: bool = False  # will be set in get_smhub_info()
+        self.is_addon: bool = False  # will be set in get_smhub_info()
         self.info: dict[str, str] = self.get_smhub_info()
         self.grp_modes: dict = {}
 
@@ -147,10 +151,12 @@ class HbtnComm:
         ipv4 = self._network_ip
         ip_len = len(ipv4)
         tk_len = len(tok)
-        nmbrs = self._mac.split(":")
-        for i in range(len(nmbrs)):
-            idx = int("0x" + nmbrs[len(nmbrs) - i - 1], 0) & 0x7F
-            tok = tok[:idx] + tok[idx + 1 :] + tok[idx]
+        if not self.is_addon:
+            nmbrs = self._mac.split(":")
+            for i in range(len(nmbrs)):
+                idx = int("0x" + nmbrs[len(nmbrs) - i - 1], 0) & 0x7F
+                if idx < tk_len:
+                    tok = tok[:idx] + tok[idx + 1 :] + tok[idx]
         args_len = ip_len + tk_len + 2
         len_l = args_len & 0xFF
         len_h = args_len >> 8
@@ -162,7 +168,9 @@ class HbtnComm:
             .replace("<tok>", tok)
         )
         await self.async_send_command(cmd_str)
-        self.logger.info(f"Sent network info to hub (ip and token) - ip: {ipv4}")  # noqa: G004
+        self.logger.warning(
+            f"Sent network info to hub (ip and token) - ip: {ipv4} - token: {tok}"  # noqa: G004
+        )
 
     async def reinit_hub(self, rtr_id, mode):
         """Restart event server on hub."""
@@ -217,6 +225,7 @@ class HbtnComm:
             self._hostip = info["hardware"]["network"]["ip"]
             self._hostname = info["hardware"]["network"]["host"]
             self._mac = info["hardware"]["network"]["lan mac"]
+            self.is_addon = self._hostname.split(".")[0].find("smart-hub") > 0
         self.logger.debug(f"SmartHub info - host name: {self._hostname}")  # noqa: G004
         self.logger.debug(f"SmartHub info - ip: {self._hostip}")  # noqa: G004
         self.logger.debug(f"SmartHub info - version: {self._version}")  # noqa: G004
@@ -738,12 +747,12 @@ class HbtnComm:
                         module.outputs[arg1 - 1].value = arg2
                         await module.outputs[arg1 - 1].handle_upd_event()
                         if (c_idx := module.get_cover_index(arg1)) >= 0:
-                            module.covers[c_idx].value = module.status[
-                                MStatIdx.ROLL_POS + c_idx
-                            ]
-                            module.covers[c_idx].tilt = module.status[
-                                MStatIdx.BLAD_POS + c_idx
-                            ]
+                            # module.covers[c_idx].value = module.status[
+                            #     MStatIdx.ROLL_POS + c_idx
+                            # ]
+                            # module.covers[c_idx].tilt = module.status[
+                            #     MStatIdx.BLAD_POS + c_idx
+                            # ]
                             await module.covers[c_idx].handle_upd_event()
                 elif evnt == HaEvents.FINGER:
                     # Ekey input detected
