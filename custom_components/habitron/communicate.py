@@ -783,6 +783,9 @@ class HbtnComm:
                 elif evnt == HaEvents.CNT_VAL:
                     module.logic[arg1].value = arg2
                     await module.logic[arg1].handle_upd_event()
+                elif evnt == HaEvents.MODE:
+                    module.mode.value = arg2
+                    await module.mode.handle_upd_event()
             except Exception as err_msg:  # pylint: disable=broad-exception-caught
                 self.logger.warning(
                     f"Error handling habitron event {evnt} with arg1 {arg1} of module {mod_id}: {err_msg}"  # noqa: G004

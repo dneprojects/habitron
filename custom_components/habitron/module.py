@@ -53,7 +53,7 @@ class HbtnModule:
         self.climate_settings: int = 0
         self.id: str = f"Mod_{mod_descriptor.uid}_{self.b_uid}"
         self.group: int = mod_descriptor.group
-        self.mode: int = 1
+        self.mode: IfDescriptor = IfDescriptor("Mode", 0, 1, 1)
 
         self.inputs: list[IfDescriptor] = []
         self.outputs: list[IfDescriptor] = []
@@ -272,8 +272,8 @@ class HbtnModule:
     def update(self, mod_status):
         """General update for Habitron modules."""
         self.status = mod_status
-        self.mode = self.status[MStatIdx.MODE]
-        self.comm.grp_modes[self.group] = self.mode
+        self.mode.value = self.status[MStatIdx.MODE]
+        self.comm.grp_modes[self.group] = self.mode.value
 
         # Andere Logikelemente in self.logic aufnehmen?
         if len(self.logic) == 0:

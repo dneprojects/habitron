@@ -49,9 +49,9 @@ class GroupMode(Enum):
     sleeping = 48
     update = 63
     config = 64
-    summer = 80
-    user1 = 96
-    user2 = 112
+    user1 = 80
+    user2 = 96
+    vacation = 112
 
 
 class HbtnRouter:
