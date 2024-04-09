@@ -94,9 +94,9 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
             self._out_down = self._nmbr * 2
         self._position: int = 0
         self._moving: int = 0
-        # self.open_cnt = 0
-        # self.closed_cnt = 0
-        # self.max_cnt = 2
+        self.open_cnt: int = 0
+        self.closed_cnt: int = 0
+        self.max_cnt: int = 1
         self._attr_unique_id: str = f"{self._module.uid}_cover_{cover.nmbr}"
 
     async def async_added_to_hass(self) -> None:
@@ -160,25 +160,25 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
         self._position = 100 - int(self._cover.value)
         self._moving = 0
         if self._module.outputs[self._out_up].value > 0:
-            # if (self._position == 100) & (self.open_cnt >= self.max_cnt):
-            #     self._module.comm.set_output(self._module.mod_addr, self._out_up + 1, 0)
-            # elif self._position == 100:
-            #     self.open_cnt += 1
-            #     self._moving = 1
-            # else:
-            #     self.open_cnt = 0
-            self._moving = 1
+            if (self._position == 100) & (self.open_cnt >= self.max_cnt):
+                self._module.comm.set_output(self._module.mod_addr, self._out_up + 1, 0)
+            elif self._position == 100:
+                self.open_cnt += 1
+                self._moving = 1
+            else:
+                self.open_cnt = 0
+                self._moving = 1
         if self._module.outputs[self._out_down].value > 0:
-            # if (self._position == 0) & (self.closed_cnt >= self.max_cnt):
-            #     self._module.comm.set_output(
-            #         self._module.mod_addr, self._out_down + 1, 0
-            #     )
-            # elif self._position == 0:
-            #     self.closed_cnt += 1
-            #     self._moving = -1
-            # else:
-            #     self.closed_cnt = 0
-            self._moving = -1
+            if (self._position == 0) & (self.closed_cnt >= self.max_cnt):
+                self._module.comm.set_output(
+                    self._module.mod_addr, self._out_down + 1, 0
+                )
+            elif self._position == 0:
+                self.closed_cnt += 1
+                self._moving = -1
+            else:
+                self.closed_cnt = 0
+                self._moving = -1
         self.async_write_ha_state()
 
     # These methods allow HA to tell the actual device what to do. In this case, move
@@ -191,18 +191,21 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
         await self._module.comm.async_set_output(
             self._module.mod_addr, self._out_down + 1, 0
         )
+        self._moving = 0
 
     async def async_open_cover(self, **kwargs: Any) -> None:
         """Open the cover."""
         await self._module.comm.async_set_output(
             self._module.mod_addr, self._out_up + 1, 1
         )
+        self._moving = 1
 
     async def async_close_cover(self, **kwargs: Any) -> None:
         """Close the cover."""
         await self._module.comm.async_set_output(
             self._module.mod_addr, self._out_down + 1, 1
         )
+        self._moving = -1
 
     async def async_set_cover_position(self, **kwargs: Any) -> None:
         """Move the cover to position."""
@@ -249,25 +252,23 @@ class HbtnBlind(HbtnShutter):
         self._moving = 0
 
         if self._module.outputs[self._out_up].value > 0:
-            # if (self._position == 100) & (self.open_cnt >= self.max_cnt):
-            #     self._module.comm.set_output(self._module.mod_addr, self._out_up + 1, 0)
-            # elif self._position == 100:
-            #     self.open_cnt += 1
-            #     self._moving = 1
-            # else:
-            #     self.open_cnt = 0
-            self._moving = 1
+            if (self._position == 100) & (self.open_cnt >= self.max_cnt):
+                self._module.comm.set_output(self._module.mod_addr, self._out_up + 1, 0)
+            elif self._position == 100:
+                self.open_cnt += 1
+                self._moving = 1
+            else:
+                self.open_cnt = 0
         if self._module.outputs[self._out_down].value > 0:
-            # if (self._position == 0) & (self.closed_cnt >= self.max_cnt):
-            #     self._module.comm.set_output(
-            #         self._module.mod_addr, self._out_down + 1, 0
-            #     )
-            # elif self._position == 0:
-            #     self.closed_cnt += 1
-            #     self._moving = -1
-            # else:
-            #     self.closed_cnt = 0
-            self._moving = -1
+            if (self._position == 0) & (self.closed_cnt >= self.max_cnt):
+                self._module.comm.set_output(
+                    self._module.mod_addr, self._out_down + 1, 0
+                )
+            elif self._position == 0:
+                self.closed_cnt += 1
+                self._moving = -1
+            else:
+                self.closed_cnt = 0
         self.async_write_ha_state()
 
     async def async_set_cover_tilt_position(self, **kwargs: Any) -> None:
