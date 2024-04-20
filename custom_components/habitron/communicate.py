@@ -1,5 +1,4 @@
 """Communicate class for Habitron system."""
-
 from __future__ import annotations
 
 import asyncio
