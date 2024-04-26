@@ -68,12 +68,16 @@ class SmartHub:
         )
         # Habitron iconset
         files_path = Path(__file__).parent / "logos"
-        hass.http.register_static_path(
-            "/habitronfiles/hbt-icons.js",
-            str(files_path / "hbt-icons.js"),
-            cache_headers=False,
-        )
-        add_extra_js_url(hass, "/habitronfiles/hbt-icons.js")
+        try:
+            hass.http.register_static_path(
+                "/habitronfiles/hbt-icons.js",
+                str(files_path / "hbt-icons.js"),
+                cache_headers=False,
+            )
+            add_extra_js_url(hass, "/habitronfiles/hbt-icons.js")
+        except Exception:
+            # install only once
+            pass
         self.sensors: list[IfDescriptor] = []
         self.diags: list[IfDescriptor] = []
         self.loglvl: list[IfDescriptor] = []
