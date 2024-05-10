@@ -29,7 +29,7 @@ async def async_setup_entry(
     hbtn_rt: HbtnRouter = hass.data[DOMAIN][entry.entry_id].router
     hbtn_cord = hbtn_rt.coord
 
-    new_devices = []
+    new_devices: list[SwitchEntity] = []
     for hbt_module in hbtn_rt.modules:
         for mod_led in hbt_module.leds:
             if mod_led.type == 0:
@@ -54,7 +54,7 @@ async def async_setup_entry(
                 )
             else:
                 new_devices.append(HbtnFlag(mod_flg, hbt_module, hbtn_cord, flg_idx))
-            flg_idx += 1
+            flg_idx += 1  # noqa: SIM113
     flg_idx = 0
     for rt_flg in hbtn_rt.flags:
         if hbtn_rt.comm.is_smhub:
@@ -65,7 +65,6 @@ async def async_setup_entry(
 
     if new_devices:
         await hbtn_cord.async_config_entry_first_refresh()
-        hbtn_cord.data = new_devices
         async_add_entities(new_devices)
 
 

@@ -1,4 +1,5 @@
 """Platform for select integration."""
+
 from __future__ import annotations
 
 from enum import Enum
@@ -65,7 +66,6 @@ async def async_setup_entry(
     # coordinator.async_refresh() instead
     if new_devices:
         await hbtn_cord.async_config_entry_first_refresh()
-        hbtn_cord.data = new_devices
         async_add_entities(new_devices)
 
 
@@ -269,7 +269,7 @@ class HbtnSelectGroupMode(HbtnMode):
         )
         self._enum = group_enum
         self._value = self._mode & self._mask
-        self._current_option = self._enum(self._value).name  # type: ignore
+        self._current_option = self._enum(self._value).name  # type: ignore  # noqa: PGH003
         if isinstance(self._module, HbtnRouter):
             self._attr_name = "Group 0 mode"
             self._attr_unique_id = f"{self.hbtnr.uid}_group_0_mode"
@@ -279,7 +279,7 @@ class HbtnSelectGroupMode(HbtnMode):
 
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
-        set_val = self._enum[option].value  # type: ignore
+        set_val = self._enum[option].value  # type: ignore  # noqa: PGH003
         if isinstance(self._module, HbtnRouter):
             # router
             await self.hbtnr.comm.async_set_group_mode(self.hbtnr.id, 0, set_val)
