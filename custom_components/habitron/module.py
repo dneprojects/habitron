@@ -1,4 +1,5 @@
 """Module modules."""
+
 from __future__ import annotations
 
 import logging
@@ -318,7 +319,7 @@ class HbtnModule:
 
     async def async_reset(self) -> None:
         """Call reset command for self."""
-        rt_nmbr = int(self._addr / 100)
+        rt_nmbr = self._addr - self.raddr
         await self.comm.module_restart(rt_nmbr, self.raddr)
 
 
