@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from enum import Enum
 from pathlib import Path
 
@@ -68,12 +69,14 @@ class SmartHub:
         )
         # Habitron iconset
         files_path = Path(__file__).parent / "logos"
-        hass.http.register_static_path(
-            "/habitronfiles/hbt-icons.js",
-            str(files_path / "hbt-icons.js"),
-            cache_headers=False,
-        )
-        add_extra_js_url(hass, "/habitronfiles/hbt-icons.js")
+        with contextlib.suppress(Exception):
+            # if multiple hub instances or restart
+            hass.http.register_static_path(
+                "/habitronfiles/hbt-icons.js",
+                str(files_path / "hbt-icons.js"),
+                cache_headers=False,
+            )
+            add_extra_js_url(hass, "/habitronfiles/hbt-icons.js")
         self.sensors: list[IfDescriptor] = []
         self.diags: list[IfDescriptor] = []
         self.loglvl: list[IfDescriptor] = []
