@@ -34,7 +34,7 @@ async def async_setup_entry(
     hbtn_rt: HbtnRouter = hass.data[DOMAIN][entry.entry_id].router
     hbtn_cord = hbtn_rt.coord
 
-    new_devices = []
+    new_devices: list[LightEntity] = []
     for hbt_module in hbtn_rt.modules:
         for mod_output in hbt_module.outputs:
             # other type numbers disable output
@@ -77,7 +77,6 @@ async def async_setup_entry(
                 )
     if new_devices:
         await hbtn_cord.async_config_entry_first_refresh()
-        hbtn_cord.data = new_devices
         async_add_entities(new_devices)
 
 

@@ -1,6 +1,5 @@
 """Constants for the Habitron integration."""
 
-
 from typing import Final
 
 DOMAIN = "habitron"  # This is the internal name of the integration, it should also match the directory

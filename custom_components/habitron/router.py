@@ -1,4 +1,5 @@
 """Habitron router class."""
+
 from __future__ import annotations
 
 from enum import Enum
@@ -390,7 +391,4 @@ class HbtnRouter:
 
     def unit_not_exists(self, mod_units: list[IfDescriptor], entry_name: str) -> bool:
         """Check for existing unit based on name."""
-        for exist_unit in mod_units:
-            if exist_unit.name == entry_name:
-                return False
-        return True
+        return all(exist_unit.name != entry_name for exist_unit in mod_units)

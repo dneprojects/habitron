@@ -1,4 +1,5 @@
 """Communicate class for Habitron system."""
+
 from __future__ import annotations
 
 import asyncio
@@ -49,7 +50,8 @@ SMHUB_COMMANDS: Final[dict[str, str]] = {
     "SET_SHUTTER_POSITION": "\x1e\1\4<rtr>\0\5\0<rtr><mod>\1<arg1><arg2>",  # <Module><RollNo><RolVal>
     "SET_BLIND_TILT": "\x1e\1\4<rtr>\0\5\0<rtr><mod>\2<arg1><arg2>",
     "SET_SETPOINT_VALUE": "\x1e\2\1<rtr>\0\5\0<rtr><mod><arg1><arg2><arg3>",  # <Module><ValNo><ValL><ValH>
-    "CALL_VIS_COMMAND": "\x1e\3\1\0\0\4\0<rtr><mod><visl><vish>",  # <Module><VisNoL><VisNoH> not tested
+    "CALL_DIR_COMMAND": "\x1e\5\1<rtr><mod>\1\0<cno>",  # <CmdNo>
+    "CALL_VIS_COMMAND": "\x1e\3\1\0\0\4\0<rtr><mod><visl><vish>",  # <Module><VisNoL><VisNoH>
     "CALL_COLL_COMMAND": "\x1e\4\1<rtr><cno>\0\0",  # <CmdNo>
     "READ_MODULE_MIRR_STATUS": "\x64\1\5<rtr><mod>\0\0",  # <Module>
     "SET_FLAG_OFF": "\x1e\x0f\0<rtr><mod>\1\0<fno>",
@@ -243,8 +245,7 @@ class HbtnComm:
         full_string = wrap_command(cmd_str)
         resp_bytes = send_receive(sck, full_string)
         sck.close()
-        info = yaml.load(resp_bytes.decode("iso8859-1"), Loader=yaml.Loader)
-        return info
+        return yaml.load(resp_bytes.decode("iso8859-1"), Loader=yaml.Loader)
 
     async def get_smr(self, rtr_id) -> bytes:
         """Get router SMR information."""
@@ -274,8 +275,7 @@ class HbtnComm:
             full_string = wrap_command(cmd_string)
             res = await async_send_receive(sck, full_string)
             sck.close()
-            resp_bytes = res[0]
-            return resp_bytes
+            return res[0]
         except TimeoutError as err_msg:  # noqa: F841
             sck.close()
             self.logger.error(f"Error connecting to Smart Hub: {err_msg}")  # noqa: G004
@@ -359,12 +359,11 @@ class HbtnComm:
         if self.update_suspended:
             # disable update to avoid conflict with SmartConfig or other communication
             return
-        else:
-            sys_status = await self.get_compact_status(self.router.id)
+        sys_status = await self.get_compact_status(self.router.id)
         if sys_status == b"":
             # self.logger.debug("No changes in compact system status, update skipped")
             return
-        elif len(sys_status) < 10:
+        if len(sys_status) < 10:
             self.logger.warning(
                 f"Received compact system status too short, length: {len(sys_status)}"  # noqa: G004
             )
@@ -448,7 +447,7 @@ class HbtnComm:
         mod = self.router.get_module(mod_addr)
         await self.async_set_output(
             mod_id,
-            nmbr + len(mod.outputs) + 1,  # type: ignore
+            nmbr + len(mod.outputs) + 1,  # type: ignore  # noqa: PGH003
             val,
         )
 
@@ -552,6 +551,16 @@ class HbtnComm:
         cmd_str = cmd_str.replace("<arg2>", chr(lo_val))
         await self.async_send_command(cmd_str)
 
+    async def async_call_dir_command(self, mod_id, nmbr) -> None:
+        """Call of direct command of nmbr."""
+        rtr_nmbr = int(mod_id / 100)
+        mod_addr = int(mod_id - 100 * rtr_nmbr)
+        cmd_str = SMHUB_COMMANDS["CALL_DIR_COMMAND"]
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
+        cmd_str = cmd_str.replace("<cno>", chr(nmbr))
+        await self.async_send_command(cmd_str)
+
     async def async_call_vis_command(self, mod_id, nmbr) -> None:
         """Call of visualization command of nmbr."""
         rtr_nmbr = int(mod_id / 100)
@@ -581,9 +590,8 @@ class HbtnComm:
         [resp_bytes, crc] = await self.async_send_command_crc(cmd_str, time_out_sec=15)
         if crc == self.crc:
             return b""
-        else:
-            self.crc = crc
-            return resp_bytes
+        self.crc = crc
+        return resp_bytes
 
     async def get_module_status(self, mod_id) -> bytes:
         """Get compact status for all modules, if changed crc."""
@@ -595,9 +603,8 @@ class HbtnComm:
         [resp_bytes, crc] = await self.async_send_command_crc(cmd_str, time_out_sec=15)
         if crc == self.crc:
             return b""
-        else:
-            self.crc = crc
-            return resp_bytes
+        self.crc = crc
+        return resp_bytes
 
     async def async_get_module_definitions(self, mod_id) -> bytes:
         """Get summary of Habitron module: names, commands, etc."""
@@ -695,8 +702,9 @@ class HbtnComm:
         cmd_str = SMHUB_COMMANDS["REBOOT_HUB"]
         await self.async_send_command(cmd_str)
 
-    async def module_restart(self, rtr_nmbr: int, mod_nmbr: int) -> None:
+    async def module_restart(self, rtr_id: int, mod_nmbr: int) -> None:
         """Restart a single module or all with arg 0xFF or router if arg 0."""
+        rtr_nmbr = int(rtr_id / 100)
         if mod_nmbr > 0:
             # module restart
             cmd_str = SMHUB_COMMANDS["REBOOT_MODULE"]
@@ -821,8 +829,7 @@ async def test_connection(host_name) -> tuple[bool, str]:
 
 def get_host_ip(host_name: str) -> str:
     """Get IP from DNS host name, error handling."""
-    host = socket.gethostbyname(host_name)
-    return host
+    return socket.gethostbyname(host_name)
 
 
 def send_receive(sck, cmd_str: str) -> bytes:
@@ -888,8 +895,7 @@ def calc_crc(data: bytes) -> int:
     for byt in data:
         idx = __crc16_tbl[(crc ^ int(byt)) & 0xFF]
         crc = ((crc >> 8) & 0xFF) ^ idx
-    crc_res = ((crc << 8) & 0xFF00) | ((crc >> 8) & 0x00FF)
-    return crc_res
+    return ((crc << 8) & 0xFF00) | ((crc >> 8) & 0x00FF)
 
 
 def check_crc(msg) -> bool:
