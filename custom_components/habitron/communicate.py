@@ -746,7 +746,10 @@ class HbtnComm:
                     # Output changed
                     if arg1 > 15:
                         # LED
-                        module.leds[arg1 - 16].value = arg2
+                        if isinstance(module.leds[arg1 - 16].value, list):
+                            module.leds[arg1 - 16].value[0] = arg2
+                        else:
+                            module.leds[arg1 - 16].value = arg2
                         await module.leds[arg1 - 16].handle_upd_event()
                     elif (module.typ[0] == 50) & (arg1 > 2):
                         await module.leds[arg1 - 2 - 1].handle_upd_event()
@@ -763,12 +766,15 @@ class HbtnComm:
                             await module.covers[c_idx].handle_upd_event()
                 elif evnt == HaEvents.FINGER:
                     # Ekey input detected
-                    module.sensors[0].value = arg1
+                    if arg2 <= 10:
+                        module.sensors[0].value = arg1
+                    else:
+                        module.sensors[0].value = arg1 * (-1)
                     await module.sensors[0].handle_upd_event()
-                    await module.fingers[0].handle_upd_event("finger", arg1)
+                    await module.fingers[0].handle_upd_event("finger", arg1, arg2)
                     await asyncio.sleep(0.2)
                     await module.fingers[0].handle_upd_event(
-                        "inactive", 0
+                        "inactive", 0, 0
                     )  # set back to 'None'
                 elif evnt == HaEvents.DIM_VAL:
                     module.dimmers[arg1].value = arg2

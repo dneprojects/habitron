@@ -325,12 +325,12 @@ class ColorLed(CoordinatorEntity, LightEntity):
         # The call back registration is done once this entity is registered with HA
         # (rather than in the __init__)
         await super().async_added_to_hass()
-        self._led.register_callback(self.async_write_ha_state)
+        self._led.register_callback(self._handle_coordinator_update)
 
     async def async_will_remove_from_hass(self) -> None:
         """Entity being removed from hass."""
         # The opposite of async_added_to_hass. Remove any registered call backs here.
-        self._led.remove_callback(self.async_write_ha_state)
+        self._led.remove_callback(self._handle_coordinator_update)
 
     # To link this entity to its device, this property must return an
     # identifiers value matching that used in the module
@@ -370,6 +370,7 @@ class ColorLed(CoordinatorEntity, LightEntity):
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
         self._attr_is_on = self._led.value[0] == 1
+        self._rgb_color = self._led.value[1], self._led.value[2], self._led.value[3]
         self.async_write_ha_state()
 
     async def async_turn_on(self, **kwargs: Any) -> None:

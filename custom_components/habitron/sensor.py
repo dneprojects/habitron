@@ -92,7 +92,11 @@ async def async_setup_entry(  # noqa: C901
                 )
             elif mod_sensor.name == "Identifier":
                 new_devices.append(
-                    EKeySensor(hbt_module, mod_sensor, hbtn_cord, len(new_devices))
+                    EKeySensorId(hbt_module, mod_sensor, hbtn_cord, len(new_devices))
+                )
+            elif mod_sensor.name == "Finger":
+                new_devices.append(
+                    EKeySensorFngr(hbt_module, mod_sensor, hbtn_cord, len(new_devices))
                 )
         for mod_logic in hbt_module.logic:
             if mod_logic.type > 0:
@@ -197,7 +201,7 @@ class IlluminanceSensor(HbtnSensor):
     _attr_native_unit_of_measurement = LIGHT_LUX
 
 
-class EKeySensor(HbtnSensor):
+class EKeySensorId(HbtnSensor):
     """Representation of an ekey identifier sensor."""
 
     _attr_should_poll = True  # for push updates
@@ -208,6 +212,38 @@ class EKeySensor(HbtnSensor):
         self.sensor = sensor
         self._attr_unique_id = f"{self._module.uid}_ekey_ident"
         self._attr_name = "Identifier Value"
+        self._attr_icon = "mdi:fingerprint"
+
+    async def async_added_to_hass(self) -> None:
+        """Run when this Entity has been added to HA."""
+        # Importantly for a push integration, the module that will be getting updates
+        # needs to notify HA of changes. The dummy device has a registercallback
+        # method, so to this we add the 'self.async_write_ha_state' method, to be
+        # called where ever there are changes.
+        # The call back registration is done once this entity is registered with HA
+        # (rather than in the __init__)
+        await super().async_added_to_hass()
+        if self._module.comm.is_smhub:
+            self.sensor.register_callback(self._handle_coordinator_update)
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Entity being removed from hass."""
+        # The opposite of async_added_to_hass. Remove any registered call backs here.
+        if self._module.comm.is_smhub:
+            self.sensor.remove_callback(self._handle_coordinator_update)
+
+
+class EKeySensorFngr(HbtnSensor):
+    """Representation of an ekey finger sensor."""
+
+    _attr_should_poll = True  # for push updates
+
+    def __init__(self, module, sensor, coord, idx) -> None:
+        """Initialize the sensor."""
+        super().__init__(module, sensor, coord, idx)
+        self.sensor = sensor
+        self._attr_unique_id = f"{self._module.uid}_ekey_fngr"
+        self._attr_name = "Finger Value"
         self._attr_icon = "mdi:fingerprint"
 
     async def async_added_to_hass(self) -> None:
@@ -430,11 +466,11 @@ class PercSensor(HbtnSensor):
         super().__init__(module, perctg, coord, idx)
         self.type = perctg.type
         self._attr_unique_id = f"{self._module.uid}_perc_{perctg.nmbr}"
-        if self._attr_name[:6].lower() == "memory":  # type: ignore
+        if self._attr_name[:6].lower() == "memory":  # type: ignore  # noqa: PGH003
             self._attr_icon = "mdi:memory"
-        elif self._attr_name[:4].lower() == "disk":  # type: ignore
+        elif self._attr_name[:4].lower() == "disk":  # type: ignore  # noqa: PGH003
             self._attr_icon = "mdi:harddisk"
-        elif self._attr_name.lower() == "cpu load":  # type: ignore
+        elif self._attr_name.lower() == "cpu load":  # type: ignore  # noqa: PGH003
             self._attr_icon = "mdi:timer-alert-outline"
         else:
             self._attr_icon = "mdi:percent-circle-outline"
@@ -465,7 +501,7 @@ class FrequencySensor(HbtnSensor):
         """Initialize the sensor."""
         super().__init__(module, freq, coord, idx)
         self.type = freq.type
-        if self._attr_name.lower() == "cpu frequency":  # type: ignore
+        if self._attr_name.lower() == "cpu frequency":  # type: ignore  # noqa: PGH003
             self._attr_icon = "mdi:clock-fast"
         else:
             self._attr_icon = "mdi:sine-wave"

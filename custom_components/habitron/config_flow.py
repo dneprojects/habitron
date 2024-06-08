@@ -78,7 +78,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     CONNECTION_CLASS = config_entries.CONN_CLASS_LOCAL_POLL
 
-    @staticmethod  # type: ignore
+    @staticmethod  # type: ignore  # noqa: PGH003
     @callback
     def async_get_options_flow(
         config_entry: config_entries.ConfigEntry,
@@ -90,11 +90,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Handle the initial step."""
         await self.async_set_unique_id("unique_habitron")
 
-        # smartips = discover_smartips(True)
-
         self._abort_if_unique_id_configured()
         if user_input is None:
-            # default_host = smartips[0]["ip"]
             default_host = CONF_DEFAULT_HOST
             default_interval = CONF_DEFAULT_INTERVAL
         else:
@@ -104,15 +101,15 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             {
                 vol.Required(
                     "habitron_host",
-                    default=default_host,  # type: ignore
+                    default=default_host,  # type: ignore # noqa: PGH003
                 ): str,
                 vol.Required(
                     "update_interval",
-                    default=default_interval,  # type: ignore
+                    default=default_interval,  # type: ignore # noqa: PGH003
                 ): int,
                 vol.Optional(
                     "websock_token",
-                    default="",  # type: ignore
+                    default="",  # type: ignore # noqa: PGH003
                 ): str,
             }
         )
@@ -182,11 +179,11 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 ): int,
                 vol.Required(
                     "updates_enabled",
-                    default=default_enablestate,  # type: ignore
+                    default=default_enablestate,  # type: ignore  # noqa: PGH003
                 ): bool,
                 vol.Optional(
                     "websock_token",
-                    default="",  # type: ignore
+                    default="",  # type: ignore  # noqa: PGH003
                 ): str,
             }
         )
