@@ -111,10 +111,8 @@ class HbtnModule:
     def get_cover_index(self, out_no: int) -> int:
         """Return cover index based on output number."""
         if self.outputs[out_no - 1].type == -10:
-            c_idx = math.ceil(out_no / 2) - 1
-            return c_idx
-        else:
-            return -1
+            return math.ceil(out_no / 2) - 1
+        return -1
 
     async def get_names(self) -> bool:  # noqa: C901
         """Get summary of Habitron module."""
@@ -507,9 +505,12 @@ class SmartControllerMini(HbtnModule):
             outpt.value = int((out_state & (0x01 << outpt.nmbr)) > 0)
 
         for led in self.leds:
-            #  led.value[0] = int((out_state & (0x01 << led.nmbr + 16)) > 0)
-            #  quick fix: use outputs 2..6, change also in communicate line 728 and SmartHub actions_hdlr.py
-            led.value[0] = int((out_state & (0x01 << led.nmbr + 2)) > 0)
+            led.value[0] = int((out_state & (0x01 << led.nmbr + 15)) > 0)
+
+            # Get color status for rgb leds
+            # led.value[1] = int(self.status[MStatIdx.ROLL_POS + led.nmbr * 3])
+            # led.value[2] = int(self.status[MStatIdx.ROLL_POS + led.nmbr * 3 + 1])
+            # led.value[3] = int(self.status[MStatIdx.ROLL_POS + led.nmbr * 3 + 2])
 
         inp_state = int.from_bytes(
             self.status[MStatIdx.INP_1_8 : MStatIdx.INP_1_8 + 3],
@@ -738,12 +739,17 @@ class SmartEKey(HbtnModule):
         super().__init__(mod_descriptor, hass, config, b_uid, comm)
         self.ids: list[IfDescriptor] = []
         self.sensors.append(IfDescriptor("Identifier", 0, 2, 0))
+        self.sensors.append(IfDescriptor("Finger", 1, 2, 0))
         self.fingers.append(IfDescriptor("Finger", 0, 2, 0))
 
     def update(self, mod_status) -> None:
         """Update with module specific method. Reads and parses status."""
         super().update(mod_status)
         self.sensors[0].value = int(self.status[MStatIdx.KEY_ID])  # last id
+        self.sensors[1].value = int(self.status[MStatIdx.KEY_ID + 1])  # last finger
+        if self.sensors[1].value > 10:
+            self.sensors[0].value *= -1  # disable
+            self.sensors[1].value -= 128
         self.diags[0].value = self.status[MStatIdx.MODULE_STAT]
 
 
