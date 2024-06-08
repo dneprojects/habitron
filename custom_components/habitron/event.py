@@ -96,7 +96,13 @@ class FingerDetected(HbtnEvent):
     _attr_event_types = ["inactive", "finger"]
 
     @callback
-    def _async_handle_event(self, event: str, user: int) -> None:
+    def _async_handle_event(self, event: str, user: int, finger: int) -> None:
         """Handle event."""
-        self._trigger_event(event, {"extra_data": f"{user}"})
+        if finger > 10:
+            # user disabled
+            self._trigger_event(
+                event, {"user": f"{user * (-1)}", "finger": f"{finger - 128}"}
+            )
+        else:
+            self._trigger_event(event, {"user": f"{user}", "finger": f"{finger}"})
         self.async_write_ha_state()

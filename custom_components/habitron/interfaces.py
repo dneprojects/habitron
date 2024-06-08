@@ -13,7 +13,10 @@ class IfDescriptor:
         self.name: str = iname
         self.nmbr: int = inmbr
         self.type: int = itype
-        self.value: int | float = ivalue
+        if isinstance(ivalue, list):
+            pass
+        else:
+            self.value: int | float = ivalue
         self._callbacks = set()
 
     def register_callback(self, callback: Callable[[], None]) -> None:
@@ -31,8 +34,10 @@ class IfDescriptor:
                 callback()
             elif len(args) == 1:
                 callback(args[0])
-            else:
+            elif len(args) == 2:
                 callback(args[0], args[1])
+            else:
+                callback(args[0], args[1], args[2])
 
     def set_name(self, new_name: str):
         """Setter for name property."""
@@ -42,7 +47,7 @@ class IfDescriptor:
 class CLedDescriptor(IfDescriptor):
     """Habitron cover interface descriptor."""
 
-    def __init__(self, iname, inmbr, itype, ivalue) -> None:
+    def __init__(self, iname, inmbr, itype, ivalue: list[int]) -> None:
         """Initialize interface."""
         super().__init__(iname, inmbr, itype, ivalue)
         self.value: list[int] = ivalue
