@@ -63,6 +63,11 @@ async def async_setup_entry(  # noqa: C901
                 TemperatureDSensor(smhub, smhub_diag, hbtn_cord, len(new_devices))
             )
     for hbt_module in hbtn_rt.modules:
+        # for inpt in hbt_module.inputs:
+        #     if inpt.type == 3:
+        #         new_devices.append(
+        #             AnalogSensor(hbt_module, inpt, hbtn_cord, len(new_devices))
+        #         )
         for mod_sensor in hbt_module.sensors:
             if mod_sensor.name[0:11] == "Temperature":
                 new_devices.append(
@@ -141,6 +146,7 @@ class HbtnSensor(CoordinatorEntity, SensorEntity):
 
     _attr_has_entity_name = True
     _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_should_poll = True  # for push updates
 
     def __init__(self, module, sensor, coord, idx) -> None:
         """Initialize a Habitron sensor, pass coordinator to CoordinatorEntity."""
@@ -170,6 +176,17 @@ class HbtnSensor(CoordinatorEntity, SensorEntity):
         """Handle updated data from the coordinator."""
         self._attr_native_value = self._module.sensors[self._sensor_idx].value
         self.async_write_ha_state()
+
+
+class AnalogSensor(HbtnSensor):
+    """Representation of a Sensor."""
+
+    _attr_device_class = SensorDeviceClass.VOLTAGE
+
+    def __init__(self, module, sensor, coord, idx) -> None:
+        """Initialize the sensor."""
+        super().__init__(module, sensor, coord, idx)
+        self._attr_icon = "mdi:graph-bell-curve-cumulative"
 
 
 class TemperatureSensor(HbtnSensor):

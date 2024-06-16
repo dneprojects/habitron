@@ -31,7 +31,7 @@ MODULE_CODES: Final[dict[bytes, str]] = {
     b"\x0a\x14": "Smart Dimm",
     b"\x0a\x15": "Smart Dimm-1",
     b"\x0a\x16": "Smart Dimm-2",
-    b"\x0a\x1e": "Smart UpM",  # Unterputzmodul
+    b"\x0a\x1e": "Smart IO 2",  # Unterputzmodul
     b"\x0a\x32": "Smart Out 8/R-1",
     b"\x0a\x33": "Smart Out 8/R-2",
     b"\x0b\x1e": "Smart In 8/24V",
