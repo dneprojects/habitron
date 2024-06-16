@@ -334,8 +334,10 @@ class SmartController(HbtnModule):
     ) -> None:
         """Init Habitron SmartController module."""
         super().__init__(mod_descriptor, hass, config, b_uid, comm)
-
-        self.inputs = [IfDescriptor("", i, 1, 0) for i in range(18)]
+        if self.typ[1] == 3:
+            self.inputs = [IfDescriptor("", i, 1, 0) for i in range(20)]
+        else:
+            self.inputs = [IfDescriptor("", i, 1, 0) for i in range(18)]
         self.outputs = [IfDescriptor("", i, 1, 0) for i in range(15)]
         self.covers = [CovDescriptor("", -1, 0, 0, 0) for i in range(5)]
         self.dimmers = [IfDescriptor("", i, -1, 0) for i in range(2)]
@@ -416,8 +418,10 @@ class SmartController(HbtnModule):
             "little",
         )
         for inpt in self.inputs:
-            if inpt.nmbr >= 0:
+            if inpt.nmbr >= 0 and inpt.type != 3:
                 inpt.value = int((inp_state & (0x01 << inpt.nmbr)) > 0)
+            if inpt.nmbr > 18:
+                inpt.type = 3
 
         flags_state = int.from_bytes(
             self.status[MStatIdx.FLAG_LOC : MStatIdx.FLAG_LOC + 2],
@@ -676,7 +680,7 @@ class SmartInput(HbtnModule):
         inp_state = int(self.status[MStatIdx.INP_1_8])
         for mod_inp in self.inputs:
             i_idx = mod_inp.nmbr
-            if i_idx >= 0:
+            if i_idx >= 0 and mod_inp.type != 3:
                 mod_inp.value = int((inp_state & (0x01 << i_idx)) > 0)
         self.diags[0].value = self.status[MStatIdx.MODULE_STAT]
 
