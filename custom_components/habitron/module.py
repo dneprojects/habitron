@@ -303,9 +303,7 @@ class HbtnModule:
         m_addr = self._addr - int(self._addr / 100) * 100
         for m_idx in range(no_mods):
             if int(sys_status[m_idx * stat_len + MStatIdx.ADDR]) == m_addr:
-                self.logger.info(
-                    f"Found module {m_addr}, extracting status"
-                )  # noqa: G004
+                self.logger.info(f"Found module {m_addr}, extracting status")  # noqa: G004
                 break
         self.logger.info(
             f"Extract status could not find module {m_addr}: status length: {len(sys_status)}"  # noqa: G004
@@ -731,6 +729,7 @@ class SmartDetect(HbtnModule):
         # No name and settings initialization needed
         device_registry = dr.async_get(self._hass)
         self.status = self.extract_status(sys_status)
+        self.uid = self.hw_version
         device_registry.async_get_or_create(
             config_entry_id=self._config.entry_id,
             identifiers={(DOMAIN, self.uid)},
@@ -807,6 +806,7 @@ class SmartNature(HbtnModule):
         # No name and settings initialization needed
         device_registry = dr.async_get(self._hass)
         self.status = self.extract_status(sys_status)
+        self.uid = self.hw_version
         device_registry.async_get_or_create(
             config_entry_id=self._config.entry_id,
             identifiers={(DOMAIN, self.uid)},

@@ -63,11 +63,12 @@ async def async_setup_entry(  # noqa: C901
                 TemperatureDSensor(smhub, smhub_diag, hbtn_cord, len(new_devices))
             )
     for hbt_module in hbtn_rt.modules:
-        for ain in hbt_module.analogins:
-            if ain.type == 3:
-                new_devices.append(
-                    AnalogSensor(hbt_module, ain, hbtn_cord, len(new_devices))
-                )
+        if hbt_module.typ == b"\x01\x03":
+            for ain in hbt_module.analogins:
+                if ain.type == 3:
+                    new_devices.append(
+                        AnalogSensor(hbt_module, ain, hbtn_cord, len(new_devices))
+                    )
         for mod_sensor in hbt_module.sensors:
             if mod_sensor.name[0:11] == "Temperature":
                 new_devices.append(
