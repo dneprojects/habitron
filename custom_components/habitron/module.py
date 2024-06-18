@@ -303,7 +303,9 @@ class HbtnModule:
         m_addr = self._addr - int(self._addr / 100) * 100
         for m_idx in range(no_mods):
             if int(sys_status[m_idx * stat_len + MStatIdx.ADDR]) == m_addr:
-                self.logger.info(f"Found module {m_addr}, extracting status")  # noqa: G004
+                self.logger.info(
+                    f"Found module {m_addr}, extracting status"
+                )  # noqa: G004
                 break
         self.logger.info(
             f"Extract status could not find module {m_addr}: status length: {len(sys_status)}"  # noqa: G004
@@ -436,8 +438,9 @@ class SmartController(HbtnModule):
         for flg in self.flags:
             flg.value = int((flags_state & (0x01 << flg.nmbr - 1)) > 0)
 
-        self.analogins[0].value = self.status[MStatIdx.AD_1]
-        self.analogins[1].value = self.status[MStatIdx.AD_2]
+        if self.typ[1] == 3:
+            self.analogins[0].value = self.status[MStatIdx.AD_1]
+            self.analogins[1].value = self.status[MStatIdx.AD_2]
 
         self.diags[0].value = self.status[MStatIdx.MODULE_STAT]
         self.diags[1].value = (
