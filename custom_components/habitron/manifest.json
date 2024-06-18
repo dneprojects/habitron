@@ -7,10 +7,10 @@
   "documentation": "https://github.com/dneprojects/habitron",
   "homekit": {},
   "integration_type": "hub",
-  "iot_class": "local_polling",
+  "iot_class": "local_push",
   "issue_tracker": "https://github.com/dneprojects/habitron/issues",
-  "requirements": ["pymodbus"],
+  "requirements": [],
   "ssdp": [],
-  "version": "1.4.6",
+  "version": "1.5.0",
   "zeroconf": []
 }

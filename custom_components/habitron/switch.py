@@ -90,7 +90,7 @@ class SwitchedLed(CoordinatorEntity, SwitchEntity):
         self._attr_name: str = led.name
         self._nmbr: int = led.nmbr
         self._state: bool = False
-        self._attr_unique_id: str = f"{self._module.uid}_led_{self.idx}"
+        self._attr_unique_id: str = f"Mod_{self._module.uid}_led{self.idx}"
 
     async def async_added_to_hass(self) -> None:
         """Run when this Entity has been added to HA."""
@@ -174,7 +174,7 @@ class HbtnFlag(CoordinatorEntity, SwitchEntity):
         self._attr_name: str = flag.name
         self._nmbr: int = flag.nmbr
         self._state: bool = False
-        self._attr_unique_id: str = f"{self._module.uid}_flag_{self._nmbr}"
+        self._attr_unique_id: str = f"Mod_{self._module.uid}_flag{self._nmbr}"
 
     @property
     def device_info(self) -> DeviceInfo:

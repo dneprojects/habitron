@@ -56,7 +56,7 @@ class HbtnEvent(EventEntity):
         self._nmbr = event_if.nmbr
         self._state = None
         self._brightness = None
-        self._attr_unique_id = f"{self._module.uid}_{event_if.nmbr}"
+        self._attr_unique_id = f"Mod_{self._module.uid}_evnt{event_if.nmbr}"
         if event_if.type < 0:
             # Entity will not show up
             self._attr_entity_registry_enabled_default = False

@@ -24,9 +24,9 @@ async def async_setup_entry(
 
     for hbt_module in hbtn_rt.modules:
         for dir_cmd in hbt_module.dir_commands:
-            new_devices.append(DirCmdButton(dir_cmd, hbt_module))
+            new_devices.append(DirCmdButton(dir_cmd, hbt_module))  # noqa: PERF401
         for vis_cmd in hbt_module.vis_commands:
-            new_devices.append(VisCmdButton(vis_cmd, hbt_module))
+            new_devices.append(VisCmdButton(vis_cmd, hbt_module))  # noqa: PERF401
         for mod_logic in hbt_module.logic:
             if mod_logic.type == 5:
                 new_devices.append(CountUpButton(mod_logic, hbt_module))
@@ -34,7 +34,7 @@ async def async_setup_entry(
         new_devices.append(RestartButton(hbt_module))
     # Add router commands as buttons
     for coll_cmd in hbtn_rt.coll_commands:
-        new_devices.append(CollCmdButton(coll_cmd, hbtn_rt))
+        new_devices.append(CollCmdButton(coll_cmd, hbtn_rt))  # noqa: PERF401
     new_devices.append(RestartButton(hbtn_rt))
     new_devices.append(RestartAllButton(hbtn_rt))
     new_devices.append(RestartHubButton(hbtn_rt))
@@ -57,7 +57,7 @@ class CollCmdButton(ButtonEntity):
         self._module = module
         self._nmbr = coll_cmd.nmbr
         self._attr_name = f"Cmd {self._nmbr}: {coll_cmd.name}"
-        self._attr_unique_id = f"{module.b_uid}_CCmd_{self._nmbr}"
+        self._attr_unique_id = f"Mod_{module.b_uid}_ccmd{self._nmbr}"
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -84,7 +84,7 @@ class DirCmdButton(ButtonEntity):
         self._module = module
         self._nmbr = dir_cmd.nmbr
         self._attr_name = f"DirectCmd {self._nmbr}: {dir_cmd.name}"
-        self._attr_unique_id = f"Mod_{self._module.uid}_DCmd_{self._nmbr}"
+        self._attr_unique_id = f"Mod_{self._module.uid}_dcmd{self._nmbr}"
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -115,7 +115,7 @@ class VisCmdButton(ButtonEntity):
         no_hi = int(self._nmbr / 256)
         no_lo = self._nmbr - no_hi * 256
         self._attr_name = f"VisCmd {no_hi}/{no_lo}: {vis_cmd.name}"
-        self._attr_unique_id = f"Mod_{self._module.uid}_VCmd_{self._nmbr}"
+        self._attr_unique_id = f"Mod_{self._module.uid}_vcmd{self._nmbr}"
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -169,7 +169,7 @@ class RestartAllButton(ButtonEntity):
         """Initialize restart all button."""
         self._name = "restart_all"
         self._router = router
-        self._attr_unique_id = f"Mod_{self._router.uid}_{self._name}"
+        self._attr_unique_id = f"Rt_{self._router.uid}_{self._name}"
         self._attr_name = "Reset all modules"
         self._attr_entity_category = EntityCategory.CONFIG
         self._attr_icon = "mdi:restart"
@@ -248,7 +248,7 @@ class CountUpButton(ButtonEntity):
         self._module = module
         self._nmbr = counter.nmbr + 1
         self._attr_name = f"Count up {self._nmbr}: {counter.name}"
-        self._attr_unique_id = f"{module.uid}_Cntup_{self._nmbr}"
+        self._attr_unique_id = f"Mod_{module.uid}_cntup{self._nmbr}"
         self._attr_icon = "mdi:chevron-up-box-outline"
 
     @property
@@ -278,7 +278,7 @@ class CountDownButton(ButtonEntity):
         self._module = module
         self._nmbr = counter.nmbr + 1
         self._attr_name = f"Count down {self._nmbr}: {counter.name}"
-        self._attr_unique_id = f"{module.uid}_Cntdown_{self._nmbr}"
+        self._attr_unique_id = f"Mod_{module.uid}_cntdown{self._nmbr}"
         self._attr_icon = "mdi:chevron-down-box-outline"
 
     @property
