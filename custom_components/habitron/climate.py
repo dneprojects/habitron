@@ -48,7 +48,7 @@ async def async_setup_entry(
     # coordinator.async_refresh() instead
     if new_devices:
         await hbtn_cord.async_config_entry_first_refresh()
-        hbtn_cord.data = new_devices
+        hbtn_cord.data = new_devices  # type: ignore  # noqa: PGH003
         async_add_entities(new_devices)
 
 
@@ -87,7 +87,7 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
         self._curr_temperature = module.sensors[1].value
         self._curr_humidity = module.sensors[2].value
         self._target_temperature = module.setvalues[0].value
-        self._attr_unique_id = f"{self._module.uid}_climate"
+        self._attr_unique_id = f"Mod_{self._module.uid}_climate"
         if self._module.climate_settings == 1:
             self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
             self._curr_hvac_mode = HVACMode.HEAT

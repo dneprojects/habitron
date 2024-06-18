@@ -106,7 +106,7 @@ class SwitchedOutput(CoordinatorEntity, LightEntity):
         self._nmbr: int = output.nmbr
         self._brightness: int = 255
         self._out_offs = 0  # Dimm 1 = Out 1 + offs
-        self._attr_unique_id: str = f"{self._module.uid}_out_{output.nmbr}"
+        self._attr_unique_id: str = f"Mod_{self._module.uid}_out{output.nmbr}"
         if output.type < 0:
             # Entity will not show up
             self._attr_entity_registry_enabled_default = False
@@ -301,7 +301,7 @@ class ColorLed(CoordinatorEntity, LightEntity):
         self._out_offs: int = 0
         self._brightness: int = 255
         self._rgb_color: tuple[int, int, int] = (50, 50, 50)
-        self._attr_unique_id: str = f"{self._module.uid}_rgbled_{led.nmbr}"
+        self._attr_unique_id: str = f"Mod_{self._module.uid}_rgbled{led.nmbr}"
         if led.type < 0:
             # Entity will not show up
             self._attr_entity_registry_enabled_default = False

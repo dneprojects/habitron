@@ -89,6 +89,7 @@ class MSetIdx:
     SW_VERS = 100
     SW_VERS_ = 122
     SHUTTER_STAT = 132
+    AD_STATE = 153
 
 
 class MStatIdx:
@@ -119,8 +120,10 @@ class MStatIdx:
     AQI = 27
     LUM = 28
     MOV = 30
-    IR_H = 31  # General field 1
-    IR_L = 32  # General field 2
+    GEN_1 = 31  # General field 1
+    GEN_2 = 32  # General field 2
+    IR_H = 31
+    IR_L = 32
     KEY_ID = 31
     WIND = 31
     WINDP = 32
@@ -128,8 +131,9 @@ class MStatIdx:
     BLAD_POS = 41  # 1..8: 41..48
     T_SETP_0 = 49  # low/high
     T_SETP_1 = 51  # low/high
-    RAIN = 53  # General field 3
-    Gen_4 = 54
+    GEN_3 = 53  # General field 3
+    GEN_4 = 54  # General field 4
+    RAIN = 53
     USER_CNT = 55
     FINGER_CNT = 56
     MODULE_STAT = 57  # Errors, etc
@@ -275,5 +279,6 @@ class HaEvents:
     PERCNT = 11
     DIR_CMD = 12
     MOVE = 13
+    ANLG_VAL = 14
     MODE = 15
     SYS_ERR = 16

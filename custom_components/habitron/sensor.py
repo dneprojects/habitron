@@ -63,11 +63,11 @@ async def async_setup_entry(  # noqa: C901
                 TemperatureDSensor(smhub, smhub_diag, hbtn_cord, len(new_devices))
             )
     for hbt_module in hbtn_rt.modules:
-        # for inpt in hbt_module.inputs:
-        #     if inpt.type == 3:
-        #         new_devices.append(
-        #             AnalogSensor(hbt_module, inpt, hbtn_cord, len(new_devices))
-        #         )
+        for ain in hbt_module.analogins:
+            if ain.type == 3:
+                new_devices.append(
+                    AnalogSensor(hbt_module, ain, hbtn_cord, len(new_devices))
+                )
         for mod_sensor in hbt_module.sensors:
             if mod_sensor.name[0:11] == "Temperature":
                 new_devices.append(
@@ -156,7 +156,7 @@ class HbtnSensor(CoordinatorEntity, SensorEntity):
         self._sensor_idx = sensor.nmbr
         self._attr_state: float | int
         self._value = 0
-        self._attr_unique_id = f"{self._module.uid}_{sensor.name.lower()}"
+        self._attr_unique_id = f"Mod_{self._module.uid}_snsr{self._sensor_idx}"
         self._attr_name = sensor.name
 
     # To link this entity to its device, this property must return an
@@ -182,11 +182,39 @@ class AnalogSensor(HbtnSensor):
     """Representation of a Sensor."""
 
     _attr_device_class = SensorDeviceClass.VOLTAGE
+    _attr_should_poll = True  # for push updates
 
     def __init__(self, module, sensor, coord, idx) -> None:
         """Initialize the sensor."""
         super().__init__(module, sensor, coord, idx)
-        self._attr_icon = "mdi:graph-bell-curve-cumulative"
+        self._attr_icon = "mdi:chart-bell-curve-cumulative"
+        self._attr_unique_id = f"Mod_{self._module.uid}_adin{self._sensor_idx}"
+        self._attr_name = self._attr_name
+        self.sensor = sensor
+
+    async def async_added_to_hass(self) -> None:
+        """Run when this Entity has been added to HA."""
+        # Importantly for a push integration, the module that will be getting updates
+        # needs to notify HA of changes. The dummy device has a registercallback
+        # method, so to this we add the 'self.async_write_ha_state' method, to be
+        # called where ever there are changes.
+        # The call back registration is done once this entity is registered with HA
+        # (rather than in the __init__)
+        await super().async_added_to_hass()
+        if self._module.comm.is_smhub:
+            self.sensor.register_callback(self._handle_coordinator_update)
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Entity being removed from hass."""
+        # The opposite of async_added_to_hass. Remove any registered call backs here.
+        if self._module.comm.is_smhub:
+            self.sensor.remove_callback(self._handle_coordinator_update)
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self._attr_native_value = self._module.analogins[self._sensor_idx].value
+        self.async_write_ha_state()
 
 
 class TemperatureSensor(HbtnSensor):
@@ -227,7 +255,7 @@ class EKeySensorId(HbtnSensor):
         """Initialize the sensor."""
         super().__init__(module, sensor, coord, idx)
         self.sensor = sensor
-        self._attr_unique_id = f"{self._module.uid}_ekey_ident"
+        self._attr_unique_id = f"Mod_{self._module.uid}_ekey_ident"
         self._attr_name = "Identifier Value"
         self._attr_icon = "mdi:fingerprint"
 
@@ -259,7 +287,7 @@ class EKeySensorFngr(HbtnSensor):
         """Initialize the sensor."""
         super().__init__(module, sensor, coord, idx)
         self.sensor = sensor
-        self._attr_unique_id = f"{self._module.uid}_ekey_fngr"
+        self._attr_unique_id = f"Mod_{self._module.uid}_ekey_fngr"
         self._attr_name = "Finger Value"
         self._attr_icon = "mdi:fingerprint"
 
@@ -287,6 +315,7 @@ class WindSensor(HbtnSensor):
 
     _attr_device_class = SensorDeviceClass.WIND_SPEED
     _attr_native_unit_of_measurement = UnitOfSpeed.METERS_PER_SECOND
+    _attr_suggested_display_precision = 1
 
     def __init__(self, module, sensor, coord, idx) -> None:
         """Initialize the sensor."""
@@ -341,7 +370,7 @@ class TemperatureDSensor(HbtnDiagSensor):
     def __init__(self, module, diag, coord, idx) -> None:
         """Initialize the sensor."""
         super().__init__(module, diag, coord, idx)
-        self._attr_unique_id = f"{self._module.uid}_{diag.name}"
+        self._attr_unique_id = f"Mod_{self._module.uid}_{diag.name}"
         self._attr_name = diag.name
 
 
@@ -351,7 +380,7 @@ class StatusSensor(HbtnDiagSensor):
     def __init__(self, module, diag, coord, idx) -> None:
         """Initialize the sensor."""
         super().__init__(module, diag, coord, idx)
-        self._attr_unique_id = f"{self._module.uid}_module_status"
+        self._attr_unique_id = f"Mod_{self._module.uid}_module_status"
         self._attr_name = diag.name
 
     @callback
@@ -376,7 +405,7 @@ class LogicSensor(HbtnSensor):
         super().__init__(module, logic, coord, idx)
         self.idx = logic.idx
         self.logic = logic
-        self._attr_unique_id = f"{self._module.uid}_logic_{logic.nmbr}"
+        self._attr_unique_id = f"Mod_{self._module.uid}_logic{logic.nmbr}"
         self._attr_name = f"Cnt{logic.nmbr + 1}: {logic.name}"
         self._attr_icon = "mdi:counter"
 
@@ -482,7 +511,7 @@ class PercSensor(HbtnSensor):
         """Initialize the sensor."""
         super().__init__(module, perctg, coord, idx)
         self.type = perctg.type
-        self._attr_unique_id = f"{self._module.uid}_perc_{perctg.nmbr}"
+        self._attr_unique_id = f"Mod_{self._module.uid}_perc{perctg.nmbr}"
         if self._attr_name[:6].lower() == "memory":  # type: ignore  # noqa: PGH003
             self._attr_icon = "mdi:memory"
         elif self._attr_name[:4].lower() == "disk":  # type: ignore  # noqa: PGH003
@@ -493,7 +522,7 @@ class PercSensor(HbtnSensor):
             self._attr_icon = "mdi:percent-circle-outline"
         if abs(perctg.type) == TYPE_DIAG:
             self._attr_entity_category = EntityCategory.DIAGNOSTIC
-            self._attr_unique_id = f"{self._module.uid}_dperc_{perctg.nmbr}"
+            self._attr_unique_id = f"Mod_{self._module.uid}_dperc{perctg.nmbr}"
             self._attr_entity_registry_enabled_default = (
                 False  # Entity will initally be disabled
             )

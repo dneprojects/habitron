@@ -50,7 +50,7 @@ async def async_setup_entry(
 
     if new_devices:
         await hbtn_cord.async_config_entry_first_refresh()
-        hbtn_cord.data = new_devices
+        hbtn_cord.data = new_devices  # type: ignore  # noqa: PGH003
         async_add_entities(new_devices)
 
 
@@ -62,10 +62,9 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
 
     _attr_has_entity_name = True
     _attr_device_class = CoverDeviceClass.SHUTTER
-    _attr_has_entity_name = True
     _attr_should_poll = True  # for push updates
 
-    supported_features = (
+    _attr_supported_features = (
         CoverEntityFeature.SET_POSITION
         | CoverEntityFeature.OPEN
         | CoverEntityFeature.CLOSE
@@ -98,7 +97,7 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
         self.open_cnt: int = 0
         self.closed_cnt: int = 0
         self.max_cnt: int = 1
-        self._attr_unique_id: str = f"{self._module.uid}_cover_{cover.nmbr}"
+        self._attr_unique_id: str = f"Mod_{self._module.uid}_cover{cover.nmbr}"
 
     async def async_added_to_hass(self) -> None:
         """Run when this Entity has been added to HA."""
@@ -210,7 +209,7 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
 
     async def async_set_cover_position(self, **kwargs: Any) -> None:
         """Move the cover to position."""
-        tmp_position = int(kwargs.get(ATTR_POSITION))
+        tmp_position = int(kwargs.get(ATTR_POSITION))  # type: ignore  # noqa: PGH003
         sh_nmbr = self._nmbr + 1
         if self._module.mod_type[:16] == "Smart Controller":
             sh_nmbr -= 2  # map #3..5 to 1..3
@@ -226,7 +225,7 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
 class HbtnBlind(HbtnShutter):
     """Representation of a shutter cover with tilt control."""
 
-    supported_features = (
+    _attr_supported_features = (
         CoverEntityFeature.SET_POSITION
         | CoverEntityFeature.OPEN
         | CoverEntityFeature.CLOSE
@@ -274,7 +273,7 @@ class HbtnBlind(HbtnShutter):
 
     async def async_set_cover_tilt_position(self, **kwargs: Any) -> None:
         """Set the tilt angle."""
-        tmp_tilt_position = int(kwargs.get(ATTR_TILT_POSITION))
+        tmp_tilt_position = int(kwargs.get(ATTR_TILT_POSITION))  # type: ignore  # noqa: PGH003
         sh_nmbr = self._nmbr + 1
         if self._module.mod_type == "Smart Controller":
             sh_nmbr -= 2  # map #3..5 to 1..3
