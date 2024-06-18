@@ -182,7 +182,7 @@ class HbtnSelectDaytimeMode(HbtnMode):
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
         if isinstance(self._module, HbtnRouter):
             self._attr_name = "Group 0 daytime"
-            self._attr_unique_id = f"{self.hbtnr.uid}_group_0_daytime_mode"
+            self._attr_unique_id = f"Rt_{self.hbtnr.uid}_group_0_daytime_mode"
             if self._value == 0:
                 # hot fix: why is mode 0?
                 hbtnr.logger.warning("Enum value 0 for router")
@@ -190,7 +190,7 @@ class HbtnSelectDaytimeMode(HbtnMode):
             self._current_option = self._enum(self._value).name
         else:
             self._attr_name = f"Group {self._module.group} daytime"
-            self._attr_unique_id = f"{self._module.uid}_daytime_mode"
+            self._attr_unique_id = f"Mod_{self._module.uid}_daytime_mode"
             self._attr_entity_registry_enabled_default = (
                 False  # Entity will initally be disabled
             )
@@ -229,10 +229,10 @@ class HbtnSelectAlarmMode(HbtnMode):
         self._current_option = self._enum(self._value).name
         if isinstance(self._module, HbtnRouter):
             self._attr_name = "Group 0 alarm"
-            self._attr_unique_id = f"{self.hbtnr.uid}_group_0_alarm_mode"
+            self._attr_unique_id = f"Rt_{self.hbtnr.uid}_group_0_alarm_mode"
         else:
             self._attr_name = f"Group {self._module.group} alarm"
-            self._attr_unique_id = f"{self._module.uid}_alarm_mode"
+            self._attr_unique_id = f"Mod_{self._module.uid}_alarm_mode"
 
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
@@ -272,10 +272,10 @@ class HbtnSelectGroupMode(HbtnMode):
         self._current_option = self._enum(self._value).name  # type: ignore  # noqa: PGH003
         if isinstance(self._module, HbtnRouter):
             self._attr_name = "Group 0 mode"
-            self._attr_unique_id = f"{self.hbtnr.uid}_group_0_mode"
+            self._attr_unique_id = f"Rt_{self.hbtnr.uid}_group_0_mode"
         else:
             self._attr_name = f"Group {self._module.group} mode"
-            self._attr_unique_id = f"{self._module.uid}_group_mode"
+            self._attr_unique_id = f"Mod_{self._module.uid}_group_mode"
 
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
@@ -378,7 +378,7 @@ class HbtnSelectLoggingLevel(CoordinatorEntity, SelectEntity):
         self._current_option = ""
         self._enum = LoggingLevels
         self._attr_name = level.name
-        self._attr_unique_id = f"{self._smhub.uid}_{level.name.replace(' ','')}"
+        self._attr_unique_id = f"Hub_{self._smhub.uid}_{level.name.replace(' ','')}"
         self._attr_translation_key = "habitron_loglevel"
 
     @property

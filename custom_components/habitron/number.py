@@ -45,11 +45,10 @@ class HbtnNumber(CoordinatorEntity, NumberEntity):
     """Representation of a input number."""
 
     _attr_has_entity_name = True
-
-    device_class = NumberDeviceClass.TEMPERATURE
-    native_max_value = 27.5
-    native_min_value = 12.5
-    native_step = 0.5
+    _attr_device_class = NumberDeviceClass.TEMPERATURE
+    _attr_native_max_value = 27.5
+    _attr_native_min_value = 12.5
+    _attr_native_step = 0.5
 
     def __init__(self, setval, module, coord, idx) -> None:
         """Initialize a Habitron set value, pass coordinator to CoordinatorEntity."""
@@ -59,7 +58,7 @@ class HbtnNumber(CoordinatorEntity, NumberEntity):
         self._module = module
         self._nmbr = setval.nmbr
         self._attr_name = setval.name
-        self._attr_unique_id = f"{self._module.uid}_number_{48+setval.nmbr}"
+        self._attr_unique_id = f"Mod_{self._module.uid}_number{48+setval.nmbr}"
         self._attr_native_value = setval.value
 
     @property
@@ -68,7 +67,7 @@ class HbtnNumber(CoordinatorEntity, NumberEntity):
         return {"identifiers": {(DOMAIN, self._module.uid)}}
 
     @property
-    def name(self) -> str:
+    def name(self) -> str | None:
         """Return the display name of this number."""
         return self._attr_name
 

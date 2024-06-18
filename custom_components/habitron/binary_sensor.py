@@ -68,7 +68,7 @@ async def async_setup_entry(
 
     if new_devices:
         await hbtn_cord.async_config_entry_first_refresh()
-        hbtn_cord.data = new_devices
+        hbtn_cord.data = new_devices  # type: ignore  # noqa: PGH003
         async_add_entities(new_devices)
 
 
@@ -129,7 +129,7 @@ class InputSwitch(HbtnBinSensor):
     ) -> None:
         """Initialize an InputSwitch, pass coordinator to CoordinatorEntity."""
         super().__init__(inpt, module, coord, idx)
-        self._attr_unique_id: str = f"{self._module.uid}_In{self._nmbr}"
+        self._attr_unique_id: str = f"Mod_{self._module.uid}_in{self._nmbr}"
 
     @property
     def icon(self) -> str:
@@ -181,7 +181,7 @@ class MotionSensor(HbtnBinSensor):
     ) -> None:
         """Initialize motion sensor."""
         super().__init__(sensor, module, coord, idx)
-        self._attr_unique_id = f"{self._module.uid}_motion"
+        self._attr_unique_id = f"Mod_{self._module.uid}_motion"
         self._attr_name = f"{self._module.name}: Motion"
 
     @property
@@ -234,7 +234,7 @@ class RainSensor(HbtnBinSensor):
     ) -> None:
         """Initialize rain sensor."""
         super().__init__(sensor, module, coord, idx)
-        self._attr_unique_id: str = f"{self._module.uid}_rain"
+        self._attr_unique_id: str = f"Mod_{self._module.uid}_rain"
         self._attr_name: str = f"{self._module.name}: Rain"
         self._attr_icon: str = "mdi:weather-rainy"
 
@@ -272,7 +272,7 @@ class HbtnState(CoordinatorEntity, BinarySensorEntity):
         self._module: HbtnModule | HbtnRouter = module
         self._nmb: int = state.nmbr
         self._on_state: bool = False
-        self._attr_unique_id: str = f"{self._module.uid}_state_{state.nmbr}"
+        self._attr_unique_id: str = f"Mod_{self._module.uid}_state{state.nmbr}"
         self._attr_name: str = state.name
         if state.type == TYPE_DIAG:
             self._attr_entity_category = EntityCategory.DIAGNOSTIC
