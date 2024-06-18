@@ -42,7 +42,7 @@ class HbtnModule:
         self.logger = logging.getLogger(__name__)
         self.sw_version: str = ""
         self.hw_version: str = ""
-        self.uid = f"Mod_{mod_descriptor.uid}_{self.b_uid}"
+        self.uid: str = ""
         self._addr: int = mod_descriptor.addr
         self.raddr: int = self._addr - int(self._addr / 100) * 100
         self.typ: bytes = mod_descriptor.mtype
@@ -56,6 +56,7 @@ class HbtnModule:
         self.group: int = mod_descriptor.group
         self.mode: IfDescriptor = IfDescriptor("Mode", 0, 1, 1)
 
+        self.analogins: list[IfDescriptor] = []
         self.inputs: list[IfDescriptor] = []
         self.outputs: list[IfDescriptor] = []
         self.dimmers: list[IfDescriptor] = []
@@ -94,6 +95,7 @@ class HbtnModule:
         await self.get_settings()
         device_registry = dr.async_get(self._hass)
         self.status = self.extract_status(sys_status)
+        self.uid = self.hw_version
         device_registry.async_get_or_create(
             config_entry_id=self._config.entry_id,
             configuration_url=f"http://{self.comm.com_ip}:7780/module-{self.raddr}",
@@ -231,8 +233,13 @@ class HbtnModule:
         inp_state = int.from_bytes(
             resp[MSetIdx.INP_STATE : MSetIdx.INP_STATE + 3], "little"
         )
+        ad_state = resp[MSetIdx.AD_STATE]
         for inp in self.inputs:
-            if inp_state & (0x01 << inp.nmbr) > 0:
+            if ad_state & (0x01 << inp.nmbr) > 0 and self.typ == b"\x0b\x1f":
+                inp.type = 3  # analog input
+                self.analogins[inp.nmbr - 2].type = 3
+                self.analogins[inp.nmbr - 2].name = inp.name
+            elif inp_state & (0x01 << inp.nmbr) > 0:
                 inp.type *= 2  # switch
 
         # pylint: disable-next=consider-using-enumerate
@@ -335,9 +342,10 @@ class SmartController(HbtnModule):
         """Init Habitron SmartController module."""
         super().__init__(mod_descriptor, hass, config, b_uid, comm)
         if self.typ[1] == 3:
-            self.inputs = [IfDescriptor("", i, 1, 0) for i in range(20)]
-        else:
-            self.inputs = [IfDescriptor("", i, 1, 0) for i in range(18)]
+            self.analogins = [
+                IfDescriptor(f"A/D-Kanal {i + 1}", i, 3, 0) for i in range(2)
+            ]
+        self.inputs = [IfDescriptor("", i, 1, 0) for i in range(18)]
         self.outputs = [IfDescriptor("", i, 1, 0) for i in range(15)]
         self.covers = [CovDescriptor("", -1, 0, 0, 0) for i in range(5)]
         self.dimmers = [IfDescriptor("", i, -1, 0) for i in range(2)]
@@ -420,8 +428,6 @@ class SmartController(HbtnModule):
         for inpt in self.inputs:
             if inpt.nmbr >= 0 and inpt.type != 3:
                 inpt.value = int((inp_state & (0x01 << inpt.nmbr)) > 0)
-            if inpt.nmbr > 18:
-                inpt.type = 3
 
         flags_state = int.from_bytes(
             self.status[MStatIdx.FLAG_LOC : MStatIdx.FLAG_LOC + 2],
@@ -429,6 +435,9 @@ class SmartController(HbtnModule):
         )
         for flg in self.flags:
             flg.value = int((flags_state & (0x01 << flg.nmbr - 1)) > 0)
+
+        self.analogins[0].value = self.status[MStatIdx.AD_1]
+        self.analogins[1].value = self.status[MStatIdx.AD_2]
 
         self.diags[0].value = self.status[MStatIdx.MODULE_STAT]
         self.diags[1].value = (
@@ -673,15 +682,27 @@ class SmartInput(HbtnModule):
         super().__init__(mod_descriptor, hass, config, b_uid, comm)
 
         self.inputs = [IfDescriptor("", i, 1, 0) for i in range(8)]
+        if self.typ[1] == 0x1F:
+            self.analogins = [IfDescriptor("", i, -3, 0) for i in range(6)]
 
     def update(self, mod_status) -> None:
         """Update with module specific method. Reads and parses status."""
+        ad_val_map = {
+            0: MStatIdx.AD_1,
+            1: MStatIdx.AD_2,
+            2: MStatIdx.GEN_1,
+            3: MStatIdx.GEN_2,
+            4: MStatIdx.GEN_3,
+            5: MStatIdx.GEN_4,
+        }
         super().update(mod_status)
         inp_state = int(self.status[MStatIdx.INP_1_8])
         for mod_inp in self.inputs:
             i_idx = mod_inp.nmbr
             if i_idx >= 0 and mod_inp.type != 3:
                 mod_inp.value = int((inp_state & (0x01 << i_idx)) > 0)
+        for anlgin in self.analogins:
+            anlgin.value = self.status[ad_val_map[anlgin.nmbr]]
         self.diags[0].value = self.status[MStatIdx.MODULE_STAT]
 
 
@@ -798,19 +819,22 @@ class SmartNature(HbtnModule):
 
     def update(self, mod_status) -> None:
         """Update with module specific method. Reads and parses status."""
+        super().update(mod_status)
         self.sensors[0].value = (
             int.from_bytes(
-                self.status[MStatIdx.TEMP_ROOM : MStatIdx.TEMP_ROOM + 2],
+                mod_status[MStatIdx.TEMP_ROOM : MStatIdx.TEMP_ROOM + 2],
                 "little",
             )
             / 10
         )  # current temperature
-        self.sensors[1].value = int(self.status[MStatIdx.HUM])  # current humidity
+        self.sensors[1].value = int(mod_status[MStatIdx.HUM])  # current humidity
         self.sensors[2].value = int.from_bytes(
-            self.status[MStatIdx.LUM : MStatIdx.LUM + 2],
+            mod_status[MStatIdx.LUM : MStatIdx.LUM + 2],
             "little",
         )  # illuminance
-        self.sensors[3].value = int(self.status[MStatIdx.WINDP])  # wind
-        self.sensors[4].value = int(self.status[MStatIdx.RAIN])  # rain
-        self.sensors[5].value = int(self.status[MStatIdx.WINDP])  # wind peak
-        self.diags[0].value = self.status[MStatIdx.MODULE_STAT]
+        self.sensors[3].value = 0.8 * self.sensors[3].value + 0.2 * int(
+            mod_status[MStatIdx.WIND]
+        )  # wind
+        self.sensors[4].value = int(mod_status[MStatIdx.RAIN])  # rain
+        self.sensors[5].value = int(mod_status[MStatIdx.WINDP])  # wind peak
+        self.diags[0].value = mod_status[MStatIdx.MODULE_STAT]

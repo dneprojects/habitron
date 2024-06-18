@@ -67,7 +67,7 @@ class EKeySensorUsr(CoordinatorEntity, SensorEntity):
         self.idx = idx
         self._module = module
         self._nmbr = nmbr
-        self._attr_unique_id = f"{self._module.uid}_ekey_ident"
+        self._attr_unique_id = f"Mod_{self._module.uid}_ekey_ident"
         self._attr_name = "Identifier Name"
         self._attr_icon = "mdi:fingerprint"
         self._attr_native_value = "None"
@@ -141,7 +141,7 @@ class EKeySensorFngr(CoordinatorEntity, SensorEntity):
         self.idx = idx
         self._module = module
         self._nmbr = nmbr
-        self._attr_unique_id = f"{self._module.uid}_ekey_fngr_ident"
+        self._attr_unique_id = f"Mod_{self._module.uid}_ekey_fngr_ident"
         self._attr_name = "Finger Name"
         self._attr_icon = "mdi:fingerprint"
         self._attr_native_value = "None"
