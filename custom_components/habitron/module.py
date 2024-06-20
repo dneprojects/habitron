@@ -65,6 +65,7 @@ class HbtnModule:
         self.leds: list[IfDescriptor] = []
         self.ids: list[IfDescriptor] = []
         self.messages: list[CmdDescriptor] = []
+        self.gsm_numbers: list[CmdDescriptor] = []
         self.dir_commands: list[CmdDescriptor] = []
         self.vis_commands: list[CmdDescriptor] = []
         self.setvalues: list[IfDescriptor] = []
@@ -148,11 +149,18 @@ class HbtnModule:
                     # Description of commands
                     self.dir_commands.append(CmdDescriptor(text, arg_code))
                 elif int(line[0]) == 254:
-                    # Description of messages
-                    self.messages.append(CmdDescriptor(text, arg_code))
+                    if self.type == "Smart GSM":
+                        if int(line[4]) == 1:
+                            self.gsm_numbers.append(CmdDescriptor(text, arg_code))
+                    else:
+                        # Description of messages
+                        self.messages.append(CmdDescriptor(text, arg_code))
                 elif int(line[0]) == 255:
                     try:
-                        if arg_code in range(10, 18):
+                        if self.type == "Smart GSM":
+                            if int(line[4]) == 1:  # only german entries
+                                self.messages.append(CmdDescriptor(text, arg_code))
+                        elif arg_code in range(10, 18):
                             # Description of module buttons
                             self.inputs[arg_code - 10] = IfDescriptor(
                                 text, arg_code - 10, 1, 0
@@ -303,9 +311,7 @@ class HbtnModule:
         m_addr = self._addr - int(self._addr / 100) * 100
         for m_idx in range(no_mods):
             if int(sys_status[m_idx * stat_len + MStatIdx.ADDR]) == m_addr:
-                self.logger.info(
-                    f"Found module {m_addr}, extracting status"
-                )  # noqa: G004
+                self.logger.info(f"Found module {m_addr}, extracting status")  # noqa: G004
                 break
         self.logger.info(
             f"Extract status could not find module {m_addr}: status length: {len(sys_status)}"  # noqa: G004
@@ -630,7 +636,7 @@ class SmartDimm(HbtnModule):
         )
 
 
-class SmartUpM(HbtnModule):
+class SmartIO2(HbtnModule):
     """Habitron SmartOutput module class."""
 
     def __init__(
@@ -781,6 +787,22 @@ class SmartEKey(HbtnModule):
             self.sensors[0].value *= -1  # disable
             self.sensors[1].value -= 128
         self.diags[0].value = self.status[MStatIdx.MODULE_STAT]
+
+
+class SmartGSM(HbtnModule):
+    """Habitron GSM module class."""
+
+    def __init__(
+        self,
+        mod_descriptor: ModuleDescriptor,
+        hass: HomeAssistant,
+        config: ConfigEntry,
+        b_uid: str,
+        comm,
+    ) -> None:
+        """Init Habitron GSM module."""
+        super().__init__(mod_descriptor, hass, config, b_uid, comm)
+        self.ids: list[IfDescriptor] = []
 
 
 class SmartNature(HbtnModule):
