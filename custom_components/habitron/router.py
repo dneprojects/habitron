@@ -20,10 +20,11 @@ from .module import (
     SmartDetect as hbtsdm,
     SmartDimm as hbtdimm,
     SmartEKey as hbtkey,
+    SmartGSM as hbtgsm,
     SmartInput as hbtinm,
+    SmartIO2 as hbtio2,
     SmartNature as hbtsnm,
     SmartOutput as hbtoutm,
-    SmartUpM as hbtupm,
 )
 
 
@@ -140,7 +141,7 @@ class HbtnRouter:
                 )
             elif (mod_desc.mtype[0] == 10) & (mod_desc.mtype[1] in [30]):
                 self.modules.append(
-                    hbtupm(mod_desc, self.hass, self.config, self.b_uid, self.comm)
+                    hbtio2(mod_desc, self.hass, self.config, self.b_uid, self.comm)
                 )
             elif mod_desc.mtype[0] == 11:
                 self.modules.append(
@@ -165,6 +166,10 @@ class HbtnRouter:
             elif (mod_desc.mtype[0] == 30) & (mod_desc.mtype[1] == 1):
                 self.modules.append(
                     hbtkey(mod_desc, self.hass, self.config, self.b_uid, self.comm)
+                )
+            elif (mod_desc.mtype[0] == 30) & (mod_desc.mtype[1] == 3):
+                self.modules.append(
+                    hbtgsm(mod_desc, self.hass, self.config, self.b_uid, self.comm)
                 )
             else:
                 continue  # Prevent dealing with unknown modules

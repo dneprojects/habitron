@@ -62,6 +62,8 @@ SMHUB_COMMANDS: Final[dict[str, str]] = {
     "SET_RGB_OFF": "\x1e\x0c\x00<rtr><mod>\1\0<lno>",
     "SET_RGB_ON": "\x1e\x0c\x01<rtr><mod>\1\0<lno>",
     "SET_RGB_COL": "\x1e\x0c\x04<rtr><mod>\4\0<lno><rd><gn><bl>",
+    "SEND_MESSAGE": "\x1e\x11\3<rtr><mod>\xff\xff<tim><msg>",
+    "SEND_SMS": "\x1e\x11\x0b<rtr><mod>\xff\xff<sms><msg>",
     "GET_LAST_IR_CODE": "\x32\2\1<rtr><mod>\0\0",
     "REINIT_HUB": "\x3c\x00\x00<rtr><opr>\0\0",
     "RESTART_HUB": "\x3c\x00\x02<rtr>\0\0\0",
@@ -689,6 +691,34 @@ class HbtnComm:
         hbtn_file = open(file_path, "w", encoding="ascii", errors="surrogateescape")
         hbtn_file.write(str_data)
         hbtn_file.close()
+
+    async def send_message(self, mod_id: int, msg_id: int | str) -> None:
+        """Send message to module."""
+        rtr_nmbr = int(mod_id / 100)
+        mod_addr = int(mod_id - 100 * rtr_nmbr)
+        cmd_str = SMHUB_COMMANDS["SEND_MESSAGE"]
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
+        cmd_str = cmd_str.replace("<tim>", chr(15))  # 15 s
+        if isinstance(msg_id, int):
+            cmd_str = cmd_str.replace("<msg>", chr(msg_id))
+        else:
+            cmd_str = cmd_str.replace("<msg>", msg_id)
+        await self.async_send_command(cmd_str)
+
+    async def send_sms(self, mod_id: int, msg_id: int | str, ct_id: int) -> None:
+        """Send sms message to module."""
+        rtr_nmbr = int(mod_id / 100)
+        mod_addr = int(mod_id - 100 * rtr_nmbr)
+        cmd_str = SMHUB_COMMANDS["SEND_SMS"]
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
+        cmd_str = cmd_str.replace("<sms>", chr(ct_id))
+        if isinstance(msg_id, int):
+            cmd_str = cmd_str.replace("<msg>", chr(msg_id))
+        else:
+            cmd_str = cmd_str.replace("<msg>", msg_id)
+        await self.async_send_command(cmd_str)
 
     async def hub_restart(self, rtr_id: int) -> None:
         """Restart hub."""
