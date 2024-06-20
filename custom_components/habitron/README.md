@@ -17,11 +17,12 @@ The `habitron` implementation allows you to integrate your [Habitron](https://ww
 For the habitron integration to work, the network interface SmartIP must be reachable via your local network. During configuration, the DNS hostname or the IP address has to given.
 A second parameter is used to control the polling update interval.
 
-| Configuration parameter     | Optional  | Description  |
-| :-------------------------- | :-------- | :----------- |
-| `Host name or IP of SmartIP`| no        | Either the DNS host name of the SmartIP or its IP address.
-| `Update interval [s]`       | no        | Polling update interval in seconds, must be between 4 and 60 seconds.
-| `Perform cyclic updates`    | no        | Must be checked for nomal operation. Uncheck only to suspend polling for communication with SmartConfig software.
+| Configuration parameter                | Optional  | Description  |
+| :------------------------------------- | :-------- | :----------- |
+| `Host name or IP of SmartHub`          | no        | Either the DNS host name of the SmartHub or its IP address.
+| `Update interval [s]`                  | no        | Polling update interval in seconds, must be between 4 and 60 seconds.
+| `Perform cyclic updates`               | no        | Must be checked for nomal operation. Uncheck only to suspend polling for communication with external software.
+| `Token for websocket authentification` | no        | Enter a "long-lived access token" you created on your personal profile (never needed for SmartCenter)
 
 These parameters can be changed after installation as well.
 
@@ -61,6 +62,7 @@ Depending on the module, a couple of sensors are created:
 | Luminance            | Luminace in lux.                                              |
 | Air qualitiy         | Index in percent.                                             |
 | Motion               | Motion sensors appear as binary sensors (see above)           |
+| Analog inputs        | If available, analog inputs appear as sensor entities.        |
 
 ### Buttons
 
@@ -77,6 +79,10 @@ The habitron system offers modes for daylight, alarm, and other modes. These are
 ### Climate
 
 Based on the first temperature setpoint and the sensor temperature, a climate controller is implemented. It supports heating on/off actions and its state can be used as input for automations. A manual on or off command will change the automatic operation for 5 minutes.
+
+### Notify
+
+Each Smart Controller offers messages to be shown on the display. In order to initiate these, e.g. by an automation, a notify entity is exposed to Home Assistant. If a Smart GSM module is available, notify entities will be generated for each sms number configured on the module.
 
 ### Diagnostic values
 
@@ -152,14 +158,4 @@ Saves a router's status data (router diagnostic values) to file. The file name i
 ### Features
 
 Multiple routers are not supported.
-
-### Modules
-
-The following modules are not supported:
-
-- Smart Key fingerprint sensor
-
-Not tested:
-- Smart Dimm
-- Unterputzmodul
 
