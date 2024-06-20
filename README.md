@@ -52,11 +52,12 @@ If the connection is established, the SmartIP, router and modules appear as devi
 For the habitron integration to work, the network interface SmartIP must be reachable via your local network. During configuration, the DNS hostname or the IP address has to given.
 A second parameter is used to control the polling update interval.
 
-| Configuration parameter    | Optional  | Description  |
-| :------------------------- | :-------- | :----------- |
-| `host name`                | no        | Either the DNS host name of the SmartIP or its IP address.
-| `update interval`          | no        | Polling update interval in seconds, must be between 4 and 60 seconds.
-| `token for websocket auth` | yes       | Enter a "long-lived access token"  you created on your personal profile.
+| Configuration parameter                | Optional  | Description  |
+| :------------------------------------- | :-------- | :----------- |
+| `Host name or IP of SmartHub`          | no        | Either the DNS host name of the SmartHub or its IP address.
+| `Update interval [s]`                  | no        | Polling update interval in seconds, must be between 4 and 60 seconds.
+| `Perform cyclic updates`               | no        | Must be checked for nomal operation. Uncheck only to suspend polling for communication with external software.
+| `Token for websocket authentification` | no        | Enter a "long-lived access token" you created on your personal profile (never needed for SmartCenter)
 
 These parameters can be changed after installation as well.
 
