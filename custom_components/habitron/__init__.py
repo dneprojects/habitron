@@ -26,50 +26,51 @@ from .smart_hub import SmartHub
 
 # List of platforms to support. There should be a matching .py file for each
 PLATFORMS: list[str] = [
-    "sensor",
-    "light",
-    "switch",
-    "cover",
-    "number",
-    "button",
     "binary_sensor",
-    "select",
+    "button",
     "climate",
-    "text",
+    "cover",
     "event",
+    "light",
+    "notify",
+    "number",
+    "select",
+    "sensor",
+    "switch",
+    "text",
 ]
 SERVICE_HUB_RESTART_SCHEMA = vol.Schema(
     {
-        vol.Required(ROUTER_NMBR, default=1): int,  # type: ignore
+        vol.Required(ROUTER_NMBR, default=1): int,  # type: ignore  # noqa: PGH003
     }
 )
 SERVICE_HUB_REBOOT_SCHEMA = vol.Schema({})
 SERVICE_MOD_RESTART_SCHEMA = vol.Schema(
     {
-        vol.Required(ROUTER_NMBR, default=1): int,  # type: ignore
-        vol.Optional(RESTART_KEY_NMBR, default=1): int,  # type: ignore
+        vol.Required(ROUTER_NMBR, default=1): int,  # type: ignore  # noqa: PGH003
+        vol.Optional(RESTART_KEY_NMBR, default=1): int,  # type: ignore  # noqa: PGH003
     }
 )
 SERVICE_MOD_FILE_SCHEMA = vol.Schema(
     {
-        vol.Required(ROUTER_NMBR, default=1): int,  # type: ignore
-        vol.Required(FILE_MOD_NMBR, default=1): int,  # type: ignore
+        vol.Required(ROUTER_NMBR, default=1): int,  # type: ignore  # noqa: PGH003
+        vol.Required(FILE_MOD_NMBR, default=1): int,  # type: ignore  # noqa: PGH003
     }
 )
 SERVICE_RTR_FILE_SCHEMA = vol.Schema(
     {
-        vol.Required(ROUTER_NMBR, default=1): int,  # type: ignore
+        vol.Required(ROUTER_NMBR, default=1): int,  # type: ignore  # noqa: PGH003
     }
 )
 SERVICE_RTR_RESTART_SCHEMA = vol.Schema(
     {
-        vol.Required(ROUTER_NMBR, default=1): int,  # type: ignore
+        vol.Required(ROUTER_NMBR, default=1): int,  # type: ignore  # noqa: PGH003
     }
 )
 SERVICE_UPDATE_ENTITY_SCHEMA = vol.Schema(
     {
         vol.Required(HUB_UID): str,
-        vol.Required(ROUTER_NMBR, default=1): int,  # type: ignore
+        vol.Required(ROUTER_NMBR, default=1): int,  # type: ignore  # noqa: PGH003
         vol.Required(MOD_NMBR): int,
         vol.Required(EVNT_TYPE): int,
         vol.Required(EVNT_ARG1): int,
