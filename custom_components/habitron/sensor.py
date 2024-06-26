@@ -182,8 +182,8 @@ class HbtnSensor(CoordinatorEntity, SensorEntity):
 class AnalogSensor(HbtnSensor):
     """Representation of a Sensor."""
 
-    _attr_device_class = SensorDeviceClass.VOLTAGE
     _attr_should_poll = True  # for push updates
+    _attr_native_unit_of_measurement = PERCENTAGE
 
     def __init__(self, module, sensor, coord, idx) -> None:
         """Initialize the sensor."""

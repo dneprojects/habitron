@@ -4,17 +4,17 @@
             "already_configured": "Already_configured_device"
         },
         "error": {
-            "cannot_connect": "Cannot connect to SmartIP",
+            "cannot_connect": "Cannot connect to SmartHub",
             "host_not_found": "Host name not fount, try with IP",
-            "interval_too_long": "Interval too short, enter max. 60 s",
-            "interval_too_short": "Interval too short, enter min. 4 s",
+            "interval_too_long": "Interval too short, enter max. 10 s",
+            "interval_too_short": "Interval too short, enter min. 2 s",
             "invalid_interval": "Invalid interval entry",
             "unknown": "Unknown"
         },
         "step": {
             "user": {
                 "data": {
-                    "habitron_host": "Host name or IP of SmartIP",
+                    "habitron_host": "Host name or IP of SmartHub",
                     "update_interval": "Update interval [s]",
                     "websock_token": "Token for websocket authentification"
                 },
@@ -24,29 +24,29 @@
     },
     "entity": {
         "select": {
+            "habitron_loglevel": {
+                "state": {
+                    "critical": "Critical",
+                    "debug": "Debug",
+                    "error": "Error",
+                    "info": "Info",
+                    "notset": "Not Set",
+                    "warning": "Warning"
+                }
+            },
             "habitron_mode": {
                 "state": {
                     "absent": "Absent",
+                    "config": "Config",
                     "day": "Day",
                     "night": "Night",
-                    "update": "Update",
-                    "config": "Config",
                     "off": "Off",
                     "on": "On",
                     "present": "Present",
                     "sleeping": "Sleeping",
+                    "update": "Update",
                     "vacation": "Vacation"
                 }
-            },
-            "habitron_loglevel": {
-              "state": {
-                "notset": "Not Set",
-                "debug": "Debug",
-                "info": "Info",
-                "warning": "Warning",
-                "error": "Error",
-                "critical": "Critical"
-              }
             }
         }
     },
@@ -55,17 +55,17 @@
             "already_configured": "Already_configured_device"
         },
         "error": {
-            "cannot_connect": "Cannot connect to SmartIP",
+            "cannot_connect": "Cannot connect to SmartHub",
             "host_not_found": "Host name not fount, try with IP",
-            "interval_too_long": "Interval too short, enter max. 10 s",
-            "interval_too_short": "Interval too short, enter min. 2 s",
+            "interval_too_long": "Interval too short, enter max. 60 s",
+            "interval_too_short": "Interval too short, enter min. 4 s",
             "invalid_interval": "Invalid interval entry",
             "unknown": "Unknown"
         },
         "step": {
             "init": {
                 "data": {
-                    "habitron_host": "Host name or IP of SmartIP",
+                    "habitron_host": "Host name or IP of SmartHub",
                     "update_interval": "Update interval [s]",
                     "updates_enabled": "Perform cyclic updates",
                     "websock_token": "Token for websocket authentification"
