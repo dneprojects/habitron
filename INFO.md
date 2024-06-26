@@ -1,5 +1,5 @@
 <h2 align="center">
-  <a href="https://habitron.de"><img src="./logos/logo@2x.png" alt="Habitron logotype" width="300"></a>
+  <a href="https://habitron.de"><img src="./custom_components/habitron/logos/logo.png" alt="Habitron logotype" width="300"></a>
   <br>
   <i>Home Assistant Habitron custom integration</i>
   <br>
@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/github/v/release/dneprojects/habitron" alt="Current version">
 </p>
 
-The `habitron` implementation allows you to integrate your [Habitron](https://www.habitron.de/) devices in Home Assistant. It is implemented using a _polling_ model in _async_.
+The `habitron` implementation allows you to integrate your [Habitron](https://www.habitron.de/) devices in Home Assistant. It is implemented using a _push_ model in _async_.
 
 ## Configuration
 
@@ -28,7 +28,7 @@ These parameters can be changed after installation as well.
 
 ## Entities
 
-For any module, a device is created. These will show up after the discovery phase and can be associated with Home Assistant rooms or zones.
+For each module, a device is created. These will show up after the discovery phase and can be associated with Home Assistant rooms or zones.
 According to the modules found, several entities will be created automatically.
 
 ### Lights
@@ -37,7 +37,7 @@ This integration creates light entities for all module outputs, and dimmers. If 
 
 ### LEDs
 
-The red LEDs around the buttons on Smart Controller are implemented as switches as they should not appear as lights. Even if no nae is given, all LEDs will show up as entities.
+The red LEDs around the buttons on Smart Controller are implemented as switches as they should not appear as lights. Even if no name is given, all LEDs will show up as entities.
 
 ### Covers
 
@@ -45,7 +45,7 @@ If output pairs are used to drive a cover, a cover entitiy is cerated. The outpu
 
 ### Binary Sensors
 
-For all module inputs, binary sensors are created. The integration detects wether an input is configured as push button or as a switch. The only distinction between these categories is a different icon.
+For all module inputs, binary sensors are created. The integration detects wether an input is configured as push button or as a switch. Input buttons are implemented as event entities.
 
 In addition, habitron flags (Merker) are represented as binary sensors. These flags reflect global or module internal states.
 
