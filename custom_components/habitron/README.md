@@ -14,7 +14,7 @@ The `habitron` implementation allows you to integrate your [Habitron](https://ww
 
 ## Configuration
 
-For the habitron integration to work, the network interface SmartIP must be reachable via your local network. During configuration, the DNS hostname or the IP address has to given.
+For the habitron integration to work, the network interface SmartHub must be reachable via your local network. During configuration, the DNS hostname or the IP address has to given.
 A second parameter is used to control the polling update interval.
 
 | Configuration parameter                | Optional  | Description  |
@@ -37,7 +37,7 @@ This integration creates light entities for all module outputs, and dimmers. If 
 
 ### LEDs
 
-The red LEDs around the buttons on Smart Controller are implemented as switches as they should not appear as lights. Even if no nae is given, all LEDs will show up as entities.
+The red LEDs around the buttons on Smart Controller are implemented as switches as they should not appear as lights. Even if no name is given, all LEDs will show up as entities.
 
 ### Covers
 
@@ -59,7 +59,7 @@ Depending on the module, a couple of sensors are created:
 | :------------------- | :------------------------------------------------------------ |
 | Temperature          | Temperatures of ambient air, power electronics, ext. sensor.  |
 | Humidity             | Air humidity in percent.                                      |
-| Luminance            | Luminace in lux.                                              |
+| Luminance            | Luminance in lux.                                             |
 | Air qualitiy         | Index in percent.                                             |
 | Motion               | Motion sensors appear as binary sensors (see above)           |
 | Analog inputs        | If available, analog inputs appear as sensor entities.        |
@@ -86,7 +86,7 @@ Each Smart Controller offers messages to be shown on the display. In order to in
 
 ### Diagnostic values
 
-Some values, e.g. the mdoule status, are implemented as diagnostic values. By default, they will be diabled. They can be found on the device panel and enabled there. Diagnostic entities are grouped in a seperate category, but they can be utilized as any other entity. The router provides some more diagnostic values, e.g. voltages, currents, and timeouts.
+Some values, e.g. the mdoule status, are implemented as diagnostic values. By default, they will be disabled. They can be found on the device panel and enabled there. Diagnostic entities are grouped in a seperate category, but they can be utilized as any other entity. The router provides some more diagnostic values, e.g. voltages, currents, and timeouts.
 
 ## Services
 
