@@ -29,6 +29,8 @@ SMHUB_COMMANDS: Final[dict[str, str]] = {
     "GET_MODULE_SMC": "\x0a\3\7<rtr><mod>\0\0",
     "GET_ROUTER_SMR": "\x0a\4\3<rtr>\0\0\0",
     "GET_ROUTER_STATUS": "\x0a\4\4<rtr>\0\0\0",
+    "GET_ROUTER_FW_FILEVS": "\x0a\4\x0a<rtr>\0\0\0",
+    "GET_MODULE_FW_FILEVS": "\x0a\5\x0a<rtr><mod>\0\0",
     "GET_MODULE_STATUS": "\x0a\5\1<rtr><mod>\0\0",
     "GET_COMPACT_STATUS": "\x0a\5\2<rtr>\xff\0\0",  # compact status of all modules (0xFF)
     "GET_SMHUB_BOOT_STATUS": "\x0a\6\1\0\0\0\0",
@@ -74,6 +76,7 @@ SMHUB_COMMANDS: Final[dict[str, str]] = {
     "GET_CURRENT_ERROR": "\x3c\x01\x02<rtr>\0\0\0",
     "GET_LAST_ERROR": "\x3c\x01\x03<rtr>\0\0\0",
     "REBOOT_ROUTER": "\x3c\x01\x04<rtr>\0\0\0",  #
+    "DO_FW_UPDATE": "\x3c\x01\x14<rtr><mod>\0\0",  #
     "REBOOT_MODULE": "\x3c\x03\x01<rtr><mod>\0\0",  # <Module> or 0xFF for all modules
 }
 
@@ -746,6 +749,35 @@ class HbtnComm:
             cmd_str = SMHUB_COMMANDS["REBOOT_ROUTER"]
         cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
         await self.async_send_command(cmd_str)
+
+    async def handle_firmware(self, rtr_id: int, mod_nmbr: int) -> bytes:
+        """Handle router/module firmware update file status."""
+        rtr_nmbr = int(rtr_id / 100)
+        if mod_nmbr:
+            cmd_str = SMHUB_COMMANDS["GET_MODULE_FW_FILEVS"]
+        else:
+            cmd_str = SMHUB_COMMANDS["GET_ROUTER_FW_FILEVS"]
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        cmd_str = cmd_str.replace("<mod>", chr(mod_nmbr))
+        [resp_bytes, crc] = await self.async_send_command_crc(cmd_str, time_out_sec=5)
+        if crc == self.crc:
+            return b""
+        self.crc = crc
+        return resp_bytes
+
+    async def update_firmware(self, rtr_id: int, mod_nmbr: int) -> bytes:
+        """Start router/module firmware updates."""
+        rtr_nmbr = int(rtr_id / 100)
+        cmd_str = SMHUB_COMMANDS["DO_FW_UPDATE"]
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        cmd_str = cmd_str.replace("<mod>", chr(mod_nmbr))
+        [resp_bytes, crc] = await self.async_send_command_crc(
+            cmd_str, time_out_sec=1000
+        )
+        if crc == self.crc:
+            return b""
+        self.crc = crc
+        return resp_bytes
 
     async def update_entity(self, hub_id, rtr_id, mod_id, evnt, arg1, arg2):
         """Event server handler to receive entity updates."""
