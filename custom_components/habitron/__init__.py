@@ -38,6 +38,7 @@ PLATFORMS: list[str] = [
     "sensor",
     "switch",
     "text",
+    "update",
 ]
 SERVICE_HUB_RESTART_SCHEMA = vol.Schema(
     {
