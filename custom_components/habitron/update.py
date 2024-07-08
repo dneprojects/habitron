@@ -84,12 +84,12 @@ class HbtnModuleUpdate(UpdateEntity):
         await sleep(0.1)
         if isinstance(self._module, HbtnRouter):
             resp = await self._module.comm.update_firmware(self._module.id, 0)
+            self._module.version = version
         else:
             resp = await self._module.comm.update_firmware(
                 int(self._module.mod_addr / 100) * 100, self._module.raddr
             )
-        self._attr_installed_version = resp.decode("iso8859-1")
-        self._attr_latest_version = resp.decode("iso8859-1")
+            self._module.sw_version = version
         self.flash_in_progress = False
         await self.async_update()
 
