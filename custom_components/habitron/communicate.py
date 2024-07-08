@@ -76,6 +76,8 @@ SMHUB_COMMANDS: Final[dict[str, str]] = {
     "GET_CURRENT_ERROR": "\x3c\x01\x02<rtr>\0\0\0",
     "GET_LAST_ERROR": "\x3c\x01\x03<rtr>\0\0\0",
     "REBOOT_ROUTER": "\x3c\x01\x04<rtr>\0\0\0",  #
+    "POWER_UP_CHAN": "\x3c\x01\x06<rtr><msk>\0\0",
+    "POWER_DWN_CHAN": "\x3c\x01\x07<rtr><msk>\0\0",
     "DO_FW_UPDATE": "\x3c\x01\x14<rtr><mod>\0\0",  #
     "REBOOT_MODULE": "\x3c\x03\x01<rtr><mod>\0\0",  # <Module> or 0xFF for all modules
 }
@@ -778,6 +780,24 @@ class HbtnComm:
             return b""
         self.crc = crc
         return resp_bytes
+
+    async def async_power_cycle_channel(self, rtr_id: int, channel: int) -> None:
+        """Power down a router channel and set power on again."""
+        rtr_nmbr = int(rtr_id / 100)
+        mask = 1 << (channel - 1)
+        cmd_str = SMHUB_COMMANDS["POWER_DWN_CHAN"]
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        cmd_str = cmd_str.replace("<msk>", chr(mask))
+        [resp_bytes, crc] = await self.async_send_command_crc(
+            cmd_str, time_out_sec=1000
+        )
+        await asyncio.sleep(2)
+        cmd_str = SMHUB_COMMANDS["POWER_UP_CHAN"]
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        cmd_str = cmd_str.replace("<msk>", chr(mask))
+        [resp_bytes, crc] = await self.async_send_command_crc(
+            cmd_str, time_out_sec=1000
+        )
 
     async def update_entity(self, hub_id, rtr_id, mod_id, evnt, arg1, arg2):
         """Event server handler to receive entity updates."""
