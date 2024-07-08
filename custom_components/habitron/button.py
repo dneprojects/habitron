@@ -39,6 +39,8 @@ async def async_setup_entry(
     new_devices.append(RestartAllButton(hbtn_rt))
     new_devices.append(RestartHubButton(hbtn_rt))
     new_devices.append(RebootHubButton(hbtn_rt))
+    for ch in range(4):
+        new_devices.append(ResetChannelPowerButton(hbtn_rt, ch + 1))
 
     if new_devices:
         async_add_entities(new_devices)
@@ -296,3 +298,31 @@ class CountDownButton(ButtonEntity):
         await self._module.comm.async_inc_dec_counter(
             self._module.mod_addr, self._nmbr, 2
         )
+
+
+class ResetChannelPowerButton(ButtonEntity):
+    """Representation of a button to trigger a power cycle on a router channel."""
+
+    _attr_has_entity_name = True
+
+    def __init__(self, router, channel) -> None:
+        """Initialize an Power Cycle button."""
+        self._router = router
+        self._chan = channel
+        self._attr_name = f"Power cycle router channel {self._chan}"
+        self._attr_unique_id = f"Rt_{router.uid}_powcyc{self._chan}"
+        self._attr_icon = "mdi:backup-restore"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return information to link this entity with the correct device."""
+        return {"identifiers": {(DOMAIN, self._router.uid)}}
+
+    @property
+    def name(self) -> str | None:
+        """Return the display name of this button."""
+        return self._attr_name
+
+    async def async_press(self) -> None:
+        """Handle the button press."""
+        await self._router.comm.async_power_cycle_channel(self._router.id, self._chan)
