@@ -38,19 +38,7 @@ async def async_setup_entry(
     for hbt_module in hbtn_rt.modules:
         for mod_output in hbt_module.outputs:
             # other type numbers disable output
-            if abs(mod_output.type) == 1:  # standard
-                if hbt_module.comm.is_smhub:
-                    new_devices.append(
-                        SwitchedOutputPush(
-                            mod_output, hbt_module, hbtn_cord, len(new_devices)
-                        )
-                    )
-                else:
-                    new_devices.append(
-                        SwitchedOutput(
-                            mod_output, hbt_module, hbtn_cord, len(new_devices)
-                        )
-                    )
+            # type == 1, standard output: -> switch entities
             if abs(mod_output.type) == 2:  # dimmer
                 if hbt_module.comm.is_smhub:
                     new_devices.append(
@@ -80,7 +68,7 @@ async def async_setup_entry(
         async_add_entities(new_devices)
 
 
-class SwitchedOutput(CoordinatorEntity, LightEntity):
+class SwitchedLight(CoordinatorEntity, LightEntity):
     """Representation of habitron light entities."""
 
     _attr_has_entity_name = True
@@ -154,7 +142,7 @@ class SwitchedOutput(CoordinatorEntity, LightEntity):
         )
 
 
-class DimmedOutput(SwitchedOutput):
+class DimmedOutput(SwitchedLight):
     """Representation of habitron light entities, dimmable."""
 
     _attr_brightness = True
@@ -204,7 +192,7 @@ class DimmedOutput(SwitchedOutput):
         )
 
 
-class SwitchedOutputPush(SwitchedOutput):
+class SwitchedLightPush(SwitchedLight):
     """Version for push update."""
 
     async def async_added_to_hass(self) -> None:
@@ -224,7 +212,7 @@ class SwitchedOutputPush(SwitchedOutput):
         self._output.remove_callback(self.async_write_ha_state)
 
 
-class DimmedOutputPush(SwitchedOutputPush):
+class DimmedOutputPush(SwitchedLightPush):
     """Representation of habitron light entities, dimmable."""
 
     _attr_brightness = True
