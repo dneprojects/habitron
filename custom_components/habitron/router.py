@@ -25,6 +25,7 @@ from .module import (
     SmartIO2 as hbtio2,
     SmartNature as hbtsnm,
     SmartOutput as hbtoutm,
+    SmartSensor as hbtsens,
 )
 
 
@@ -131,15 +132,15 @@ class HbtnRouter:
         await self.comm.async_system_update()  # Inital update
 
         for mod_desc in self.modules_desc:
-            if (mod_desc.mtype[0] == 10) & (mod_desc.mtype[1] in [1, 2, 50, 51]):
+            if (mod_desc.mtype[0] == 10) and (mod_desc.mtype[1] in [1, 2, 50, 51]):
                 self.modules.append(
                     hbtoutm(mod_desc, self.hass, self.config, self.b_uid, self.comm)
                 )
-            elif (mod_desc.mtype[0] == 10) & (mod_desc.mtype[1] in [20, 21, 22]):
+            elif (mod_desc.mtype[0] == 10) and (mod_desc.mtype[1] in [20, 21, 22]):
                 self.modules.append(
                     hbtdimm(mod_desc, self.hass, self.config, self.b_uid, self.comm)
                 )
-            elif (mod_desc.mtype[0] == 10) & (mod_desc.mtype[1] in [30]):
+            elif (mod_desc.mtype[0] == 10) and (mod_desc.mtype[1] in [30]):
                 self.modules.append(
                     hbtio2(mod_desc, self.hass, self.config, self.b_uid, self.comm)
                 )
@@ -155,19 +156,23 @@ class HbtnRouter:
                 self.modules.append(
                     hbtsnm(mod_desc, self.hass, self.config, self.b_uid, self.comm)
                 )
-            elif mod_desc.mtype[0] == 50:
+            elif mod_desc.mtype[0] == 50 and (mod_desc.mtype[1] in [1]):
                 self.modules.append(
                     hbtscmm(mod_desc, self.hass, self.config, self.b_uid, self.comm)
+                )
+            elif mod_desc.mtype[0] == 50 and (mod_desc.mtype[1] in [40]):
+                self.modules.append(
+                    hbtsens(mod_desc, self.hass, self.config, self.b_uid, self.comm)
                 )
             elif mod_desc.mtype[0] == 1:
                 self.modules.append(
                     hbtscm(mod_desc, self.hass, self.config, self.b_uid, self.comm)
                 )
-            elif (mod_desc.mtype[0] == 30) & (mod_desc.mtype[1] == 1):
+            elif (mod_desc.mtype[0] == 30) and (mod_desc.mtype[1] == 1):
                 self.modules.append(
                     hbtkey(mod_desc, self.hass, self.config, self.b_uid, self.comm)
                 )
-            elif (mod_desc.mtype[0] == 30) & (mod_desc.mtype[1] == 3):
+            elif (mod_desc.mtype[0] == 30) and (mod_desc.mtype[1] == 3):
                 self.modules.append(
                     hbtgsm(mod_desc, self.hass, self.config, self.b_uid, self.comm)
                 )
