@@ -7,6 +7,7 @@ from enum import Enum
 from pathlib import Path
 
 from homeassistant.components.frontend import add_extra_js_url
+from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
@@ -68,15 +69,6 @@ class SmartHub:
             hw_version=self._type,
         )
         # Habitron iconset
-        files_path = Path(__file__).parent / "logos"
-        with contextlib.suppress(Exception):
-            # if multiple hub instances or restart
-            hass.http.register_static_path(
-                "/habitronfiles/hbt-icons.js",
-                str(files_path / "hbt-icons.js"),
-                cache_headers=False,
-            )
-            add_extra_js_url(hass, "/habitronfiles/hbt-icons.js")
         self.sensors: list[IfDescriptor] = []
         self.diags: list[IfDescriptor] = []
         self.loglvl: list[IfDescriptor] = []
@@ -131,6 +123,19 @@ class SmartHub:
         if self.is_smhub:
             await self.comm.reinit_hub(100, 0)  # force Opr mode to stop
             await self.comm.send_network_info(self.config.data["websock_token"])
+            with contextlib.suppress(Exception):
+                # if multiple hub instances or restart
+                files_path = Path(__file__).parent / "logos"
+                await self.hass.http.async_register_static_paths(
+                    [
+                        StaticPathConfig(
+                            "/habitronfiles/hbt-icons.js",
+                            str(files_path / "hbt-icons.js"),
+                            False,
+                        )
+                    ]
+                )
+                add_extra_js_url(self.hass, "/habitronfiles/hbt-icons.js")
         else:
             await self.comm.async_stop_mirror(1)
         self.router = hbtr(self.hass, self.config, self)

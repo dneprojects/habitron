@@ -42,7 +42,7 @@ MODULE_CODES: Final[dict[bytes, str]] = {
     b"\x1e\x03": "Smart GSM",
     b"\x1e\x04": "FanM-Bus",
     b"\x32\x01": "Smart Controller Mini",
-    # b"\x32\x28": "Smart Sensors",
+    b"\x32\x28": "Smart Sensor",
     b"\x50\x64": "Smart Detect 180",
     b"\x50\x65": "Smart Detect 360",
     b"\x50\x66": "Smart Detect 180-2",
