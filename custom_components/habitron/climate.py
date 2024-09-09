@@ -37,7 +37,9 @@ async def async_setup_entry(
 
     new_devices = []
     for hbt_module in hbtn_rt.modules:
-        if hbt_module.mod_type[:16] == "Smart Controller":
+        if (hbt_module.mod_type[:16] == "Smart Controller") or (
+            hbt_module.mod_type == "Smart Sensor"
+        ):
             new_devices.append(HbtnClimate(hbt_module, hbtn_cord, len(new_devices)))
     # Fetch initial data so we have data when entities subscribe
     #
@@ -84,8 +86,12 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
         self._attr_swing_modes = None
         self._state = None
         self._curr_hvac_mode = HVACMode.HEAT
-        self._curr_temperature = module.sensors[1].value
-        self._curr_humidity = module.sensors[2].value
+        if len(module.sensors) > 1:
+            self._curr_temperature = module.sensors[1].value
+            self._curr_humidity = module.sensors[2].value
+        else:
+            self._curr_temperature = module.sensors[0].value
+            self._curr_humidity = None
         self._target_temperature = module.setvalues[0].value
         self._attr_unique_id = f"Mod_{self._module.uid}_climate"
         if self._module.climate_settings == 1:
@@ -210,8 +216,12 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        self._curr_temperature = self._module.sensors[1].value
-        self._curr_humidity = self._module.sensors[2].value
+        if len(self._module.sensors) > 1:
+            self._curr_temperature = self._module.sensors[1].value
+            self._curr_humidity = self._module.sensors[2].value
+        else:
+            self._curr_temperature = self._module.sensors[0].value
+            self._curr_humidity = None
         self._target_temperature = self._module.setvalues[0].value
         self.update_action()
         self.async_write_ha_state()

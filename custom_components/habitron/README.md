@@ -1,5 +1,5 @@
 <h2 align="center">
-  <a href="https://habitron.de"><img src="https://github.com/dneprojects/habitron/tree/main/custom_components/habitron/logos/logo.png" alt="Habitron logotype" width="300"></a>
+  <a href="https://habitron.de"><img src="./logos/logo@2x.png" alt="Habitron logotype" width="300"></a>
   <br>
   <i>Home Assistant Habitron custom integration</i>
   <br>
@@ -10,12 +10,12 @@
   <img src="https://img.shields.io/github/v/release/dneprojects/habitron" alt="Current version">
 </p>
 
-The `habitron` implementation allows you to integrate your [Habitron](https://www.habitron.de/) devices in Home Assistant. It is implemented using a _push_ model in _async_.
+The `habitron` implementation allows you to integrate your [Habitron](https://www.habitron.de/) devices in Home Assistant. It is implemented using a _polling_ model in _async_.
 
 ## Configuration
 
-For the habitron integration to work, the network interface SmartHub must be reachable via your local network. During configuration, the DNS hostname or the IP address has to be given. If your Home Assistant runs on a SmartCenter, the SmartHub uses the same IP address.
-A second parameter is used to control the polling update interval for entities, which don't use push updates, such as temperatures.
+For the habitron integration to work, the network interface SmartHub must be reachable via your local network. During configuration, the DNS hostname or the IP address has to given.
+A second parameter is used to control the polling update interval.
 
 | Configuration parameter                | Optional  | Description  |
 | :------------------------------------- | :-------- | :----------- |
@@ -28,30 +28,28 @@ These parameters can be changed after installation as well.
 
 ## Entities
 
-For each module, a device is created. These will show up after the discovery phase and can be associated with Home Assistant rooms or zones.
-According to the modules found, several entities will be created automatically. The different Habitron entities get distinct icons.
+For any module, a device is created. These will show up after the discovery phase and can be associated with Home Assistant rooms or zones.
+According to the modules found, several entities will be created automatically.
 
 ### Lights
 
-The Habitron integration creates light entities for all module outputs and dimmers. If covers are configured, the associated outputs will not appear as lights. All outputs without names are deactivated.
+This integration creates light entities for all module outputs, and dimmers. If covers are configured, the associated outputs will not appear as lights. All outputs without names are deactivated.
 
 ### LEDs
 
-The red LEDs around the buttons on a Smart Controller are implemented as switch entities as they should not appear as lights. Even if no name is given, all LEDs will show up as entities.
-
-### Switches
-
-Habitron flags (Merker) are represented as switch entities. These flags reflect global or module internal states and can be set or reset by Home Assistant.
+The red LEDs around the buttons on Smart Controller are implemented as switches as they should not appear as lights. Even if no name is given, all LEDs will show up as entities.
 
 ### Covers
 
-If output pairs are used to drive a cover, a cover entity is created. The output polarity (which output of the pair is used to open, which one to close) is configured automatically. If tilt times have been stored in the module, in Home Assistant the cover will be represented as blind with additional tilt property.
+If output pairs are used to drive a cover, a cover entitiy is cerated. The output polarity (which one of the pair is used to open, which one to close) is configured automatically. If tilt times have been stored in the module, the cover has an additional tilt property.
 
 ### Binary Sensors
 
-For all module inputs, binary sensors are created. The integration detects wether an input is configured for a push button or a switch. Input buttons are implemented as event entities with attributes for short and long presses.
+For all module inputs, binary sensors are created. The integration detects wether an input is configured as push button or as a switch. The only distinction between these categories is a different icon.
 
-For modules, which support sensors, such as motion detection or rain, binary sensors are created, too.
+In addition, habitron flags (Merker) are represented as binary sensors. These flags reflect global or module internal states.
+
+For modules, which support motion detection, binary sensors are created, too.
 
 ### Sensors
 
@@ -61,18 +59,18 @@ Depending on the module, a couple of sensors are created:
 | :------------------- | :------------------------------------------------------------ |
 | Temperature          | Temperatures of ambient air, power electronics, ext. sensor.  |
 | Humidity             | Air humidity in percent.                                      |
-| Luminance            | Luminace in lux.                                              |
+| Luminance            | Luminance in lux.                                             |
 | Air qualitiy         | Index in percent.                                             |
 | Motion               | Motion sensors appear as binary sensors (see above)           |
 | Analog inputs        | If available, analog inputs appear as sensor entities.        |
 
 ### Buttons
 
-The habitron integration creates buttons for collective commands, direct commands, and visualization commands to allow Home Assistant user to call these commands.
+The habitron integration creates buttons for collective commands, direct commands, and visualization commands.
 
 ### Numbers
 
-For Smart Controller modules, an input number entity is created to control the two temperature setpoints.
+For Smart Controller modules, an input number entitiy is created to control the two temperature setpoints.
 
 ### Select
 
@@ -80,7 +78,7 @@ The habitron system offers modes for daylight, alarm, and other modes. These are
 
 ### Climate
 
-Based on the first temperature setpoint and the sensor temperature, a climate controller is implemented. It supports heating on/off actions and its state can be used as input for automations.
+Based on the first temperature setpoint and the sensor temperature, a climate controller is implemented. It supports heating on/off actions and its state can be used as input for automations. A manual on or off command will change the automatic operation for 5 minutes.
 
 ### Notify
 
@@ -88,7 +86,7 @@ Each Smart Controller offers messages to be shown on the display. In order to in
 
 ### Diagnostic values
 
-Some values, e.g. the mdoule status, are implemented as diagnostic values. By default, they will be disabled. They can be found on the device panel and enabled there. Diagnostic entities are grouped in a seperate category, but they can be utilized as any other entity. The router provides some more diagnostic sensor values, e.g. voltages, currents, and timeouts.
+Some values, e.g. the mdoule status, are implemented as diagnostic values. By default, they will be disabled. They can be found on the device panel and enabled there. Diagnostic entities are grouped in a seperate category, but they can be utilized as any other entity. The router provides some more diagnostic values, e.g. voltages, currents, and timeouts.
 
 ## Services
 
@@ -155,8 +153,9 @@ Saves a router's status data (router diagnostic values) to file. The file name i
 | `rtr_nmbr`              | no        | The address of the habitron router, which serves the module.
 
 
-## Limitations
+## Unsupported
 
 ### Features
 
 Multiple routers are not supported.
+
