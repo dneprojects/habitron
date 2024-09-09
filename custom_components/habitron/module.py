@@ -867,3 +867,40 @@ class SmartNature(HbtnModule):
         self.sensors[4].value = int(mod_status[MStatIdx.RAIN])  # rain
         self.sensors[5].value = int(mod_status[MStatIdx.WINDP])  # wind peak
         self.diags[0].value = mod_status[MStatIdx.MODULE_STAT]
+
+
+class SmartSensor(HbtnModule):
+    """Temperature sensor module."""
+
+    def __init__(
+        self,
+        mod_descriptor: ModuleDescriptor,
+        hass: HomeAssistant,
+        config: ConfigEntry,
+        b_uid: str,
+        comm,
+    ) -> None:
+        """Init Habitron SmartSensor module."""
+        super().__init__(mod_descriptor, hass, config, b_uid, comm)
+        self.sensors.append(IfDescriptor("Temperature", 0, 2, 0))
+        self.setvalues = [IfDescriptor("Set temperature", 0, 2, 20.0)]
+
+    def update(self, mod_status) -> None:
+        """Update with module specific method. Reads and parses status."""
+        super().update(mod_status)
+        self.sensors[0].value = (
+            int.from_bytes(
+                self.status[MStatIdx.TEMP_ROOM : MStatIdx.TEMP_ROOM + 2],
+                "little",
+            )
+            / 10
+        )  # current room temperature
+        self.setvalues[0].value = (
+            int.from_bytes(
+                self.status[MStatIdx.T_SETP_0 : MStatIdx.T_SETP_0 + 2],
+                "little",
+            )
+            / 10
+        )
+
+        self.diags[0].value = self.status[MStatIdx.MODULE_STAT]
