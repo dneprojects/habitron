@@ -172,13 +172,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry.async_on_unload(entry.add_update_listener(update_listener))
 
     # Register services
-    if smhub.is_smhub:
-        hass.services.async_register(
-            DOMAIN, "hub_restart", restart_hub, schema=SERVICE_HUB_RESTART_SCHEMA
-        )
-        hass.services.async_register(
-            DOMAIN, "hub_reboot", reboot_hub, schema=SERVICE_HUB_REBOOT_SCHEMA
-        )
+    hass.services.async_register(
+        DOMAIN, "hub_restart", restart_hub, schema=SERVICE_HUB_RESTART_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN, "hub_reboot", reboot_hub, schema=SERVICE_HUB_REBOOT_SCHEMA
+    )
     hass.services.async_register(
         DOMAIN, "mod_restart", restart_module, schema=SERVICE_MOD_RESTART_SCHEMA
     )
@@ -206,13 +205,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         save_router_status,
         schema=SERVICE_RTR_FILE_SCHEMA,
     )
-    if smhub.is_smhub:
-        hass.services.async_register(
-            DOMAIN,
-            "update_entity",
-            update_entity,
-            schema=SERVICE_UPDATE_ENTITY_SCHEMA,
-        )
+    hass.services.async_register(
+        DOMAIN,
+        "update_entity",
+        update_entity,
+        schema=SERVICE_UPDATE_ENTITY_SCHEMA,
+    )
 
     # This creates each HA object for each platform your device requires.
     # It's done by calling the `async_setup_entry` function in each platform module.
