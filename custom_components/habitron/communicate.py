@@ -202,26 +202,39 @@ class HbtnComm:
 
     def get_smhub_info(self) -> dict[str, str]:
         """Get basic infos of SmartHub."""
+        smhub_info = query_smarthub(self._host)  # get info from query port
+        if not smhub_info:
+            raise (TimeoutError)
+        self.is_smhub = smhub_info["serial"] == "RBPI"
+        if not self.is_smhub:
+            # Smart Hub
+            info = smhub_info
+            self._version = info["version"]
+            self._serial = info["serial"]
+            self._hwtype = info["type"]
+            self._hostip = info["ip"]
+            self._mac = info["mac"]
+            self._hostname = info["hostname"]
+        else:
+            # Smart Hub
+            sck = socket.socket()  # Create a socket object
+            try:
+                sck.connect((self._host, self._port))
+            except ConnectionRefusedError as exc:
+                raise ConnectionRefusedError from exc
+            sck.settimeout(8)  # 8 seconds
+            cmd_str = SMHUB_COMMANDS["GET_SMHUB_INFO"]
+            full_string = wrap_command(cmd_str)
+            resp_bytes = send_receive(sck, full_string)
+            sck.close()
 
-        # Smart Hub
-        sck = socket.socket()  # Create a socket object
-        try:
-            sck.connect((self._host, self._port))
-        except ConnectionRefusedError as exc:
-            raise ConnectionRefusedError from exc
-        sck.settimeout(8)  # 8 seconds
-        cmd_str = SMHUB_COMMANDS["GET_SMHUB_INFO"]
-        full_string = wrap_command(cmd_str)
-        resp_bytes = send_receive(sck, full_string)
-        sck.close()
-
-        info = yaml.load(resp_bytes.decode("iso8859-1"), Loader=yaml.Loader)
-        self._version = info["software"]["version"]
-        self._hwtype = info["hardware"]["platform"]["type"]
-        self._hostip = info["hardware"]["network"]["ip"]
-        self._hostname = info["hardware"]["network"]["host"]
-        self._mac = info["hardware"]["network"]["lan mac"]
-        self.is_addon = self._hostname.split(".")[0].find("smart-hub") > 0
+            info = yaml.load(resp_bytes.decode("iso8859-1"), Loader=yaml.Loader)
+            self._version = info["software"]["version"]
+            self._hwtype = info["hardware"]["platform"]["type"]
+            self._hostip = info["hardware"]["network"]["ip"]
+            self._hostname = info["hardware"]["network"]["host"]
+            self._mac = info["hardware"]["network"]["lan mac"]
+            self.is_addon = self._hostname.split(".")[0].find("smart-hub") > 0
         self.logger.debug(f"SmartHub info - host name: {self._hostname}")  # noqa: G004
         self.logger.debug(f"SmartHub info - ip: {self._hostip}")  # noqa: G004
         self.logger.debug(f"SmartHub info - version: {self._version}")  # noqa: G004
