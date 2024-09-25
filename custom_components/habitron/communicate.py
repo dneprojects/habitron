@@ -9,6 +9,7 @@ import socket
 import struct
 from typing import Final
 
+import anyio
 import yaml
 
 from homeassistant.config_entries import ConfigEntry
@@ -75,10 +76,10 @@ SMHUB_COMMANDS: Final[dict[str, str]] = {
     "RESTART_FORWARD_TABLE": "\x3c\x01\x01<rtr>\0\0\0",  # Weiterleitungstabelle löschen und -automatik starten
     "GET_CURRENT_ERROR": "\x3c\x01\x02<rtr>\0\0\0",
     "GET_LAST_ERROR": "\x3c\x01\x03<rtr>\0\0\0",
-    "REBOOT_ROUTER": "\x3c\x01\x04<rtr>\0\0\0",  #
+    "REBOOT_ROUTER": "\x3c\x01\x04<rtr>\0\0\0",
     "POWER_UP_CHAN": "\x3c\x01\x06<rtr><msk>\0\0",
     "POWER_DWN_CHAN": "\x3c\x01\x07<rtr><msk>\0\0",
-    "DO_FW_UPDATE": "\x3c\x01\x14<rtr><mod>\0\0",  #
+    "DO_FW_UPDATE": "\x3c\x01\x14<rtr><mod>\0\0",
     "REBOOT_MODULE": "\x3c\x03\x01<rtr><mod>\0\0",  # <Module> or 0xFF for all modules
 }
 
@@ -110,8 +111,8 @@ class HbtnComm:
         self.crc: int = 0
         self.router: HbtnRouter
         self.update_suspended: bool = False
-        self.is_smhub: bool = False  # will be set in get_smhub_info()
-        self.is_addon: bool = False  # will be set in get_smhub_info()
+        self.is_smhub: bool = True  # will be set in get_smhub_info()
+        self.is_addon: bool = True  # will be set in get_smhub_info()
         self.info: dict[str, str] = self.get_smhub_info()
         self.grp_modes: dict = {}
 
@@ -201,39 +202,26 @@ class HbtnComm:
 
     def get_smhub_info(self) -> dict[str, str]:
         """Get basic infos of SmartHub."""
-        smhub_info = query_smarthub(self._host)  # get info from query port
-        if not smhub_info:
-            raise (TimeoutError)
-        self.is_smhub = smhub_info["serial"] == "RBPI"
-        if not self.is_smhub:
-            # Smart Hub
-            info = smhub_info
-            self._version = info["version"]
-            self._serial = info["serial"]
-            self._hwtype = info["type"]
-            self._hostip = info["ip"]
-            self._mac = info["mac"]
-            self._hostname = info["hostname"]
-        else:
-            # Smart Hub
-            sck = socket.socket()  # Create a socket object
-            try:
-                sck.connect((self._host, self._port))
-            except ConnectionRefusedError as exc:
-                raise ConnectionRefusedError from exc
-            sck.settimeout(8)  # 8 seconds
-            cmd_str = SMHUB_COMMANDS["GET_SMHUB_INFO"]
-            full_string = wrap_command(cmd_str)
-            resp_bytes = send_receive(sck, full_string)
-            sck.close()
 
-            info = yaml.load(resp_bytes.decode("iso8859-1"), Loader=yaml.Loader)
-            self._version = info["software"]["version"]
-            self._hwtype = info["hardware"]["platform"]["type"]
-            self._hostip = info["hardware"]["network"]["ip"]
-            self._hostname = info["hardware"]["network"]["host"]
-            self._mac = info["hardware"]["network"]["lan mac"]
-            self.is_addon = self._hostname.split(".")[0].find("smart-hub") > 0
+        # Smart Hub
+        sck = socket.socket()  # Create a socket object
+        try:
+            sck.connect((self._host, self._port))
+        except ConnectionRefusedError as exc:
+            raise ConnectionRefusedError from exc
+        sck.settimeout(8)  # 8 seconds
+        cmd_str = SMHUB_COMMANDS["GET_SMHUB_INFO"]
+        full_string = wrap_command(cmd_str)
+        resp_bytes = send_receive(sck, full_string)
+        sck.close()
+
+        info = yaml.load(resp_bytes.decode("iso8859-1"), Loader=yaml.Loader)
+        self._version = info["software"]["version"]
+        self._hwtype = info["hardware"]["platform"]["type"]
+        self._hostip = info["hardware"]["network"]["ip"]
+        self._hostname = info["hardware"]["network"]["host"]
+        self._mac = info["hardware"]["network"]["lan mac"]
+        self.is_addon = self._hostname.split(".")[0].find("smart-hub") > 0
         self.logger.debug(f"SmartHub info - host name: {self._hostname}")  # noqa: G004
         self.logger.debug(f"SmartHub info - ip: {self._hostip}")  # noqa: G004
         self.logger.debug(f"SmartHub info - version: {self._version}")  # noqa: G004
@@ -693,9 +681,10 @@ class HbtnComm:
         if not (os.path.isdir(data_path)):
             os.mkdir(data_path)
         file_path = data_path + file_name
-        hbtn_file = open(file_path, "w", encoding="ascii", errors="surrogateescape")
-        hbtn_file.write(str_data)
-        hbtn_file.close()
+        async with await anyio.open_file(
+            file_path, "w", encoding="ascii", errors="surrogateescape"
+        ) as hbtn_file:
+            await hbtn_file.write(str_data)
 
     async def send_message(self, mod_id: int, msg_id: int | str) -> None:
         """Send message to module."""
@@ -881,7 +870,7 @@ class HbtnComm:
                 elif evnt == HaEvents.MODE:
                     module.mode.value = arg2
                     await module.mode.handle_upd_event()
-            except Exception as err_msg:  # pylint: disable=broad-exception-caught
+            except Exception as err_msg:  # pylint: disable=broad-exception-caught  # noqa: BLE001
                 self.logger.warning(
                     f"Error handling habitron event {evnt} with arg1 {arg1} of module {mod_id}: {err_msg}"  # noqa: G004
                 )
