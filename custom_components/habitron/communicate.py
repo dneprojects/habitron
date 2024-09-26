@@ -205,9 +205,9 @@ class HbtnComm:
         smhub_info = query_smarthub(self._host)  # get info from query port
         if not smhub_info:
             raise (TimeoutError)
-        self.is_smhub = smhub_info["serial"] == "RBPI"
+        self.is_smhub = True
         if not self.is_smhub:
-            # Smart Hub
+            # Smart IP
             info = smhub_info
             self._version = info["version"]
             self._serial = info["serial"]
