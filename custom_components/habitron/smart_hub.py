@@ -45,7 +45,7 @@ class SmartHub:
         self.uid: str = self._mac.replace(":", "")
         self._version: str = self.comm.com_version
         self._type: str = self.comm.com_hwtype
-        self.is_smhub: bool = self.comm.is_smhub
+        self.is_smhub: bool = True
         self.router: hbtr
 
         self.host = self.comm.com_ip
