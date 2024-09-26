@@ -126,8 +126,6 @@ class HbtnRouter:
             via_device=(DOMAIN, self.smhub.uid),
         )
         # Further initialization of module instances
-        if not self.comm.is_smhub:
-            await self.comm.async_start_mirror(self.id)
         self.modules_desc = await self.get_modules(self.module_grp)
         await self.comm.async_system_update()  # Inital update
 

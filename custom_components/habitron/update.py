@@ -83,10 +83,10 @@ class HbtnModuleUpdate(UpdateEntity):
         self.async_write_ha_state()
         await sleep(0.1)
         if isinstance(self._module, HbtnRouter):
-            resp = await self._module.comm.update_firmware(self._module.id, 0)
+            await self._module.comm.update_firmware(self._module.id, 0)
             self._module.version = version
         else:
-            resp = await self._module.comm.update_firmware(
+            await self._module.comm.update_firmware(
                 int(self._module.mod_addr / 100) * 100, self._module.raddr
             )
             self._module.sw_version = version

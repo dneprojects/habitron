@@ -254,6 +254,15 @@ class HbtnSelectGroupMode(HbtnMode):
         super().__init__(module, hbtnr, coord, idx)
         self._mask = 0xF0
         self.hbtnr = hbtnr
+        user1_name = hbtnr.user1_name
+        user2_name = hbtnr.user2_name
+        if not user1_name.isprintable():
+            user1_name = "Unbekannt"
+        if not user2_name.isprintable():
+            user2_name = "Unbekannt"
+        if user1_name == user2_name:
+            # e.g. both "UNBEKANNT"
+            user2_name += "2"
         group_enum = Enum(
             value="group_enum",
             names=[
@@ -262,8 +271,8 @@ class HbtnSelectGroupMode(HbtnMode):
                 ("sleeping", 48),
                 ("update", 63),
                 ("config", 64),
-                (self.hbtnr.user1_name, 80),
-                (self.hbtnr.user2_name, 96),
+                (user1_name, 80),
+                (user2_name, 96),
                 ("vacation", 112),
             ],
         )
