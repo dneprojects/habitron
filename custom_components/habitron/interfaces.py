@@ -70,6 +70,14 @@ class CmdDescriptor(IfDescriptor):
         super().__init__(cname, cnmbr, 0, 0)
 
 
+class AreaDescriptor(IfDescriptor):
+    """Habitron area descriptor."""
+
+    def __init__(self, aname, anmbr) -> None:
+        """Initialize interface."""
+        super().__init__(aname, anmbr, 0, 0)
+
+
 class LgcDescriptor(IfDescriptor):
     """Habitron logic descriptor."""
 

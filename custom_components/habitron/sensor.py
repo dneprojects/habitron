@@ -106,16 +106,9 @@ async def async_setup_entry(  # noqa: C901
                 )
         for mod_logic in hbt_module.logic:
             if mod_logic.type > 0:
-                if hbt_module.comm.is_smhub:
-                    new_devices.append(
-                        LogicSensorPush(
-                            hbt_module, mod_logic, hbtn_cord, len(new_devices)
-                        )
-                    )
-                else:
-                    new_devices.append(
-                        LogicSensor(hbt_module, mod_logic, hbtn_cord, len(new_devices))
-                    )
+                new_devices.append(
+                    LogicSensorPush(hbt_module, mod_logic, hbtn_cord, len(new_devices))
+                )
         for mod_diag in hbt_module.diags:
             if mod_diag.name == "Status":
                 new_devices.append(
@@ -202,14 +195,12 @@ class AnalogSensor(HbtnSensor):
         # The call back registration is done once this entity is registered with HA
         # (rather than in the __init__)
         await super().async_added_to_hass()
-        if self._module.comm.is_smhub:
-            self.sensor.register_callback(self._handle_coordinator_update)
+        self.sensor.register_callback(self._handle_coordinator_update)
 
     async def async_will_remove_from_hass(self) -> None:
         """Entity being removed from hass."""
         # The opposite of async_added_to_hass. Remove any registered call backs here.
-        if self._module.comm.is_smhub:
-            self.sensor.remove_callback(self._handle_coordinator_update)
+        self.sensor.remove_callback(self._handle_coordinator_update)
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -269,14 +260,12 @@ class EKeySensorId(HbtnSensor):
         # The call back registration is done once this entity is registered with HA
         # (rather than in the __init__)
         await super().async_added_to_hass()
-        if self._module.comm.is_smhub:
-            self.sensor.register_callback(self._handle_coordinator_update)
+        self.sensor.register_callback(self._handle_coordinator_update)
 
     async def async_will_remove_from_hass(self) -> None:
         """Entity being removed from hass."""
         # The opposite of async_added_to_hass. Remove any registered call backs here.
-        if self._module.comm.is_smhub:
-            self.sensor.remove_callback(self._handle_coordinator_update)
+        self.sensor.remove_callback(self._handle_coordinator_update)
 
 
 class EKeySensorFngr(HbtnSensor):
@@ -301,14 +290,12 @@ class EKeySensorFngr(HbtnSensor):
         # The call back registration is done once this entity is registered with HA
         # (rather than in the __init__)
         await super().async_added_to_hass()
-        if self._module.comm.is_smhub:
-            self.sensor.register_callback(self._handle_coordinator_update)
+        self.sensor.register_callback(self._handle_coordinator_update)
 
     async def async_will_remove_from_hass(self) -> None:
         """Entity being removed from hass."""
         # The opposite of async_added_to_hass. Remove any registered call backs here.
-        if self._module.comm.is_smhub:
-            self.sensor.remove_callback(self._handle_coordinator_update)
+        self.sensor.remove_callback(self._handle_coordinator_update)
 
 
 class WindSensor(HbtnSensor):

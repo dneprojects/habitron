@@ -179,6 +179,10 @@ class HbtnModule:
                                 self.inputs[arg_code - 32] = IfDescriptor(
                                     text, arg_code - 32, 1, 0
                                 )
+                        elif arg_code in range(50, 52):
+                            # Description of  Inputs
+                            if self.mod_type[:16] == "Smart Controller":
+                                self.analogins[arg_code - 50].name = text
                         elif arg_code in range(110, 120):
                             # Description of logic units
                             for lgc in self.logic:
