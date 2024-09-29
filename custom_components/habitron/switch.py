@@ -33,18 +33,11 @@ async def async_setup_entry(
     for hbt_module in hbtn_rt.modules:
         for mod_output in hbt_module.outputs:
             if abs(mod_output.type) == 1:  # standard
-                if hbt_module.comm.is_smhub:
-                    new_devices.append(
-                        SwitchedOutputPush(
-                            mod_output, hbt_module, hbtn_cord, len(new_devices)
-                        )
+                new_devices.append(
+                    SwitchedOutputPush(
+                        mod_output, hbt_module, hbtn_cord, len(new_devices)
                     )
-                else:
-                    new_devices.append(
-                        SwitchedOutput(
-                            mod_output, hbt_module, hbtn_cord, len(new_devices)
-                        )
-                    )
+                )
         for mod_led in hbt_module.leds:
             if mod_led.type == 0:
                 if mod_led.nmbr == 0:
@@ -62,19 +55,11 @@ async def async_setup_entry(
                 )
         flg_idx = 0
         for mod_flg in hbt_module.flags:
-            if hbt_module.comm.is_smhub:
-                new_devices.append(
-                    HbtnFlagPush(mod_flg, hbt_module, hbtn_cord, flg_idx)
-                )
-            else:
-                new_devices.append(HbtnFlag(mod_flg, hbt_module, hbtn_cord, flg_idx))
+            new_devices.append(HbtnFlagPush(mod_flg, hbt_module, hbtn_cord, flg_idx))
             flg_idx += 1  # noqa: SIM113
     flg_idx = 0
     for rt_flg in hbtn_rt.flags:
-        if hbtn_rt.comm.is_smhub:
-            new_devices.append(HbtnFlagPush(rt_flg, hbtn_rt, hbtn_cord, flg_idx))
-        else:
-            new_devices.append(HbtnFlag(rt_flg, hbtn_rt, hbtn_cord, flg_idx))
+        new_devices.append(HbtnFlagPush(rt_flg, hbtn_rt, hbtn_cord, flg_idx))
         flg_idx += 1
 
     if new_devices:
