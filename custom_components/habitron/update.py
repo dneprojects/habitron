@@ -29,13 +29,9 @@ async def async_setup_entry(
     hbtn_cord = hbtn_rt.coord
 
     new_devices = []
-    if hbtn_rt.smhub.is_smhub:
-        # Update support restricted to SmartHub
-        new_devices.append(HbtnModuleUpdate(hbtn_rt, hbtn_cord, len(new_devices)))
-        for hbt_module in hbtn_rt.modules:
-            new_devices.append(
-                HbtnModuleUpdate(hbt_module, hbtn_cord, len(new_devices))
-            )
+    new_devices.append(HbtnModuleUpdate(hbtn_rt, hbtn_cord, len(new_devices)))
+    for hbt_module in hbtn_rt.modules:
+        new_devices.append(HbtnModuleUpdate(hbt_module, hbtn_cord, len(new_devices)))
     if new_devices:
         await hbtn_cord.async_config_entry_first_refresh()
         hbtn_cord.data = new_devices

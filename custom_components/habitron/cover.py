@@ -96,7 +96,7 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
         self._moving: int = 0
         self.open_cnt: int = 0
         self.closed_cnt: int = 0
-        self.max_cnt: int = 1
+        self.max_cnt: int = module.comm.router.cover_autostop_cnt
         self._attr_unique_id: str = f"Mod_{self._module.uid}_cover{cover.nmbr}"
 
     async def async_added_to_hass(self) -> None:
@@ -108,14 +108,12 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
         # The call back registration is done once this entity is registered with HA
         # (rather than in the __init__)
         await super().async_added_to_hass()
-        if self._module.comm.is_smhub:
-            self._cover.register_callback(self._handle_coordinator_update)
+        self._cover.register_callback(self._handle_coordinator_update)
 
     async def async_will_remove_from_hass(self) -> None:
         """Entity being removed from hass."""
         # The opposite of async_added_to_hass. Remove any registered call backs here.
-        if self._module.comm.is_smhub:
-            self._cover.remove_callback(self._handle_coordinator_update)
+        self._cover.remove_callback(self._handle_coordinator_update)
 
     # To link this entity to its device, this property must return an
     # identifiers value matching that used in the module
@@ -160,7 +158,11 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
         self._position = 100 - int(self._cover.value)
         self._moving = 0
         if self._module.outputs[self._out_up].value > 0:
-            if (self._position == 100) & (self.open_cnt >= self.max_cnt):
+            if (
+                (self._position == 100)
+                and self.max_cnt
+                and (self.open_cnt >= self.max_cnt)
+            ):
                 self._module.comm.set_output(self._module.mod_addr, self._out_up + 1, 0)
             elif self._position == 100:
                 self.open_cnt += 1
@@ -169,7 +171,11 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
                 self.open_cnt = 0
                 self._moving = 1
         if self._module.outputs[self._out_down].value > 0:
-            if (self._position == 0) & (self.closed_cnt >= self.max_cnt):
+            if (
+                (self._position == 0)
+                and self.max_cnt
+                and (self.closed_cnt >= self.max_cnt)
+            ):
                 self._module.comm.set_output(
                     self._module.mod_addr, self._out_down + 1, 0
                 )
@@ -252,7 +258,11 @@ class HbtnBlind(HbtnShutter):
         self._moving = 0
 
         if self._module.outputs[self._out_up].value > 0:
-            if (self._position == 100) & (self.open_cnt >= self.max_cnt):
+            if (
+                (self._position == 100)
+                and self.max_cnt
+                and (self.open_cnt >= self.max_cnt)
+            ):
                 self._module.comm.set_output(self._module.mod_addr, self._out_up + 1, 0)
             elif self._position == 100:
                 self.open_cnt += 1
@@ -260,7 +270,11 @@ class HbtnBlind(HbtnShutter):
             else:
                 self.open_cnt = 0
         if self._module.outputs[self._out_down].value > 0:
-            if (self._position == 0) & (self.closed_cnt >= self.max_cnt):
+            if (
+                (self._position == 0)
+                and self.max_cnt
+                and (self.closed_cnt >= self.max_cnt)
+            ):
                 self._module.comm.set_output(
                     self._module.mod_addr, self._out_down + 1, 0
                 )

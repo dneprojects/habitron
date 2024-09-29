@@ -40,18 +40,11 @@ async def async_setup_entry(
             # other type numbers disable output
             # type == 1, standard output: -> switch entities
             if abs(mod_output.type) == 2:  # dimmer
-                if hbt_module.comm.is_smhub:
-                    new_devices.append(
-                        DimmedOutputPush(
-                            mod_output, hbt_module, hbtn_cord, len(new_devices)
-                        )
+                new_devices.append(
+                    DimmedOutputPush(
+                        mod_output, hbt_module, hbtn_cord, len(new_devices)
                     )
-                else:
-                    new_devices.append(
-                        DimmedOutput(
-                            mod_output, hbt_module, hbtn_cord, len(new_devices)
-                        )
-                    )
+                )
         for mod_led in hbt_module.leds:
             if isinstance(mod_led, CLedDescriptor):
                 led_name = "RGB LED"
