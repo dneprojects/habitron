@@ -45,7 +45,6 @@ class SmartHub:
         self.uid: str = self._mac.replace(":", "")
         self._version: str = self.comm.com_version
         self._type: str = self.comm.com_hwtype
-        self.is_smhub: bool = True
         self.router: hbtr
 
         self.host = self.comm.com_ip
@@ -89,8 +88,6 @@ class SmartHub:
 
     def update(self) -> None:
         """Update in a module specific method. Reads and parses status."""
-        if not self.is_smhub:
-            return
         info = self.comm.get_smhub_update()
         if info == "":
             return
@@ -120,35 +117,29 @@ class SmartHub:
 
     async def async_setup(self) -> None:
         """Initialize SmartHub instance."""
-        if self.is_smhub:
-            await self.comm.reinit_hub(100, 0)  # force Opr mode to stop
-            await self.comm.send_network_info(self.config.data["websock_token"])
-            with contextlib.suppress(Exception):
-                # if multiple hub instances or restart
-                files_path = Path(__file__).parent / "logos"
-                await self.hass.http.async_register_static_paths(
-                    [
-                        StaticPathConfig(
-                            "/habitronfiles/hbt-icons.js",
-                            str(files_path / "hbt-icons.js"),
-                            False,
-                        )
-                    ]
-                )
-                add_extra_js_url(self.hass, "/habitronfiles/hbt-icons.js")
-        else:
-            await self.comm.async_stop_mirror(1)
+        await self.comm.reinit_hub(100, 0)  # force Opr mode to stop
+        await self.comm.send_network_info(self.config.data["websock_token"])
+        with contextlib.suppress(Exception):
+            # if multiple hub instances or restart
+            files_path = Path(__file__).parent / "logos"
+            await self.hass.http.async_register_static_paths(
+                [
+                    StaticPathConfig(
+                        "/habitronfiles/hbt-icons.js",
+                        str(files_path / "hbt-icons.js"),
+                        False,
+                    )
+                ]
+            )
+            add_extra_js_url(self.hass, "/habitronfiles/hbt-icons.js")
         self.router = hbtr(self.hass, self.config, self)
         await self.router.initialize()
-        if self.is_smhub:
-            await self.comm.reinit_hub(100, 1)  # restart event server
+        await self.comm.reinit_hub(100, 1)  # restart event server
 
     async def restart(self, rt_id) -> None:
         """Restart hub."""
-        if self.is_smhub:
-            await self.comm.hub_restart(rt_id)
+        await self.comm.hub_restart(rt_id)
 
     async def reboot(self) -> None:
         """Reboot hub."""
-        if self.is_smhub:
-            await self.comm.hub_reboot()
+        await self.comm.hub_reboot()

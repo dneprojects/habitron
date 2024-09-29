@@ -35,30 +35,16 @@ async def async_setup_entry(
     for hbt_module in hbtn_rt.modules:
         for mod_input in hbt_module.inputs:
             if abs(mod_input.type) == 2:  # switch
-                if hbt_module.comm.is_smhub:
-                    new_devices.append(
-                        InputSwitchPush(
-                            mod_input, hbt_module, hbtn_cord, len(new_devices)
-                        )
-                    )
-                else:
-                    new_devices.append(
-                        InputSwitch(mod_input, hbt_module, hbtn_cord, len(new_devices))
-                    )
+                new_devices.append(
+                    InputSwitchPush(mod_input, hbt_module, hbtn_cord, len(new_devices))
+                )
         for mod_sensor in hbt_module.sensors:
             if mod_sensor.name == "Movement":
-                if hbt_module.comm.is_smhub:
-                    new_devices.append(
-                        MotionSensorPush(
-                            mod_sensor, hbt_module, hbtn_cord, len(new_devices)
-                        )
+                new_devices.append(
+                    MotionSensorPush(
+                        mod_sensor, hbt_module, hbtn_cord, len(new_devices)
                     )
-                else:
-                    new_devices.append(
-                        MotionSensor(
-                            mod_sensor, hbt_module, hbtn_cord, len(new_devices)
-                        )
-                    )
+                )
             elif mod_sensor.name == "Rain":
                 new_devices.append(
                     RainSensor(mod_sensor, hbt_module, hbtn_cord, len(new_devices))
@@ -182,7 +168,7 @@ class MotionSensor(HbtnBinSensor):
         """Initialize motion sensor."""
         super().__init__(sensor, module, coord, idx)
         self._attr_unique_id = f"Mod_{self._module.uid}_motion"
-        self._attr_name = f"{self._module.name}: Motion"
+        self._attr_name = "Motion"
 
     @property
     def icon(self) -> str:
@@ -235,7 +221,7 @@ class RainSensor(HbtnBinSensor):
         """Initialize rain sensor."""
         super().__init__(sensor, module, coord, idx)
         self._attr_unique_id: str = f"Mod_{self._module.uid}_rain"
-        self._attr_name: str = f"{self._module.name}: Rain"
+        self._attr_name: str = "Rain"
         self._attr_icon: str = "mdi:weather-rainy"
 
     @property

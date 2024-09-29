@@ -12,7 +12,13 @@ from homeassistant.helpers import device_registry as dr
 # for more information.
 from .const import DOMAIN, FALSE_VAL, TRUE_VAL, ModuleDescriptor, MStatIdx, RoutIdx
 from .coordinator import HbtnCoordinator
-from .interfaces import TYPE_DIAG, CmdDescriptor, IfDescriptor, StateDescriptor
+from .interfaces import (
+    TYPE_DIAG,
+    AreaDescriptor,
+    CmdDescriptor,
+    IfDescriptor,
+    StateDescriptor,
+)
 from .module import (
     HbtnModule,
     SmartController as hbtscm,
@@ -81,8 +87,10 @@ class HbtnRouter:
         self.chan_list = []
         self.module_grp = []
         self.max_group = 0
+        self.cover_autostop_cnt = 1
         self.modules_desc = list
         self.modules: list[HbtnModule] = []
+        self.areas: list[AreaDescriptor] = []
         self.coll_commands: list[CmdDescriptor] = []
         self.flags: list[StateDescriptor] = []
         self.chan_timeouts = [
@@ -274,6 +282,10 @@ class HbtnRouter:
                 self.coll_commands.append(CmdDescriptor(entry_name, entry_no))
             elif content_code == 2303:  # FF 08: alarm commands
                 pass
+            elif content_code == 2815:  # FF 0A: areas
+                self.areas.append(AreaDescriptor(entry_name, entry_no))
+            elif content_code == 3071:  # FF 0B: cover autostop counter
+                self.cover_autostop_cnt = entry_no
             else:
                 mod_addr = int(line[1]) + self.id
                 # Skip disabled modules
