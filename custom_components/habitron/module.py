@@ -95,7 +95,7 @@ class HbtnModule:
     def area(self) -> str:
         """Area of module."""
         if self.area_member:
-            return self.comm.router.areas[self.area_member - 1].name
+            return "House"  # self.comm.router.areas[self.area_member - 1].name
         return "House"
 
     async def initialize(self, sys_status) -> None:
