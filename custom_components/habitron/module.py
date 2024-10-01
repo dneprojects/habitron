@@ -38,6 +38,7 @@ class HbtnModule:
         self._config: ConfigEntry = config
         self.b_uid: str = b_uid
         self.name: str = mod_descriptor.name
+        self.area_member: int = 0
         self.comm = comm
         self.logger = logging.getLogger(__name__)
         self.sw_version: str = ""
@@ -90,6 +91,13 @@ class HbtnModule:
         """Type of module."""
         return self.type
 
+    @property
+    def area(self) -> str:
+        """Area of module."""
+        if self.area_member:
+            return self.comm.router.areas[self.area_member - 1].name
+        return "House"
+
     async def initialize(self, sys_status) -> None:
         """Initialize module instance."""
         await self.get_names()
@@ -102,7 +110,7 @@ class HbtnModule:
             configuration_url=f"http://{self.comm.com_ip}:7780/module-{self.raddr}",
             identifiers={(DOMAIN, self.uid)},
             manufacturer="Habitron GmbH",
-            suggested_area="House",
+            suggested_area=self.area,
             name=self.name,
             model=self.type,
             sw_version=self.sw_version,
@@ -196,6 +204,9 @@ class HbtnModule:
                                     text, len(self.flags), arg_code - 119, 0, False
                                 )
                             )
+                        elif arg_code == 136:
+                            # Description of module area
+                            self.area_member = line[1]
                         elif arg_code in range(140, 173):
                             # Description of vis commands (max 32)
                             self.vis_commands.append(

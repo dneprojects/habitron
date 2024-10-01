@@ -136,6 +136,7 @@ class HbtnRouter:
         # Further initialization of module instances
         self.modules_desc = await self.get_modules(self.module_grp)
         await self.comm.async_system_update()  # Inital update
+        await self.get_descriptions()  # Some descriptions for modules, too
 
         for mod_desc in self.modules_desc:
             if (mod_desc.mtype[0] == 10) and (mod_desc.mtype[1] in [1, 2, 50, 51]):
@@ -187,7 +188,6 @@ class HbtnRouter:
                 # self.modules.append(hbtm(mod_desc, self.hass, self.config, self.comm))
             await self.modules[-1].initialize(self.sys_status)
 
-        await self.get_descriptions()  # Some descriptions for modules, too
         return True
 
     async def get_definitions(self) -> None:
