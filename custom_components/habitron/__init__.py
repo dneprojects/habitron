@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import logging
+import os
+
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.helpers.device_registry import DeviceEntry
+from homeassistant.helpers.device_registry import DeviceEntry, DeviceRegistry as dr
 
 from .communicate import TimeoutException
 from .const import (
@@ -78,6 +81,8 @@ SERVICE_UPDATE_ENTITY_SCHEMA = vol.Schema(
         vol.Required(EVNT_ARG2): int,
     }
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -154,19 +159,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await smhub.async_setup()
     except (TimeoutError, TimeoutException) as ex:
         raise ConfigEntryNotReady("Timeout while connecting to SmartHub") from ex
-
-    # Ensure every device associated with this config entry is still in the list of
-    # habitron devices, otherwise remove the device (and thus entities).
-    # device_registry = dr.async_get(hass)
-    # for device_entry in dr.async_entries_for_config_entry(
-    #     device_registry, entry.entry_id
-    # ):
-    #     for identifier in device_entry.identifiers:
-    #         set_of_ids = [DOMAIN]
-    #         if identifier in set_of_ids:
-    #             break
-    #     else:
-    #         device_registry.async_remove_device(device_entry.id)
 
     # Register update handler for runtime configuration of Habitron integration
     entry.async_on_unload(entry.add_update_listener(update_listener))

@@ -68,9 +68,14 @@ class HbtnModuleUpdate(UpdateEntity):
         return self._attr_name
 
     @property
-    def in_progress(self) -> bool | int:
+    def in_progress(self) -> bool:
         """Update installation in progress."""
         return self.flash_in_progress
+
+    @property
+    def update_percentage(self) -> int | None:
+        """Return percentage, if available."""
+        return None
 
     async def async_install(self, version: str | None, backup: bool) -> None:
         """Install an update."""

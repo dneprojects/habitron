@@ -119,6 +119,7 @@ class HbtnRouter:
 
         self.comm.set_router(self)
         await self.get_definitions()
+        await self.get_descriptions()  # No descriptions for modules expected!
 
         device_registry = dr.async_get(self.hass)
         device_registry.async_get_or_create(
@@ -136,7 +137,6 @@ class HbtnRouter:
         # Further initialization of module instances
         self.modules_desc = await self.get_modules(self.module_grp)
         await self.comm.async_system_update()  # Inital update
-        await self.get_descriptions()  # Some descriptions for modules, too
 
         for mod_desc in self.modules_desc:
             if (mod_desc.mtype[0] == 10) and (mod_desc.mtype[1] in [1, 2, 50, 51]):
@@ -280,6 +280,9 @@ class HbtnRouter:
                 )
             elif content_code == 1023:  # FF 03: collective commands (Sammelbefehle)
                 self.coll_commands.append(CmdDescriptor(entry_name, entry_no))
+            elif int(line[2]) == 7:
+                # Group name
+                pass
             elif content_code == 2303:  # FF 08: alarm commands
                 pass
             elif content_code == 2815:  # FF 0A: areas
@@ -287,52 +290,10 @@ class HbtnRouter:
             elif content_code == 3071:  # FF 0B: cover autostop counter
                 self.cover_autostop_cnt = entry_no
             else:
-                mod_addr = int(line[1]) + self.id
-                # Skip disabled modules
-                mod_found = False
-                for mod in self.modules:
-                    if mod.mod_addr == mod_addr:
-                        mod_found = True
-                        break
-                if mod_found:
-                    if int(line[2]) == 1:
-                        # local flag (Merker)
-                        if self.unit_not_exists(
-                            self.modules[self.mod_reg[mod_addr]].flags, entry_name
-                        ):
-                            self.modules[self.mod_reg[mod_addr]].flags.append(
-                                StateDescriptor(
-                                    entry_name,
-                                    len(self.modules[self.mod_reg[mod_addr]].flags),
-                                    entry_no,
-                                    0,
-                                    False,
-                                )
-                            )
-                    # elif int(line[2]) == 2:
-                    # global flag (Merker)
-                    elif int(line[2]) == 4:
-                        # local visualization command
-                        if self.unit_not_exists(
-                            self.modules[self.mod_reg[mod_addr]].vis_commands,
-                            entry_name,
-                        ):
-                            entry_no = int.from_bytes(resp[3:5], "little")
-                            self.modules[self.mod_reg[mod_addr]].vis_commands.append(
-                                CmdDescriptor(entry_name, entry_no)
-                            )
-                    elif int(line[2]) == 5:
-                        # logic element, if needed to fix unexpected error
-                        if self.unit_not_exists(
-                            self.modules[self.mod_reg[mod_addr]].logic, entry_name
-                        ):
-                            l_nmbr = line[3] - 1
-                            for lgc in self.modules[self.mod_reg[mod_addr]].logic:
-                                if lgc.nmbr == l_nmbr:
-                                    lgc.name = entry_name  # counter
+                self.logger.warning(
+                    f"Unexpected description, code: {line[1]} {line[2]} {line[3]}"
+                )  # noqa: G004
 
-                    # elif int(line[2]) == 7:
-                    # Group name
             resp = resp[line_len:]
 
     async def get_comm_errors(self) -> bytes:
