@@ -94,7 +94,7 @@ class HbtnModule:
     @property
     def area(self) -> str:
         """Area of module."""
-        if self.area_member:
+        if self.area_member > 0:
             return self.comm.router.areas[self.area_member - 1].name
         return "House"
 
@@ -293,6 +293,12 @@ class HbtnModule:
                 cname = cname.replace("ab", "")
                 cname = cname.replace("auf", "")
                 cname = cname.replace("zu", "")
+                cname = cname.replace("up", "")
+                cname = cname.replace("down", "")
+                if cname == "":
+                    self.covers[c_idx].nmbr = abs(self.covers[c_idx].nmbr) * (
+                        -1
+                    )  # disable
                 self.covers[c_idx] = CovDescriptor(cname.strip(), c_idx, pol, 0, 0)
                 self.outputs[2 * c_idx].type = -10  # disable light output
                 self.outputs[2 * c_idx + 1].type = -10
