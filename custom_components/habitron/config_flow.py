@@ -39,8 +39,18 @@ async def validate_input(hass: HomeAssistant, data: dict) -> dict[str, Any]:
     # This is a simple example to show an error in the UI for a short hostname
     # The exceptions are defined at the end of this file, and are used in the
     # `async_step_user` method below.
+
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.connect(("8.8.8.8", 80))
+    own_ip = s.getsockname()[0]
+    s.close()
+    _LOGGER.info(f"Smart Center own IP: {own_ip}")  # noqa: G004
+
     if len(data["habitron_host"]) < 4:
         raise InvalidHost
+
+    if data["habitron_host"] == "local":
+        data["habitron_host"] = own_ip
 
     if not (isinstance(data["update_interval"], int)):
         raise InvalidInterval

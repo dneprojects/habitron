@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import logging
-import os
 
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.helpers.device_registry import DeviceEntry, DeviceRegistry as dr
+from homeassistant.helpers.device_registry import DeviceEntry
 
 from .communicate import TimeoutException
 from .const import (
@@ -157,57 +156,58 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         smhub = SmartHub(hass, entry)
         hass.data.setdefault(DOMAIN, {})[entry.entry_id] = smhub
         await smhub.async_setup()
+
+        # Register update handler for runtime configuration of Habitron integration
+        entry.async_on_unload(entry.add_update_listener(update_listener))
+
+        # Register services
+        hass.services.async_register(
+            DOMAIN, "hub_restart", restart_hub, schema=SERVICE_HUB_RESTART_SCHEMA
+        )
+        hass.services.async_register(
+            DOMAIN, "hub_reboot", reboot_hub, schema=SERVICE_HUB_REBOOT_SCHEMA
+        )
+        hass.services.async_register(
+            DOMAIN, "mod_restart", restart_module, schema=SERVICE_MOD_RESTART_SCHEMA
+        )
+        hass.services.async_register(
+            DOMAIN, "rtr_restart", restart_router, schema=SERVICE_RTR_RESTART_SCHEMA
+        )
+        hass.services.async_register(
+            DOMAIN, "save_module_smc", save_module_smc, schema=SERVICE_MOD_FILE_SCHEMA
+        )
+        hass.services.async_register(
+            DOMAIN, "save_module_smg", save_module_smg, schema=SERVICE_MOD_FILE_SCHEMA
+        )
+        hass.services.async_register(
+            DOMAIN, "save_router_smr", save_router_smr, schema=SERVICE_RTR_FILE_SCHEMA
+        )
+        hass.services.async_register(
+            DOMAIN,
+            "save_module_status",
+            save_module_status,
+            schema=SERVICE_MOD_FILE_SCHEMA,
+        )
+        hass.services.async_register(
+            DOMAIN,
+            "save_router_status",
+            save_router_status,
+            schema=SERVICE_RTR_FILE_SCHEMA,
+        )
+        hass.services.async_register(
+            DOMAIN,
+            "update_entity",
+            update_entity,
+            schema=SERVICE_UPDATE_ENTITY_SCHEMA,
+        )
+
+        # This creates each HA object for each platform your device requires.
+        # It's done by calling the `async_setup_entry` function in each platform module.
+        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+        return True  # noqa: TRY300
+
     except (TimeoutError, TimeoutException) as ex:
         raise ConfigEntryNotReady("Timeout while connecting to SmartHub") from ex
-
-    # Register update handler for runtime configuration of Habitron integration
-    entry.async_on_unload(entry.add_update_listener(update_listener))
-
-    # Register services
-    hass.services.async_register(
-        DOMAIN, "hub_restart", restart_hub, schema=SERVICE_HUB_RESTART_SCHEMA
-    )
-    hass.services.async_register(
-        DOMAIN, "hub_reboot", reboot_hub, schema=SERVICE_HUB_REBOOT_SCHEMA
-    )
-    hass.services.async_register(
-        DOMAIN, "mod_restart", restart_module, schema=SERVICE_MOD_RESTART_SCHEMA
-    )
-    hass.services.async_register(
-        DOMAIN, "rtr_restart", restart_router, schema=SERVICE_RTR_RESTART_SCHEMA
-    )
-    hass.services.async_register(
-        DOMAIN, "save_module_smc", save_module_smc, schema=SERVICE_MOD_FILE_SCHEMA
-    )
-    hass.services.async_register(
-        DOMAIN, "save_module_smg", save_module_smg, schema=SERVICE_MOD_FILE_SCHEMA
-    )
-    hass.services.async_register(
-        DOMAIN, "save_router_smr", save_router_smr, schema=SERVICE_RTR_FILE_SCHEMA
-    )
-    hass.services.async_register(
-        DOMAIN,
-        "save_module_status",
-        save_module_status,
-        schema=SERVICE_MOD_FILE_SCHEMA,
-    )
-    hass.services.async_register(
-        DOMAIN,
-        "save_router_status",
-        save_router_status,
-        schema=SERVICE_RTR_FILE_SCHEMA,
-    )
-    hass.services.async_register(
-        DOMAIN,
-        "update_entity",
-        update_entity,
-        schema=SERVICE_UPDATE_ENTITY_SCHEMA,
-    )
-
-    # This creates each HA object for each platform your device requires.
-    # It's done by calling the `async_setup_entry` function in each platform module.
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    return True
 
 
 async def async_remove_config_entry_device(
