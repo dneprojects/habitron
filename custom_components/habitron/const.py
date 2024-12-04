@@ -3,7 +3,7 @@
 from typing import Final
 
 DOMAIN = "habitron"  # This is the internal name of the integration, it should also match the directory
-CONF_DEFAULT_HOST = "SmartCenter.local"  # default DNS name of SmartIP
+CONF_DEFAULT_HOST = "local"  # default host string of SmartCenter, uses own ip
 CONF_DEFAULT_INTERVAL = 10  # default update interval
 CONF_MIN_INTERVAL = 4  # min update interval
 CONF_MAX_INTERVAL = 60  # max update interval
