@@ -188,6 +188,11 @@ class HbtnComm:
         resp = await self.async_send_command(
             cmd_str, time_out_sec=12
         )  # extended time-out 12 s
+        if resp == "not ready":
+            self.logger.info(
+                "Re-initialized hub failed, waiting for home assistant finishing boot"
+            )
+            raise (TimeoutError)
         self.logger.info(f"Re-initialized hub with mode {mode}")  # noqa: G004
         return resp
 
@@ -275,6 +280,10 @@ class HbtnComm:
             sck.close()
             self.logger.error(f"Error connecting to Smart Hub: {err_msg}")  # noqa: G004
             return b""
+        except ConnectionRefusedError:
+            sck.close()
+            self.logger.info("Smart Hub not available, probably rebooting.")
+            return b""
 
     async def async_send_command_crc(
         self, cmd_string: str, time_out_sec=10
@@ -291,6 +300,10 @@ class HbtnComm:
         except TimeoutError as err_msg:  # noqa: F841
             sck.close()
             self.logger.error(f"Error connecting to Smart Hub: {err_msg}")  # noqa: G004
+            return b"", 0
+        except ConnectionRefusedError:
+            sck.close()
+            self.logger.warning("Smart Hub not available.")  # noqa: G004
             return b"", 0
 
     async def async_get_router_status(self, rtr_id) -> bytes:

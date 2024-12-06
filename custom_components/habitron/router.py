@@ -291,7 +291,7 @@ class HbtnRouter:
                 self.cover_autostop_cnt = entry_no
             else:
                 self.logger.warning(
-                    f"Unexpected description, code: {line[1]} {line[2]} {line[3]}"
+                    f"Unexpected description, code: {line[1]} {line[2]} {line[3]}"  # noqa: G004
                 )  # noqa: G004
 
             resp = resp[line_len:]
