@@ -63,5 +63,5 @@ These parameters can be changed after installation as well.
 
 ## More Information
 
-More information can be found <a href="./custom_components/habitron/README.md">here</a>.
+More information can be found <a href="https://github.com/dneprojects/habitron/blob/0625fcc42b262b2497aa8e398a4ba482f0841a2c/info.md">here</a>.
 
