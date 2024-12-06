@@ -94,7 +94,7 @@ class HbtnModule:
     @property
     def area(self) -> str:
         """Area of module."""
-        if self.area_member > 0:
+        if self.area_member in range(1, len(self.comm.router.areas) + 1):
             return self.comm.router.areas[self.area_member - 1].name
         return "House"
 
@@ -244,8 +244,14 @@ class HbtnModule:
         """Get settings of Habitron module."""
         resp = await self.comm.async_get_module_settings(self._addr)
         if resp == "":
+            self.logger.warning(
+                f"get_settings: No settings received for module {self.raddr}"
+            )  # noqa: G004
             return False
 
+        self.logger.info(
+            f"get_settings: Received {len(resp)} bytes for module {self.raddr}"
+        )  # noqa: G004
         self.hw_version = (
             resp[MSetIdx.HW_VERS : MSetIdx.HW_VERS_].decode("iso8859-1").strip()
         )
@@ -333,10 +339,12 @@ class HbtnModule:
         for m_idx in range(no_mods):
             if int(sys_status[m_idx * stat_len + MStatIdx.ADDR]) == m_addr:
                 self.logger.info(f"Found module {m_addr}, extracting status")  # noqa: G004
+                found_module = True
                 break
-        self.logger.info(
-            f"Extract status could not find module {m_addr}: status length: {len(sys_status)}"  # noqa: G004
-        )
+        if not found_module:
+            self.logger.info(
+                f"Extract status could not find module {m_addr}: status length: {len(sys_status)}"  # noqa: G004
+            )
         return sys_status[m_idx * stat_len : (m_idx + 1) * stat_len]
 
     def set_default_names(self, mod_entities, def_name: str) -> None:
