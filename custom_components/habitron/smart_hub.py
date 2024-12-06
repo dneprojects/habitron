@@ -134,6 +134,7 @@ class SmartHub:
             add_extra_js_url(self.hass, "/habitronfiles/hbt-icons.js")
         self.router = hbtr(self.hass, self.config, self)
         await self.router.initialize()
+
         await self.comm.reinit_hub(100, 1)  # restart event server
 
     async def restart(self, rt_id) -> None:
