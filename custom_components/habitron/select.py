@@ -185,7 +185,7 @@ class HbtnSelectDaytimeMode(HbtnMode):
             self._attr_unique_id = f"Rt_{self.hbtnr.uid}_group_0_daytime_mode"
             if self._value == 0:
                 # hot fix: why is mode 0?
-                hbtnr.logger.warning("Enum value 0 for router")
+                hbtnr.logger.info("Enum value 0 for router")
                 self._value = 1
             self._current_option = self._enum(self._value).name
         else:
@@ -196,7 +196,7 @@ class HbtnSelectDaytimeMode(HbtnMode):
             )
             if self._value == 0:
                 # Not clear, inherit mode of group 0?
-                hbtnr.logger.warning("Enum value 0 for router daytime mode")
+                hbtnr.logger.info("Enum value 0 for router daytime mode")
                 self._value = 1
             self._current_option = self._enum(self._value).name
 
