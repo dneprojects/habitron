@@ -1,5 +1,5 @@
 <h2 align="center">
-  <a href="https://habitron.de"><img src="https://github.com/dneprojects/habitron/blob/d145496646cad001fdf47c2f3f79c5d583acd5d6/custom_components/habitron/logos/logo%402x.png" alt="Habitron logotype" width="300"></a>
+  <a href="https://habitron.de"><img src="https://www.habitron.de/tl_files/habitron/design/logo.png" alt="Habitron logotype" width="300"></a>
   <br>
   <i>Home Assistant Habitron custom integration</i>
   <br>
