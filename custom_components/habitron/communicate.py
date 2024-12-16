@@ -35,7 +35,7 @@ SMHUB_COMMANDS: Final[dict[str, str]] = {
     "GET_MODULE_STATUS": "\x0a\5\1<rtr><mod>\0\0",
     "GET_COMPACT_STATUS": "\x0a\5\2<rtr>\xff\0\0",  # compact status of all modules (0xFF)
     "GET_SMHUB_BOOT_STATUS": "\x0a\6\1\0\0\0\0",
-    "GET_SMHUB_INFO": "\x0a\6\2\0\0\0\0",
+    "GET_SMHUB_INFO": "\x0a\6\2\0\0<len><vlen><vers>",
     "GET_SMHUB_UPDATE": "\x0a\6\3\0\0\0\0",
     "GET_GLOBAL_DESCRIPTIONS": "\x0a\7\1<rtr>\0\0\0",  # Flags, Command collections
     "GET_SMHUB_STATUS": "\x14\0\0\0\0\0\0",
@@ -174,8 +174,6 @@ class HbtnComm:
             .replace("<ipv4>", ipv4)
             .replace("<toklen>", chr(tk_len))
             .replace("<tok>", tok)
-            .replace("<vlen>", chr(len(HBTINT_VERSION)))
-            .replace("<vers>", HBTINT_VERSION)
         )
         await self.async_send_command(cmd_str)
         self.logger.warning(
@@ -212,7 +210,16 @@ class HbtnComm:
         except ConnectionRefusedError as exc:
             raise ConnectionRefusedError from exc
         sck.settimeout(8)  # 8 seconds
+        vlen = len(HBTINT_VERSION)
+        args_len = vlen + 1
+        len_l = args_len & 0xFF
+        len_h = args_len >> 8
         cmd_str = SMHUB_COMMANDS["GET_SMHUB_INFO"]
+        cmd_str = (
+            cmd_str.replace("<len>", chr(len_l) + chr(len_h))
+            .replace("<vlen>", chr(vlen))
+            .replace("<vers>", HBTINT_VERSION)
+        )
         full_string = wrap_command(cmd_str)
         resp_bytes = send_receive(sck, full_string)
         sck.close()
