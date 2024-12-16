@@ -16,7 +16,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 import homeassistant.exceptions as HAexceptions
 
-from .const import DOMAIN, HaEvents
+from .const import DOMAIN, HBTINT_VERSION, HaEvents
 from .router import HbtnRouter
 
 BASE_PATH_COMPONENT = "./homeassistant/components"
@@ -71,7 +71,7 @@ SMHUB_COMMANDS: Final[dict[str, str]] = {
     "REINIT_HUB": "\x3c\x00\x00<rtr><opr>\0\0",
     "RESTART_HUB": "\x3c\x00\x02<rtr>\0\0\0",
     "REBOOT_HUB": "\x3c\x00\x03\0\0\0\0",
-    "SEND_NETWORK_INFO": "\x3c\x00\x04\0\0<len><iplen><ipv4><toklen><tok>",
+    "SEND_NETWORK_INFO": "\x3c\x00\x04\0\0<len><iplen><ipv4><toklen><tok><vlen><vers>",
     "SET_LOG_LEVEL": "\x3c\x00\x05<hdlr><lvl>\0\0",  # Set logging level of console/file handler
     "RESTART_FORWARD_TABLE": "\x3c\x01\x01<rtr>\0\0\0",  # Weiterleitungstabelle löschen und -automatik starten
     "GET_CURRENT_ERROR": "\x3c\x01\x02<rtr>\0\0\0",
@@ -174,6 +174,8 @@ class HbtnComm:
             .replace("<ipv4>", ipv4)
             .replace("<toklen>", chr(tk_len))
             .replace("<tok>", tok)
+            .replace("<vlen>", chr(len(HBTINT_VERSION)))
+            .replace("<vers>", HBTINT_VERSION)
         )
         await self.async_send_command(cmd_str)
         self.logger.warning(
