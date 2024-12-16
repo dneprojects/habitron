@@ -1,5 +1,5 @@
 <h2 align="center">
-  <a href="https://habitron.de"><img src="./custom_components/habitron/logos/logo@2x.png" alt="Habitron logotype" width="300"></a>
+  <a href="https://habitron.de"><img src="https://www.habitron.de/tl_files/habitron/design/logo.png" alt="Habitron logotype" width="300"></a>
   <br>
   <i>Home Assistant Habitron custom integration</i>
   <br>
@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/github/v/release/dneprojects/habitron" alt="Current version">
 </p>
 
-The `habitron` implementation allows you to integrate your [Habitron](https://www.habitron.de/) devices in Home Assistant. It is implemented using a _polling_ model in _async_. Some events are triggered when inputs or other entities change their values.
+The `habitron` implementation allows you to integrate your [Habitron](https://www.habitron.de/) devices in Home Assistant. It is implemented using a _push_ and _polling_ model in _async_. Some events are triggered when inputs or other entities change their values.
 
 ## Installation
 
@@ -63,5 +63,5 @@ These parameters can be changed after installation as well.
 
 ## More Information
 
-More information can be found <a href="./custom_components/habitron/README.md">here</a>.
+More information can be found <a href="https://github.com/dneprojects/habitron/blob/0625fcc42b262b2497aa8e398a4ba482f0841a2c/info.md">here</a>.
 
