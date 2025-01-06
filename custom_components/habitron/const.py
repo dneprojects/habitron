@@ -20,7 +20,7 @@ FILE_MOD_NMBR = "mod_nmbr"
 LOC_FLAG_OFFS = 100
 GLOB_FLAG_OFFS = 132
 LOGIC_INP_OFFS = 164
-HBTINT_VERSION = "2.0.6"
+HBTINT_VERSION = "2.1.0"
 
 MODULE_CODES: Final[dict[bytes, str]] = {
     b"\x01\x01": "Smart Controller XL-1",
