@@ -807,7 +807,13 @@ class HbtnComm:
         inp_event_types = ["inactive", "single_press", "long_press", "long_press_end"]
         if self._hostip != hub_id:
             return
-        module = self.router.get_module(mod_id)
+        try:
+            module = self.router.get_module(mod_id)
+        except Exception as err_msg:  # pylint: disable=broad-exception-caught  # noqa: BLE001
+            self.logger.warning(
+                f"Error handling habitron event {evnt} with arg1 {arg1} of module {mod_id}: {err_msg}"  # noqa: G004
+            )
+            return
         if module is None:
             self.logger.error(
                 f"Error in update_entity: No module found for mod_id {mod_id}"  # noqa: G004
