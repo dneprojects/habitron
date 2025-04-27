@@ -237,6 +237,8 @@ class HbtnBlind(HbtnShutter):
         | CoverEntityFeature.CLOSE
         | CoverEntityFeature.STOP
         | CoverEntityFeature.SET_TILT_POSITION
+        | CoverEntityFeature.OPEN_TILT
+        | CoverEntityFeature.CLOSE_TILT
     )
     _attr_device_class = CoverDeviceClass.BLIND
 
@@ -297,4 +299,30 @@ class HbtnBlind(HbtnShutter):
             self._module.mod_addr,
             sh_nmbr,
             100 - tmp_tilt_position,
+        )
+
+    async def async_open_cover_tilt(self, **kwargs) -> None:
+        """Set the tilt angle."""
+        sh_nmbr = self._nmbr + 1
+        if self._module.mod_type[:16] == "Smart Controller":
+            sh_nmbr -= 2  # map #3..5 to 1..3
+            if sh_nmbr < 1:
+                sh_nmbr += 5  # ...and 1..2 to 4..5
+        await self._module.comm.async_set_blindtilt(
+            self._module.mod_addr,
+            sh_nmbr,
+            0,
+        )
+
+    async def async_close_cover_tilt(self, **kwargs) -> None:
+        """Set the tilt angle."""
+        sh_nmbr = self._nmbr + 1
+        if self._module.mod_type[:16] == "Smart Controller":
+            sh_nmbr -= 2  # map #3..5 to 1..3
+            if sh_nmbr < 1:
+                sh_nmbr += 5  # ...and 1..2 to 4..5
+        await self._module.comm.async_set_blindtilt(
+            self._module.mod_addr,
+            sh_nmbr,
+            100,
         )
