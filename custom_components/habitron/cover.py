@@ -237,6 +237,8 @@ class HbtnBlind(HbtnShutter):
         | CoverEntityFeature.CLOSE
         | CoverEntityFeature.STOP
         | CoverEntityFeature.SET_TILT_POSITION
+        | CoverEntityFeature.OPEN_TILT
+        | CoverEntityFeature.CLOSE_TILT
     )
     _attr_device_class = CoverDeviceClass.BLIND
 
