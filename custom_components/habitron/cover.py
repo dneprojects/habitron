@@ -289,7 +289,7 @@ class HbtnBlind(HbtnShutter):
         """Set the tilt angle."""
         tmp_tilt_position = int(kwargs.get(ATTR_TILT_POSITION))  # type: ignore  # noqa: PGH003
         sh_nmbr = self._nmbr + 1
-        if self._module.mod_type == "Smart Controller":
+        if self._module.mod_type[:16] == "Smart Controller":
             sh_nmbr -= 2  # map #3..5 to 1..3
             if sh_nmbr < 1:
                 sh_nmbr += 5  # ...and 1..2 to 4..5
