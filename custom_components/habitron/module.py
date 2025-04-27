@@ -245,12 +245,12 @@ class HbtnModule:
         resp = await self.comm.async_get_module_settings(self._addr)
         if resp == "":
             self.logger.warning(
-                f"get_settings: No settings received for module {self.raddr}"
+                f"get_settings: No settings received for module {self.raddr}"  # noqa: G004
             )  # noqa: G004
             return False
 
         self.logger.info(
-            f"get_settings: Received {len(resp)} bytes for module {self.raddr}"
+            f"get_settings: Received {len(resp)} bytes for module {self.raddr}"  # noqa: G004
         )  # noqa: G004
         self.hw_version = (
             resp[MSetIdx.HW_VERS : MSetIdx.HW_VERS_].decode("iso8859-1").strip()
