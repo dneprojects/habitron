@@ -26,6 +26,7 @@ MODULE_CODES: Final[dict[bytes, str]] = {
     b"\x01\x01": "Smart Controller XL-1",
     b"\x01\x02": "Smart Controller XL-2",
     b"\x01\x03": "Smart Controller XL-2 (LE2)",
+    b"\x01\x04": "Smart Controller Touch",
     # b"\x01\x0a": "Smart Controller X",
     b"\x0a\x01": "Smart Out 8/R",
     b"\x0a\x02": "Smart Out 8/T",

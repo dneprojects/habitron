@@ -82,15 +82,14 @@ class SwitchedLight(CoordinatorEntity, LightEntity):
         self._module: HbtnModule = module
         if output.name.strip() == "":
             self._attr_name = f"Out {output.nmbr + 1}"
+            # Entity will not show up
+            self._attr_entity_registry_enabled_default = False
         else:
             self._attr_name = output.name
         self._nmbr: int = output.nmbr
         self._brightness: int = 255
         self._out_offs = 0  # Dimm 1 = Out 1 + offs
         self._attr_unique_id: str = f"Mod_{self._module.uid}_out{output.nmbr}"
-        if output.type < 0:
-            # Entity will not show up
-            self._attr_entity_registry_enabled_default = False
 
     # To link this entity to its device, this property must return an
     # identifiers value matching that used in the module
