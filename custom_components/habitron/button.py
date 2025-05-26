@@ -36,6 +36,7 @@ async def async_setup_entry(
     for coll_cmd in hbtn_rt.coll_commands:
         new_devices.append(CollCmdButton(coll_cmd, hbtn_rt))  # noqa: PERF401
     new_devices.append(RestartButton(hbtn_rt))
+    new_devices.append(RestartFwdTableButton(hbtn_rt))
     new_devices.append(RestartAllButton(hbtn_rt))
     new_devices.append(RestartHubButton(hbtn_rt))
     new_devices.append(RebootHubButton(hbtn_rt))
@@ -160,6 +161,32 @@ class RestartButton(ButtonEntity):
     async def async_press(self) -> None:
         """Handle the button press."""
         await self._module.async_reset()
+
+
+class RestartFwdTableButton(ButtonEntity):
+    """Representation of a button to trigger a router forward table restart command."""
+
+    _attr_has_entity_name = True
+
+    def __init__(self, module) -> None:
+        """Initialize an restart button."""
+        self._name = "restartfwdtable"
+        self._module = module
+        self._attr_unique_id = f"Mod_{self._module.uid}_{self._name}"
+        self._attr_name = "Restart Forward Table"
+        self._attr_entity_category = EntityCategory.CONFIG
+        self._attr_icon = "mdi:restore"
+
+    # To link this entity to its device, this property must return an
+    # identifiers value matching that used in the module
+    @property
+    def device_info(self) -> DeviceInfo:  # type: ignore
+        """Return information to link this entity with the correct device."""
+        return {"identifiers": {(DOMAIN, self._module.uid)}}
+
+    async def async_press(self) -> None:
+        """Handle the button press."""
+        await self._module.async_restart_fwd_tbl()
 
 
 class RestartAllButton(ButtonEntity):

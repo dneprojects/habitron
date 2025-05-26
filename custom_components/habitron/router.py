@@ -366,6 +366,10 @@ class HbtnRouter:
         """Call reset command for self."""
         await self.comm.module_restart(self.id, 0)
 
+    async def async_restart_fwd_tbl(self) -> None:
+        """Call reset command for self."""
+        await self.comm.restart_fwd_tbl(self.id)
+
     async def async_reset_all_modules(self) -> None:
         """Call reset command for all modules."""
         await self.comm.module_restart(self.id, 0xFF)

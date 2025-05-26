@@ -755,6 +755,13 @@ class HbtnComm:
         cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
         await self.async_send_command(cmd_str)
 
+    async def restart_fwd_tbl(self, rtr_id: int) -> None:
+        """Restart forwarding table of router."""
+        rtr_nmbr = int(rtr_id / 100)
+        cmd_str = SMHUB_COMMANDS["RESTART_FORWARD_TABLE"]
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        await self.async_send_command(cmd_str)
+
     async def handle_firmware(self, rtr_id: int, mod_nmbr: int) -> bytes:
         """Handle router/module firmware update file status."""
         rtr_nmbr = int(rtr_id / 100)
