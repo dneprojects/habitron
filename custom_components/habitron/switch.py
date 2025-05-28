@@ -7,7 +7,6 @@ from typing import Any
 from homeassistant.components.switch import SwitchDeviceClass, SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
@@ -91,27 +90,11 @@ class SwitchedOutput(CoordinatorEntity, SwitchEntity):
             self._attr_name = output.name
         self._nmbr: int = output.nmbr
         self._out_offs = 0  # Dimm 1 = Out 1 + offs
-        self._attr_unique_id: str = f"Mod_{self._module.uid}_out{output.nmbr}"
+        self._attr_unique_id: str | None = f"Mod_{self._module.uid}_out{output.nmbr}"
         if output.type < 0:
             # Entity will not show up
             self._attr_entity_registry_enabled_default = False
-
-    # To link this entity to its device, this property must return an
-    # identifiers value matching that used in the module
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
-
-    @property
-    def name(self) -> str | None:
-        """Return the display name of this light."""
-        return self._attr_name
-
-    @property
-    def is_on(self) -> bool:
-        """Return status of output."""
-        return self._output.value == 1
+        self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -124,12 +107,14 @@ class SwitchedOutput(CoordinatorEntity, SwitchEntity):
         await self._module.comm.async_set_output(
             self._module.mod_addr, self._nmbr + 1, 1
         )
+        self._attr_is_on = True
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Instruct the light to turn off."""
         await self._module.comm.async_set_output(
             self._module.mod_addr, self._nmbr + 1, 0
         )
+        self._attr_is_on = False
 
 
 class SwitchedOutputPush(SwitchedOutput):
@@ -171,10 +156,11 @@ class SwitchedLed(CoordinatorEntity, SwitchEntity):
         self.idx: int = idx
         self._led: IfDescriptor = led
         self._module: HbtnModule = module
-        self._attr_name: str = led.name
+        self._attr_name: str | None = led.name
         self._nmbr: int = led.nmbr
         self._state: bool = False
-        self._attr_unique_id: str = f"Mod_{self._module.uid}_led{self.idx}"
+        self._attr_unique_id: str | None = f"Mod_{self._module.uid}_led{self.idx}"
+        self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
 
     async def async_added_to_hass(self) -> None:
         """Run when this Entity has been added to HA."""
@@ -191,16 +177,6 @@ class SwitchedLed(CoordinatorEntity, SwitchEntity):
         """Entity being removed from hass."""
         # The opposite of async_added_to_hass. Remove any registered call backs here.
         self._module.leds[self._nmbr].remove_callback(self.async_write_ha_state)
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
-
-    @property
-    def name(self) -> str | None:
-        """Return the display name of this switch."""
-        return self._attr_name
 
     @property
     def is_on(self) -> bool:
@@ -255,20 +231,11 @@ class HbtnFlag(CoordinatorEntity, SwitchEntity):
         self.idx: int = idx
         self._flag: StateDescriptor = flag
         self._module: HbtnRouter | HbtnModule = module
-        self._attr_name: str = flag.name
+        self._attr_name: str | None = flag.name
         self._nmbr: int = flag.nmbr
         self._state: bool = False
-        self._attr_unique_id: str = f"Mod_{self._module.uid}_flag{self._nmbr}"
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
-
-    @property
-    def name(self) -> str | None:
-        """Return the display name of this switch."""
-        return self._attr_name
+        self._attr_unique_id: str | None = f"Mod_{self._module.uid}_flag{self._nmbr}"
+        self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
 
     @property
     def is_on(self) -> bool:

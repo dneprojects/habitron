@@ -13,7 +13,6 @@ from homeassistant.components.cover import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
@@ -83,7 +82,12 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
         self.idx: int = idx
         self._cover: CovDescriptor = cover
         self._module: HbtnModule = module
-        self._attr_name: str = cover.name
+        if cover.name.strip() == "":
+            self._attr_name = f"Out {cover.nmbr + 1}"
+            # Entity will not show up
+            self._attr_entity_registry_enabled_default = False
+        else:
+            self._attr_name = cover.name
         self._nmbr: int = cover.nmbr
         self._polarity: bool = cover.type > 0
         if self._polarity:
@@ -97,7 +101,8 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
         self.open_cnt: int = 0
         self.closed_cnt: int = 0
         self.max_cnt: int = module.comm.router.cover_autostop_cnt
-        self._attr_unique_id: str = f"Mod_{self._module.uid}_cover{cover.nmbr}"
+        self._attr_unique_id: str | None = f"Mod_{self._module.uid}_cover{cover.nmbr}"
+        self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
 
     async def async_added_to_hass(self) -> None:
         """Run when this Entity has been added to HA."""
@@ -115,40 +120,28 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
         # The opposite of async_added_to_hass. Remove any registered call backs here.
         self._cover.remove_callback(self._handle_coordinator_update)
 
-    # To link this entity to its device, this property must return an
-    # identifiers value matching that used in the module
     @property
-    def device_info(self) -> DeviceInfo:
-        """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
-
-    @property
-    def name(self) -> str:
-        """Return name."""
-        return self._attr_name
-
-    @property
-    def current_cover_position(self) -> int:
+    def current_cover_position(self) -> int | None:
         """Return the current position of the cover."""
         return self._position
 
     @property
-    def is_closed(self) -> bool:
+    def is_closed(self) -> bool | None:
         """Return if the cover is closed, same as position 0."""
         return (self._position == 0) & (self._moving == 0)
 
     @property
-    def is_open(self) -> bool:
+    def is_open(self) -> bool | None:
         """Return if the cover is closed, same as position 0."""
         return (self._position == 100) & (self._moving == 0)
 
     @property
-    def is_closing(self) -> bool:
+    def is_closing(self) -> bool | None:
         """Return if the cover is closing or not."""
         return self._moving < 0
 
     @property
-    def is_opening(self) -> bool:
+    def is_opening(self) -> bool | None:
         """Return if the cover is opening or not."""
         return self._moving > 0
 
@@ -248,7 +241,7 @@ class HbtnBlind(HbtnShutter):
         self._tilt_position = 0
 
     @property
-    def current_cover_tilt_position(self) -> int:
+    def current_cover_tilt_position(self) -> int | None:
         """Return the current tilt position of the cover."""
         return self._tilt_position
 
