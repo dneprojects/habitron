@@ -12,7 +12,6 @@ from homeassistant.components.light import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
@@ -89,22 +88,11 @@ class SwitchedLight(CoordinatorEntity, LightEntity):
         self._nmbr: int = output.nmbr
         self._brightness: int = 255
         self._out_offs = 0  # Dimm 1 = Out 1 + offs
-        self._attr_unique_id: str = f"Mod_{self._module.uid}_out{output.nmbr}"
-
-    # To link this entity to its device, this property must return an
-    # identifiers value matching that used in the module
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
+        self._attr_unique_id: str | None = f"Mod_{self._module.uid}_out{output.nmbr}"
+        self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
 
     @property
-    def name(self) -> str | None:
-        """Return the display name of this light."""
-        return self._attr_name
-
-    @property
-    def supported_color_modes(self) -> set[ColorMode] | set[str]:
+    def supported_color_modes(self) -> set[ColorMode] | set[str] | None:
         """Flag supported color modes."""
         color_modes: set[ColorMode | str] = set()
         color_modes.add(ColorMode.ONOFF)
@@ -144,14 +132,15 @@ class DimmedOutput(SwitchedLight):
         super().__init__(output, module, coord, idx)
         if module.mod_type[:18] == "Smart Controller X":
             self._out_offs = 10  # Dimm 1 = Out 11
+        self._attr_icon = "mdi:lightbulb-on-60"
 
     @property
-    def brightness(self) -> int:
+    def brightness(self) -> int | None:
         """Return the brightness of the light."""
         return self._brightness
 
     @property
-    def color_mode(self) -> ColorMode:
+    def color_mode(self) -> ColorMode | str | None:
         """Return colormode."""
         return ColorMode.BRIGHTNESS
 
@@ -216,7 +205,7 @@ class DimmedOutputPush(SwitchedLightPush):
             self._out_offs = 10  # Dimm 1 = Out 11
 
     @property
-    def brightness(self) -> int:
+    def brightness(self) -> int | None:
         """Return the brightness of the light."""
         return self._brightness
 
@@ -281,7 +270,8 @@ class ColorLed(CoordinatorEntity, LightEntity):
         self._out_offs: int = 0
         self._brightness: int = 255
         self._rgb_color: tuple[int, int, int] = (50, 50, 50)
-        self._attr_unique_id: str = f"Mod_{self._module.uid}_rgbled{led.nmbr}"
+        self._attr_unique_id: str | None = f"Mod_{self._module.uid}_rgbled{led.nmbr}"
+        self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
         if led.type < 0:
             # Entity will not show up
             self._attr_entity_registry_enabled_default = False
@@ -312,20 +302,8 @@ class ColorLed(CoordinatorEntity, LightEntity):
         # The opposite of async_added_to_hass. Remove any registered call backs here.
         self._led.remove_callback(self._handle_coordinator_update)
 
-    # To link this entity to its device, this property must return an
-    # identifiers value matching that used in the module
     @property
-    def device_info(self) -> DeviceInfo:
-        """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
-
-    @property
-    def name(self) -> str | None:
-        """Return the display name of this light."""
-        return self._attr_name
-
-    @property
-    def is_on(self) -> bool:
+    def is_on(self) -> bool | None:
         """Return status of output."""
         return self._led.value[0] == 1
 
