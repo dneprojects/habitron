@@ -5,7 +5,7 @@ from __future__ import annotations
 from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import DeviceInfo, EntityCategory
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
@@ -40,8 +40,7 @@ async def async_setup_entry(
     new_devices.append(RestartAllButton(hbtn_rt))
     new_devices.append(RestartHubButton(hbtn_rt))
     new_devices.append(RebootHubButton(hbtn_rt))
-    for ch in range(4):
-        new_devices.append(ResetChannelPowerButton(hbtn_rt, ch + 1))
+    new_devices = [ResetChannelPowerButton(hbtn_rt, ch + 1) for ch in range(4)]
 
     if new_devices:
         async_add_entities(new_devices)
@@ -61,16 +60,7 @@ class CollCmdButton(ButtonEntity):
         self._nmbr = coll_cmd.nmbr
         self._attr_name = f"Cmd {self._nmbr}: {coll_cmd.name}"
         self._attr_unique_id = f"Mod_{module.b_uid}_ccmd{self._nmbr}"
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
-
-    @property
-    def name(self) -> str | None:
-        """Return the display name of this button."""
-        return self._attr_name
+        self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
 
     async def async_press(self) -> None:
         """Handle the button press."""
@@ -88,16 +78,7 @@ class DirCmdButton(ButtonEntity):
         self._nmbr = dir_cmd.nmbr
         self._attr_name = f"DirectCmd {self._nmbr}: {dir_cmd.name}"
         self._attr_unique_id = f"Mod_{self._module.uid}_dcmd{self._nmbr}"
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
-
-    @property
-    def name(self) -> str | None:
-        """Return the display name of this button."""
-        return self._attr_name
+        self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
 
     async def async_press(self) -> None:
         """Handle the button press."""
@@ -119,16 +100,7 @@ class VisCmdButton(ButtonEntity):
         no_lo = self._nmbr - no_hi * 256
         self._attr_name = f"VisCmd {no_hi}/{no_lo}: {vis_cmd.name}"
         self._attr_unique_id = f"Mod_{self._module.uid}_vcmd{self._nmbr}"
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
-
-    @property
-    def name(self) -> str | None:
-        """Return the display name of this button."""
-        return self._attr_name
+        self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
 
     async def async_press(self) -> None:
         """Handle the button press."""
@@ -150,13 +122,7 @@ class RestartButton(ButtonEntity):
         self._attr_name = "Reset"
         self._attr_entity_category = EntityCategory.CONFIG
         self._attr_icon = "mdi:restart"
-
-    # To link this entity to its device, this property must return an
-    # identifiers value matching that used in the module
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
+        self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
 
     async def async_press(self) -> None:
         """Handle the button press."""
@@ -176,13 +142,7 @@ class RestartFwdTableButton(ButtonEntity):
         self._attr_name = "Restart Forward Table"
         self._attr_entity_category = EntityCategory.CONFIG
         self._attr_icon = "mdi:restore"
-
-    # To link this entity to its device, this property must return an
-    # identifiers value matching that used in the module
-    @property
-    def device_info(self) -> DeviceInfo:  # type: ignore
-        """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
+        self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
 
     async def async_press(self) -> None:
         """Handle the button press."""
@@ -202,13 +162,7 @@ class RestartAllButton(ButtonEntity):
         self._attr_name = "Reset all modules"
         self._attr_entity_category = EntityCategory.CONFIG
         self._attr_icon = "mdi:restart"
-
-    # To link this entity to its device, this property must return an
-    # identifiers value matching that used in the router
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._router.uid)}}
+        self._attr_device_info = {"identifiers": {(DOMAIN, self._router.uid)}}
 
     async def async_press(self) -> None:
         """Handle the button press."""
@@ -228,13 +182,7 @@ class RestartHubButton(ButtonEntity):
         self._attr_name = "Restart Hub"
         self._attr_entity_category = EntityCategory.CONFIG
         self._attr_icon = "mdi:restart"
-
-    # To link this entity to its device, this property must return an
-    # identifiers value matching that used in the module
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._router.b_uid)}}
+        self._attr_device_info = {"identifiers": {(DOMAIN, self._router.b_uid)}}
 
     async def async_press(self) -> None:
         """Handle the button press."""
@@ -254,13 +202,7 @@ class RebootHubButton(ButtonEntity):
         self._attr_name = "Reboot Hub"
         self._attr_entity_category = EntityCategory.CONFIG
         self._attr_icon = "mdi:restart-alert"
-
-    # To link this entity to its device, this property must return an
-    # identifiers value matching that used in the module
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._router.b_uid)}}
+        self._attr_device_info = {"identifiers": {(DOMAIN, self._router.b_uid)}}
 
     async def async_press(self) -> None:
         """Handle the button press."""
@@ -279,16 +221,7 @@ class CountUpButton(ButtonEntity):
         self._attr_name = f"Count up {self._nmbr}: {counter.name}"
         self._attr_unique_id = f"Mod_{module.uid}_cntup{self._nmbr}"
         self._attr_icon = "mdi:chevron-up-box-outline"
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
-
-    @property
-    def name(self) -> str | None:
-        """Return the display name of this button."""
-        return self._attr_name
+        self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
 
     async def async_press(self) -> None:
         """Handle the button press."""
@@ -309,16 +242,7 @@ class CountDownButton(ButtonEntity):
         self._attr_name = f"Count down {self._nmbr}: {counter.name}"
         self._attr_unique_id = f"Mod_{module.uid}_cntdown{self._nmbr}"
         self._attr_icon = "mdi:chevron-down-box-outline"
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
-
-    @property
-    def name(self) -> str | None:
-        """Return the display name of this button."""
-        return self._attr_name
+        self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
 
     async def async_press(self) -> None:
         """Handle the button press."""
@@ -339,16 +263,7 @@ class ResetChannelPowerButton(ButtonEntity):
         self._attr_name = f"Power cycle router channel {self._chan}"
         self._attr_unique_id = f"Rt_{router.uid}_powcyc{self._chan}"
         self._attr_icon = "mdi:backup-restore"
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._router.uid)}}
-
-    @property
-    def name(self) -> str | None:
-        """Return the display name of this button."""
-        return self._attr_name
+        self._attr_device_info = {"identifiers": {(DOMAIN, self._router.uid)}}
 
     async def async_press(self) -> None:
         """Handle the button press."""
