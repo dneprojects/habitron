@@ -150,7 +150,7 @@ class HbtnSensor(CoordinatorEntity, SensorEntity):
         self._sensor_idx = sensor.nmbr
         self._attr_state: float | int
         self._value = 0
-        self._attr_unique_id = f"Mod_{self._module.uid}_snsr{self._sensor_idx}"
+        self._attr_unique_id = f"Mod_{self._module.uid}_snsr{idx}"
         self._attr_name = sensor.name
 
     # To link this entity to its device, this property must return an

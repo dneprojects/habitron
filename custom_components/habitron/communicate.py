@@ -216,6 +216,9 @@ class HbtnComm:
         sck.close()
 
         info = yaml.load(resp_bytes.decode("iso8859-1"), Loader=yaml.Loader)
+        if isinstance(info, str):
+            self.logger.error(f"Error getting SmartHub info: {info}")
+            raise (TimeoutError)
         self._version = info["software"]["version"]
         self._hwtype = info["hardware"]["platform"]["type"]
         self._hostip = info["hardware"]["network"]["ip"]
@@ -1031,7 +1034,7 @@ def format_block_output(byte_str: bytes) -> str:
         line = ""
         end_l = min([ptr + 10, lbs])
         for i in range(end_l - ptr):
-            line = line + f"{f'{byte_str[ptr+i]:02X}'} "
+            line = line + f"{f'{byte_str[ptr + i]:02X}'} "
         res_str += f"{f'{ptr:03d}'}  {line}{chr(13)}"
         ptr += 10
     return res_str
@@ -1138,10 +1141,10 @@ def query_smarthub(smhub_ip) -> dict[str, str]:
             smhub_type = f"{response[8]:c}-{response[9]:c}"
             if smhub_type == "E-5":
                 # Classic SmartIP
-                smhub_name = f"SmartIP_{smhub_mac.replace(':','')}"
+                smhub_name = f"SmartIP_{smhub_mac.replace(':', '')}"
             else:
                 # Smart Hub
-                smhub_name = f"SmartHub_{smhub_mac.replace(':','')}"
+                smhub_name = f"SmartHub_{smhub_mac.replace(':', '')}"
 
             smartip_info = {
                 "name": smhub_name,
