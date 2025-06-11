@@ -226,7 +226,7 @@ class DimmedOutputPush(SwitchedLightPush):
         """Handle updated data from the coordinator."""
         self._attr_is_on = self._output.value == 1
         self._brightness = int(
-            self._module.dimmers[self._nmbr - self._out_offs].value * 2.55
+            round(self._module.dimmers[self._nmbr - self._out_offs].value * 2.55)
         )
         self.async_write_ha_state()
 
@@ -239,7 +239,7 @@ class DimmedOutputPush(SwitchedLightPush):
         await self._module.comm.async_set_dimmval(
             self._module.mod_addr,
             self._nmbr - self._out_offs + 1,
-            int(self._brightness * 100.0 / 255),
+            int(round(self._brightness * 100.0 / 255)),
         )
 
 
