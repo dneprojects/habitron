@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import socket
 import struct
 from typing import Final
@@ -16,7 +15,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 import homeassistant.exceptions as HAexceptions
 
-from .const import DOMAIN, HBTINT_VERSION, HaEvents
+from .const import DOMAIN, HaEvents
 from .router import HbtnRouter
 
 BASE_PATH_COMPONENT = "./homeassistant/components"
@@ -114,6 +113,9 @@ class HbtnComm:
         self.is_addon: bool = True  # will be set in get_smhub_info()
         self.info: dict[str, str] = self.get_smhub_info()
         self.grp_modes: dict = {}
+        self._hbtn_version: str = self._hass.data["integrations"]["habitron"].manifest[
+            "version"
+        ]
 
     @property
     def com_ip(self) -> str:
@@ -134,6 +136,11 @@ class HbtnComm:
     def com_version(self) -> str:
         """Firmware version of SmartHub."""
         return self._version
+
+    @property
+    def hbtn_version(self) -> str:
+        """Firmware version of SmartHub."""
+        return self._hbtn_version
 
     @property
     def com_hwtype(self) -> str:
@@ -217,7 +224,7 @@ class HbtnComm:
 
         info = yaml.load(resp_bytes.decode("iso8859-1"), Loader=yaml.Loader)
         if isinstance(info, str):
-            self.logger.error(f"Error getting SmartHub info: {info}")
+            self.logger.error("Error getting SmartHub info: %s", info)
             raise (TimeoutError)
         self._version = info["software"]["version"]
         self._hwtype = info["hardware"]["platform"]["type"]
@@ -239,7 +246,7 @@ class HbtnComm:
         except ConnectionRefusedError as exc:
             raise ConnectionRefusedError from exc
         sck.settimeout(8)  # 8 seconds
-        vlen = len(HBTINT_VERSION)
+        vlen = len(self._hbtn_version)
         args_len = vlen + 1
         len_l = args_len & 0xFF
         len_h = args_len >> 8
@@ -247,7 +254,7 @@ class HbtnComm:
         cmd_str = (
             cmd_str.replace("<len>", chr(len_l) + chr(len_h))
             .replace("<vlen>", chr(vlen))
-            .replace("<vers>", HBTINT_VERSION)
+            .replace("<vers>", self._hbtn_version)
         )
         full_string = wrap_command(cmd_str)
         resp_bytes = send_receive(sck, full_string)
@@ -283,7 +290,7 @@ class HbtnComm:
             res = await async_send_receive(sck, full_string)
             sck.close()
             return res[0]
-        except TimeoutError as err_msg:  # noqa: F841
+        except TimeoutError as err_msg:
             sck.close()
             self.logger.error(f"Error connecting to Smart Hub: {err_msg}")  # noqa: G004
             return b""
@@ -304,13 +311,13 @@ class HbtnComm:
             res = await async_send_receive(sck, full_string)
             sck.close()
             return res[0], res[1]
-        except TimeoutError as err_msg:  # noqa: F841
+        except TimeoutError as err_msg:
             sck.close()
-            self.logger.error(f"Error connecting to Smart Hub: {err_msg}")  # noqa: G004
+            self.logger.error("Error connecting to Smart Hub: %s", err_msg)
             return b"", 0
         except ConnectionRefusedError:
             sck.close()
-            self.logger.info("Smart Hub not available.")  # noqa: G004
+            self.logger.info("Smart Hub not available.")
             return b"", 0
 
     async def async_get_router_status(self, rtr_id) -> bytes:
@@ -691,12 +698,14 @@ class HbtnComm:
 
     async def save_config_data(self, file_name: str, str_data: str) -> None:
         """Save config info to text file."""
-        if os.path.isdir(BASE_PATH_COMPONENT):
+        from pathlib import Path
+
+        if Path(BASE_PATH_COMPONENT).is_dir():
             data_path = f"{BASE_PATH_COMPONENT}/{DOMAIN}/data/"
         else:
             data_path = f"{BASE_PATH_CUSTOM_COMPONENT}/{DOMAIN}/data/"
-        if not (os.path.isdir(data_path)):
-            os.mkdir(data_path)
+        if not Path(data_path).is_dir():
+            Path(data_path).mkdir()
         file_path = data_path + file_name
         async with await anyio.open_file(
             file_path, "w", encoding="ascii", errors="surrogateescape"
@@ -1160,7 +1169,7 @@ def query_smarthub(smhub_ip) -> dict[str, str]:
         return {}
 
     network_socket.close()
-    try:  # noqa: SIM105
+    try:
         smartip_info["hostname"] = socket.gethostbyaddr(smhub_ip)[0].split(".")[0]
     except:  # noqa: E722
         smartip_info["hostname"] = ""
