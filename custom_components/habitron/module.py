@@ -222,8 +222,10 @@ class HbtnModule:
                         else:
                             # Description of outputs
                             self.outputs[arg_code - 60].name = text
-                    except:  # noqa: E722
-                        pass
+                    except Exception as err_msg:  # noqa: BLE001
+                        self.logger.warning(
+                            "Error processing line '%s': %s", line, err_msg
+                        )
 
             resp = resp[line_len : len(resp)]  # Strip processed line
         self.set_default_names(self.inputs, "Inp")
@@ -245,13 +247,15 @@ class HbtnModule:
         resp = await self.comm.async_get_module_settings(self._addr)
         if resp == "":
             self.logger.warning(
-                f"get_settings: No settings received for module {self.raddr}"  # noqa: G004
-            )  # noqa: G004
+                "get_settings: No settings received for module %s", self.raddr
+            )
             return False
 
         self.logger.info(
-            f"get_settings: Received {len(resp)} bytes for module {self.raddr}"  # noqa: G004
-        )  # noqa: G004
+            "get_settings: Received %s bytes for module %s",
+            len(resp),
+            self.raddr,
+        )
         self.hw_version = (
             resp[MSetIdx.HW_VERS : MSetIdx.HW_VERS_].decode("iso8859-1").strip()
         )
@@ -322,7 +326,7 @@ class HbtnModule:
             for l_idx in range(10):
                 if self.status[MStatIdx.COUNTER + 3 * l_idx] == 5:
                     self.logic.append(
-                        LgcDescriptor(f"Counter {cnt_cnt+1}", cnt_cnt, l_idx, 5, 0)
+                        LgcDescriptor(f"Counter {cnt_cnt + 1}", cnt_cnt, l_idx, 5, 0)
                     )
                     cnt_cnt += 1
         if len(self.logic) == 0:
@@ -338,12 +342,14 @@ class HbtnModule:
         m_addr = self._addr - int(self._addr / 100) * 100
         for m_idx in range(no_mods):
             if int(sys_status[m_idx * stat_len + MStatIdx.ADDR]) == m_addr:
-                self.logger.info(f"Found module {m_addr}, extracting status")  # noqa: G004
+                self.logger.info("Found module %s, extracting status", m_addr)
                 found_module = True
                 break
         if not found_module:
             self.logger.info(
-                f"Extract status could not find module {m_addr}: status length: {len(sys_status)}"  # noqa: G004
+                "Extract status could not find module %s: status length: %s",
+                m_addr,
+                len(sys_status),
             )
         return sys_status[m_idx * stat_len : (m_idx + 1) * stat_len]
 
@@ -356,7 +362,7 @@ class HbtnModule:
                 # Type sign switched, can be used to disable entity
                 e_type = mod_entities[e_idx].type
                 mod_entities[e_idx] = IfDescriptor(
-                    f"{self.id} {def_name}{e_idx+1}", e_idx, -1 * e_type, 0
+                    f"{self.id} {def_name}{e_idx + 1}", e_idx, -1 * e_type, 0
                 )
 
     async def async_reset(self) -> None:
@@ -912,6 +918,7 @@ class SmartSensor(HbtnModule):
         """Init Habitron SmartSensor module."""
         super().__init__(mod_descriptor, hass, config, b_uid, comm)
         self.sensors.append(IfDescriptor("Temperature", 0, 2, 0))
+        # self.sensors.append(IfDescriptor("Humidity", 1, 2, 0))
         self.setvalues = [IfDescriptor("Set temperature", 0, 2, 20.0)]
 
     def update(self, mod_status) -> None:
@@ -931,5 +938,6 @@ class SmartSensor(HbtnModule):
             )
             / 10
         )
+        # self.sensors[1].value = int(self.status[MStatIdx.HUM])  # current humidity
 
         self.diags[0].value = self.status[MStatIdx.MODULE_STAT]

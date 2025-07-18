@@ -4,6 +4,7 @@ import asyncio
 from datetime import timedelta
 import logging
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
@@ -13,13 +14,14 @@ _LOGGER = logging.getLogger(__name__)
 class HbtnCoordinator(DataUpdateCoordinator):
     """Habitron data update coordinator."""
 
-    def __init__(self, hass: HomeAssistant, hbtn_comm) -> None:
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry, hbtn_comm) -> None:
         """Initialize Habitron update coordinator."""
         super().__init__(
             hass,
             _LOGGER,
             # Name of the data. For logging purposes.
             name="Habitron updates",
+            config_entry=entry,
             # Polling interval. Will only be polled if there are subscribers.
             update_interval=timedelta(
                 seconds=hbtn_comm._config.data["update_interval"]  # noqa: SLF001
