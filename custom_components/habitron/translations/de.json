@@ -73,5 +73,18 @@
           }
         }
       }
+    },
+    "system_health": {
+    "info": {
+      "hbtn_version": "Version",
+      "router_status": "Router status",
+      "module_count": "Modulanzahl"
+    }
+  },
+  "issues": {
+      "router_system_error": {
+        "title": "Router Systemfehler",
+        "description": "Der Habitron-Router hat einen Fehler festgestellt, z. B. einen Kommunikationsfehler mit einem Modul."
+      }
     }
 }

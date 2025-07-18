@@ -25,6 +25,7 @@ from .const import (
     ROUTER_NMBR,
 )
 from .smart_hub import SmartHub
+from .system_health import system_health_info  # noqa: F401
 
 # List of platforms to support. There should be a matching .py file for each
 PLATFORMS: list[str] = [
@@ -214,7 +215,12 @@ async def async_remove_config_entry_device(
     hass: HomeAssistant, config_entry: ConfigEntry, device_entry: DeviceEntry
 ) -> bool:
     """Remove a config entry from a device."""
-    return True
+    return not any(
+        identifier
+        for identifier in device_entry.identifiers
+        if identifier[0] == DOMAIN
+        and identifier[1] in config_entry.runtime_data.data.devices
+    )
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

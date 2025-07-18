@@ -7,7 +7,7 @@ import logging
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import device_registry as dr, issue_registry as ir
 
 # for more information.
 from .const import DOMAIN, FALSE_VAL, TRUE_VAL, ModuleDescriptor, MStatIdx, RoutIdx
@@ -78,7 +78,7 @@ class HbtnRouter:
         self.smhub = smhub
         self.comm = smhub.comm
         self.logger = logging.getLogger(__name__)
-        self.coord: HbtnCoordinator = HbtnCoordinator(hass, self.comm)
+        self.coord: HbtnCoordinator = HbtnCoordinator(hass, config, self.comm)
         self.name = f"Router {smhub.uid}"
         self.version = ""
         self.serial = ""
@@ -94,10 +94,10 @@ class HbtnRouter:
         self.coll_commands: list[CmdDescriptor] = []
         self.flags: list[StateDescriptor] = []
         self.chan_timeouts = [
-            IfDescriptor(f"Timeouts channel {i+1}", i, TYPE_DIAG, 0) for i in range(4)
+            IfDescriptor(f"Timeouts channel {i + 1}", i, TYPE_DIAG, 0) for i in range(4)
         ]
         self.chan_currents = [
-            IfDescriptor(f"Current channel {i+1}", i, TYPE_DIAG, 0) for i in range(8)
+            IfDescriptor(f"Current channel {i + 1}", i, TYPE_DIAG, 0) for i in range(8)
         ]
         self.voltages = [IfDescriptor("", i, TYPE_DIAG, 0) for i in range(2)]
         self.voltages[0].name = "Voltage 5V"
@@ -113,6 +113,14 @@ class HbtnRouter:
         self.mod_reg = {}
         self._sys_ok = True
         self._mirror_started = True
+
+    def system_ok(self) -> bool:
+        """Return if system is ok."""
+        return self._sys_ok
+
+    def number_modules(self) -> int:
+        """Return number of modules."""
+        return len(self.modules)
 
     async def initialize(self) -> bool:
         """Initialize router instance."""
@@ -292,7 +300,7 @@ class HbtnRouter:
             else:
                 self.logger.warning(
                     f"Unexpected description, code: {line[1]} {line[2]} {line[3]}"  # noqa: G004
-                )  # noqa: G004
+                )
 
             resp = resp[line_len:]
 
@@ -351,6 +359,21 @@ class HbtnRouter:
         self.states[1].value = self._mirror_started
         if not (self._mirror_started):
             await self.comm.async_start_mirror(self.id)
+        if not (self._sys_ok):
+            ir.async_create_issue(
+                self.hass,
+                DOMAIN,
+                "router_system_error",
+                is_fixable=False,
+                severity=ir.IssueSeverity.WARNING,
+                translation_key="router_system_error",
+            )
+        else:
+            ir.async_delete_issue(
+                self.hass,
+                DOMAIN,
+                "router_system_error",
+            )
 
         for m_idx in range(len(self.modules)):
             mod_status = self.sys_status[
