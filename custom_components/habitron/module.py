@@ -173,6 +173,9 @@ class HbtnModule:
                             self.inputs[arg_code - 10] = IfDescriptor(
                                 text, arg_code - 10, 1, 0
                             )
+                        elif arg_code in range(101, 109):
+                            # Description of module buttons, long press
+                            pass
                         elif arg_code in range(18, 26):
                             # Description of module LEDs
                             self.leds[arg_code - 17].name = text
