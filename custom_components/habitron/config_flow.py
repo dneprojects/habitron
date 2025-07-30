@@ -10,7 +10,6 @@ import voluptuous as vol
 
 from homeassistant import config_entries, exceptions
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.data_entry_flow import FlowResult
 
 # pylint:disable=unused-import
 from .communicate import test_connection
@@ -96,7 +95,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Create the options flow."""
         return OptionsFlowHandler(config_entry)
 
-    async def async_step_user(self, user_input=None) -> FlowResult:
+    async def async_step_user(self, user_input=None) -> config_entries.ConfigFlowResult:
         """Handle the initial step."""
         await self.async_set_unique_id("unique_habitron")
 
@@ -167,7 +166,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> config_entries.ConfigFlowResult:
         """Manage the options."""
         if user_input is None:
             default_host = self.config_entry.data["habitron_host"]
