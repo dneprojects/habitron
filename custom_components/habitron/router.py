@@ -87,7 +87,7 @@ class HbtnRouter:
         self.chan_list = []
         self.module_grp = []
         self.max_group = 0
-        self.cover_autostop_cnt = 1
+        self.cover_autostop_del = 5
         self.modules_desc = list
         self.modules: list[HbtnModule] = []
         self.areas: list[AreaDescriptor] = []
@@ -296,7 +296,7 @@ class HbtnRouter:
             elif content_code == 2815:  # FF 0A: areas
                 self.areas.append(AreaDescriptor(entry_name, entry_no))
             elif content_code == 3071:  # FF 0B: cover autostop counter
-                self.cover_autostop_cnt = entry_no
+                self.cover_autostop_del = entry_no
             else:
                 self.logger.warning(
                     f"Unexpected description, code: {line[1]} {line[2]} {line[3]}"  # noqa: G004
