@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from homeassistant.components.cover import (
@@ -98,9 +99,7 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
             self._out_down = self._nmbr * 2
         self._position: int = 0
         self._moving: int = 0
-        self.open_cnt: int = 0
-        self.closed_cnt: int = 0
-        self.max_cnt: int = module.comm.router.cover_autostop_cnt
+        self.stop_delay: int = module.comm.router.cover_autostop_del
         self._attr_unique_id: str | None = f"Mod_{self._module.uid}_cover{cover.nmbr}"
         self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
 
@@ -149,36 +148,32 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
         self._position = 100 - int(self._cover.value)
-        self._moving = 0
+        self.stop_delay = self._module.comm.router.cover_autostop_del
         if self._module.outputs[self._out_up].value > 0:
-            if (
-                (self._position == 100)
-                and self.max_cnt
-                and (self.open_cnt >= self.max_cnt)
-            ):
-                self._module.comm.set_output(self._module.mod_addr, self._out_up + 1, 0)
-            elif self._position == 100:
-                self.open_cnt += 1
-                self._moving = 1
-            else:
-                self.open_cnt = 0
-                self._moving = 1
-        if self._module.outputs[self._out_down].value > 0:
-            if (
-                (self._position == 0)
-                and self.max_cnt
-                and (self.closed_cnt >= self.max_cnt)
-            ):
-                self._module.comm.set_output(
-                    self._module.mod_addr, self._out_down + 1, 0
-                )
-            elif self._position == 0:
-                self.closed_cnt += 1
-                self._moving = -1
-            else:
-                self.closed_cnt = 0
-                self._moving = -1
+            self._moving = 1
+        elif self._module.outputs[self._out_down].value > 0:
+            self._moving = -1
+        else:
+            self._moving = 0
+        if self._moving == 1:
+            if (self._position == 100) and (self.stop_delay >= 0):
+                self.hass.create_task(self._stop_cover_after_delay(self.stop_delay))
+        elif self._moving == -1:
+            if (self._position == 0) and (self.stop_delay >= 0):
+                self.hass.create_task(self._stop_cover_after_delay(self.stop_delay))
         self.async_write_ha_state()
+
+    async def _stop_cover_after_delay(self, delay_time: int) -> None:
+        await asyncio.sleep(delay_time)
+        if self._moving == 1:
+            await self._module.comm.async_set_output(
+                self._module.mod_addr, self._out_up + 1, 0
+            )
+        else:
+            await self._module.comm.async_set_output(
+                self._module.mod_addr, self._out_down + 1, 0
+            )
+        self._moving = 0
 
     # These methods allow HA to tell the actual device what to do. In this case, move
     # the cover to the desired position, or open and close it all the way.
@@ -191,9 +186,11 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
             self._module.mod_addr, self._out_down + 1, 0
         )
         self._moving = 0
+        self._position = 100 - int(self._cover.value)
 
     async def async_open_cover(self, **kwargs: Any) -> None:
         """Open the cover."""
+        self._position = 100 - int(self._cover.value)
         await self._module.comm.async_set_output(
             self._module.mod_addr, self._out_up + 1, 1
         )
@@ -201,6 +198,7 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
 
     async def async_close_cover(self, **kwargs: Any) -> None:
         """Close the cover."""
+        self._position = 100 - int(self._cover.value)
         await self._module.comm.async_set_output(
             self._module.mod_addr, self._out_down + 1, 1
         )
@@ -209,11 +207,18 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
     async def async_set_cover_position(self, **kwargs: Any) -> None:
         """Move the cover to position."""
         tmp_position = int(kwargs.get(ATTR_POSITION))  # type: ignore  # noqa: PGH003
+        self._position = 100 - int(self._cover.value)
         sh_nmbr = self._nmbr + 1
         if self._module.mod_type[:16] == "Smart Controller":
             sh_nmbr -= 2  # map #3..5 to 1..3
             if sh_nmbr < 1:
                 sh_nmbr += 5  # ...and 1..2 to 4..5
+        if self._position == tmp_position:
+            return
+        if self._position < tmp_position:
+            self._moving = 1
+        if self._position > tmp_position:
+            self._moving = -1
         await self._module.comm.async_set_shutterpos(
             self._module.mod_addr,
             sh_nmbr,
@@ -250,39 +255,26 @@ class HbtnBlind(HbtnShutter):
         """Handle updated data from the coordinator."""
         self._position = 100 - int(self._module.covers[self._nmbr].value)
         self._tilt_position = 100 - self._module.covers[self._nmbr].tilt
-        self._moving = 0
-
+        self.stop_delay = self._module.comm.router.cover_autostop_del
         if self._module.outputs[self._out_up].value > 0:
-            if (
-                (self._position == 100)
-                and self.max_cnt
-                and (self.open_cnt >= self.max_cnt)
-            ):
-                self._module.comm.set_output(self._module.mod_addr, self._out_up + 1, 0)
-            elif self._position == 100:
-                self.open_cnt += 1
-                self._moving = 1
-            else:
-                self.open_cnt = 0
-        if self._module.outputs[self._out_down].value > 0:
-            if (
-                (self._position == 0)
-                and self.max_cnt
-                and (self.closed_cnt >= self.max_cnt)
-            ):
-                self._module.comm.set_output(
-                    self._module.mod_addr, self._out_down + 1, 0
-                )
-            elif self._position == 0:
-                self.closed_cnt += 1
-                self._moving = -1
-            else:
-                self.closed_cnt = 0
+            self._moving = 1
+        elif self._module.outputs[self._out_down].value > 0:
+            self._moving = -1
+        else:
+            self._moving = 0
+        self._position = 100 - int(self._cover.value)
+        if self._moving == 1:
+            if (self._position == 100) and (self.stop_delay >= 0):
+                self.hass.create_task(self._stop_cover_after_delay(self.stop_delay))
+        elif self._moving == -1:
+            if (self._position == 0) and (self.stop_delay >= 0):
+                self.hass.create_task(self._stop_cover_after_delay(self.stop_delay))
         self.async_write_ha_state()
 
     async def async_set_cover_tilt_position(self, **kwargs: Any) -> None:
         """Set the tilt angle."""
         tmp_tilt_position = int(kwargs.get(ATTR_TILT_POSITION))  # type: ignore  # noqa: PGH003
+        self._tilt_position = 100 - self._module.covers[self._nmbr].tilt
         sh_nmbr = self._nmbr + 1
         if self._module.mod_type[:16] == "Smart Controller":
             sh_nmbr -= 2  # map #3..5 to 1..3
@@ -297,6 +289,7 @@ class HbtnBlind(HbtnShutter):
     async def async_open_cover_tilt(self, **kwargs) -> None:
         """Set the tilt angle."""
         sh_nmbr = self._nmbr + 1
+        self._tilt_position = 100 - self._module.covers[self._nmbr].tilt
         if self._module.mod_type[:16] == "Smart Controller":
             sh_nmbr -= 2  # map #3..5 to 1..3
             if sh_nmbr < 1:
@@ -310,6 +303,7 @@ class HbtnBlind(HbtnShutter):
     async def async_close_cover_tilt(self, **kwargs) -> None:
         """Set the tilt angle."""
         sh_nmbr = self._nmbr + 1
+        self._tilt_position = 100 - self._module.covers[self._nmbr].tilt
         if self._module.mod_type[:16] == "Smart Controller":
             sh_nmbr -= 2  # map #3..5 to 1..3
             if sh_nmbr < 1:
