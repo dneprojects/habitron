@@ -107,7 +107,7 @@ class HbtnModule:
         self.uid = self.hw_version
         device_registry.async_get_or_create(
             config_entry_id=self._config.entry_id,
-            configuration_url=f"http://{self.comm.com_ip}:7780/module-{self.raddr}",
+            configuration_url=f"{self.comm.router.smhub.base_url}/module-{self.raddr}",
             identifiers={(DOMAIN, self.uid)},
             manufacturer="Habitron GmbH",
             suggested_area=self.area,

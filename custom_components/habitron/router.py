@@ -129,10 +129,10 @@ class HbtnRouter:
         await self.get_definitions()
         await self.get_descriptions()  # No descriptions for modules expected!
 
-        device_registry = dr.async_get(self.hass)
+        device_registry: dr.DeviceRegistry = dr.async_get(self.hass)
         device_registry.async_get_or_create(
             config_entry_id=self.config.entry_id,
-            configuration_url=f"http://{self.comm.com_ip}:7780/router",
+            configuration_url=f"{self.smhub.base_url}/router",
             identifiers={(DOMAIN, self.uid)},
             manufacturer="Habitron GmbH",
             suggested_area="House",

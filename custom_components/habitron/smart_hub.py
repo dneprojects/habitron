@@ -46,13 +46,17 @@ class SmartHub:
         self._version: str = self.comm.com_version
         self._type: str = self.comm.com_hwtype
         self.router: hbtr
-
+        self.addon_slug: str = "aed76be6_smart_hub"
+        if self.comm.is_addon:
+            self.base_url: str = f"http://api/ingress/{self.addon_slug}"
+        else:
+            self.base_url: str = f"http://{self.comm.com_ip}:7780"
         self.host = self.comm.com_ip
         self._port = self.comm.com_port
         if len(self.host) == 0:
             conf_url = None
         else:
-            conf_url = f"http://{self.comm.com_ip}:7780/hub"
+            conf_url = f"{self.base_url}/hub"
 
         device_registry = dr.async_get(hass)
         device_registry.async_get_or_create(
