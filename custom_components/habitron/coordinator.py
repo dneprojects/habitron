@@ -31,6 +31,7 @@ class HbtnCoordinator(DataUpdateCoordinator):
         self.comm = hbtn_comm
         self.config = hbtn_comm._config  # noqa: SLF001
         self.rtr_id = 1
+        self.previous_devices: set[str] = set()
 
     def set_update_interval(self, interval: int, updates: bool):
         """Update interval for integration re-configuration."""

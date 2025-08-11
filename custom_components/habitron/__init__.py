@@ -218,8 +218,7 @@ async def async_remove_config_entry_device(
     return not any(
         identifier
         for identifier in device_entry.identifiers
-        if identifier[0] == DOMAIN
-        and identifier[1] in config_entry.runtime_data.data.devices
+        if identifier[0] == DOMAIN and identifier[1] in config_entry.runtime_data.data
     )
 
 

@@ -122,6 +122,7 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
     @property
     def current_cover_position(self) -> int | None:
         """Return the current position of the cover."""
+        self._position = 100 - int(self._cover.value)
         return self._position
 
     @property
