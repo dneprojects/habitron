@@ -31,6 +31,7 @@ from .system_health import system_health_info  # noqa: F401
 PLATFORMS: list[str] = [
     "binary_sensor",
     "button",
+    "camera",
     "climate",
     "cover",
     "event",
