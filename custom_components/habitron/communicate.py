@@ -826,6 +826,19 @@ class HbtnComm:
         inp_event_types = ["inactive", "single_press", "long_press", "long_press_end"]
         if self._hostip != hub_id:
             return
+        if mod_id == 0:
+            # router event
+            if evnt == HaEvents.FLAG:
+                for flg in self.router.flags:
+                    if flg.nmbr == arg1:
+                        flg.value = arg2
+                        await flg.handle_upd_event()
+                        break
+                return
+            self.logger.warning(
+                f"Unhandled router event {evnt} with arg1 {arg1} of router {rtr_id}"  # noqa: G004
+            )
+            return
         try:
             module = self.router.get_module(mod_id)
         except Exception as err_msg:  # pylint: disable=broad-exception-caught  # noqa: BLE001
@@ -900,9 +913,10 @@ class HbtnComm:
                     await module.sensors[arg1].handle_upd_event()
                 elif evnt == HaEvents.FLAG:
                     for flg in module.flags:
-                        if flg.nmbr == arg1 + 1:
-                            flg.value = int(arg2 > 0)
+                        if flg.nmbr == arg1:
+                            flg.value = arg2
                             await flg.handle_upd_event()
+                            break
                 elif evnt == HaEvents.CNT_VAL:
                     module.logic[arg1].value = arg2
                     await module.logic[arg1].handle_upd_event()
