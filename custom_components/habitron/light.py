@@ -130,7 +130,7 @@ class DimmedOutput(SwitchedLight):
     def __init__(self, output, module, coord, idx) -> None:
         """Initialize a dimmable Habitron Light."""
         super().__init__(output, module, coord, idx)
-        if module.mod_type[:18] == "Smart Controller X":
+        if module.typ[0] == 1:
             self._out_offs = 10  # Dimm 1 = Out 11
         self._attr_icon = "mdi:lightbulb-on-60"
 
@@ -201,7 +201,7 @@ class DimmedOutputPush(SwitchedLightPush):
     def __init__(self, output, module, coord, idx) -> None:
         """Initialize a dimmable Habitron Light."""
         super().__init__(output, module, coord, idx)
-        if module.mod_type[:18] == "Smart Controller X":
+        if module.typ[0] == 1:
             self._out_offs = 10  # Dimm 1 = Out 11
 
     @property
