@@ -6,6 +6,7 @@ import logging
 
 import voluptuous as vol
 
+from config.custom_components.habitron.webrtc_provider import async_setup_provider
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryNotReady
@@ -159,7 +160,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.data.setdefault(DOMAIN, {})[entry.entry_id] = smhub
         await smhub.async_setup()
 
-        # Register update handler for runtime configuration of Habitron integration
         entry.async_on_unload(entry.add_update_listener(update_listener))
 
         # Register services
