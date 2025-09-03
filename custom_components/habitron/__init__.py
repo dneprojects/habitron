@@ -6,7 +6,6 @@ import logging
 
 import voluptuous as vol
 
-from config.custom_components.habitron.webrtc_provider import async_setup_provider
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryNotReady
