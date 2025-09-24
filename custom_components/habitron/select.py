@@ -49,9 +49,11 @@ async def async_setup_entry(
                     hbt_module, hbtn_rt, hbtn_cord, len(new_devices)
                 )
             )
-    new_devices.append(HbtnSelectDaytimeMode(0, hbtn_rt, hbtn_cord, len(new_devices)))
-    new_devices.append(HbtnSelectAlarmMode(0, hbtn_rt, hbtn_cord, len(new_devices)))
-    new_devices.append(HbtnSelectGroupMode(0, hbtn_rt, hbtn_cord, len(new_devices)))
+    new_devices.append(
+        HbtnSelectDaytimeModePush(0, hbtn_rt, hbtn_cord, len(new_devices))
+    )
+    new_devices.append(HbtnSelectAlarmModePush(0, hbtn_rt, hbtn_cord, len(new_devices)))
+    new_devices.append(HbtnSelectGroupModePush(0, hbtn_rt, hbtn_cord, len(new_devices)))
     for log_level in smhub.loglvl:
         new_devices.append(
             HbtnSelectLoggingLevel(smhub, log_level, hbtn_cord, len(new_devices))
@@ -89,7 +91,9 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
             self._module = hbtnr
         else:
             self._module = module
-        self._mode = hbtnr.mode0 if isinstance(module, int) else int(module.mode.value)
+        self._mode = (
+            int(hbtnr.mode.value) if isinstance(module, int) else int(module.mode.value)
+        )
         self._current_option = ""
         self.hbtnr = hbtnr
         self._attr_translation_key = "habitron_mode"
@@ -137,10 +141,7 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator, get current module mode."""
-        if isinstance(self._module, HbtnRouter):
-            self._mode = self.hbtnr.mode0
-        else:
-            self._mode = int(self._module.mode.value)
+        self._mode = int(self._module.mode.value)
         if self._mode == 0:
             # should not be the case
             return
@@ -154,11 +155,10 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
         mode_val = self._enum[option].value
+        self._mode = (int(self._module.mode.value) & (0xFF - self._mask)) + mode_val
         if isinstance(self._module, HbtnRouter):
-            self._mode = (self.hbtnr.mode0 & (0xFF - self._mask)) + mode_val
             await self.hbtnr.comm.async_set_group_mode(self.hbtnr.id, 0, self._mode)
         else:
-            self._mode = (int(self._module.mode.value) & (0xFF - self._mask)) + mode_val
             await self._module.comm.async_set_group_mode(
                 self._module.mod_addr, self._module.group, self._mode
             )
@@ -206,7 +206,7 @@ class HbtnSelectDaytimeMode(HbtnMode):
         if isinstance(self._module, HbtnRouter):
             await self.hbtnr.comm.async_set_daytime_mode(self.hbtnr.id, 0, mode_val)
         else:
-            await self._module.comm.async_set_group_mode(
+            await self._module.comm.async_set_daytime_mode(
                 self._module.mod_addr, self._module.group, mode_val
             )
 
@@ -387,7 +387,7 @@ class HbtnSelectLoggingLevel(CoordinatorEntity, SelectEntity):
         self._current_option = ""
         self._enum = LoggingLevels
         self._attr_name = level.name
-        self._attr_unique_id = f"Hub_{self._smhub.uid}_{level.name.replace(' ','')}"
+        self._attr_unique_id = f"Hub_{self._smhub.uid}_{level.name.replace(' ', '')}"
         self._attr_translation_key = "habitron_loglevel"
 
     @property

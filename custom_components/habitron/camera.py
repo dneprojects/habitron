@@ -1,10 +1,9 @@
+"""Camera platform for Habitron integration in Home Assistant."""
+
 from __future__ import annotations
 
 import logging
 from typing import Any
-
-from aiohttp.hdrs import CONTENT_TYPE
-import async_timeout
 
 from homeassistant.components.camera import (
     Camera,
@@ -13,16 +12,14 @@ from homeassistant.components.camera import (
     WebRTCClientConfiguration,
     async_get_supported_provider,
 )
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
-
+from homeassistant.const import EVENT_HOMEASSISTANT_START
+from homeassistant.core import CoreState, Event, HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-import homeassistant.helpers.network as network_helper
 
 from .const import DOMAIN
 from .module import HbtnModule
 from .router import HbtnRouter
-from .webrtc_provider import async_setup_provider, HabitronWebRTCProvider
+from .webrtc_provider import HabitronWebRTCProvider, async_setup_provider
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -35,27 +32,40 @@ async def async_setup_entry(
     """Set up Habitron cameras from a config entry."""
     hbtn_rt: HbtnRouter = hass.data[DOMAIN][entry.entry_id].router
 
-    # Provider initialisieren, bevor Entitäten erstellt werden
-    provider: HabitronWebRTCProvider = await async_setup_provider(hass)
+    async def async_init_provider_and_entities(event: Event | None = None) -> None:
+        """Initialize the provider and entities when HA is ready."""
+        _LOGGER.info(
+            "Home Assistant started. Initializing Habitron WebRTC provider and cameras"
+        )
 
-    new_devices = []
-    # Get the authentication object and pass it to the camera entity
-    auth = hass.auth
+        provider: HabitronWebRTCProvider = await async_setup_provider(hass)
 
-    for hbt_module in hbtn_rt.modules:
-        if hbt_module.mod_type == "Smart Controller Touch":
-            # Pass the auth object and the provider to the camera constructor
-            new_devices.append(
-                HbtnCam(hass, hbt_module, auth, len(new_devices), provider)
-            )
+        new_devices = []
+        auth = hass.auth
 
-    if new_devices:
-        async_add_entities(new_devices)
-        _LOGGER.info("Added %d Habitron WebRTC camera(s)", len(new_devices))
+        for hbt_module in hbtn_rt.modules:
+            if hbt_module.mod_type == "Smart Controller Touch":
+                new_devices.append(
+                    HbtnCam(hass, hbt_module, auth, len(new_devices), provider)
+                )
 
+        if new_devices:
+            async_add_entities(new_devices)
+            _LOGGER.info("Added %d Habitron WebRTC camera(s)", len(new_devices))
+        else:
+            _LOGGER.info("No Habitron Smart Controller Touch modules found")
+
+    if hass.state == CoreState.running:
+        # If HA is already fully running, initialize immediately.
+        await async_init_provider_and_entities()
     else:
-        _LOGGER.info("No Habitron Smart Controller Touch modules found")
-        # Call the provider setup, but indicate that no cameras were found
+        # If HA is still starting up, wait for the "started" event.
+        _LOGGER.info(
+            "Home Assistant is not fully started yet. Deferring Habitron setup"
+        )
+        hass.bus.async_listen_once(
+            EVENT_HOMEASSISTANT_START, async_init_provider_and_entities
+        )
 
 
 class HbtnCam(Camera):
@@ -95,18 +105,17 @@ class HbtnCam(Camera):
     ) -> bytes | None:
         """Return bytes of camera image."""
         if not self._attr_is_on:
-            _LOGGER.info("Camera is off, cannot fetch image.")
+            _LOGGER.info("Camera is off, cannot fetch image")
             return None
 
         _LOGGER.debug(
             "Requesting still image from provider for stream: %s", self._stream_name
         )
         try:
-            image_data = await self._provider.async_take_snapshot(
+            return await self._provider.async_take_snapshot(
                 stream_name=self._stream_name
             )
-            return image_data
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             _LOGGER.error(
                 "Failed to get snapshot for camera '%s': %s", self._stream_name, e
             )
@@ -132,7 +141,7 @@ class HbtnCam(Camera):
     ) -> None:
         """Handle the WebRTC offer coming from the HA frontend."""
         if not self._attr_is_on:
-            _LOGGER.warning("Attempted to start stream on a camera that is off.")
+            _LOGGER.warning("Attempted to start stream on a camera that is off")
             raise RuntimeError("Cannot start stream when the camera is off")
 
         provider = await async_get_supported_provider(self.hass, self)
