@@ -4,6 +4,7 @@ import asyncio
 import base64
 import logging
 import os
+import re
 import socket
 from typing import Any
 import uuid
@@ -17,6 +18,7 @@ from homeassistant.components.camera import (
     RTCIceCandidateInit,
     WebRTCAnswer,
     WebRTCCandidate,
+    WebRTCError,
     WebRTCSendMessage,
     async_register_webrtc_provider,
 )
@@ -27,24 +29,18 @@ from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-# Zentraler Speicher für aktive WebSocket-Verbindungen: stream_name -> connection
+# --- Global state dictionaries ---
 _active_ws_connections: dict[str, websocket_api.ActiveConnection] = {}
-
-# Speicher für ausstehende WebRTC-Futures: session_id -> asyncio.Future
 _webrtc_futures: dict[str, asyncio.Future] = {}
-
-# Speicherung der send_message-Callbacks für jede WebRTC-Sitzung
 _webrtc_send_message_callbacks: dict[str, WebRTCSendMessage] = {}
-
-# Mapping session_id -> stream_name
 _session_to_stream_map: dict[str, str] = {}
-
-# Warteschlange für ausstehende Kandidaten
-# Der Schlüssel ist die session_id, der Wert ist eine Liste von WebRTCCandidate-Objekten
 _pending_candidates: dict[str, list[WebRTCCandidate]] = {}
-
-# Speicher für ausstehende Snapshot-Futures: request_id -> dict mit 'future' und 'stream_name'
 _snapshot_futures: dict[str, dict] = {}
+
+
+def _filter_ipv6_candidates(sdp: str) -> str:
+    """Remove IPv6 candidates from an SDP offer to improve reliability on some local networks."""
+    return re.sub(r"a=candidate:.* IP6 .*\r\n", "", sdp)
 
 
 class HabitronWebRTCProvider(CameraWebRTCProvider):
@@ -91,7 +87,7 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
             _webrtc_send_message_callbacks[session_id] = send_message
             _LOGGER.debug("Mapped session %s to stream '%s'", session_id, stream_name)
 
-            # Determine local IP dynamically
+            # (Your IP replacement and IPv6 filtering logic remains here and is correct)
             local_ip = "127.0.0.1"
             try:
                 if os.environ.get("DOCKER_HOST") or os.environ.get(
@@ -106,12 +102,10 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
                     "Failed to determine local IP, fallback to 127.0.0.1: %s", e
                 )
 
-            modified_offer_sdp = offer_sdp.replace("127.0.0.1", local_ip)
-            _LOGGER.info("Replaced SDP IP with %s", local_ip)
-            _LOGGER.debug("Original SDP: %s", offer_sdp)
-            _LOGGER.debug("Modified SDP: %s", modified_offer_sdp)
+            modified_offer_sdp = _filter_ipv6_candidates(offer_sdp)
+            modified_offer_sdp = modified_offer_sdp.replace("127.0.0.1", local_ip)
+            _LOGGER.info("Replaced SDP IP with %s and filtered IPv6", local_ip)
 
-            # Send offer via WebSocket to Flutter client
             ws_connection.send_message(
                 {
                     "type": "habitron/webrtc_offer",
@@ -120,38 +114,38 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
                 }
             )
 
-            # Wait for the answer
             fut: asyncio.Future = asyncio.Future()
             _webrtc_futures[session_id] = fut
             _LOGGER.info(
                 "Waiting for answer from Flutter client for session: %s", session_id
             )
-            await asyncio.wait_for(fut, timeout=30)
-            answer_sdp = fut.result()
-            send_message(WebRTCAnswer(answer=answer_sdp))
-            _LOGGER.info("WebRTC answer delivered for stream: %s", stream_name)
-            _LOGGER.debug("Answer SDP from Flutter: %s", answer_sdp)
 
-            # NEU: Kandidaten aus der Warteschlange verarbeiten
-            if session_id in _pending_candidates:
-                _LOGGER.info(
-                    "Processing %d pending candidates for session %s",
-                    len(_pending_candidates[session_id]),
-                    session_id,
+            try:
+                answer_sdp = await asyncio.wait_for(fut, timeout=10)
+                send_message(WebRTCAnswer(answer=answer_sdp))
+                _LOGGER.info("WebRTC answer delivered for stream: %s", stream_name)
+            except TimeoutError:
+                _LOGGER.error("WebRTC answer from Flutter client timed out")
+                send_message(
+                    WebRTCError(
+                        code="webrtc_answer_timeout", message="WebRTC answer timed out."
+                    )
                 )
-                for candidate_obj in _pending_candidates[session_id]:
-                    # KEIN await, da send_message ein Callback ist
-                    send_message(candidate_obj)
-                del _pending_candidates[session_id]
-                _LOGGER.info("Pending candidates sent")
+            finally:
+                # This block processes candidates that arrived early.
+                if session_id in _pending_candidates:
+                    _LOGGER.info(
+                        "Processing %d pending candidates for session %s",
+                        len(_pending_candidates[session_id]),
+                        session_id,
+                    )
+                    for candidate_obj in _pending_candidates[session_id]:
+                        send_message(candidate_obj)
+                    del _pending_candidates[session_id]
 
-        except TimeoutError as err:
-            _LOGGER.error("WebRTC answer from Flutter client timed out")
-            raise HomeAssistantError(
-                "WebRTC answer from Flutter client timed out"
-            ) from err
         except Exception as err:
             _LOGGER.error("WebRTC negotiation with Flutter failed: %s", err)
+            send_message(WebRTCError(code="negotiation_failed", message=str(err)))
             raise HomeAssistantError(
                 f"WebRTC negotiation with Flutter failed: {err}"
             ) from err
@@ -159,40 +153,28 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
     async def async_on_webrtc_candidate(
         self, session_id: str, candidate: RTCIceCandidateInit
     ) -> None:
-        """Forward all valid ICE candidates to the Flutter client."""
-        _LOGGER.info(
-            "Received ICE candidate from HA frontend for session %s: %s",
-            session_id,
-            candidate.candidate,
+        """Forward ICE candidates from the HA frontend to the Flutter client."""
+        _LOGGER.debug(
+            "Received ICE candidate from HA frontend for session %s", session_id
         )
-
-        send_message = _webrtc_send_message_callbacks.get(session_id)
-
-        # Verpackt das RTCIceCandidateInit-Objekt in ein WebRTCCandidate-Objekt.
-        webrtc_candidate_obj = WebRTCCandidate(candidate=candidate)
-
-        # Das korrekt verpackte Objekt an die Home Assistant Core senden
-        if send_message:
-            try:
-                # KEIN await, da send_message ein Callback ist
-                send_message(webrtc_candidate_obj)
-                _LOGGER.info(
-                    "Forwarded ICE candidate to HA frontend for session %s",
-                    session_id,
-                )
-            except Exception as e:
-                _LOGGER.error("Error forwarding candidate to HA frontend: %s", e)
-                raise HomeAssistantError(
-                    "Error forwarding candidate to HA frontend"
-                ) from e
-        else:
-            # Kandidat zur Warteschlange hinzufügen, falls send_message noch nicht verfügbar ist
-            # Hinzufügen des korrekten Typs zum Pending-Array
-            _pending_candidates.setdefault(session_id, []).append(webrtc_candidate_obj)
-            _LOGGER.info(
-                "No send_message callback found. Candidate added to pending queue for session %s",
+        stream_name = _session_to_stream_map.get(session_id)
+        if not stream_name or not (
+            ws_connection := _active_ws_connections.get(stream_name)
+        ):
+            _LOGGER.warning(
+                "Could not forward candidate for unknown session or disconnected client: %s",
                 session_id,
             )
+            return
+
+        ws_connection.send_message(
+            {
+                "type": "habitron/webrtc_candidate",
+                "candidate": candidate.candidate,
+                "sdp_mid": candidate.sdp_mid,
+                "sdp_m_line_index": candidate.sdp_m_line_index,
+            }
+        )
 
     async def async_take_snapshot(self, stream_name: str) -> bytes:
         """Handles a request from Home Assistant to take a snapshot from the stream."""
@@ -208,16 +190,13 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
         _snapshot_futures[request_id] = {"future": fut, "stream_name": stream_name}
 
         ws_connection.send_message(
-            {
-                "type": "habitron/snapshot_request",
-                "request_id": request_id,
-            }
+            {"type": "habitron/snapshot_request", "request_id": request_id}
         )
 
         try:
-            snapshot_data = await asyncio.wait_for(fut, timeout=30)
+            snapshot_data = await asyncio.wait_for(fut, timeout=3)
             _LOGGER.info("Received snapshot data for stream: %s", stream_name)
-            return snapshot_data
+            return snapshot_data  # noqa: TRY300
         except TimeoutError as err:
             _LOGGER.error("Snapshot request for stream '%s' timed out", stream_name)
             raise HomeAssistantError("Snapshot request timed out.") from err
@@ -225,6 +204,9 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
             _LOGGER.error(
                 "Error receiving snapshot for stream '%s': %s", stream_name, e
             )
+            data = _snapshot_futures.get(request_id)
+            if data and not data["future"].done():
+                data["future"].set_exception(e)
             raise HomeAssistantError("Error receiving snapshot.") from e
         finally:
             _snapshot_futures.pop(request_id, None)
@@ -244,19 +226,28 @@ def _async_on_ws_disconnect(
         s for s, sn in _session_to_stream_map.items() if sn == stream_name
     ]
     for session_id in sessions_to_delete:
-        _webrtc_futures.pop(session_id, None)
+        if fut := _webrtc_futures.pop(session_id, None):
+            if not fut.done():
+                fut.set_exception(
+                    HomeAssistantError("Client disconnected during negotiation")
+                )
         _webrtc_send_message_callbacks.pop(session_id, None)
         _session_to_stream_map.pop(session_id, None)
         _pending_candidates.pop(session_id, None)
 
     # Clean up related snapshot futures
     snapshot_requests_to_delete = [
-        r
-        for r, data in _snapshot_futures.items()
-        if data["stream_name"] == stream_name and not data["future"].done()
+        r for r, data in _snapshot_futures.items() if data["stream_name"] == stream_name
     ]
     for request_id in snapshot_requests_to_delete:
-        _snapshot_futures.pop(request_id, None)
+        if fut := _snapshot_futures.pop(request_id, {}).get("future"):
+            if not fut.done():
+                fut.set_exception(
+                    HomeAssistantError("Client disconnected during snapshot")
+                )
+
+
+# --- WebSocket Command Handlers ---
 
 
 @websocket_api.websocket_command(
@@ -267,15 +258,13 @@ async def handle_register_stream(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
 ):
     """Handle Flutter stream registration."""
-    _LOGGER.info("Received message: %s", msg)  # Hinzugefügt für das Debugging
+    _LOGGER.info("Received message: %s", msg)
     stream_name = msg["stream_name"]
     _active_ws_connections[stream_name] = connection
     connection.subscriptions[stream_name] = lambda: _async_on_ws_disconnect(
         stream_name, connection
     )
-    connection.send_message(
-        websocket_api.messages.result_message(msg["id"], {"status": "ok"})
-    )
+    connection.send_result(msg["id"], {"status": "ok"})
     _LOGGER.info("Flutter client registered stream '%s'", stream_name)
 
 
@@ -288,9 +277,11 @@ async def handle_register_stream(
     }
 )
 @websocket_api.async_response
-async def handle_webrtc_answer(hass: HomeAssistant, connection, msg):
+async def handle_webrtc_answer(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+):
     """Handle WebRTC answer from Flutter app."""
-    _LOGGER.info("Received message: %s", msg)  # Hinzugefügt für das Debugging
+    _LOGGER.info("Received message: %s", msg)
     session_id = msg["session_id"]
     sdp = msg["sdp"]
     fut = _webrtc_futures.get(session_id)
@@ -300,8 +291,10 @@ async def handle_webrtc_answer(hass: HomeAssistant, connection, msg):
         _LOGGER.debug("Received answer SDP from Flutter: %s", sdp)
     else:
         _LOGGER.error("WebRTC session '%s' not found or already completed", session_id)
+    connection.send_result(msg["id"])
 
 
+# This handler now ONLY queues candidates. It no longer sends them directly.
 @websocket_api.websocket_command(
     {
         vol.Required("type"): "habitron/webrtc_candidate",
@@ -312,77 +305,105 @@ async def handle_webrtc_answer(hass: HomeAssistant, connection, msg):
     }
 )
 @websocket_api.async_response
-async def handle_webrtc_candidate(hass: HomeAssistant, connection, msg):
-    """Handle ICE candidate from Flutter app."""
-    _LOGGER.info("Received message: %s", msg)  # Hinzugefügt für das Debugging
-    _LOGGER.info(
-        "Received ICE candidate from Flutter client for session %s", msg["session_id"]
+async def handle_webrtc_candidate(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+):
+    """Handle ICE candidate from Flutter app and forward it immediately if possible."""
+    session_id = msg["session_id"]
+    _LOGGER.debug(
+        "Received ICE candidate from Flutter client for session %s",
+        session_id,
     )
 
-    send_message = _webrtc_send_message_callbacks.get(msg["session_id"])
+    send_message = _webrtc_send_message_callbacks.get(session_id)
 
-    # Umwandlung des eingehenden Dictionaries in ein RTCIceCandidateInit-Objekt
     candidate_init_obj = RTCIceCandidateInit(
         candidate=msg["candidate"],
         sdp_mid=msg["sdp_mid"],
         sdp_m_line_index=msg["sdp_m_line_index"],
     )
-
-    # Verpacken des RTCIceCandidateInit-Objekts in ein WebRTCCandidate-Objekt
     webrtc_candidate_obj = WebRTCCandidate(candidate=candidate_init_obj)
 
-    # Das korrekt verpackte Objekt an die Home Assistant Core senden
+    # MODIFIED: This logic now attempts to send immediately,
+    # and only queues as a fallback.
     if send_message:
         try:
-            # KEIN await, da send_message ein Callback ist
             send_message(webrtc_candidate_obj)
             _LOGGER.info(
                 "Forwarded ICE candidate to HA frontend for session %s",
-                msg["session_id"],
+                session_id,
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             _LOGGER.error("Error forwarding candidate to HA frontend: %s", e)
+            raise HomeAssistantError("Error forwarding candidate to HA frontend") from e
     else:
-        # Kandidat zur Warteschlange hinzufügen, falls send_message noch nicht verfügbar ist
-        _pending_candidates.setdefault(msg["session_id"], []).append(
-            webrtc_candidate_obj
-        )
+        # The queue is now only used if the connection to the browser is not yet ready.
+        _pending_candidates.setdefault(session_id, []).append(webrtc_candidate_obj)
         _LOGGER.info(
             "No send_message callback found. Candidate added to pending queue for session %s",
-            msg["session_id"],
+            session_id,
         )
+
+    connection.send_result(msg["id"])
 
 
 @websocket_api.websocket_command(
     {
         vol.Required("type"): "habitron/snapshot_result",
         vol.Required("request_id"): str,
-        vol.Required("data"): str,
+        vol.Optional("data"): str,
+        vol.Optional("error"): str,
     }
 )
 @websocket_api.async_response
-async def handle_snapshot_result(hass: HomeAssistant, connection, msg):
+async def handle_snapshot_result(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+):
     """Handle snapshot result from Flutter app."""
     request_id = msg["request_id"]
     data = _snapshot_futures.get(request_id)
     if data and not data["future"].done():
-        try:
-            snapshot_data = base64.b64decode(msg["data"])
-            data["future"].set_result(snapshot_data)
-            _LOGGER.info("Set snapshot result for request %s", request_id)
-        except Exception as e:  # noqa: BLE001
-            _LOGGER.error("Error decoding snapshot data: %s", e)
-            data["future"].set_exception(
-                HomeAssistantError("Failed to decode snapshot data.")
-            )
-    else:
-        _LOGGER.warning(
-            "Snapshot request %s not found or already completed", request_id
+        if msg.get("error"):
+            error = HomeAssistantError(f"Snapshot failed on client: {msg['error']}")
+            data["future"].set_exception(error)
+        elif "data" in msg:
+            try:
+                snapshot_data = base64.b64decode(msg["data"])
+                data["future"].set_result(snapshot_data)
+            except Exception as e:  # noqa: BLE001
+                _LOGGER.error("Error decoding snapshot data: %s", e)
+                error = HomeAssistantError("Failed to decode snapshot data.")
+                data["future"].set_exception(error)
+    connection.send_result(msg["id"])
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "result",
+        vol.Optional("success"): bool,
+        vol.Optional("id"): int,
+        vol.Optional("error"): vol.Schema(
+            {
+                vol.Required("code"): str,
+                vol.Required("message"): str,
+            }
+        ),
+    }
+)
+@websocket_api.async_response
+async def handle_flutter_error_message(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+):
+    """Handle generic result/error messages from the Flutter client."""
+    if not msg.get("success", True):
+        _LOGGER.error(
+            "Received error from Flutter client: id=%s, code=%s, message=%s",
+            msg.get("id"),
+            msg.get("error", {}).get("code", "unknown"),
+            msg.get("error", {}).get("message", "No message provided"),
         )
-    connection.send_message(websocket_api.messages.result_message(msg["id"]))
 
 
-# Funktion zur Registrierung des WebRTC-Providers
 async def async_setup_provider(hass: HomeAssistant):
     """Set up the Habitron WebRTC provider."""
     _LOGGER.info("Registering Habitron WebRTC provider")
@@ -394,6 +415,7 @@ async def async_setup_provider(hass: HomeAssistant):
     websocket_api.async_register_command(hass, handle_webrtc_answer)
     websocket_api.async_register_command(hass, handle_webrtc_candidate)
     websocket_api.async_register_command(hass, handle_snapshot_result)
+    websocket_api.async_register_command(hass, handle_flutter_error_message)
 
     _LOGGER.info("Habitron WebRTC provider registered successfully")
     return provider

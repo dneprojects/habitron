@@ -314,10 +314,11 @@ class WindSensor(HbtnSensor):
 class AirqualitySensor(HbtnSensor):
     """Representation of a airquality sensor."""
 
+    _attr_device_class = SensorDeviceClass.AQI
+    _attr_native_unit_of_measurement = PERCENTAGE
+
 
 class HbtnDiagSensor(CoordinatorEntity, SensorEntity):
-    _attr_device_class = SensorDeviceClass.AQI
-
     """Base representation of a Habitron sensor."""
 
     _attr_state_class = SensorStateClass.MEASUREMENT

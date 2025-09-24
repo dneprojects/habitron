@@ -109,7 +109,7 @@ class HbtnRouter:
         self.user1_name = "user1"
         self.user2_name = "user2"
         self.sys_status = ""
-        self.mode0 = 0x11
+        self.mode = IfDescriptor("Mode", 0, 1, 0x11)
         self.mod_reg = {}
         self._sys_ok = True
         self._mirror_started = True
@@ -322,8 +322,8 @@ class HbtnRouter:
         if not (len(self.status) >= RoutIdx.MIRROR_STARTED):
             self.logger.warning(f"Router status too short, length: {len(self.status)}")  # noqa: G004
             return
-        self.mode0 = int(self.status[RoutIdx.MODE0])
-        self.comm.grp_modes[0] = self.mode0
+        self.mode.value = int(self.status[RoutIdx.MODE0])
+        self.comm.grp_modes[0] = self.mode.value
         flags_state = int.from_bytes(
             self.status[RoutIdx.FLAG_GLOB : RoutIdx.FLAG_GLOB + 2],
             "little",

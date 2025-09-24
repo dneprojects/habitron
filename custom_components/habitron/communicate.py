@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from pathlib import Path
 import socket
 import struct
 from typing import Final
@@ -698,7 +699,6 @@ class HbtnComm:
 
     async def save_config_data(self, file_name: str, str_data: str) -> None:
         """Save config info to text file."""
-        from pathlib import Path
 
         if Path(BASE_PATH_COMPONENT).is_dir():
             data_path = f"{BASE_PATH_COMPONENT}/{DOMAIN}/data/"
@@ -821,7 +821,7 @@ class HbtnComm:
             cmd_str, time_out_sec=1000
         )
 
-    async def update_entity(self, hub_id, rtr_id, mod_id, evnt, arg1, arg2):
+    async def update_entity(self, hub_id, rtr_id, mod_id, evnt, arg1, arg2):  # noqa: C901
         """Event server handler to receive entity updates."""
         inp_event_types = ["inactive", "single_press", "long_press", "long_press_end"]
         if self._hostip != hub_id:
@@ -835,9 +835,16 @@ class HbtnComm:
                         await flg.handle_upd_event()
                         break
                 return
-            self.logger.warning(
-                f"Unhandled router event {evnt} with arg1 {arg1} of router {rtr_id}"  # noqa: G004
-            )
+        elif evnt == HaEvents.MODE:
+            self.grp_modes[arg1] = arg2
+            if arg1 == 0:
+                self.router.mode.value = arg2
+                await self.router.mode.handle_upd_event()
+            else:
+                mod_idx = self.router.module_grp.index(arg1)
+                module = self.router.modules[mod_idx]
+                module.mode.value = arg2
+                await module.mode.handle_upd_event()
             return
         try:
             module = self.router.get_module(mod_id)
@@ -920,9 +927,6 @@ class HbtnComm:
                 elif evnt == HaEvents.CNT_VAL:
                     module.logic[arg1].value = arg2
                     await module.logic[arg1].handle_upd_event()
-                elif evnt == HaEvents.MODE:
-                    module.mode.value = arg2
-                    await module.mode.handle_upd_event()
             except Exception as err_msg:  # pylint: disable=broad-exception-caught  # noqa: BLE001
                 self.logger.warning(
                     f"Error handling habitron event {evnt} with arg1 {arg1} of module {mod_id}: {err_msg}"  # noqa: G004
