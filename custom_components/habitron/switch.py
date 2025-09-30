@@ -7,6 +7,7 @@ from typing import Any
 from homeassistant.components.switch import SwitchDeviceClass, SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
@@ -56,6 +57,9 @@ async def async_setup_entry(
         for mod_flg in hbt_module.flags:
             new_devices.append(HbtnFlagPush(mod_flg, hbt_module, hbtn_cord, flg_idx))
             flg_idx += 1  # noqa: SIM113
+
+        if hbt_module.mod_type == "Smart Controller Touch":
+            new_devices.append(MicrophoneSwitch(hbt_module))
     flg_idx = 0
     for rt_flg in hbtn_rt.flags:
         new_devices.append(HbtnFlagPush(rt_flg, hbtn_rt, hbtn_cord, flg_idx))
@@ -294,3 +298,58 @@ class HbtnFlagPush(HbtnFlag):
         """Entity being removed from hass."""
         # The opposite of async_added_to_hass. Remove any registered call backs here.
         self._flag.remove_callback(self._handle_coordinator_update)
+
+
+class MicrophoneSwitch(SwitchEntity):
+    """Representation of a button to trigger a speech command."""
+
+    _attr_has_entity_name = True
+
+    def __init__(self, module) -> None:
+        """Initialize a switch for the microphone."""
+        self._name = "Microphone Mode"
+        self._module = module
+        self._stream_name = module.name.lower().replace(" ", "_")
+        self._provider = module.comm.router.smhub.ws_provider
+        self._active_ws_connections = self._provider.active_ws_connections
+        self._attr_unique_id = f"Mod_{self._module.uid}_{self._name}"
+        self._attr_name = "Microphone Mode"
+        self._attr_icon = "mdi:microphone"
+        self._state = False
+
+    # To link this entity to its device, this property must return an
+    # identifiers value matching that used in the module
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return information to link this entity with the correct device."""
+        return {"identifiers": {(DOMAIN, self._module.uid)}}
+
+    @property
+    def is_on(self) -> bool:
+        """Return status of output."""
+        return self._state
+
+    @property
+    def icon(self) -> str:
+        """Icon of the switch, based on state."""
+        if self.is_on:
+            return "mdi:webcam"
+        return "mdi:microphone-message"
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Instruct the flag to turn on."""
+        ws_connection = self._active_ws_connections.get(self._stream_name)
+        if ws_connection:
+            ws_connection.send_message(
+                {"type": "habitron/set_webrtc_audio_mode", "audio_enabled": True}
+            )
+        self._state = True
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Instruct the flag to turn off."""
+        ws_connection = self._active_ws_connections.get(self._stream_name)
+        if ws_connection:
+            ws_connection.send_message(
+                {"type": "habitron/set_webrtc_audio_mode", "audio_enabled": False}
+            )
+        self._state = False

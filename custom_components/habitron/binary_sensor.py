@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 # Import the device class from the component that you want to support
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
@@ -18,8 +20,10 @@ from homeassistant.helpers.update_coordinator import (
 
 from .const import DOMAIN
 from .interfaces import TYPE_DIAG, IfDescriptor, StateDescriptor
-from .module import HbtnModule
-from .router import HbtnRouter
+
+if TYPE_CHECKING:
+    from .module import HbtnModule
+    from .router import HbtnRouter
 
 
 async def async_setup_entry(
@@ -49,6 +53,10 @@ async def async_setup_entry(
                 new_devices.append(
                     RainSensor(mod_sensor, hbt_module, hbtn_cord, len(new_devices))
                 )
+        if hbt_module.mod_type == "Smart Controller Touch":
+            listening_sensor = ListeningStatusSensor(hbt_module)
+            hbt_module.vce_stat = listening_sensor
+            new_devices.append(listening_sensor)
     for rt_stat in hbtn_rt.states:
         new_devices.append(HbtnState(rt_stat, hbtn_rt, hbtn_cord, len(new_devices)))
 
@@ -298,3 +306,40 @@ class HbtnState(CoordinatorEntity, BinarySensorEntity):
         """Handle updated data from the coordinator."""
         self._on_state = self._state.value == 1
         self.async_write_ha_state()
+
+
+class ListeningStatusSensor(BinarySensorEntity):
+    """Representation of the speech satellite status."""
+
+    _attr_has_entity_name = True
+    _attr_should_poll = True
+    _attr_name: str = "Listening Status"
+    _attr_device_class = BinarySensorDeviceClass.SOUND
+
+    def __init__(
+        self,
+        module: HbtnModule,
+    ) -> None:
+        """Initialize."""
+        # Note: No 'super().__init__(...)' call to a coordinator
+        self._module: HbtnModule = module
+        self._attr_is_on: bool = False  # Default state is off
+        self._attr_unique_id: str = f"Mod_{self._module.uid}_listening_status"
+        self._stream_name = module.name.lower().replace(" ", "_")
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return information to link this entity with the correct device."""
+        return {"identifiers": {(DOMAIN, self._module.uid)}}
+
+    @property
+    def icon(self) -> str:
+        """Icon of the sensor, based on state."""
+        return "mdi:microphone-message" if self.is_on else "mdi:microphone-message-off"
+
+    # This method allows us to update the state from outside
+    def set_listening_state(self, is_listening: bool) -> None:
+        """Update the sensor's state from the WebSocket handler."""
+        if self._attr_is_on != is_listening:
+            self._attr_is_on = is_listening
+            self.async_write_ha_state()

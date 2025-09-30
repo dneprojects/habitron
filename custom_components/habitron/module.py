@@ -9,6 +9,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
+from .binary_sensor import ListeningStatusSensor
 from .const import DOMAIN, MODULE_CODES, ModuleDescriptor, MSetIdx, MStatIdx
 from .interfaces import (
     CLedDescriptor,
@@ -75,6 +76,7 @@ class HbtnModule:
         self.fingers: list[IfDescriptor] = []
         self.diags = [IfDescriptor("", 0, 0, 0)]
         self.diags.append(IfDescriptor("Status", 0, 1, 0))
+        self.vce_stat: ListeningStatusSensor | None = None
 
     @property
     def mod_id(self) -> str:
