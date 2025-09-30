@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from homeassistant.components.button import ButtonEntity
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import _LOGGER, ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -31,6 +31,8 @@ async def async_setup_entry(
             if mod_logic.type == 5:
                 new_devices.append(CountUpButton(mod_logic, hbt_module))
                 new_devices.append(CountDownButton(mod_logic, hbt_module))
+        if hbt_module.mod_type == "Smart Controller Touch":
+            new_devices.append(SpeechButton(hbt_module))
         new_devices.append(RestartButton(hbt_module))
     # Add router commands as buttons
     for coll_cmd in hbtn_rt.coll_commands:
@@ -40,8 +42,7 @@ async def async_setup_entry(
     new_devices.append(RestartAllButton(hbtn_rt))
     new_devices.append(RestartHubButton(hbtn_rt))
     new_devices.append(RebootHubButton(hbtn_rt))
-    for ch in range(4):
-        new_devices.append(ResetChannelPowerButton(hbtn_rt, ch + 1))
+    new_devices.extend([ResetChannelPowerButton(hbtn_rt, ch + 1) for ch in range(4)])
 
     if new_devices:
         async_add_entities(new_devices)
@@ -180,7 +181,7 @@ class RestartFwdTableButton(ButtonEntity):
     # To link this entity to its device, this property must return an
     # identifiers value matching that used in the module
     @property
-    def device_info(self) -> DeviceInfo:  # type: ignore
+    def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
         return {"identifiers": {(DOMAIN, self._module.uid)}}
 
@@ -353,3 +354,44 @@ class ResetChannelPowerButton(ButtonEntity):
     async def async_press(self) -> None:
         """Handle the button press."""
         await self._router.comm.async_power_cycle_channel(self._router.id, self._chan)
+
+
+class SpeechButton(ButtonEntity):
+    """Representation of a button to trigger a speech command."""
+
+    _attr_has_entity_name = True
+
+    def __init__(self, module) -> None:
+        """Initialize a speech button."""
+        self._name = "Activate voice input"
+        self._module = module
+        self._stream_name = module.name.lower().replace(" ", "_")
+        self._provider = module.comm.router.smhub.ws_provider
+        self._active_ws_connections = self._provider.active_ws_connections
+        self._attr_unique_id = f"Mod_{self._module.uid}_{self._name}"
+        self._attr_name = "Activate voice input"
+        self._attr_icon = "mdi:account-voice"
+
+    # To link this entity to its device, this property must return an
+    # identifiers value matching that used in the module
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return information to link this entity with the correct device."""
+        return {"identifiers": {(DOMAIN, self._module.uid)}}
+
+    async def async_press(self) -> None:
+        """Handle the button press by sending a WebSocket message to the client."""
+
+        ws_connection = self._active_ws_connections.get(self._stream_name)
+
+        if ws_connection:
+            ws_connection.send_message(
+                {
+                    "type": "habitron/voice_activate_request",
+                }
+            )
+        else:
+            _LOGGER.info(
+                "Could not send voice activate request: No active client for stream '%s'",
+                self._stream_name,
+            )

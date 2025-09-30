@@ -19,7 +19,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import DOMAIN
 from .module import HbtnModule
 from .router import HbtnRouter
-from .webrtc_provider import HabitronWebRTCProvider, async_setup_provider
+from .ws_provider import HabitronWebRTCProvider
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -38,15 +38,19 @@ async def async_setup_entry(
             "Home Assistant started. Initializing Habitron WebRTC provider and cameras"
         )
 
-        provider: HabitronWebRTCProvider = await async_setup_provider(hass)
-
         new_devices = []
         auth = hass.auth
 
         for hbt_module in hbtn_rt.modules:
             if hbt_module.mod_type == "Smart Controller Touch":
                 new_devices.append(
-                    HbtnCam(hass, hbt_module, auth, len(new_devices), provider)
+                    HbtnCam(
+                        hass,
+                        hbt_module,
+                        auth,
+                        len(new_devices),
+                        hbtn_rt.smhub.ws_provider,
+                    )
                 )
 
         if new_devices:
