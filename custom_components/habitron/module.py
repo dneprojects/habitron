@@ -496,6 +496,7 @@ class SmartController(HbtnModule):
             )
             / 10
         )
+        self.climate_settings = int(self.status[MStatIdx.CLIM_MODE + 1])
 
 
 class SmartControllerMini(HbtnModule):
@@ -590,6 +591,7 @@ class SmartControllerMini(HbtnModule):
             flg.value = int((flags_state & (0x01 << flg.nmbr - 1)) > 0)
 
         self.diags[0].value = self.status[MStatIdx.MODULE_STAT]
+        self.climate_settings = int(self.status[MStatIdx.CLIM_MODE])
 
 
 class SmartOutput(HbtnModule):
