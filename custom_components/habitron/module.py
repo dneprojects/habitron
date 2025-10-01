@@ -496,7 +496,7 @@ class SmartController(HbtnModule):
             )
             / 10
         )
-        self.climate_settings = int(self.status[MStatIdx.CLIM_MODE + 1])
+        self.climate_settings = int(self.status[MStatIdx.CLIM_MODE])
 
 
 class SmartControllerMini(HbtnModule):
