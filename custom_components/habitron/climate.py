@@ -94,21 +94,7 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
             self._curr_humidity = None
         self._target_temperature = module.setvalues[0].value
         self._attr_unique_id = f"Mod_{self._module.uid}_climate"
-        if self._module.climate_settings == 1:
-            self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
-            self._curr_hvac_mode = HVACMode.HEAT
-        elif self._module.climate_settings == 2:
-            self._attr_hvac_modes = [HVACMode.OFF, HVACMode.COOL]
-            self._curr_hvac_mode = HVACMode.COOL
-        elif self._module.climate_settings == 3:
-            self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT_COOL]
-            self._curr_hvac_mode = HVACMode.HEAT_COOL
-        elif self._module.climate_settings == 4:
-            self._attr_hvac_modes = [HVACMode.OFF]
-            self._curr_hvac_mode = HVACMode.OFF
-        else:
-            self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
-            self._curr_hvac_mode = HVACMode.HEAT
+        self._get_hvac_mode()
         self._attr_temperature_unit = UnitOfTemperature.CELSIUS
         self._attr_target_temperature_high: float = 25
         self._attr_target_temperature_low: float = 15
@@ -218,11 +204,12 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
         """Handle updated data from the coordinator."""
         if len(self._module.sensors) > 1:
             self._curr_temperature = self._module.sensors[1].value
-            self._curr_humidity = self._module.sensors[2].value
+            self._curr_humidity = self._module.sensors[3].value
         else:
             self._curr_temperature = self._module.sensors[0].value
             self._curr_humidity = None
         self._target_temperature = self._module.setvalues[0].value
+        self._get_hvac_mode()
         self.update_action()
         self.async_write_ha_state()
 
@@ -235,3 +222,20 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Set new target hvac mode."""
         self._curr_hvac_mode = hvac_mode
+
+    def _get_hvac_mode(self) -> None:
+        if self._module.climate_settings == 1:
+            self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
+            self._curr_hvac_mode = HVACMode.HEAT
+        elif self._module.climate_settings == 2:
+            self._attr_hvac_modes = [HVACMode.OFF, HVACMode.COOL]
+            self._curr_hvac_mode = HVACMode.COOL
+        elif self._module.climate_settings == 3:
+            self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT_COOL]
+            self._curr_hvac_mode = HVACMode.HEAT_COOL
+        elif self._module.climate_settings == 4:
+            self._attr_hvac_modes = [HVACMode.OFF]
+            self._curr_hvac_mode = HVACMode.OFF
+        else:
+            self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
+            self._curr_hvac_mode = HVACMode.HEAT
