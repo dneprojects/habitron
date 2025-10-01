@@ -131,6 +131,7 @@ class MStatIdx:
     BLAD_POS = 41  # 1..8: 41..48
     T_SETP_0 = 49  # low/high
     T_SETP_1 = 51  # low/high
+    CLIM_MODE = 53  # Klima mode, nachträglich in SMHUB eingefügt
     GEN_3 = 53  # General field 3
     GEN_4 = 54  # General field 4
     RAIN = 53
