@@ -1,9 +1,6 @@
 # Latest changes
 
-## v2.1.8
-
+## v2.2.9
 ### New
-- System health platform detects router system error
-
-### Fix
-- Changed way to pass config_entry object in home assistant
+- Media player for Smart Touch
+- Voice pipeline for Smart Touch
