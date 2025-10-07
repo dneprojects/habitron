@@ -36,6 +36,7 @@ PLATFORMS: list[str] = [
     "cover",
     "event",
     "light",
+    "media_player",
     "notify",
     "number",
     "select",
