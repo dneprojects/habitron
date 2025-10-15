@@ -16,7 +16,8 @@ from .communicate import HbtnComm as hbtn_com
 from .const import DOMAIN
 from .interfaces import IfDescriptor
 from .router import HbtnRouter as hbtr
-from .ws_provider import HabitronWebRTCProvider, async_setup_provider
+
+from .ws_provider import HabitronWebRTCProvider
 
 
 class LoggingLevels(Enum):
@@ -46,7 +47,7 @@ class SmartHub:
         self.uid: str = self._mac.replace(":", "")
         self._version: str = self.comm.com_version
         self._type: str = self.comm.com_hwtype
-        self.router: hbtr
+        self.router = hbtr(self.hass, self.config, self)
         self.addon_slug: str = "aed76be6_smart_hub"
         if self.comm.is_addon:
             self.base_url: str = f"http://api/ingress/{self.addon_slug}"
@@ -54,10 +55,7 @@ class SmartHub:
             self.base_url: str = f"http://{self.comm.com_ip}:7780"
         self.host = self.comm.com_ip
         self._port = self.comm.com_port
-        if len(self.host) == 0:
-            conf_url = None
-        else:
-            conf_url = f"{self.base_url}/hub"
+        conf_url = f"{self.base_url}/hub" if self.host else None
 
         device_registry = dr.async_get(hass)
         device_registry.async_get_or_create(
@@ -84,7 +82,7 @@ class SmartHub:
             self.sensors.append(IfDescriptor("Disk free", 1, 2, 0))
             self.loglvl.append(IfDescriptor("Logging level console", 0, 2, 0))
             self.loglvl.append(IfDescriptor("Logging level file", 1, 2, 0))
-        self.ws_provider: HabitronWebRTCProvider
+        self.ws_provider: HabitronWebRTCProvider | None = None
         self.update()
 
     @property
@@ -95,7 +93,7 @@ class SmartHub:
     def update(self) -> None:
         """Update in a module specific method. Reads and parses status."""
         info = self.comm.get_smhub_update()
-        if info == "":
+        if not info or not self.diags:
             return
         self.diags[0].value = float(
             info["hardware"]["cpu"]["frequency current"].replace("MHz", "")
@@ -117,12 +115,15 @@ class SmartHub:
         """Test connectivity to SmartHub is OK."""
         resp = await self.comm.get_smhub_version()
         ver_string = resp.decode("iso8859-1")
-        if ver_string[0:7] == "SmartIP":
-            return ver_string[9 : len(ver_string)]
-        return "0.0.0"
+        return ver_string[9:] if ver_string.startswith("SmartIP") else "0.0.0"
 
     async def async_setup(self) -> None:
         """Initialize SmartHub instance."""
+        if self.ws_provider is None:
+            raise RuntimeError(
+                "HabitronWebRTCProvider has not been attached to SmartHub before setup."
+            )
+
         await self.comm.reinit_hub(100, 0)  # force Opr mode to stop
         await self.comm.send_network_info(self.config.data["websock_token"])
         with contextlib.suppress(Exception):
@@ -138,10 +139,7 @@ class SmartHub:
                 ]
             )
             add_extra_js_url(self.hass, "/habitronfiles/hbt-icons.js")
-        self.router = hbtr(self.hass, self.config, self)
-        self.ws_provider: HabitronWebRTCProvider = await async_setup_provider(
-            self.hass, self.router
-        )
+
         await self.router.initialize()
 
         await self.comm.reinit_hub(100, 1)  # restart event server

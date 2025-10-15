@@ -10,9 +10,9 @@
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/dneprojects/habitron/issues",
   "requirements": [
-    "wyoming==1.5.2"
+    "wyoming"
   ],
   "ssdp": [],
-  "version": "2.2.9",
+  "version": "2.3.0",
   "zeroconf": []
 }
