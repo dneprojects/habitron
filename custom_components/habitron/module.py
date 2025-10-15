@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import math
+from typing import TYPE_CHECKING
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -19,6 +20,9 @@ from .interfaces import (
     LgcDescriptor,
     StateDescriptor,
 )
+
+if TYPE_CHECKING:
+    from .media_player import HbtnMediaPlayer
 
 
 class HbtnModule:
@@ -402,6 +406,8 @@ class SmartController(HbtnModule):
         self.setvalues = [IfDescriptor("Set temperature", 0, 2, 20.0)]
         self.setvalues.append(IfDescriptor("Set temperature 2", 1, 2, 20.0))
         self.auxheat_value = 0
+        self.assist_entity_id = ""
+        self.media_player: HbtnMediaPlayer
 
         self.sensors.append(IfDescriptor("Movement", 0, 2, 0))
         self.sensors.append(IfDescriptor("Temperature", 1, 2, 0))
@@ -410,6 +416,10 @@ class SmartController(HbtnModule):
         self.sensors.append(IfDescriptor("Illuminance", 4, 2, 0))
         self.sensors.append(IfDescriptor("Airquality", 5, 2, 0))
         self.diags.append(IfDescriptor("PowerTemp", 1, 1, 0))
+
+    def set_assist_entity(self, entity_id: str):
+        """Store assist satellite entity id in module properties."""
+        self.assist_entity_id = entity_id
 
     def update(self, mod_status) -> None:
         """Update with module specific method. Reads and parses status."""

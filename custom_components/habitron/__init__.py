@@ -26,9 +26,10 @@ from .const import (
 )
 from .smart_hub import SmartHub
 from .system_health import system_health_info  # noqa: F401
+from .ws_provider import HabitronWebRTCProvider
 
-# List of platforms to support. There should be a matching .py file for each
 PLATFORMS: list[str] = [
+    "assist_satellite",
     "binary_sensor",
     "button",
     "camera",
@@ -89,80 +90,92 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Habitron from a config entry."""
-    # Store an instance of the "connecting" class that does the work of speaking
-    # with your actual devices.
-
-    async def restart_hub(call: ServiceCall):
-        """Handle the service call."""
-        rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
-        await smhub.comm.hub_restart(rtr_id)
-
-    async def reboot_hub(call: ServiceCall):
-        """Handle the service call."""
-        await smhub.comm.hub_reboot()
-
-    async def restart_module(call: ServiceCall):
-        """Handle the service call."""
-        rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
-        mod_nmbr = call.data.get(RESTART_KEY_NMBR, RESTART_ALL)
-        await smhub.comm.module_restart(rtr_id, rtr_id + mod_nmbr)
-
-    async def restart_router(call: ServiceCall):
-        """Handle the service call."""
-        rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
-        await smhub.comm.module_restart(rtr_id, 0)
-
-    async def save_module_smc(call: ServiceCall):
-        """Handle the service call."""
-        rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
-        mod_nmbr = call.data.get(FILE_MOD_NMBR, 1)
-        await smhub.comm.save_smc_file(rtr_id + mod_nmbr)
-
-    async def save_module_smg(call: ServiceCall):
-        """Handle the service call."""
-        rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
-        mod_nmbr = call.data.get(FILE_MOD_NMBR, 1)
-        await smhub.comm.save_smg_file(rtr_id + mod_nmbr)
-
-    async def save_router_smr(call: ServiceCall):
-        """Handle the service call."""
-        rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
-        await smhub.comm.save_smr_file(rtr_id)
-
-    async def save_module_status(call: ServiceCall):
-        """Handle the service call."""
-        rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
-        mod_nmbr = call.data.get(FILE_MOD_NMBR, 1)
-        await smhub.comm.save_module_status(rtr_id + mod_nmbr)
-
-    async def save_router_status(call: ServiceCall):
-        """Handle the service call."""
-        rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
-        await smhub.comm.save_router_status(rtr_id)
-
-    async def update_entity(call: ServiceCall):
-        """Handle the update service call."""
-        hub_id = call.data.get(HUB_UID)
-        rtr_id = call.data.get(ROUTER_NMBR, 1)
-        mod_id = call.data.get(MOD_NMBR)
-        evnt = call.data.get(EVNT_TYPE)
-        arg1 = call.data.get(EVNT_ARG1)
-        arg2 = call.data.get(EVNT_ARG2)
-        for hub in smhub.hass.data["habitron"]:
-            if smhub.hass.data["habitron"][hub].host == hub_id:
-                await smhub.hass.data["habitron"][hub].comm.update_entity(
-                    hub_id, rtr_id, mod_id, evnt, arg1, arg2
-                )
-                break
 
     try:
+        # 1. Create the main SmartHub instance.
         smhub = SmartHub(hass, entry)
+
+        # 2. Create the provider, passing it the router from the SmartHub.
+        provider = HabitronWebRTCProvider(hass, smhub.router)
+
+        # 3. Attach the provider to the SmartHub instance.
+        smhub.ws_provider = provider
+
+        # 4. Store ONLY the smhub object. Other platforms will access .router and .ws_provider from it.
         hass.data.setdefault(DOMAIN, {})[entry.entry_id] = smhub
+
+        # 5. Now, run the setup which initializes router, etc.
         await smhub.async_setup()
+
+        # 6. Register websocket handlers from the provider instance.
+        provider.async_register_websocket_handlers()
 
         entry.async_on_unload(entry.add_update_listener(update_listener))
 
-        # Register services
+        # --- Service Registration ---
+        async def restart_hub(call: ServiceCall):
+            """Handle the service call."""
+            rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
+            await smhub.comm.hub_restart(rtr_id)
+
+        async def reboot_hub(call: ServiceCall):
+            """Handle the service call."""
+            await smhub.comm.hub_reboot()
+
+        async def restart_module(call: ServiceCall):
+            """Handle the service call."""
+            rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
+            mod_nmbr = call.data.get(RESTART_KEY_NMBR, RESTART_ALL)
+            await smhub.comm.module_restart(rtr_id, rtr_id + mod_nmbr)
+
+        async def restart_router(call: ServiceCall):
+            """Handle the service call."""
+            rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
+            await smhub.comm.module_restart(rtr_id, 0)
+
+        async def save_module_smc(call: ServiceCall):
+            """Handle the service call."""
+            rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
+            mod_nmbr = call.data.get(FILE_MOD_NMBR, 1)
+            await smhub.comm.save_smc_file(rtr_id + mod_nmbr)
+
+        async def save_module_smg(call: ServiceCall):
+            """Handle the service call."""
+            rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
+            mod_nmbr = call.data.get(FILE_MOD_NMBR, 1)
+            await smhub.comm.save_smg_file(rtr_id + mod_nmbr)
+
+        async def save_router_smr(call: ServiceCall):
+            """Handle the service call."""
+            rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
+            await smhub.comm.save_smr_file(rtr_id)
+
+        async def save_module_status(call: ServiceCall):
+            """Handle the service call."""
+            rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
+            mod_nmbr = call.data.get(FILE_MOD_NMBR, 1)
+            await smhub.comm.save_module_status(rtr_id + mod_nmbr)
+
+        async def save_router_status(call: ServiceCall):
+            """Handle the service call."""
+            rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
+            await smhub.comm.save_router_status(rtr_id)
+
+        async def update_entity(call: ServiceCall):
+            """Handle the update service call."""
+            hub_id = call.data.get(HUB_UID)
+            rtr_id = call.data.get(ROUTER_NMBR, 1)
+            mod_id = call.data.get(MOD_NMBR)
+            evnt = call.data.get(EVNT_TYPE)
+            arg1 = call.data.get(EVNT_ARG1)
+            arg2 = call.data.get(EVNT_ARG2)
+            for hub in smhub.hass.data["habitron"]:
+                if smhub.hass.data["habitron"][hub].host == hub_id:
+                    await smhub.hass.data["habitron"][hub].comm.update_entity(
+                        hub_id, rtr_id, mod_id, evnt, arg1, arg2
+                    )
+                    break
+
         hass.services.async_register(
             DOMAIN, "hub_restart", restart_hub, schema=SERVICE_HUB_RESTART_SCHEMA
         )
@@ -216,10 +229,11 @@ async def async_remove_config_entry_device(
     hass: HomeAssistant, config_entry: ConfigEntry, device_entry: DeviceEntry
 ) -> bool:
     """Remove a config entry from a device."""
+    smhub: SmartHub = hass.data[DOMAIN][config_entry.entry_id]
     return not any(
         identifier
         for identifier in device_entry.identifiers
-        if identifier[0] == DOMAIN and identifier[1] in config_entry.runtime_data.data
+        if identifier[0] == DOMAIN and identifier[1] == smhub.uid
     )
 
 
@@ -231,16 +245,14 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id)
-
     return unload_ok
 
 
 async def update_listener(hass: HomeAssistant, entry: ConfigEntry):
     """Handle options update."""
-    hbtn_comm = hass.data[DOMAIN][entry.entry_id].router.comm
-    hbtn_cord = hass.data[DOMAIN][entry.entry_id].router.coord
-    await hbtn_comm.set_host(entry.options["habitron_host"])
-    hbtn_cord.set_update_interval(
+    smhub: SmartHub = hass.data[DOMAIN][entry.entry_id]
+    await smhub.router.comm.set_host(entry.options["habitron_host"])
+    smhub.router.coord.set_update_interval(
         entry.options["update_interval"], entry.options["updates_enabled"]
     )
-    await hbtn_comm.send_network_info(entry.options["websock_token"])
+    await smhub.router.comm.send_network_info(entry.options["websock_token"])

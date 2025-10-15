@@ -6,14 +6,16 @@ import logging
 import os
 import re
 import socket
-from typing import Any
+import struct
+from typing import TYPE_CHECKING, Any
 import uuid
 
 import voluptuous as vol
 
-from homeassistant.components import websocket_api
+from homeassistant.components import tts, websocket_api
 from homeassistant.components.assist_pipeline import (
     PipelineEvent,
+    PipelineEventType,
     async_pipeline_from_audio_stream,
 )
 from homeassistant.components.camera import (
@@ -37,22 +39,15 @@ from homeassistant.components.stt import (
 from homeassistant.core import Context, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 
-from .binary_sensor import ListeningStatusSensor
 from .const import DOMAIN
-from .media_player import HbtnMediaPlayer
 from .router import HbtnRouter
 
-_LOGGER = logging.getLogger(__name__)
+if TYPE_CHECKING:
+    from .assist_satellite import HbtnAssistSat
+    from .media_player import HbtnMediaPlayer
 
-# --- Global Dictionaries for Stateless Futures/Callbacks ---
-# State is managed in the provider instance, but these are for async operations.
-_webrtc_futures: dict[str, asyncio.Future] = {}
-_webrtc_send_message_callbacks: dict[str, WebRTCSendMessage] = {}
-_session_to_stream_map: dict[str, str] = {}
-_pending_candidates: dict[str, list[WebRTCCandidate]] = {}
-_snapshot_futures: dict[str, dict] = {}
-_voice_pipelines: dict[str, dict[str, Any]] = {}
-_media_players: dict[str, HbtnMediaPlayer] = {}
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def _filter_ipv6_candidates(sdp: str) -> str:
@@ -61,13 +56,26 @@ def _filter_ipv6_candidates(sdp: str) -> str:
 
 
 class HabitronWebRTCProvider(CameraWebRTCProvider):
-    """WebRTC provider that forwards offers and snapshot requests to connected Flutter clients."""
+    """WebRTC and Voice provider that forwards commands to connected Flutter clients."""
 
     def __init__(self, hass: HomeAssistant, hbtn_rt: HbtnRouter) -> None:
         """Initialize the provider."""
         self.hass = hass
         self.rtr = hbtn_rt
+
+        # State is managed within the class instance.
         self.active_ws_connections: dict[str, websocket_api.ActiveConnection] = {}
+        self.webrtc_futures: dict[str, asyncio.Future] = {}
+        self.webrtc_send_message_callbacks: dict[str, WebRTCSendMessage] = {}
+        self.session_to_stream_map: dict[str, str] = {}
+        self.pending_candidates: dict[str, list[WebRTCCandidate]] = {}
+        self.snapshot_futures: dict[str, dict] = {}
+        self.media_players: dict[str, HbtnMediaPlayer] = {}
+        self.assist_satellites: dict[str, HbtnAssistSat] = {}
+        self.voice_pipelines: dict[str, dict[str, Any]] = {}
+
+        # Register this instance as the WebRTC provider
+        async_register_webrtc_provider(self.hass, self)
 
     @property
     def domain(self) -> str:
@@ -75,45 +83,31 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
         return DOMAIN
 
     @callback
-    def register_media_player(self, player: HbtnMediaPlayer) -> None:
+    def register_media_player(self, player: "HbtnMediaPlayer") -> None:
         """Allow media player entities to register themselves with the provider."""
-        _LOGGER.info("Registering media player: %s", player.name)
-        # The key is the stream_name which is unique per module/client
-        _media_players[player._stream_name] = player
+        self.media_players[player.stream_name] = player
+        _LOGGER.info("Media player registered for stream: %s", player.stream_name)
 
-    async def async_send_media_command(
-        self, stream_name: str, command: str, **kwargs: Any
-    ) -> None:
-        """Send a media command to a specific connected client."""
+    @callback
+    def register_assist_satellite(self, satellite: "HbtnAssistSat") -> None:
+        """Allow assist satellite entities to register themselves with the provider."""
+        self.assist_satellites[satellite.stream_name] = satellite
+
+    async def async_send_json_message(self, stream_name: str, msg: dict) -> None:
+        """Send a structured JSON message to a specific connected client."""
         if not (ws_connection := self.active_ws_connections.get(stream_name)):
             _LOGGER.warning(
-                "Cannot send media command '%s': No client for stream '%s'",
-                command,
+                "Cannot send message, no client for stream '%s': %s",
                 stream_name,
+                msg.get("type"),
             )
             return
-
-        _LOGGER.info("Sending command '%s' to client '%s'", command, stream_name)
-        ws_connection.send_message(
-            {
-                "type": f"habitron/{command}",
-                "payload": kwargs,
-            }
-        )
+        ws_connection.send_message(msg)
 
     @callback
     def async_is_supported(self, stream_source: str) -> bool:
         """Return True if the stream source is supported by this provider."""
         return stream_source.startswith("habitron://")
-
-    def get_listening_sensor(self, stream_name: str) -> ListeningStatusSensor | None:
-        """Return the listening status sensor for the given stream name."""
-        for mod in self.rtr.modules:
-            if mod.name.lower().replace(" ", "_") == stream_name and hasattr(
-                mod, "vce_stat"
-            ):
-                return mod.vce_stat
-        return None
 
     async def async_handle_async_webrtc_offer(
         self,
@@ -127,17 +121,14 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
         stream_source = await camera.stream_source()
         if not stream_source:
             raise HomeAssistantError("Stream source unavailable.")
-
         stream_name = stream_source.replace("habitron://", "")
-        ws_connection = self.active_ws_connections.get(stream_name)
-        if not ws_connection:
+        if not self.active_ws_connections.get(stream_name):
             _LOGGER.error("No client connected for stream '%s'", stream_name)
             send_message(WebRTCAnswer(answer=""))
             return
-
         try:
-            _session_to_stream_map[session_id] = stream_name
-            _webrtc_send_message_callbacks[session_id] = send_message
+            self.session_to_stream_map[session_id] = stream_name
+            self.webrtc_send_message_callbacks[session_id] = send_message
             local_ip = "127.0.0.1"
             try:
                 if os.environ.get("DOCKER_HOST") or os.environ.get(
@@ -145,24 +136,21 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
                 ):
                     local_ip = "host.docker.internal"
                 else:
-                    hostname = socket.gethostname()
-                    local_ip = socket.gethostbyname(hostname)
+                    local_ip = socket.gethostbyname(socket.gethostname())
             except Exception as e:  # noqa: BLE001
                 _LOGGER.warning("Failed to determine local IP: %s", e)
-
             modified_offer_sdp = _filter_ipv6_candidates(offer_sdp)
             modified_offer_sdp = modified_offer_sdp.replace("127.0.0.1", local_ip)
-
-            ws_connection.send_message(
+            await self.async_send_json_message(
+                stream_name,
                 {
                     "type": "habitron/webrtc_offer",
                     "value": modified_offer_sdp,
                     "session_id": session_id,
-                }
+                },
             )
-
             fut: asyncio.Future = asyncio.Future()
-            _webrtc_futures[session_id] = fut
+            self.webrtc_futures[session_id] = fut
             _LOGGER.info("Waiting for answer from client for session: %s", session_id)
             try:
                 answer_sdp = await asyncio.wait_for(fut, timeout=10)
@@ -173,9 +161,8 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
                     WebRTCError(code="timeout", message="WebRTC answer timed out.")
                 )
             finally:
-                if session_id in _pending_candidates:
-                    for candidate_obj in _pending_candidates.pop(session_id, []):
-                        send_message(candidate_obj)
+                for candidate_obj in self.pending_candidates.pop(session_id, []):
+                    send_message(candidate_obj)
         except Exception as err:
             _LOGGER.error("WebRTC negotiation failed: %s", err)
             send_message(WebRTCError(code="negotiation_failed", message=str(err)))
@@ -185,393 +172,456 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
         self, session_id: str, candidate: RTCIceCandidateInit
     ) -> None:
         """Handle an incoming ICE candidate from Home Assistant."""
-        stream_name = _session_to_stream_map.get(session_id)
-        if not stream_name or not (
-            ws_connection := self.active_ws_connections.get(stream_name)
-        ):
+        if not (stream_name := self.session_to_stream_map.get(session_id)):
             return
-
-        ws_connection.send_message(
+        await self.async_send_json_message(
+            stream_name,
             {
                 "type": "habitron/webrtc_candidate",
                 "candidate": candidate.candidate,
                 "sdp_mid": candidate.sdp_mid,
                 "sdp_m_line_index": candidate.sdp_m_line_index,
-            }
+            },
         )
 
     async def async_take_snapshot(self, stream_name: str) -> bytes:
         """Request a snapshot from the connected client."""
-        ws_connection = self.active_ws_connections.get(stream_name)
-        if not ws_connection:
+        if not self.active_ws_connections.get(stream_name):
             raise HomeAssistantError(f"No active client for stream '{stream_name}'.")
-
         request_id = uuid.uuid4().hex
         fut: asyncio.Future = asyncio.Future()
-        _snapshot_futures[request_id] = {"future": fut, "stream_name": stream_name}
-
-        ws_connection.send_message(
-            {"type": "habitron/snapshot_request", "request_id": request_id}
+        self.snapshot_futures[request_id] = {"future": fut}
+        await self.async_send_json_message(
+            stream_name, {"type": "habitron/snapshot_request", "request_id": request_id}
         )
-
         try:
-            snapshot_data = await asyncio.wait_for(fut, timeout=5)
-            if snapshot_data is None:
-                raise HomeAssistantError("Snapshot data was not retrieved.")
-            return snapshot_data  # noqa: TRY300
+            return await asyncio.wait_for(fut, timeout=5)
         except TimeoutError as err:
             raise HomeAssistantError("Snapshot request timed out.") from err
         finally:
-            _snapshot_futures.pop(request_id, None)
-
-
-async def async_setup_provider(  # noqa: C901
-    hass: HomeAssistant, hbtn_rt: HbtnRouter
-) -> HabitronWebRTCProvider:
-    """Set up the Habitron WebRTC provider and its WebSocket handlers."""
-    _LOGGER.info("Registering Habitron provider and WebSocket commands")
-
-    provider = HabitronWebRTCProvider(hass, hbtn_rt)
-    async_register_webrtc_provider(hass, provider)
+            self.snapshot_futures.pop(request_id, None)
 
     @callback
-    def _async_on_ws_disconnect(
-        stream_name: str, connection: websocket_api.ActiveConnection
-    ) -> None:
-        _LOGGER.info("Client for stream '%s' disconnected", stream_name)
-        if provider.active_ws_connections.get(stream_name) == connection:
-            del provider.active_ws_connections[stream_name]
-        if sensor := provider.get_listening_sensor(stream_name):
-            if hasattr(sensor, "set_listening_state"):
-                sensor.set_listening_state(False)
-        sessions_to_delete = [
-            s for s, sn in _session_to_stream_map.items() if sn == stream_name
-        ]
-        for session_id in sessions_to_delete:
-            if fut := _webrtc_futures.pop(session_id, None):
-                if not fut.done():
-                    fut.set_exception(HomeAssistantError("Client disconnected"))
-            _webrtc_send_message_callbacks.pop(session_id, None)
-            _session_to_stream_map.pop(session_id, None)
-            _pending_candidates.pop(session_id, None)
-        if pipeline_data := _voice_pipelines.pop(stream_name, None):
-            if not pipeline_data["task"].done():
-                pipeline_data["task"].cancel()
+    def async_register_websocket_handlers(self) -> None:  # noqa: C901
+        """Register all custom websocket command handlers."""
+        _LOGGER.info("Registering all Habitron WebSocket command handlers")
 
-    @websocket_api.websocket_command(
-        {
-            vol.Required("type"): "habitron/register_stream",
-            vol.Required("stream_name"): str,
-        }
-    )
-    @websocket_api.async_response
-    async def handle_register_stream(
-        hass: HomeAssistant,
-        connection: websocket_api.ActiveConnection,
-        msg: dict[str, Any],
-    ):
-        stream_name = msg["stream_name"]
-        provider.active_ws_connections[stream_name] = connection
-        connection.subscriptions[stream_name] = lambda: _async_on_ws_disconnect(
-            stream_name, connection
-        )
-        connection.send_result(msg["id"])
-        _LOGGER.info("Client registered stream '%s'", stream_name)
+        @callback
+        def _async_on_ws_disconnect(stream_name: str) -> None:
+            """Handle client disconnection."""
+            _LOGGER.info("Client for stream '%s' disconnected", stream_name)
+            self.active_ws_connections.pop(stream_name, None)
+            if pipeline_data := self.voice_pipelines.pop(stream_name, None):
+                if not pipeline_data["task"].done():
+                    pipeline_data["task"].cancel()
+            sessions_to_delete = [
+                s for s, sn in self.session_to_stream_map.items() if sn == stream_name
+            ]
+            for session_id in sessions_to_delete:
+                if fut := self.webrtc_futures.pop(session_id, None):
+                    if not fut.done():
+                        fut.set_exception(HomeAssistantError("Client disconnected"))
+                self.webrtc_send_message_callbacks.pop(session_id, None)
+                self.session_to_stream_map.pop(session_id, None)
+                self.pending_candidates.pop(session_id, None)
 
-    @websocket_api.websocket_command(
-        {
-            vol.Required("type"): "habitron/webrtc_answer",
-            vol.Required("session_id"): str,
-            vol.Required("sdp"): str,
-            vol.Required("stream_name"): str,
-        }
-    )
-    @websocket_api.async_response
-    async def handle_webrtc_answer(
-        hass: HomeAssistant,
-        connection: websocket_api.ActiveConnection,
-        msg: dict[str, Any],
-    ):
-        session_id = msg["session_id"]
-        if (fut := _webrtc_futures.get(session_id)) and not fut.done():
-            fut.set_result(msg["sdp"])
-        connection.send_result(msg["id"])
-
-    @websocket_api.websocket_command(
-        {
-            vol.Required("type"): "habitron/webrtc_candidate",
-            vol.Required("session_id"): str,
-            vol.Required("candidate"): str,
-            vol.Required("sdp_mid"): str,
-            vol.Required("sdp_m_line_index"): int,
-        }
-    )
-    @websocket_api.async_response
-    async def handle_webrtc_candidate(
-        hass: HomeAssistant,
-        connection: websocket_api.ActiveConnection,
-        msg: dict[str, Any],
-    ):
-        session_id = msg["session_id"]
-        send_message = _webrtc_send_message_callbacks.get(session_id)
-        candidate = WebRTCCandidate(
-            candidate=RTCIceCandidateInit(
-                candidate=msg["candidate"],
-                sdp_mid=msg["sdp_mid"],
-                sdp_m_line_index=msg["sdp_m_line_index"],
+        async def _run_voice_pipeline(
+            connection: websocket_api.ActiveConnection,
+            stream_name: str,
+            context: Context,
+            pipeline_id: str | None,
+            device_id: str | None,
+            satellite_id: str | None,
+            tts_voice: str | None,
+        ) -> None:
+            """Start manual voice pipeling."""
+            _LOGGER.info(
+                "Starting manual voice pipeline for stream '%s' with pipeline_id: %s",
+                stream_name,
+                pipeline_id,
             )
-        )
-        if send_message:
-            send_message(candidate)
-        else:
-            _pending_candidates.setdefault(session_id, []).append(candidate)
-        connection.send_result(msg["id"])
+            audio_queue: asyncio.Queue[bytes | None] = asyncio.Queue()
+            self.voice_pipelines[stream_name] = {
+                "queue": audio_queue,
+                "task": asyncio.current_task(),
+            }
 
-    @websocket_api.websocket_command(
-        {
-            vol.Required("type"): "habitron/snapshot_result",
-            vol.Required("request_id"): str,
-            vol.Optional("data"): str,
-            vol.Optional("error"): str,
-        }
-    )
-    @websocket_api.async_response
-    async def handle_snapshot_result(
-        hass: HomeAssistant,
-        connection: websocket_api.ActiveConnection,
-        msg: dict[str, Any],
-    ):
-        request_id = msg["request_id"]
-        if (data := _snapshot_futures.get(request_id)) and not data["future"].done():
-            if error_msg := msg.get("error"):
-                data["future"].set_exception(
-                    HomeAssistantError(f"Snapshot failed on client: {error_msg}")
-                )
-            elif "data" in msg:
-                try:
-                    snapshot_data = base64.b64decode(msg["data"])
-                    data["future"].set_result(snapshot_data)
-                except Exception as e:  # noqa: BLE001
-                    data["future"].set_exception(
-                        HomeAssistantError(f"Failed to decode snapshot: {e}")
+            try:
+
+                async def audio_stream():
+                    # Create a 44-byte WAV header for 16-bit 16kHz mono PCM
+                    channels = 1
+                    sample_width_bytes = 2
+                    sample_rate = 16000
+                    header = struct.pack(
+                        "<4sI4s4sIHHIIHH4sI",
+                        b"RIFF",
+                        0,
+                        b"WAVE",
+                        b"fmt ",
+                        16,
+                        1,
+                        channels,
+                        sample_rate,
+                        sample_rate * channels * sample_width_bytes,
+                        channels * sample_width_bytes,
+                        sample_width_bytes * 8,
+                        b"data",
+                        0,
                     )
-        connection.send_result(msg["id"])
+                    yield header
 
-    # ✨ HIER IST DIE FEHLENDE FUNKTION
-    @websocket_api.websocket_command(
-        {
-            vol.Required("type"): "habitron/update_media_state",
-            vol.Required("state"): str,
-            vol.Optional("attributes"): dict,
-        }
-    )
-    @websocket_api.async_response
-    async def handle_update_media_state(
-        hass: HomeAssistant,
-        connection: websocket_api.ActiveConnection,
-        msg: dict[str, Any],
-    ):
-        """Handle state updates from the media player client."""
-        # Find the stream_name associated with this websocket connection
-        stream_name = next(
-            (n for n, c in provider.active_ws_connections.items() if c == connection),
-            None,
+                    while True:
+                        chunk = await audio_queue.get()
+                        if chunk is None:
+                            break
+                        yield chunk
+
+                tts_task: asyncio.Task | None = None
+
+                @callback
+                def event_callback(event: PipelineEvent):
+                    nonlocal tts_task
+                    if (
+                        event.type == PipelineEventType.TTS_END
+                        and event.data
+                        and (tts_output := event.data.get("tts_output"))
+                        and (token := tts_output.get("token"))
+                    ):
+
+                        async def _stream_tts_to_client():
+                            _LOGGER.debug(
+                                "Starting TTS stream to client for token %s", token
+                            )
+                            try:
+                                stream = tts.async_get_stream(self.hass, token)
+                                if stream is None:
+                                    _LOGGER.error(
+                                        "Could not find TTS stream for token %s", token
+                                    )
+                                    return
+
+                                async for chunk in stream.async_stream_result():
+                                    if chunk:
+                                        await self.async_send_json_message(
+                                            stream_name,
+                                            {
+                                                "type": "habitron/voice_tts_chunk",
+                                                "payload": base64.b64encode(
+                                                    chunk
+                                                ).decode("utf-8"),
+                                            },
+                                        )
+                                await self.async_send_json_message(
+                                    stream_name,
+                                    {"type": "habitron/voice_tts_chunk", "payload": ""},
+                                )
+                            except Exception:
+                                _LOGGER.exception("Error streaming TTS to client")
+
+                        tts_task = self.hass.async_create_task(_stream_tts_to_client())
+
+                stt_metadata = SpeechMetadata(
+                    language=self.hass.config.language,
+                    format=AudioFormats.WAV,
+                    codec=AudioCodecs.PCM,
+                    bit_rate=AudioBitRates.BITRATE_16,
+                    sample_rate=AudioSampleRates.SAMPLERATE_16000,
+                    channel=AudioChannels.CHANNEL_MONO,
+                )
+
+                tts_audio_output = {tts.ATTR_PREFERRED_FORMAT: "wav"}
+                if tts_voice:
+                    tts_audio_output["voice"] = tts_voice
+
+                await async_pipeline_from_audio_stream(
+                    self.hass,
+                    context=context,
+                    event_callback=event_callback,
+                    stt_stream=audio_stream(),
+                    stt_metadata=stt_metadata,
+                    pipeline_id=pipeline_id,
+                    conversation_id=None,
+                    device_id=device_id,
+                    satellite_id=satellite_id,
+                    tts_audio_output=tts_audio_output,
+                )
+
+                if tts_task:
+                    await tts_task
+            except Exception:
+                _LOGGER.exception(
+                    "Unexpected error in voice pipeline for stream '%s'", stream_name
+                )
+            finally:
+                _LOGGER.info("Voice pipeline for stream '%s' finished", stream_name)
+                connection.send_message({"type": "habitron/tts_pipeline_finished"})
+                self.voice_pipelines.pop(stream_name, None)
+
+        @websocket_api.websocket_command(
+            {
+                vol.Required("type"): "habitron/voice_pipeline_start",
+                vol.Required("payload"): dict,
+            }
         )
-        if not stream_name:
-            _LOGGER.warning("Received media state update from unknown client.")
-            return
-
-        if player := _media_players.get(stream_name):
-            _LOGGER.info("Received state update for %s: %s", player.name, msg["state"])
-            player.update_from_client(msg["state"], msg.get("attributes"))
-        else:
-            _LOGGER.warning(
-                "Received media state update for unregistered player: %s", stream_name
+        @websocket_api.async_response
+        async def handle_voice_pipeline_start(hass: HomeAssistant, connection, msg):
+            stream_name = next(
+                (n for n, c in self.active_ws_connections.items() if c == connection),
+                None,
             )
-        connection.send_result(msg["id"])
+            if not stream_name or stream_name in self.voice_pipelines:
+                return
 
-    async def _run_voice_pipeline(
-        hass: HomeAssistant,
-        connection: websocket_api.ActiveConnection,
-        stream_name: str,
-        start_payload: dict[str, Any],
-        context: Context,
-    ) -> None:
-        _LOGGER.info("Starting voice pipeline for stream '%s'", stream_name)
-        audio_queue = asyncio.Queue()
-        _voice_pipelines[stream_name] = {
-            "queue": audio_queue,
-            "task": asyncio.current_task(),
-        }
+            # Get the satellite entity and its configured pipeline
+            pipeline_id = None
+            device_id = None
+            satellite_id = None
+            tts_voice = None
+            satellite = self.assist_satellites.get(stream_name)
 
-        try:
+            if satellite:
+                satellite_id = satellite.entity_id
+                if satellite.registry_entry:
+                    device_id = satellite.registry_entry.device_id
+                if satellite.registry_entry and satellite.registry_entry.options:
+                    if isinstance(
+                        p := satellite.registry_entry.options.get("pipeline"), str
+                    ):
+                        pipeline_id = p
+                    if isinstance(
+                        v := satellite.registry_entry.options.get("tts_voice"), str
+                    ):
+                        tts_voice = v
 
-            async def audio_stream():
-                while True:
-                    chunk = await audio_queue.get()
-                    if chunk is None:
-                        break
-                    yield chunk
-
-            @callback
-            def event_callback(event: PipelineEvent):
-                if (
-                    event.type == "tts-end"
-                    and event.data
-                    and (tts_output := event.data.get("tts_output"))
-                ):
-                    if wav_bytes := tts_output.get("wav_bytes"):
-                        connection.send_message(
-                            {
-                                "type": "habitron/voice_tts_chunk",
-                                "payload": base64.b64encode(wav_bytes).decode("utf-8"),
-                            }
-                        )
-
-            metadata = SpeechMetadata(
-                language=hass.config.language,
-                format=AudioFormats.WAV,
-                codec=AudioCodecs.PCM,
-                bit_rate=AudioBitRates.BITRATE_16,
-                sample_rate=AudioSampleRates.SAMPLERATE_16000,
-                channel=AudioChannels.CHANNEL_MONO,
-            )
-
-            await async_pipeline_from_audio_stream(
-                hass,
-                context=context,
-                event_callback=event_callback,
-                stt_stream=audio_stream(),
-                pipeline_id=None,
-                conversation_id=None,
-                stt_metadata=metadata,
-            )
-        except asyncio.CancelledError:
-            _LOGGER.info("Voice pipeline for stream '%s' was cancelled", stream_name)
-        except Exception:
-            _LOGGER.exception(
-                "Unexpected error in voice pipeline for stream '%s'", stream_name
-            )
-        finally:
-            _LOGGER.info("Voice pipeline for stream '%s' finished", stream_name)
-            if sensor := provider.get_listening_sensor(stream_name):
-                if hasattr(sensor, "set_listening_state"):
-                    sensor.set_listening_state(False)
-            queue = _voice_pipelines[stream_name].get("queue")
-            if queue:
-                queue.shutdown()
-            connection.send_message(
-                {
-                    "type": "habitron/tts_pipeline_finished",
-                }
-            )
-
-    @websocket_api.websocket_command(
-        {
-            vol.Required("type"): "habitron/voice_pipeline_start",
-            vol.Required("payload"): vol.Schema(
-                {
-                    vol.Required("sample_rate"): int,
-                    vol.Required("sample_width"): int,
-                    vol.Required("channels"): int,
-                }
-            ),
-        }
-    )
-    @websocket_api.async_response
-    async def handle_voice_pipeline_start(
-        hass: HomeAssistant,
-        connection: websocket_api.ActiveConnection,
-        msg: dict[str, Any],
-    ):
-        stream_name = next(
-            (n for n, c in provider.active_ws_connections.items() if c == connection),
-            None,
-        )
-        if not stream_name or stream_name in _voice_pipelines:
-            return
-
-        if sensor := provider.get_listening_sensor(stream_name):
-            if hasattr(sensor, "set_listening_state"):
-                sensor.set_listening_state(True)
-
-        context = connection.context(msg)
-        asyncio.create_task(
-            _run_voice_pipeline(hass, connection, stream_name, msg["payload"], context)
-        )
-        connection.send_result(msg["id"])
-
-    @websocket_api.websocket_command(
-        {
-            vol.Required("type"): "habitron/voice_audio_chunk",
-            vol.Required("payload"): str,
-        }
-    )
-    @websocket_api.async_response
-    async def handle_voice_audio_chunk(
-        hass: HomeAssistant,
-        connection: websocket_api.ActiveConnection,
-        msg: dict[str, Any],
-    ):
-        stream_name = next(
-            (n for n, c in provider.active_ws_connections.items() if c == connection),
-            None,
-        )
-        if not stream_name or stream_name not in _voice_pipelines:
-            return
-        if queue := _voice_pipelines[stream_name].get("queue"):
-            if queue._is_shutdown:
-                _LOGGER.info("Voice pipeline for stream '%s' closed", stream_name)
-                connection.send_message(
-                    {
-                        "type": "habitron/stt_pipeline_aborted",
-                    }
+                _LOGGER.debug(
+                    "Found satellite '%s' (device: %s), using language: %s, pipeline: %s, voice: %s",
+                    stream_name,
+                    device_id,
+                    satellite_id,
+                    pipeline_id,
+                    tts_voice,
                 )
             else:
-                try:
-                    await queue.put(base64.b64decode(msg["payload"]))
-                except Exception:
-                    _LOGGER.exception(
-                        "Error processing audio chunk for stream '%s'", stream_name
-                    )
-                    connection.send_message(
-                        {
-                            "type": "habitron/stt_pipeline_aborted",
-                        }
-                    )
+                _LOGGER.warning(
+                    "No assist_satellite found for stream '%s', using default pipeline",
+                    stream_name,
+                )
 
-    @websocket_api.websocket_command(
-        {vol.Required("type"): "habitron/voice_pipeline_end"}
-    )
-    @websocket_api.async_response
-    async def handle_voice_pipeline_end(
-        hass: HomeAssistant,
-        connection: websocket_api.ActiveConnection,
-        msg: dict[str, Any],
-    ):
-        stream_name = next(
-            (n for n, c in provider.active_ws_connections.items() if c == connection),
-            None,
+            context = connection.context(msg)
+            asyncio.create_task(  # noqa: RUF006
+                _run_voice_pipeline(
+                    connection,
+                    stream_name,
+                    context,
+                    pipeline_id,
+                    device_id,
+                    satellite_id,
+                    tts_voice,
+                )
+            )
+            connection.send_result(msg["id"])
+
+        @websocket_api.websocket_command(
+            {
+                vol.Required("type"): "habitron/voice_audio_chunk",
+                vol.Required("payload"): str,  # base64 encoded string
+            }
         )
-        if not stream_name or stream_name not in _voice_pipelines:
-            return
-        if queue := _voice_pipelines[stream_name].get("queue"):
-            await queue.put(None)
-        connection.send_result(msg["id"])
+        @websocket_api.async_response
+        async def handle_voice_audio_chunk(hass: HomeAssistant, connection, msg):
+            stream_name = next(
+                (n for n, c in self.active_ws_connections.items() if c == connection),
+                None,
+            )
+            if not stream_name or not (
+                pipeline_data := self.voice_pipelines.get(stream_name)
+            ):
+                return
+            if queue := pipeline_data.get("queue"):
+                await queue.put(base64.b64decode(msg["payload"]))
+            # No result needed for audio chunks for performance
 
-    # --- Register ALL Command Handlers ---
-    _LOGGER.info("Registering all WebSocket command handlers")
-    websocket_api.async_register_command(hass, handle_register_stream)
-    websocket_api.async_register_command(hass, handle_webrtc_answer)
-    websocket_api.async_register_command(hass, handle_webrtc_candidate)
-    websocket_api.async_register_command(hass, handle_snapshot_result)
+        @websocket_api.websocket_command(
+            {vol.Required("type"): "habitron/voice_pipeline_end"}
+        )
+        @websocket_api.async_response
+        async def handle_voice_pipeline_end(_, connection, msg):
+            stream_name = next(
+                (n for n, c in self.active_ws_connections.items() if c == connection),
+                None,
+            )
+            if not stream_name or not (
+                pipeline_data := self.voice_pipelines.get(stream_name)
+            ):
+                return
 
-    # ✨ UND HIER DIE FEHLENDE REGISTRIERUNG
-    websocket_api.async_register_command(hass, handle_update_media_state)
+            if queue := pipeline_data.get("queue"):
+                await queue.put(None)  # Signal end of stream
+            connection.send_result(msg["id"])
 
-    websocket_api.async_register_command(hass, handle_voice_pipeline_start)
-    websocket_api.async_register_command(hass, handle_voice_audio_chunk)
-    websocket_api.async_register_command(hass, handle_voice_pipeline_end)
-    _LOGGER.info("All handlers registered successfully")
+        @websocket_api.websocket_command(
+            {
+                vol.Required("type"): "habitron/register_stream",
+                vol.Required("stream_name"): str,
+            }
+        )
+        @websocket_api.async_response
+        async def handle_register_stream(
+            hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+        ):
+            stream_name = msg["stream_name"]
+            self.active_ws_connections[stream_name] = connection
+            connection.subscriptions[msg["id"]] = lambda: _async_on_ws_disconnect(
+                stream_name
+            )
+            connection.send_result(msg["id"])
+            _LOGGER.info("Client registered stream '%s'", stream_name)
 
-    return provider
+        @websocket_api.websocket_command(
+            {
+                vol.Required("type"): "habitron/webrtc_answer",
+                vol.Required("session_id"): str,
+                vol.Required("sdp"): str,
+                vol.Required("stream_name"): str,
+            }
+        )
+        @websocket_api.async_response
+        async def handle_webrtc_answer(
+            hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+        ):
+            session_id = msg["session_id"]
+            if (fut := self.webrtc_futures.get(session_id)) and not fut.done():
+                fut.set_result(msg["sdp"])
+            connection.send_result(msg["id"])
+
+        @websocket_api.websocket_command(
+            {
+                "type": "habitron/webrtc_candidate",
+                "session_id": str,
+                "candidate": str,
+                "sdp_mid": str,
+                "sdp_m_line_index": int,
+            }
+        )
+        @websocket_api.async_response
+        async def handle_webrtc_candidate(
+            hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+        ):
+            session_id = msg["session_id"]
+            send_message = self.webrtc_send_message_callbacks.get(session_id)
+            candidate = WebRTCCandidate(
+                candidate=RTCIceCandidateInit(
+                    candidate=msg["candidate"],
+                    sdp_mid=msg["sdp_mid"],
+                    sdp_m_line_index=msg["sdp_m_line_index"],
+                )
+            )
+            if send_message:
+                send_message(candidate)
+            else:
+                self.pending_candidates.setdefault(session_id, []).append(candidate)
+            connection.send_result(msg["id"])
+
+        @websocket_api.websocket_command(
+            {
+                vol.Required("type"): "habitron/snapshot_result",
+                vol.Required("request_id"): str,
+                vol.Optional("data"): str,
+                vol.Optional("error"): str,
+            }
+        )
+        @websocket_api.async_response
+        async def handle_snapshot_result(
+            hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+        ):
+            request_id = msg["request_id"]
+            if (data := self.snapshot_futures.get(request_id)) and not data[
+                "future"
+            ].done():
+                if error_msg := msg.get("error"):
+                    data["future"].set_exception(
+                        HomeAssistantError(f"Snapshot failed on client: {error_msg}")
+                    )
+                elif "data" in msg:
+                    try:
+                        snapshot_data = base64.b64decode(msg["data"])
+                        data["future"].set_result(snapshot_data)
+                    except Exception as e:  # noqa: BLE001
+                        data["future"].set_exception(
+                            HomeAssistantError(f"Failed to decode snapshot: {e}")
+                        )
+            connection.send_result(msg["id"])
+
+        @websocket_api.websocket_command(
+            {
+                vol.Required("type"): "habitron/update_media_state",
+                vol.Required("state"): str,
+                vol.Optional("attributes"): dict,
+            }
+        )
+        @websocket_api.async_response
+        async def handle_update_media_state(
+            hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+        ):
+            stream_name = next(
+                (n for n, c in self.active_ws_connections.items() if c == connection),
+                None,
+            )
+            if not stream_name:
+                _LOGGER.warning("Received media state update from unknown client")
+                return
+            if player := self.media_players.get(stream_name):
+                _LOGGER.debug("Updating state for %s: %s", player.name, msg["state"])
+                player.update_from_client(msg["state"], msg.get("attributes", {}))
+            else:
+                _LOGGER.warning(
+                    "Received media state update for unregistered player: %s",
+                    stream_name,
+                )
+            connection.send_result(msg["id"])
+
+        @websocket_api.websocket_command(
+            {vol.Required("type"): "habitron/media_next_track"}
+        )
+        @websocket_api.async_response
+        async def handle_media_next_track(
+            hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+        ) -> None:
+            """Handle skip to next track command from the client."""
+            stream_name = next(
+                (n for n, c in self.active_ws_connections.items() if c == connection),
+                None,
+            )
+            if stream_name and (player := self.media_players.get(stream_name)):
+                await player.async_media_next_track()
+            connection.send_result(msg["id"])
+
+        @websocket_api.websocket_command(
+            {vol.Required("type"): "habitron/media_previous_track"}
+        )
+        @websocket_api.async_response
+        async def handle_media_previous_track(
+            hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+        ) -> None:
+            """Handle skip to previous track command from the client."""
+            stream_name = next(
+                (n for n, c in self.active_ws_connections.items() if c == connection),
+                None,
+            )
+            if stream_name and (player := self.media_players.get(stream_name)):
+                await player.async_media_previous_track()
+            connection.send_result(msg["id"])
+
+        # --- REGISTRATION OF ALL HANDLERS ---
+
+        websocket_api.async_register_command(self.hass, handle_register_stream)
+        websocket_api.async_register_command(self.hass, handle_webrtc_answer)
+        websocket_api.async_register_command(self.hass, handle_webrtc_candidate)
+        websocket_api.async_register_command(self.hass, handle_snapshot_result)
+        websocket_api.async_register_command(self.hass, handle_update_media_state)
+        websocket_api.async_register_command(self.hass, handle_voice_pipeline_start)
+        websocket_api.async_register_command(self.hass, handle_voice_audio_chunk)
+        websocket_api.async_register_command(self.hass, handle_voice_pipeline_end)
+        websocket_api.async_register_command(self.hass, handle_media_next_track)
+        websocket_api.async_register_command(self.hass, handle_media_previous_track)

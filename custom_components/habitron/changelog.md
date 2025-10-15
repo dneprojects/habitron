@@ -1,6 +1,10 @@
 # Latest changes
 
-## v2.2.9
+## v2.3.0
+
 ### New
-- Media player for Smart Touch
-- Voice pipeline for Smart Touch
+- Smart Touch media player
+- Smart Touch speech dialog
+
+### Fix
+- Init

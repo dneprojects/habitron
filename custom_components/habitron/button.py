@@ -388,6 +388,7 @@ class SpeechButton(ButtonEntity):
             ws_connection.send_message(
                 {
                     "type": "habitron/voice_activate_request",
+                    "payload": {"entity_id": self._module.assist_entity_id},
                 }
             )
         else:
