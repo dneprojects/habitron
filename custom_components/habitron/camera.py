@@ -9,14 +9,14 @@ from homeassistant.components.camera import (
     Camera,
     CameraEntityFeature,
     RTCIceCandidateInit,
-    WebRTCClientConfiguration,
     async_get_supported_provider,
 )
-from homeassistant.const import EVENT_HOMEASSISTANT_START
-from homeassistant.core import CoreState, Event, HomeAssistant, callback
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
+from .smart_hub import SmartHub
 from .module import HbtnModule
 from .router import HbtnRouter
 from .ws_provider import HabitronWebRTCProvider
@@ -26,56 +26,39 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry,
+    entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Habitron cameras from a config entry."""
-    hbtn_rt: HbtnRouter = hass.data[DOMAIN][entry.entry_id].router
+    smhub: SmartHub = hass.data[DOMAIN][entry.entry_id]
+    hbtn_rt: HbtnRouter = smhub.router
+    if smhub.ws_provider is None:
+        _LOGGER.error("WebRTC provider not available on SmartHub instance")
+        return
+    provider: HabitronWebRTCProvider = smhub.ws_provider
 
-    async def async_init_provider_and_entities(event: Event | None = None) -> None:
-        """Initialize the provider and entities when HA is ready."""
-        _LOGGER.info(
-            "Home Assistant started. Initializing Habitron WebRTC provider and cameras"
-        )
-
-        new_devices = []
-        auth = hass.auth
-
-        for hbt_module in hbtn_rt.modules:
-            if hbt_module.mod_type == "Smart Controller Touch":
-                new_devices.append(
-                    HbtnCam(
-                        hass,
-                        hbt_module,
-                        auth,
-                        len(new_devices),
-                        hbtn_rt.smhub.ws_provider,
-                    )
+    new_devices = []
+    for hbt_module in hbtn_rt.modules:
+        if hbt_module.mod_type == "Smart Controller Touch":
+            new_devices.append(
+                HbtnCam(
+                    hass,
+                    hbt_module,
+                    len(new_devices),
+                    provider,  # Pass the provider instance correctly
                 )
+            )
 
-        if new_devices:
-            async_add_entities(new_devices)
-            _LOGGER.info("Added %d Habitron WebRTC camera(s)", len(new_devices))
-        else:
-            _LOGGER.info("No Habitron Smart Controller Touch modules found")
-
-    if hass.state == CoreState.running:
-        # If HA is already fully running, initialize immediately.
-        await async_init_provider_and_entities()
+    if new_devices:
+        async_add_entities(new_devices)
+        _LOGGER.info("Added %d Habitron WebRTC camera(s)", len(new_devices))
     else:
-        # If HA is still starting up, wait for the "started" event.
-        _LOGGER.info(
-            "Home Assistant is not fully started yet. Deferring Habitron setup"
-        )
-        hass.bus.async_listen_once(
-            EVENT_HOMEASSISTANT_START, async_init_provider_and_entities
-        )
+        _LOGGER.info("No Habitron Smart Controller Touch modules found")
 
 
 class HbtnCam(Camera):
     """Habitron Camera entity (the phone publishes media; HA just negotiates)."""
 
-    # We now support both streaming and on/off features.
     _attr_supported_features = CameraEntityFeature.STREAM | CameraEntityFeature.ON_OFF
     _attr_frontend_stream_type = "webrtc"
     _attr_is_on = True
@@ -84,7 +67,6 @@ class HbtnCam(Camera):
         self,
         hass: HomeAssistant,
         module: HbtnModule,
-        auth: Any,
         idx: int,
         provider: HabitronWebRTCProvider,
     ) -> None:
@@ -97,7 +79,6 @@ class HbtnCam(Camera):
         self._attr_unique_id = f"Mod_{self._module.uid}_camera"
         self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
         self.hass = hass
-        self._auth = auth
         self._provider = provider
 
     async def stream_source(self) -> str:
@@ -138,20 +119,14 @@ class HbtnCam(Camera):
         _LOGGER.info("Camera turned off: %s", self._attr_name)
 
     async def async_handle_async_webrtc_offer(
-        self,
-        offer_sdp: str,
-        session_id: str,
-        send_message,
+        self, offer_sdp: str, session_id: str, send_message: Any
     ) -> None:
         """Handle the WebRTC offer coming from the HA frontend."""
         if not self._attr_is_on:
             _LOGGER.warning("Attempted to start stream on a camera that is off")
             raise RuntimeError("Cannot start stream when the camera is off")
-
-        provider = await async_get_supported_provider(self.hass, self)
-        if not provider:
+        if not (provider := await async_get_supported_provider(self.hass, self)):
             raise RuntimeError("No WebRTC provider available for this camera")
-
         await provider.async_handle_async_webrtc_offer(
             camera=self,
             offer_sdp=offer_sdp,
@@ -162,18 +137,16 @@ class HbtnCam(Camera):
     async def async_on_webrtc_candidate(
         self, session_id: str, candidate: RTCIceCandidateInit
     ) -> None:
-        """Forward frontend ICE candidates to the provider (which relays to phone)."""
-        provider = await async_get_supported_provider(self.hass, self)
-        if not provider:
-            _LOGGER.debug("No provider for candidate; session=%s", session_id)
+        """Forward frontend ICE candidates to the provider."""
+        if not (provider := await async_get_supported_provider(self.hass, self)):
             return
         await provider.async_on_webrtc_candidate(session_id, candidate)
 
-    @callback
-    def close_webrtc_session(self, session_id: str) -> None:
-        """Called by HA when the WS subscription is closed; notify provider."""
-        _LOGGER.debug("WebRTC session %s closed by frontend", session_id)
+    # @callback
+    # def close_webrtc_session(self, session_id: str) -> None:
+    #     """Called by HA when the WS subscription is closed; notify provider."""
+    #     _LOGGER.debug("WebRTC session %s closed by frontend", session_id)
 
-    def async_get_webrtc_client_configuration(self) -> WebRTCClientConfiguration:
-        """Optionally provide client ICE config."""
-        return WebRTCClientConfiguration()
+    # def async_get_webrtc_client_configuration(self) -> WebRTCClientConfiguration:
+    #     """Optionally provide client ICE config."""
+    #     return WebRTCClientConfiguration()
