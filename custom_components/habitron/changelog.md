@@ -8,3 +8,8 @@
 
 ### Fix
 - Init
+
+## v2.3.1
+
+### Improvements
+- Smart Touch media player
