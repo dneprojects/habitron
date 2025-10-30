@@ -78,7 +78,7 @@ class HbtnMediaPlayer(MediaPlayerEntity):
         self._attr_name = f"Player {module.name}"
         self._attr_unique_id = f"Mod_{self._module.uid}_mediaplayer"
         self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
-        self._attr_state = MediaPlayerState.IDLE
+        self._attr_state = MediaPlayerState.OFF
 
         # Define supported features for the media player.
         self._attr_supported_features = (
