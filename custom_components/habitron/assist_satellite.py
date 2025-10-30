@@ -4,6 +4,7 @@ import asyncio
 import logging
 from typing import Any
 
+from homeassistant.components import tts
 from homeassistant.components.assist_pipeline.pipeline import (
     PipelineEvent,
     PipelineEventType,
@@ -15,9 +16,10 @@ from homeassistant.components.assist_satellite import (
     AssistSatelliteEntityFeature,
     AssistSatelliteWakeWord,
 )
+from homeassistant.components.assist_satellite.entity import AssistSatelliteState
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddEntitiesCallback, callback
 
 from .const import DOMAIN
 from .module import SmartController
@@ -79,11 +81,36 @@ class HbtnAssistSat(AssistSatelliteEntity):
             AssistSatelliteEntityFeature.ANNOUNCE
             | AssistSatelliteEntityFeature.START_CONVERSATION
         )
+        self._attr_state = AssistSatelliteState.IDLE
 
     @property
     def stream_name(self) -> str:
         """Return the stream name used for websocket communication."""
         return self._stream_name
+
+    @callback
+    def set_listening(self) -> None:
+        """Set the state to listening."""
+        _LOGGER.warning("HbtnAssistSat: set_listening called for %s", self._stream_name)
+        self._set_state(AssistSatelliteState.LISTENING)
+
+    @callback
+    def set_processing(self) -> None:
+        """Set the state to processing."""
+        _LOGGER.warning("HbtnAssistSat: set_processing called for %s", self._stream_name)
+        self._set_state(AssistSatelliteState.PROCESSING)
+
+    @callback
+    def set_responding(self) -> None:
+        """Set the state to responding."""
+        _LOGGER.warning("HbtnAssistSat: set_responding called for %s", self._stream_name)
+        self._set_state(AssistSatelliteState.RESPONDING)
+
+    @callback
+    def set_idle(self) -> None:
+        """Set the state to idle."""
+        _LOGGER.warning("HbtnAssistSat: set_idle called for %s", self._stream_name)
+        self._set_state(AssistSatelliteState.IDLE)
 
     async def async_start_conversation(
         self, start_announcement: AssistSatelliteAnnouncement
@@ -140,14 +167,36 @@ class HbtnAssistSat(AssistSatelliteEntity):
     async def async_set_configuration(self, config: dict[str, Any]) -> None:
         """Set the pipeline configuration for this satellite."""
 
-    async def on_pipeline_event(self, event: PipelineEvent) -> None:
-        """Handle events from the pipeline to notify the client."""
+    async def respond_no_text_recognized(self) -> None:
+        """Handle 'no text recognized' scenario."""
+        _LOGGER.warning(
+            "HbtnAssistSat: respond_no_text_recognized called for %s", self._stream_name
+        )
+        await self.async_internal_announce(message="Das habe ich nicht verstanden.", preannounce=False)
+        self.set_idle()
+
+    def on_pipeline_event(self, event: PipelineEvent) -> None:
+        """Handle custom actions based on pipeline events."""
+        # Standard state changes done by _internal_on_pipeline_event of base class
+        _LOGGER.debug("HbtnAssistSat: on_pipeline_event received: %s", event.type)
+
+        if event.type == PipelineEventType.INTENT_START:
+            self.set_processing()
+        elif event.type == PipelineEventType.TTS_START:
+            self.set_responding()
         if event.type == PipelineEventType.RUN_END:
             _LOGGER.debug(
-                "Pipeline run ended for %s. Notifying client to finish", self.entity_id
+                "HbtnAssistSat: Pipeline run ended. Notifying client %s to finish.", self._stream_name
             )
-            # This message tells the client that the conversation is over,
-            # so it can hide the "Listening..." UI and restart wake word detection.
-            await self._provider.async_send_json_message(
-                self._stream_name, {"type": "habitron/voice_pipeline_finished"}
-            )
+            # self.hass.async_create_task(
+            #     self._provider.async_send_json_message(
+            #         self._stream_name, {"type": "habitron/voice_pipeline_finished"}
+            #     )
+            # )
+        elif event.type == PipelineEventType.ERROR:
+            _LOGGER.error("HbtnAssistSat: Pipeline error occurred: %s", event.data)
+            if event.data and event.data.get("code") == "stt-no-text-recognized":
+                _LOGGER.info("No text recognized error, triggering TTS announcement.")
+                self.hass.async_create_task(self.respond_no_text_recognized())
+            else:
+                self.set_idle()
