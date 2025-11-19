@@ -1,5 +1,7 @@
 """The Habitron integration."""
 
+# remoteHA Token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJmMWI4NWUzZDg3ODg0MGNiOTIzNDE2OWE4ZDMxZDZhOCIsImlhdCI6MTc2MjA3OTMxMCwiZXhwIjoyMDc3NDM5MzEwfQ.NnEjgKTM_gbkBoRsf_pHVLzskY88SPR7gqlgReMWxKU
+
 from __future__ import annotations
 
 import logging

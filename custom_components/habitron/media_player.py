@@ -2,24 +2,27 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import TYPE_CHECKING, Any
-from urllib import parse
 
 from aiohttp import ClientError, ClientSession
 
 from homeassistant.components import media_source
 from homeassistant.components.media_player import (
     BrowseMedia,
+    MediaPlayerEnqueue,
     MediaPlayerEntity,
     MediaPlayerEntityFeature,
     MediaPlayerState,
     MediaType,
     async_get_clientsession,
 )
-from homeassistant.config_entries import ConfigEntry  # FIX 2: Added missing import
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.event import async_track_time_interval, timedelta
+from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import DOMAIN
 from .module import SmartController
@@ -30,6 +33,24 @@ if TYPE_CHECKING:
     from .ws_provider import HabitronWebRTCProvider
 
 _LOGGER = logging.getLogger(__name__)
+
+
+# Helper class for queue items
+class QueueItem:
+    """Class to hold queue item data."""
+
+    def __init__(
+        self,
+        media_id: str,
+        media_type: str | MediaType,
+        media_url: str,
+        metadata: dict[str, Any],
+    ) -> None:
+        """Initialize the queue item."""
+        self.media_id = media_id
+        self.media_type = media_type
+        self.media_url = media_url
+        self.metadata = metadata
 
 
 async def async_setup_entry(
@@ -52,7 +73,7 @@ async def async_setup_entry(
             isinstance(hbt_module, SmartController)
             and hbt_module.mod_type == "Smart Controller Touch"
         ):
-            new_devices.append(HbtnMediaPlayer(hbt_module, provider))
+            new_devices.append(HbtnMediaPlayer(hbt_module, provider, hass))
             hbt_module.media_player = new_devices[-1]
 
     if new_devices:
@@ -60,7 +81,8 @@ async def async_setup_entry(
         _LOGGER.info("Added %d Habitron media player(s)", len(new_devices))
 
 
-class HbtnMediaPlayer(MediaPlayerEntity):
+# RestoreEntity stores state between Home Assistant restarts
+class HbtnMediaPlayer(MediaPlayerEntity, RestoreEntity):
     """Representation of a Habitron client as a media player."""
 
     _attr_should_poll = False
@@ -69,32 +91,24 @@ class HbtnMediaPlayer(MediaPlayerEntity):
         self,
         module: HbtnModule,
         provider: HabitronWebRTCProvider,
+        hass: HomeAssistant,
     ) -> None:
         """Initialize the media player."""
         self._module: HbtnModule = module
         self._provider = provider
-        # Create a stream name from the module name.
-        self._stream_name: str = module.name.lower().replace(" ", "_")
+        self._stream_name: str = (
+            module.name.lower().replace(" ", "_") + f"_{module.raddr}"
+        )
+        self._hass = hass
         self._attr_name = f"Player {module.name}"
         self._attr_unique_id = f"Mod_{self._module.uid}_mediaplayer"
         self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
         self._attr_state = MediaPlayerState.OFF
 
-        # Define supported features for the media player.
-        self._attr_supported_features = (
-            MediaPlayerEntityFeature.PLAY_MEDIA
-            | MediaPlayerEntityFeature.PLAY
-            | MediaPlayerEntityFeature.PAUSE
-            | MediaPlayerEntityFeature.STOP
-            | MediaPlayerEntityFeature.VOLUME_SET
-            | MediaPlayerEntityFeature.VOLUME_MUTE
-            | MediaPlayerEntityFeature.TURN_OFF
-            | MediaPlayerEntityFeature.TURN_ON
-            # | MediaPlayerEntityFeature.NEXT_TRACK
-            # | MediaPlayerEntityFeature.PREVIOUS_TRACK
-            | MediaPlayerEntityFeature.BROWSE_MEDIA
-            # | MediaPlayerEntityFeature.MEDIA_ENQUEUE
-        )
+        self._queue: list[QueueItem] = []
+        self._history: list[QueueItem] = []
+        self._current_item: QueueItem | None = None
+        self._play_request_lock = asyncio.Lock()
         self._attr_icon = "mdi:speaker"
         self._attr_volume_level: float = 0.3
         self._attr_is_volume_muted = False
@@ -102,6 +116,8 @@ class HbtnMediaPlayer(MediaPlayerEntity):
 
         self._source_player_entity_id: str | None = None
         self._internal_auth_token: str
+        self._track_mode: str = "single"  # 'single' or 'multi'
+        self._poll_remove = None
 
     @property
     def stream_name(self) -> str:
@@ -114,6 +130,48 @@ class HbtnMediaPlayer(MediaPlayerEntity):
         # Register the media player with the WebSocket provider.
         self._provider.register_media_player(self)
         _LOGGER.info("Habitron media player %s added", self.name)
+
+        # Restore previous state
+        last_state = await self.async_get_last_state()
+        if last_state is not None:
+            vol = last_state.attributes.get("volume_level")
+            muted = last_state.attributes.get("is_volume_muted")
+            if vol is not None:
+                self._attr_volume_level = vol
+            if muted is not None:
+                self._attr_is_volume_muted = muted
+
+    # Dynamic supported_features based on track mode
+    @property
+    def supported_features(self) -> MediaPlayerEntityFeature:
+        """Return the list of supported features, dynamic based on track mode."""
+
+        # Start with the base features that are always available
+        base_features = (
+            MediaPlayerEntityFeature.PLAY_MEDIA
+            | MediaPlayerEntityFeature.PLAY
+            | MediaPlayerEntityFeature.PAUSE
+            | MediaPlayerEntityFeature.STOP
+            | MediaPlayerEntityFeature.VOLUME_SET
+            | MediaPlayerEntityFeature.VOLUME_MUTE
+            | MediaPlayerEntityFeature.TURN_OFF
+            | MediaPlayerEntityFeature.TURN_ON
+            | MediaPlayerEntityFeature.BROWSE_MEDIA
+            | MediaPlayerEntityFeature.MEDIA_ENQUEUE
+            | MediaPlayerEntityFeature.CLEAR_PLAYLIST
+        )
+
+        # Dynamically add skip buttons ONLY if in multi-track mode
+        if self._track_mode == "multi":
+            _LOGGER.debug("[%s] Multi-track mode: Adding Skip buttons", self.entity_id)
+            base_features |= MediaPlayerEntityFeature.NEXT_TRACK
+            base_features |= MediaPlayerEntityFeature.PREVIOUS_TRACK
+        else:
+            _LOGGER.debug(
+                "[%s] Single-track mode: Removing Skip buttons", self.entity_id
+            )
+
+        return base_features
 
     async def get_token(self):
         """Get an internal Home Assistant auth token for API calls."""
@@ -143,64 +201,192 @@ class HbtnMediaPlayer(MediaPlayerEntity):
             return response.status
 
     async def async_play_media(
-        self, media_type: MediaType | str, media_id: str, **kwargs: Any
+        self,
+        media_type: MediaType | str,
+        media_id: str,
+        enqueue: MediaPlayerEnqueue | None = None,
+        **kwargs: Any,
     ) -> None:
-        """Forward the play_media command to the client."""
-
-        _LOGGER.warning(
-            "[%s] play_media triggered. Media ID: %s, kwargs: %s",
+        """Handle play_media service call (populates internal queue)."""
+        _LOGGER.info(
+            "[%s] play_media received: media_id=%s, enqueue_mode=%s",
             self.entity_id,
             media_id,
-            kwargs,
+            enqueue,
         )
 
-        self._source_player_entity_id = None
+        if enqueue in (
+            MediaPlayerEnqueue.ADD,
+            MediaPlayerEnqueue.NEXT,
+            MediaPlayerEnqueue.PLAY,
+        ):
+            self._track_mode = "multi"
+        else:
+            self._track_mode = "single"
+        _LOGGER.debug("[%s] Set track_mode to: %s", self.entity_id, self._track_mode)
 
-        # --- Media Resolution (TTS/Media Source) ---
-        # Resolve media_id to a full, playable URL, handling media-source and TTS.
-        final_media_url = await self._process_media_id(media_id)
-        if not final_media_url:
-            _LOGGER.error(
-                "[%s] Could not resolve media_id to a playable URL", self.entity_id
+        # Ensure that @property supported_features is queried again
+        self.async_write_ha_state()
+
+        if not self._poll_remove:
+            self._poll_remove = async_track_time_interval(
+                self.hass, self._poll_ma_metadata, timedelta(seconds=3)
             )
-            self._attr_state = MediaPlayerState.IDLE
-            self.async_write_ha_state()
-            return
+            _LOGGER.debug("[%s] Started proxy metadata polling", self.entity_id)
 
-        # --- Metadata Initialization from Browsing Data ---
-        title = "Playing Media"
-        artist = "Home Assistant"  # Default fallback
-        artwork_url = None
-
-        # Attempt to get metadata via the Browse Media mechanism for the media-source ID
-        if media_id.startswith("media-source://"):
+        # Prevent concurrent play_media calls
+        async with self._play_request_lock:
+            # Resolve URL and metadata
             try:
-                # Use async_browse_media to get metadata for the specific item
-                browse_result = await media_source.async_browse_media(
-                    self.hass,
-                    media_id,
+                media_url = await self._process_media_id(media_id)
+                if not media_url:
+                    _LOGGER.error("[%s] Could not resolve media_id", self.entity_id)
+                    return
+
+                metadata = await self._extract_metadata(media_id, kwargs)
+                metadata["track_mode"] = self._track_mode
+
+                item = QueueItem(media_id, media_type, media_url, metadata)
+
+            except Exception as e:  # noqa: BLE001
+                _LOGGER.error("[%s] Error processing media_id: %s", self.entity_id, e)
+                return
+
+            # Manage queue (based on MA enum)
+            play_now = False
+
+            if enqueue == MediaPlayerEnqueue.REPLACE or enqueue is None:
+                _LOGGER.debug("[%s] Mode REPLACE: Clearing queue", self.entity_id)
+                self._queue = [item]
+                self._history = []
+                if self._current_item:
+                    self._history.append(self._current_item)
+                self._current_item = None
+                play_now = True
+
+            elif enqueue == MediaPlayerEnqueue.ADD:
+                _LOGGER.debug("[%s] Mode ADD: Appending to queue", self.entity_id)
+                self._queue.append(item)
+
+            elif enqueue == MediaPlayerEnqueue.NEXT:
+                _LOGGER.debug(
+                    "[%s] Mode NEXT: Inserting at top of queue", self.entity_id
+                )
+                self._queue.insert(0, item)
+
+            elif enqueue == MediaPlayerEnqueue.PLAY:
+                _LOGGER.debug(
+                    "[%s] Mode PLAY: Inserting and forcing play", self.entity_id
+                )
+                if self._current_item:
+                    self._history.append(self._current_item)
+                self._queue.insert(0, item)
+                play_now = True
+
+            # Trigger playback if player is 'idle' or 'play_now' is forced
+            if self._attr_state in (MediaPlayerState.IDLE, MediaPlayerState.OFF):
+                play_now = True
+
+            if play_now:
+                _LOGGER.debug(
+                    "[%s] Play is requested, calling _play_next_item_in_queue",
+                    self.entity_id,
+                )
+                await self._play_next_item_in_queue()
+            else:
+                _LOGGER.debug(
+                    "[%s] Player is busy or not idle, queueing track", self.entity_id
                 )
 
-                # Check if results have metadata on the root level
-                if browse_result.title:
+    async def _poll_ma_metadata(self, _now) -> None:
+        """Log metadata from Music Assistant if available."""
+
+        if self._attr_state != MediaPlayerState.PLAYING:
+            await self._stop_proxy_polling()
+            return
+
+        proxy_entity_id = self._get_mass_proxy_entity_id()
+        if not proxy_entity_id:
+            return
+
+        state = self.hass.states.get(proxy_entity_id)
+        if not state:
+            return
+
+        self._track_mode = "multi"
+        title = state.attributes.get("media_title")
+        artist = state.attributes.get("media_artist")
+        artwork_url = state.attributes.get("entity_picture")
+        _LOGGER.debug(
+            "[%s] MA Proxy Metadata: Title=%s, Artist=%s, Artwork=%s",
+            self.entity_id,
+            title,
+            artist,
+            artwork_url,
+        )
+        current_metadata = {
+            "title": title,
+            "artist": artist,
+            "entity_picture": artwork_url,
+        }
+        payload = {
+            "metadata": current_metadata,
+            "origin": "Music Assistant",
+        }
+
+        # Send the play_media command via WebSocket
+        await self._provider.async_send_json_message(
+            self._stream_name,
+            {
+                "type": "habitron/update_metadata",
+                "payload": payload,
+            },
+        )
+
+    async def _stop_proxy_polling(self):
+        """Beende das Polling, falls aktiv."""
+        if self._poll_remove:
+            self._poll_remove()  # deregister the listener
+            self._poll_remove = None
+            _LOGGER.debug("[%s] Stopped proxy metadata polling", self.entity_id)
+
+    async def _extract_metadata(self, media_id: str, kwargs: dict[str, Any]) -> dict:
+        """Helper to extract metadata from kwargs or browse_media."""
+
+        metadata_in = kwargs.get("extra", {}).get("metadata", {})
+        title = metadata_in.get("title", "Unknown Title")
+        artist = metadata_in.get("artist", "Unknown Artist")
+        artwork_url = metadata_in.get("imageUrl") or metadata_in.get("entity_picture")
+
+        if media_id.startswith("media-source://") and (
+            artist in {"Home Assistant", "Unknown Artist"}
+        ):
+            try:
+                browse_result = await media_source.async_browse_media(
+                    self.hass, media_id
+                )
+                if browse_result and browse_result.title:
                     title = browse_result.title
-                    if " - " in title:
+                    if title == "Radio Browser":
+                        title = "Internet Radio"
+                        artist = "Home Assistant"
+                    elif " - " in title:
                         parts = title.split(" - ", 1)
                         artist = parts[0].strip()
                         title = parts[1].strip()
-
                     elif "/" in title:
                         parts = title.split("/", 1)
                         artist = parts[1].strip()
                         title = parts[0].strip()
 
-                if browse_result.thumbnail:
+                if browse_result and browse_result.thumbnail:
                     artwork_url = browse_result.thumbnail
 
-                _LOGGER.warning(
-                    "[%s] Metadata found via browse: Title=%s, Artwork=%s",
+                _LOGGER.info(
+                    "[%s] Metadata found via browse: Title=%s, Artist=%s, Artwork=%s",
                     self.entity_id,
                     title,
+                    artist,
                     artwork_url,
                 )
 
@@ -217,16 +403,28 @@ class HbtnMediaPlayer(MediaPlayerEntity):
             "artist": artist,
         }
         if artwork_url:
+            if artwork_url.startswith("/"):
+                artwork_url = f"{self.hass.config.internal_url}{artwork_url}"
             client_metadata["entity_picture"] = artwork_url
 
-        # --- SEND TO CLIENT ---
-        payload = {
-            "media_content_id": final_media_url,
-            "metadata": client_metadata,
-        }
-        payload["origin"] = None
+        return client_metadata
 
-        # Send the play_media command via WebSocket to the Habitron client
+    async def _send_item_to_client(self, item: QueueItem) -> None:
+        """Sends a single item to the client for playback."""
+        _LOGGER.info(
+            "[%s] Sending play_media to client: %s (Mode: %s)",
+            self.entity_id,
+            item.metadata.get("title"),
+            self._track_mode,
+        )
+
+        payload = {
+            "media_content_id": item.media_url,
+            "metadata": item.metadata,
+            "origin": None,
+        }
+
+        # Send the play_media command via WebSocket
         await self._provider.async_send_json_message(
             self._stream_name,
             {
@@ -236,16 +434,38 @@ class HbtnMediaPlayer(MediaPlayerEntity):
         )
 
         # Update entity state attributes
-        self._attr_media_image_url = artwork_url
-        self._attr_media_title = title
-        self._attr_media_artist = artist
+        self._attr_media_image_url = item.metadata.get("entity_picture")
+        self._attr_media_title = item.metadata.get("title")
+        self._attr_media_artist = item.metadata.get("artist")
 
-        _LOGGER.info(
-            "[%s] Sent play_media to client",
-            self.entity_id,
-        )
-        self._attr_state = MediaPlayerState.PLAYING
+        # Important: Prevents "Race Condition"
+        self._attr_state = MediaPlayerState.BUFFERING
         self.async_write_ha_state()
+
+    async def _play_next_item_in_queue(self) -> None:
+        """Plays the next item from the internal queue."""
+
+        if not self._queue:
+            _LOGGER.info(
+                "[%s] Internal queue is empty. Setting state to IDLE", self.entity_id
+            )
+            self._attr_state = MediaPlayerState.IDLE
+            if self._current_item:
+                self._history.append(self._current_item)
+            self._current_item = None
+            self._attr_media_title = None
+            self._attr_media_artist = None
+            self._attr_media_image_url = None
+            self.async_write_ha_state()
+            return
+
+        # Get current title (if available) and move to history
+        if self._current_item:
+            self._history.append(self._current_item)
+
+        # Get next title from the queue
+        self._current_item = self._queue.pop(0)
+        await self._send_item_to_client(self._current_item)
 
     async def async_browse_media(
         self, media_content_type: str | None = None, media_content_id: str | None = None
@@ -257,66 +477,36 @@ class HbtnMediaPlayer(MediaPlayerEntity):
             media_content_id,
             content_filter=lambda item: item.media_content_type.startswith("audio/"),
         )
-        _LOGGER.warning("Browse media called. Result: %s", res)
+        _LOGGER.debug("Browse media called. Result: %s", res)
         return res
 
     async def _process_media_id(self, media_id: str) -> str:
-        """Check media_id and convert to a playable url, handling TTS and media-source."""
+        """Check media_id and convert to a playable url, handling all media-source types."""
 
-        if media_id.startswith("media-source://tts/"):
-            # Logic for Text-to-Speech (TTS) resolution
-            try:
-                parts = media_id.replace("media-source://tts/", "").split("?")
-                engine_id = parts[0]
-                params = dict(parse.parse_qsl(parts[1]))
-                message = params.get("message", "Error: No message found.")
-                _LOGGER.info("Resolving TTS URL for message: '%s'", message)
-
-                session = async_get_clientsession(self.hass)
-                url = f"{self.hass.config.internal_url}/api/tts_get_url"
-                payload = {"engine_id": engine_id, "message": message}
-
-                resolved_path = await self._async_resolve_tts_url(session, url, payload)
-
-                # Handle token expiration by refreshing and retrying
-                if resolved_path == 401:
-                    _LOGGER.warning(
-                        "Token expired or invalid. Getting new token and retrying"
-                    )
-                    await self.get_token()
-                    resolved_path = await self._async_resolve_tts_url(
-                        session, url, payload
-                    )
-
-                if isinstance(resolved_path, str):
-                    # Return the full internal URL for the resolved TTS path
-                    return f"{self.hass.config.internal_url}{resolved_path}"
-                _LOGGER.error(
-                    "Failed to resolve TTS URL. Final status was: %s", resolved_path
-                )
-                return ""  # noqa: TRY300
-            except Exception as e:  # noqa: BLE001
-                _LOGGER.error("Error while processing TTS request in play_media: %s", e)
-                return ""
-
-        elif media_id.startswith("media-source://"):
-            # Logic for standard media-source resolution
+        # If it's a media-source URL (file, radio, or TTS),
+        # let Home Assistant resolve it.
+        if media_id.startswith("media-source://"):
             try:
                 _LOGGER.debug(
                     "[%s] Resolving media_source URL: %s", self.entity_id, media_id
                 )
-                # Use Home Assistant's async_resolve_media helper
+
+                # This single function can resolve BOTH TTS and regular media files.
                 resolved_media = await media_source.async_resolve_media(
                     self.hass, media_id, self.entity_id
                 )
+
                 url = resolved_media.url
                 _LOGGER.info(
                     "[%s] Resolved media_source URL to: %s", self.entity_id, url
                 )
 
                 # Make it an absolute URL if it's relative
+                # (e.g., /api/tts_proxy/... -> http://<ha_ip>:8123/api/tts_proxy/...)
                 if url.startswith("/"):
                     return f"{self.hass.config.internal_url}{url}"
+
+                # If it's already absolute (e.g., from a radio stream), return as is.
                 return url  # noqa: TRY300
 
             except Exception:
@@ -326,41 +516,152 @@ class HbtnMediaPlayer(MediaPlayerEntity):
                 )
                 return ""
 
-        # Fallback for regular URLs
+        # If it's not a media-source URL (e.g., a direct http:// URL),
+        # return it as is.
         return media_id
 
     async def async_media_play(self, **kwargs: Any) -> None:
         """Send a command to the client to resume playback."""
-        # Send a WebSocket message for play
         await self._provider.async_send_json_message(
             self._stream_name, {"type": "habitron/play"}
         )
+        self._attr_state = MediaPlayerState.PLAYING
+        self.async_write_ha_state()
 
     async def async_media_pause(self, **kwargs: Any) -> None:
         """Send a command to the client to pause playback."""
-        # Send a WebSocket message for pause
         await self._provider.async_send_json_message(
             self._stream_name, {"type": "habitron/pause"}
         )
+        self._attr_state = MediaPlayerState.PAUSED
+        self.async_write_ha_state()
 
-    async def async_media_stop(self, **kwargs: Any) -> None:
-        """Send a command to the client to stop media."""
-        # Send a WebSocket message for stop
+    async def async_media_stop(
+        self, force_client_stop: bool = False, **kwargs: Any
+    ) -> None:
+        """Stop media playback."""
+        _LOGGER.debug("[%s] Stop command received. Clearing queue", self.entity_id)
+        self._queue = []
+        self._history = []
+        self._current_item = None
+        self._track_mode = "single"
+
         await self._provider.async_send_json_message(
             self._stream_name, {"type": "habitron/stop"}
         )
 
-    # async def async_media_next_track(self, **kwargs: Any) -> None:
-    #     """Send a command to the client to skip to the next track."""
-    #     _LOGGER.debug("[%s] Skipping to next track", self.entity_id)
+        # If the stop was forced by 'play_now', do not set the status
+        # to IDLE, as a new song is coming immediately.
+        if not force_client_stop:
+            self._attr_state = MediaPlayerState.IDLE
+            self.async_write_ha_state()
 
-    # async def async_media_previous_track(self, **kwargs: Any) -> None:
-    #     """Send a command to the client to skip to the previous track."""
-    #     _LOGGER.debug("[%s] Skipping to previous track", self.entity_id)
+    async def async_clear_playlist(self, **kwargs: Any) -> None:
+        """Clear the internal playlist without stopping playback."""
+        _LOGGER.debug("[%s] Clear playlist command received", self.entity_id)
+        self._queue = []
+        self._history = []
+        # Do not stop current playback or change state
+        self.async_write_ha_state()
+
+    def _get_mass_proxy_entity_id(self) -> str | None:
+        """Find the Music Assistant player entity ID that is proxying this player."""
+        # Find the MA player that has this entity set as its active queue
+        for state in self.hass.states.async_all("media_player"):
+            if (
+                state.attributes.get("mass_player_type") == "player"
+                and state.attributes.get("active_queue") == self.entity_id
+            ):
+                _LOGGER.debug("Found MA proxy player: %s", state.entity_id)
+                return state.entity_id
+        _LOGGER.warning("Could not find MA proxy player for %s", self.entity_id)
+        return None
+
+    async def async_media_next_track(self, **kwargs: Any) -> None:
+        """Skip to the next track in the internal queue, or delegate to MA if empty."""
+        _LOGGER.debug("[%s] Next track called", self.entity_id)
+
+        # Skip allowing in "multi" mode
+        if self._track_mode == "single":
+            _LOGGER.debug(
+                "[%s] Skip ignored: Player is in 'single track' mode", self.entity_id
+            )
+            return
+
+        # Check the internal queue
+        if self._queue:
+            _LOGGER.info("[%s] Playing next item from internal queue", self.entity_id)
+            await self._play_next_item_in_queue()
+
+        # Internal queue is empty - delegate to MA
+        else:
+            _LOGGER.info(
+                "[%s] Internal queue empty. Delegating next_track to Music Assistant",
+                self.entity_id,
+            )
+            proxy_entity_id = self._get_mass_proxy_entity_id()
+            if not proxy_entity_id:
+                _LOGGER.error(
+                    "[%s] Cannot skip track: No MA proxy player found", self.entity_id
+                )
+                # If no proxy is found, set the status to IDLE
+                await self._play_next_item_in_queue()  # This sets the status to IDLE
+                return
+
+            await self.hass.services.async_call(
+                "media_player",
+                "media_next_track",
+                {"entity_id": proxy_entity_id},
+                blocking=True,
+            )
+
+    async def async_media_previous_track(self, **kwargs: Any) -> None:
+        """Skip to the previous track in history, or delegate to MA if empty."""
+        _LOGGER.debug("[%s] Previous track called", self.entity_id)
+
+        # Allow skipping only in "multi" mode
+        if self._track_mode == "single":
+            _LOGGER.warning(
+                "[%s] Previous track ignored: Player is in 'single track' mode",
+                self.entity_id,
+            )
+            return
+
+        # Check the internal history
+        if self._history:
+            _LOGGER.info(
+                "[%s] Playing previous item from internal history", self.entity_id
+            )
+            # Current title (if available) back to the beginning of the queue
+            if self._current_item:
+                self._queue.insert(0, self._current_item)
+
+            # Get last title from history and play it
+            self._current_item = self._history.pop()
+            await self._send_item_to_client(self._current_item)
+
+        # Internal history is empty - delegate to MA
+        else:
+            _LOGGER.info(
+                "[%s] Internal history empty. Delegating previous_track to Music Assistant",
+                self.entity_id,
+            )
+            proxy_entity_id = self._get_mass_proxy_entity_id()
+            if not proxy_entity_id:
+                _LOGGER.error(
+                    "[%s] Cannot skip track: No MA proxy player found", self.entity_id
+                )
+                return
+
+            await self.hass.services.async_call(
+                "media_player",
+                "media_previous_track",
+                {"entity_id": proxy_entity_id},
+                blocking=True,
+            )
 
     async def async_set_volume_level(self, volume: float) -> None:
         """Send a command to the client to set the volume."""
-        # Send a WebSocket message to set volume
         await self._provider.async_send_json_message(
             self._stream_name,
             {"type": "habitron/set_volume", "payload": {"volume_level": volume}},
@@ -371,11 +672,9 @@ class HbtnMediaPlayer(MediaPlayerEntity):
     async def async_mute_volume(self, mute: bool) -> None:
         """Mute or unmute the volume."""
         if mute:
-            # Save current volume before muting
             self._pre_mute_volume = self._attr_volume_level
             await self.async_set_volume_level(0)
         else:
-            # Restore volume or default if no pre-mute volume is saved
             await self.async_set_volume_level(self._pre_mute_volume or 0.5)
 
         self._attr_is_volume_muted = mute
@@ -383,17 +682,27 @@ class HbtnMediaPlayer(MediaPlayerEntity):
 
     async def async_turn_on(self) -> None:
         """Turn on the media player."""
-        # Send a WebSocket message to turn on the player
         await self._provider.async_send_json_message(
             self._stream_name, {"type": "habitron/player_turn_on"}
         )
+        if self._attr_state == MediaPlayerState.OFF:
+            self._attr_state = MediaPlayerState.IDLE
+        self.async_write_ha_state()
 
     async def async_turn_off(self) -> None:
         """Turn off the media player."""
-        # Send a WebSocket message to turn off the player
+        _LOGGER.debug("[%s] Turn off command received. Clearing queue", self.entity_id)
+        # Clearing internal queue
+        self._queue = []
+        self._history = []
+        self._current_item = None
+        self._track_mode = "single"
+
         await self._provider.async_send_json_message(
             self._stream_name, {"type": "habitron/player_turn_off"}
         )
+        self._attr_state = MediaPlayerState.OFF
+        self.async_write_ha_state()
 
     async def _async_fetch_image(self, url: str) -> tuple[bytes | None, str | None]:
         """Fetch an image from a URL (used for album art)."""
@@ -417,7 +726,6 @@ class HbtnMediaPlayer(MediaPlayerEntity):
         self, media_content_type, media_content_id, media_image_id=None
     ):
         """Serve album art. Returns (content, content_type)."""
-        # Use the currently set media image URL for fetching artwork
         image_url = self._attr_media_image_url
         if not image_url:
             return None, None
@@ -425,26 +733,45 @@ class HbtnMediaPlayer(MediaPlayerEntity):
 
     @callback
     def update_from_client(
-        self, state: str, attributes: dict[str, Any] | None = None
+        self, state_str: str, attributes: dict[str, Any] | None = None
     ) -> None:
         """Update the entity's state when a message is received from the client."""
-        try:
-            # Convert incoming state string to MediaPlayerState enum
-            self._attr_state = MediaPlayerState(state.lower())
-        except ValueError:
-            _LOGGER.warning("Received unknown media player state: %s", state)
-            self._attr_state = MediaPlayerState.IDLE
 
         try:
+            new_state = MediaPlayerState(state_str.lower())
+        except ValueError:
+            # Accept client 'error', but set to 'idle' for HA
+            if state_str.lower() == "error":
+                _LOGGER.warning(
+                    "[%s] Client reported error, setting state to IDLE", self.entity_id
+                )
+                new_state = MediaPlayerState.IDLE
+            else:
+                _LOGGER.warning("Received unknown media player state: %s", state_str)
+                new_state = MediaPlayerState.IDLE
+
+        # If client reports PLAYING (e.g. after Play/Pause)
+        if new_state == MediaPlayerState.PLAYING:
+            self._attr_state = MediaPlayerState.PLAYING
+
+        # For all other states
+        else:
+            self._attr_state = new_state
+
+        # Synchronize attributes from client (volume, mute)
+        try:
             if attributes:
-                # Update various media attributes from client data
-                self._attr_media_title = attributes.get("media_title")
-                self._attr_media_artist = attributes.get("media_artist")
-                self._attr_media_image_url = attributes.get("entity_picture")
                 if "volume_level" in attributes:
                     self._attr_volume_level = attributes["volume_level"]
                 if "is_volume_muted" in attributes:
                     self._attr_is_volume_muted = attributes["is_volume_muted"]
+
+                # Update metadata only if it comes from the client (ICY)
+                if "media_title" in attributes:
+                    self._attr_media_title = attributes.get("media_title")
+                    self._attr_media_artist = attributes.get("media_artist")
+                    self._attr_media_image_url = attributes.get("entity_picture")
+
         except Exception as e:  # noqa: BLE001
             _LOGGER.error("Error updating attributes from client: %s", e)
 

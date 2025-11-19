@@ -1,6 +1,7 @@
 # Latest changes
 
-## v2.3.2
+## v2.3.3
 
-### Improvements
-- Smart Touch voice satellite
+###  New
+- Smart Touch OTA update
+- Privacy settings

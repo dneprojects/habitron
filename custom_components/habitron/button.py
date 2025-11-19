@@ -365,7 +365,7 @@ class SpeechButton(ButtonEntity):
         """Initialize a speech button."""
         self._name = "Activate voice input"
         self._module = module
-        self._stream_name = module.name.lower().replace(" ", "_")
+        self._stream_name = module.stream_name
         self._provider = module.comm.router.smhub.ws_provider
         self._active_ws_connections = self._provider.active_ws_connections
         self._attr_unique_id = f"Mod_{self._module.uid}_{self._name}"
@@ -385,12 +385,20 @@ class SpeechButton(ButtonEntity):
         ws_connection = self._active_ws_connections.get(self._stream_name)
 
         if ws_connection:
-            ws_connection.send_message(
-                {
-                    "type": "habitron/voice_activate_request",
-                    "payload": {"entity_id": self._module.assist_entity_id},
-                }
-            )
+            if not self._provider.assist_satellites.get(
+                self._stream_name
+            ).recognition_disabled:
+                ws_connection.send_message(
+                    {
+                        "type": "habitron/voice_activate_request",
+                        "payload": {"entity_id": self._module.assist_entity_id},
+                    }
+                )
+            else:
+                _LOGGER.info(
+                    "Voice recognition is currently disabled for stream '%s'; not sending activate request",
+                    self._stream_name,
+                )
         else:
             _LOGGER.info(
                 "Could not send voice activate request: No active client for stream '%s'",

@@ -81,6 +81,11 @@ class HbtnModule:
         self.diags = [IfDescriptor("", 0, 0, 0)]
         self.diags.append(IfDescriptor("Status", 0, 1, 0))
         self.vce_stat: ListeningStatusSensor | None = None
+        if self.type == "Smart Controller Touch":
+            self.stream_name: str = (
+                self.name.lower().replace(" ", "_") + f"_{self.raddr}"
+            )
+            self.client_version = "unknown"
 
     @property
     def mod_id(self) -> str:
