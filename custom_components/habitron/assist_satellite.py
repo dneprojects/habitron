@@ -4,7 +4,6 @@ import asyncio
 import logging
 from typing import Any
 
-from homeassistant.components import tts
 from homeassistant.components.assist_pipeline.pipeline import (
     PipelineEvent,
     PipelineEventType,
@@ -51,9 +50,7 @@ async def async_setup_entry(
             and hbt_module.mod_type == "Smart Controller Touch"
         ):
             new_devices.append(HbtnAssistSat(hass, hbt_module, provider))
-            provider.assist_satellites[hbt_module.name.lower().replace(" ", "_")] = (
-                new_devices[-1]
-            )
+            provider.assist_satellites[hbt_module.stream_name] = new_devices[-1]
 
     if new_devices:
         async_add_entities(new_devices)
@@ -73,7 +70,7 @@ class HbtnAssistSat(AssistSatelliteEntity):
         self._hass = hass
         self._module: SmartController = module
         self._provider = provider
-        self._stream_name: str = module.name.lower().replace(" ", "_")
+        self._stream_name: str = module.stream_name
         self._attr_name = f"Voice {module.name}"
         self._attr_unique_id = f"Mod_{self._module.uid}_assist_sat"
         self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
@@ -82,6 +79,8 @@ class HbtnAssistSat(AssistSatelliteEntity):
             | AssistSatelliteEntityFeature.START_CONVERSATION
         )
         self._attr_state = AssistSatelliteState.IDLE
+        self._not_recognized = False
+        self.recognition_disabled = False
 
     @property
     def stream_name(self) -> str:
@@ -97,13 +96,17 @@ class HbtnAssistSat(AssistSatelliteEntity):
     @callback
     def set_processing(self) -> None:
         """Set the state to processing."""
-        _LOGGER.warning("HbtnAssistSat: set_processing called for %s", self._stream_name)
+        _LOGGER.warning(
+            "HbtnAssistSat: set_processing called for %s", self._stream_name
+        )
         self._set_state(AssistSatelliteState.PROCESSING)
 
     @callback
     def set_responding(self) -> None:
         """Set the state to responding."""
-        _LOGGER.warning("HbtnAssistSat: set_responding called for %s", self._stream_name)
+        _LOGGER.warning(
+            "HbtnAssistSat: set_responding called for %s", self._stream_name
+        )
         self._set_state(AssistSatelliteState.RESPONDING)
 
     @callback
@@ -172,8 +175,25 @@ class HbtnAssistSat(AssistSatelliteEntity):
         _LOGGER.warning(
             "HbtnAssistSat: respond_no_text_recognized called for %s", self._stream_name
         )
-        await self.async_internal_announce(message="Das habe ich nicht verstanden.", preannounce=False)
+        await self.async_internal_announce(
+            message="Das habe ich nicht verstanden.", preannounce=False
+        )
         self.set_idle()
+
+    async def not_recognized_retry(self) -> None:
+        """Handle 'not recognized' retry scenario."""
+        _LOGGER.warning(
+            "HbtnAssistSat: not_recognized_retry called for %s", self._stream_name
+        )
+        await self.async_internal_announce(message="Wie, bitte?", preannounce=False)
+        await asyncio.sleep(1.5)
+        await self._provider.async_send_json_message(
+            self._stream_name,
+            {
+                "type": "habitron/voice_activate_request",
+                "payload": {"entity_id": self.entity_id},
+            },
+        )
 
     def on_pipeline_event(self, event: PipelineEvent) -> None:
         """Handle custom actions based on pipeline events."""
@@ -184,19 +204,27 @@ class HbtnAssistSat(AssistSatelliteEntity):
             self.set_processing()
         elif event.type == PipelineEventType.TTS_START:
             self.set_responding()
+            self._not_recognized = False
         if event.type == PipelineEventType.RUN_END:
             _LOGGER.debug(
-                "HbtnAssistSat: Pipeline run ended. Notifying client %s to finish.", self._stream_name
+                "HbtnAssistSat: Pipeline run ended. Notifying client %s to finish",
+                self._stream_name,
             )
-            # self.hass.async_create_task(
-            #     self._provider.async_send_json_message(
-            #         self._stream_name, {"type": "habitron/voice_pipeline_finished"}
-            #     )
-            # )
         elif event.type == PipelineEventType.ERROR:
             _LOGGER.error("HbtnAssistSat: Pipeline error occurred: %s", event.data)
             if event.data and event.data.get("code") == "stt-no-text-recognized":
-                _LOGGER.info("No text recognized error, triggering TTS announcement.")
-                self.hass.async_create_task(self.respond_no_text_recognized())
+                if self._not_recognized:
+                    self._not_recognized = not self._not_recognized
+                    _LOGGER.info(
+                        "No text recognized error, triggering TTS announcement"
+                    )
+                    self.hass.async_create_task(self.respond_no_text_recognized())
+                else:
+                    self._not_recognized = not self._not_recognized
+                    _LOGGER.info(
+                        "No text recognized error, triggering TTS announcement and retry"
+                    )
+                    self.hass.async_create_task(self.not_recognized_retry())
             else:
                 self.set_idle()
+                self._not_recognized = False

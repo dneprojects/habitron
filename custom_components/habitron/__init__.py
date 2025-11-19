@@ -1,5 +1,7 @@
 """The Habitron integration."""
 
+# remoteHA Token: ***REMOVED-TOKEN***
+
 from __future__ import annotations
 
 import logging
