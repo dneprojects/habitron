@@ -72,7 +72,7 @@ class HbtnCam(Camera):
     ) -> None:
         """Initialize the camera entity."""
         super().__init__()
-        self._stream_name = module.name.lower().replace(" ", "_")
+        self._stream_name = module.stream_name
         self.idx: int = idx
         self._module: HbtnModule = module
         self._attr_name = f"HbtnCam {idx + 1} ({module.name})"

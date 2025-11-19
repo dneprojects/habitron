@@ -1,10 +1,13 @@
-"""Habitron direct WebRTC and Voice provider (HA <-> Flutter client)."""
+"""Habitron web socket provider for direct WebRTC and Voice (HA <-> Flutter client)."""
 
 import asyncio
 import base64
+import hashlib
 import logging
 import os
+from pathlib import Path
 import re
+import shutil
 import socket
 import struct
 from typing import TYPE_CHECKING, Any
@@ -92,7 +95,9 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
     def register_assist_satellite(self, satellite: "HbtnAssistSat") -> None:
         """Allow assist satellite entities to register themselves with the provider."""
         self.assist_satellites[satellite.stream_name] = satellite
-        _LOGGER.debug("Assist satellite registered for stream: %s", satellite.stream_name)
+        _LOGGER.debug(
+            "Assist satellite registered for stream: %s", satellite.stream_name
+        )
 
     async def async_send_json_message(self, stream_name: str, msg: dict) -> None:
         """Send a structured JSON message to a specific connected client."""
@@ -104,6 +109,16 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
             )
             return
         ws_connection.send_message(msg)
+
+    async def async_broadcast_message(self, msg: dict) -> None:
+        """Broadcast a structured JSON message to all connected clients."""
+        for stream_name, ws_connection in self.active_ws_connections.items():
+            _LOGGER.debug(
+                "Broadcasting message to stream '%s': %s",
+                stream_name,
+                msg.get("type"),
+            )
+            ws_connection.send_message(msg)
 
     @callback
     def async_is_supported(self, stream_source: str) -> bool:
@@ -126,7 +141,7 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
         stream_name = stream_source.replace("habitron://", "")
         if not self.active_ws_connections.get(stream_name):
             _LOGGER.error("No client connected for stream '%s'", stream_name)
-            send_message(WebRTCAnswer(answer="")) # Send empty answer to signal failure
+            send_message(WebRTCAnswer(answer=""))  # Send empty answer to signal failure
             return
 
         try:
@@ -134,13 +149,15 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
             self.webrtc_send_message_callbacks[session_id] = send_message
 
             # Try to determine the local IP address visible to the client
-            local_ip = "127.0.0.1" # Default fallback
+            local_ip = "127.0.0.1"  # Default fallback
             try:
                 # Check for Docker environment variables
                 if os.environ.get("DOCKER_HOST") or os.environ.get(
                     "HOMEASSISTANT_DOCKER"
                 ):
-                    local_ip = "host.docker.internal" # Special hostname for Docker host
+                    local_ip = (
+                        "host.docker.internal"  # Special hostname for Docker host
+                    )
                 else:
                     # Try getting the hostname's IP (might not always be correct)
                     local_ip = socket.gethostbyname(socket.gethostname())
@@ -169,7 +186,7 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
             # Wait for the answer with a timeout
             try:
                 answer_sdp = await asyncio.wait_for(fut, timeout=10)
-                send_message(WebRTCAnswer(answer=answer_sdp)) # Send answer back to HA
+                send_message(WebRTCAnswer(answer=answer_sdp))  # Send answer back to HA
             except TimeoutError:
                 _LOGGER.error("WebRTC answer timed out for session %s", session_id)
                 send_message(
@@ -224,10 +241,10 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
         except TimeoutError as err:
             raise HomeAssistantError("Snapshot request timed out.") from err
         finally:
-            self.snapshot_futures.pop(request_id, None) # Clean up future
+            self.snapshot_futures.pop(request_id, None)  # Clean up future
 
     @callback
-    def async_register_websocket_handlers(self) -> None: # noqa: C901
+    def async_register_websocket_handlers(self) -> None:  # noqa: C901
         """Register all custom websocket command handlers."""
         _LOGGER.info("Registering all Habitron WebSocket command handlers")
 
@@ -235,7 +252,9 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
         def _async_on_ws_disconnect(stream_name: str) -> None:
             """Handle client disconnection and clean up resources."""
             _LOGGER.info("Client for stream '%s' disconnected", stream_name)
-            self.active_ws_connections.pop(stream_name, None) # Remove connection reference
+            self.active_ws_connections.pop(
+                stream_name, None
+            )  # Remove connection reference
 
             # Cancel any ongoing voice pipeline for this client
             if pipeline_data := self.voice_pipelines.pop(stream_name, None):
@@ -273,42 +292,49 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
             playback_finished_event = asyncio.Event()
             self.voice_pipelines[stream_name] = {
                 "queue": audio_queue,
-                "task": asyncio.current_task(), # Store reference to this task
+                "task": asyncio.current_task(),  # Store reference to this task
                 "playback_event": playback_finished_event,
             }
 
             # Set satellite state to LISTENING immediately
             satellite = self.assist_satellites.get(stream_name)
             if satellite:
-                _LOGGER.info("Setting satellite %s state to LISTENING via base class _set_state", satellite.entity_id)
+                _LOGGER.info(
+                    "Setting satellite %s state to LISTENING via base class _set_state",
+                    satellite.entity_id,
+                )
                 # Use the inherited _set_state method from AssistSatelliteEntity
                 satellite.set_listening()
             else:
-                _LOGGER.warning("Could not find satellite for stream '%s' to update state", stream_name)
+                _LOGGER.warning(
+                    "Could not find satellite for stream '%s' to update state",
+                    stream_name,
+                )
 
             try:
+                last_err = ""
 
                 async def audio_stream():
                     """Yield audio chunks for the pipeline, starting with a WAV header."""
                     # Create a 44-byte WAV header for 16-bit 16kHz mono PCM
                     channels = 1
-                    sample_width_bytes = 2 # 16 bits
-                    sample_rate = 16000 # 16 kHz
+                    sample_width_bytes = 2  # 16 bits
+                    sample_rate = 16000  # 16 kHz
                     header = struct.pack(
                         "<4sI4s4sIHHIIHH4sI",
                         b"RIFF",
-                        0, # Placeholder for file size
+                        0,  # Placeholder for file size
                         b"WAVE",
                         b"fmt ",
-                        16, # PCM format chunk size
-                        1, # PCM format
+                        16,  # PCM format chunk size
+                        1,  # PCM format
                         channels,
                         sample_rate,
-                        sample_rate * channels * sample_width_bytes, # byte_rate
-                        channels * sample_width_bytes, # block_align
-                        sample_width_bytes * 8, # bits_per_sample
+                        sample_rate * channels * sample_width_bytes,  # byte_rate
+                        channels * sample_width_bytes,  # block_align
+                        sample_width_bytes * 8,  # bits_per_sample
                         b"data",
-                        0, # Placeholder for data size
+                        0,  # Placeholder for data size
                     )
                     yield header
 
@@ -319,7 +345,9 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
                             break
                         yield chunk
 
-                tts_task: asyncio.Task | None = None # Task for streaming TTS audio back
+                tts_task: asyncio.Task | None = (
+                    None  # Task for streaming TTS audio back
+                )
                 tts_was_streamed = False
 
                 @callback
@@ -327,14 +355,21 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
                     """Handle pipeline events FOR TTS STREAMING ONLY."""
                     # This callback is executed synchronously by the pipeline.
                     nonlocal tts_task
-                    _LOGGER.warning("Provider event_callback received: %s for %s", event.type, stream_name)
+                    _LOGGER.warning(
+                        "Provider event_callback received: %s for %s",
+                        event.type,
+                        stream_name,
+                    )
                     sat = self.assist_satellites.get(stream_name)
                     if sat:
                         # Forward the event to the satellite entity's on_pipeline_event method
                         # Run as task because on_pipeline_event might become async or do async things
                         sat.on_pipeline_event(event)
                     else:
-                        _LOGGER.warning("event_callback: Could not find satellite for stream '%s' to forward event", stream_name)
+                        _LOGGER.warning(
+                            "Event_callback: Could not find satellite for stream '%s' to forward event",
+                            stream_name,
+                        )
                     # --- Specific handling for TTS_END to stream audio ---
                     if (
                         event.type == PipelineEventType.TTS_END
@@ -342,6 +377,7 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
                         and (tts_output := event.data.get("tts_output"))
                         and (token := tts_output.get("token"))
                     ):
+
                         async def _stream_tts_to_client():
                             """Fetch TTS audio stream and send chunks to the client."""
                             _LOGGER.debug(
@@ -373,7 +409,10 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
                                     stream_name,
                                     {"type": "habitron/voice_tts_chunk", "payload": ""},
                                 )
-                                _LOGGER.debug("Finished streaming TTS to client for token %s", token)
+                                _LOGGER.debug(
+                                    "Finished streaming TTS to client for token %s",
+                                    token,
+                                )
                             except Exception:
                                 _LOGGER.exception("Error streaming TTS to client")
 
@@ -394,7 +433,11 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
                 )
 
                 # Specify preferred TTS output format and optional voice
-                tts_audio_output = {tts.ATTR_PREFERRED_FORMAT: "wav"}
+                tts_audio_output = {
+                    tts.ATTR_PREFERRED_FORMAT: AudioFormats.WAV.value,
+                    tts.ATTR_PREFERRED_SAMPLE_RATE: AudioSampleRates.SAMPLERATE_16000.value,
+                    tts.ATTR_PREFERRED_SAMPLE_CHANNELS: AudioChannels.CHANNEL_MONO.value,
+                }
                 if tts_voice:
                     tts_audio_output["voice"] = tts_voice
 
@@ -402,11 +445,11 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
                 await async_pipeline_from_audio_stream(
                     self.hass,
                     context=context,
-                    event_callback=event_callback, # Pass our local callback for TTS
+                    event_callback=event_callback,  # Pass our local callback for TTS
                     stt_stream=audio_stream(),
                     stt_metadata=stt_metadata,
-                    pipeline_id=pipeline_id, # Use configured or default pipeline
-                    conversation_id=None, # Start new conversation
+                    pipeline_id=pipeline_id,  # Use configured or default pipeline
+                    conversation_id=None,  # Start new conversation
                     device_id=device_id,
                     satellite_id=satellite_id,
                     tts_audio_output=tts_audio_output,
@@ -414,9 +457,9 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
 
                 # Wait for the TTS streaming task (if any) to complete
                 if tts_task:
-                    _LOGGER.debug("Waiting for TTS streaming task to complete...")
+                    _LOGGER.debug("Waiting for TTS streaming task to complete")
                     await tts_task
-                    _LOGGER.debug("TTS streaming task completed.")
+                    _LOGGER.debug("TTS streaming task completed")
 
                     if tts_was_streamed:
                         # Wait for client 'tts_playback_finished' event
@@ -426,28 +469,73 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
                         )
                         try:
                             # Wait for the event set by handle_tts_playback_finished
-                            await asyncio.wait_for(playback_finished_event.wait(), timeout=30)
+                            await asyncio.wait_for(
+                                playback_finished_event.wait(), timeout=30
+                            )
                             _LOGGER.debug(
                                 "Client confirmed TTS playback finished for stream %s",
                                 stream_name,
                             )
                         except TimeoutError:
                             _LOGGER.warning(
-                                "Client did not confirm TTS playback for stream %s, timing out.",
+                                "Client did not confirm TTS playback for stream %s, timing out",
                                 stream_name,
                             )
 
             except asyncio.CancelledError:
-                _LOGGER.info("Voice pipeline task cancelled for stream '%s'", stream_name)
-            except Exception:
+                _LOGGER.info(
+                    "Voice pipeline task cancelled for stream '%s'", stream_name
+                )
+            except Exception as err:
                 _LOGGER.exception(
                     "Unexpected error in voice pipeline for stream '%s'", stream_name
                 )
+                last_err = str(err)
             finally:
                 _LOGGER.info("Voice pipeline for stream '%s' finished", stream_name)
                 self.voice_pipelines.pop(stream_name, None)
-                connection.send_message({"type": "habitron/voice_pipeline_finished"})
+                connection.send_message(
+                    {"type": "habitron/voice_pipeline_finished", "error": last_err}
+                )
+
         # --- WebSocket Command Handlers ---
+        @websocket_api.websocket_command(
+            {
+                vol.Required("type"): "habitron/voice_pipeline_status",
+                vol.Required("disabled"): bool,  # Expects an empty dict for now
+            }
+        )
+        @websocket_api.async_response
+        async def handle_voice_pipeline_status(hass: HomeAssistant, connection, msg):
+            """Handle request from client to start the voice pipeline."""
+            stream_name = next(
+                (n for n, c in self.active_ws_connections.items() if c == connection),
+                None,
+            )
+            # Ignore if client unknown or pipeline already running for this client
+            if not stream_name or stream_name in self.voice_pipelines:
+                _LOGGER.debug(
+                    "Ignoring voice_pipeline_status for %s (unknown)",
+                    stream_name,
+                )
+                # Still send a result so the client isn't waiting indefinitely
+                connection.send_result(msg["id"])
+                return
+            disabled = msg["disabled"]  # Get the disabled status
+            _LOGGER.info(
+                "Received voice_pipeline_status for %s: disabled=%s",
+                stream_name,
+                disabled,
+            )
+            satEntity = self.assist_satellites.get(stream_name)
+            if satEntity:
+                satEntity.recognition_disabled = disabled
+                satEntity.set_idle()  # Reset state to IDLE on status change
+            else:
+                _LOGGER.warning(
+                    "No assist_satellite found for stream '%s' to update recognition_disabled",
+                    stream_name,
+                )
 
         @websocket_api.websocket_command(
             {
@@ -464,7 +552,10 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
             )
             # Ignore if client unknown or pipeline already running for this client
             if not stream_name or stream_name in self.voice_pipelines:
-                _LOGGER.debug("Ignoring voice_pipeline_start for %s (unknown or already running)", stream_name)
+                _LOGGER.debug(
+                    "Ignoring voice_pipeline_start for %s (unknown or already running)",
+                    stream_name,
+                )
                 # Still send a result so the client isn't waiting indefinitely
                 connection.send_result(msg["id"])
                 return
@@ -510,7 +601,7 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
             # Get the context from the WebSocket message
             context = connection.context(msg)
             # Create a new task to run the pipeline
-            asyncio.create_task( # Use create_task to run concurrently
+            asyncio.create_task(  # Use create_task to run concurrently  # noqa: RUF006
                 _run_voice_pipeline(
                     connection,
                     stream_name,
@@ -530,7 +621,7 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
                 vol.Required("payload"): str,  # base64 encoded string
             }
         )
-        @websocket_api.async_response # Use async_response for commands that don't need a result
+        @websocket_api.async_response  # Use async_response for commands that don't need a result
         async def handle_voice_audio_chunk(hass: HomeAssistant, connection, msg):
             """Handle incoming audio chunks from the client."""
             stream_name = next(
@@ -542,7 +633,7 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
                 pipeline_data := self.voice_pipelines.get(stream_name)
             ):
                 # _LOGGER.warning("Received audio chunk for unknown or inactive pipeline: %s", stream_name)
-                return # Ignore chunks if pipeline isn't running
+                return  # Ignore chunks if pipeline isn't running
 
             # Put the decoded audio data into the queue
             if queue := pipeline_data.get("queue"):
@@ -550,9 +641,13 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
                     audio_data = base64.b64decode(msg["payload"])
                     await queue.put(audio_data)
                 except (TypeError, ValueError):
-                    _LOGGER.error("Failed to decode base64 audio chunk for %s", stream_name)
+                    _LOGGER.error(
+                        "Failed to decode base64 audio chunk for %s", stream_name
+                    )
                 except asyncio.QueueFull:
-                    _LOGGER.warning("Audio queue full for %s, dropping chunk", stream_name)
+                    _LOGGER.warning(
+                        "Audio queue full for %s, dropping chunk", stream_name
+                    )
             # No result message is sent back for chunks to minimize overhead
 
         @websocket_api.websocket_command(
@@ -568,16 +663,21 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
             if not stream_name or not (
                 pipeline_data := self.voice_pipelines.get(stream_name)
             ):
-                _LOGGER.debug("Ignoring voice_pipeline_end for unknown or inactive pipeline: %s", stream_name)
-                connection.send_result(msg["id"]) # Still acknowledge
+                _LOGGER.debug(
+                    "Ignoring voice_pipeline_end for unknown or inactive pipeline: %s",
+                    stream_name,
+                )
+                connection.send_result(msg["id"])  # Still acknowledge
                 return
 
             # Put None into the queue to signal the end of the audio stream
             if queue := pipeline_data.get("queue"):
-                _LOGGER.debug("Received end signal, putting None in audio queue for %s", stream_name)
+                _LOGGER.debug(
+                    "Received end signal, putting None in audio queue for %s",
+                    stream_name,
+                )
                 await queue.put(None)
-            connection.send_result(msg["id"]) # Acknowledge command
-
+            connection.send_result(msg["id"])  # Acknowledge command
 
         @websocket_api.websocket_command(
             {vol.Required("type"): "habitron/tts_playback_finished"}
@@ -592,9 +692,7 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
                 None,
             )
             # Find the running pipeline and trigger its wait event
-            if stream_name and (
-                pipeline_data := self.voice_pipelines.get(stream_name)
-            ):
+            if stream_name and (pipeline_data := self.voice_pipelines.get(stream_name)):
                 if event := pipeline_data.get("playback_event"):
                     _LOGGER.debug(
                         "Setting playback_finished_event for stream %s", stream_name
@@ -602,17 +700,23 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
                     event.set()
 
             if stream_name and (satellite := self.assist_satellites.get(stream_name)):
-                _LOGGER.info("Client finished TTS playback, setting satellite %s state to IDLE", satellite.entity_id)
+                _LOGGER.info(
+                    "Client finished TTS playback, setting satellite %s state to IDLE",
+                    satellite.entity_id,
+                )
                 # Call inherited method to set state to IDLE
                 satellite.set_idle()
             else:
-                _LOGGER.warning("Received tts_playback_finished for unknown stream: %s", stream_name)
-            connection.send_result(msg["id"]) # Acknowledge command
+                _LOGGER.warning(
+                    "Received tts_playback_finished for unknown stream: %s", stream_name
+                )
+            connection.send_result(msg["id"])  # Acknowledge command
 
         @websocket_api.websocket_command(
             {
                 vol.Required("type"): "habitron/register_stream",
                 vol.Required("stream_name"): str,
+                vol.Required("version"): str,
             }
         )
         @websocket_api.async_response
@@ -621,18 +725,23 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
         ):
             """Handle client registering its stream name."""
             stream_name = msg["stream_name"]
+            client_version = msg.get("version", "unknown")
+            module = self.rtr.get_module_by_stream(stream_name)
+            if module:
+                module.client_version = client_version
             if existing_conn := self.active_ws_connections.get(stream_name):
-                 if existing_conn != connection:
-                     _LOGGER.warning("Stream '%s' re-registered by new client, disconnecting old one.", stream_name)
-                     # Optionally disconnect the old client here
-                     # await existing_conn.close()
+                if existing_conn != connection:
+                    _LOGGER.warning(
+                        "Stream '%s' re-registered by new client, disconnecting old one",
+                        stream_name,
+                    )
             _LOGGER.info("Client registered stream '%s'", stream_name)
             self.active_ws_connections[stream_name] = connection
             # Register disconnect handler
             connection.subscriptions[msg["id"]] = lambda: _async_on_ws_disconnect(
                 stream_name
             )
-            connection.send_result(msg["id"]) # Acknowledge registration
+            connection.send_result(msg["id"])  # Acknowledge registration
             _LOGGER.info("Client registered stream '%s'", stream_name)
 
         @websocket_api.websocket_command(
@@ -654,9 +763,11 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
                 _LOGGER.debug("Received WebRTC answer for session %s", session_id)
                 fut.set_result(msg["sdp"])
             else:
-                _LOGGER.warning("Received WebRTC answer for unknown or completed session %s", session_id)
-            connection.send_result(msg["id"]) # Acknowledge
-
+                _LOGGER.warning(
+                    "Received WebRTC answer for unknown or completed session %s",
+                    session_id,
+                )
+            connection.send_result(msg["id"])  # Acknowledge
 
         @websocket_api.websocket_command(
             {
@@ -675,29 +786,30 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
             session_id = msg["session_id"]
             send_message = self.webrtc_send_message_callbacks.get(session_id)
             candidate_init = RTCIceCandidateInit(
-                    candidate=msg["candidate"],
-                    sdp_mid=msg["sdp_mid"],
-                    sdp_m_line_index=msg["sdp_m_line_index"],
-                )
+                candidate=msg["candidate"],
+                sdp_mid=msg["sdp_mid"],
+                sdp_m_line_index=msg["sdp_m_line_index"],
+            )
             candidate = WebRTCCandidate(candidate=candidate_init)
 
             # If the HA-side send_message callback is ready, send immediately
             if send_message:
-                _LOGGER.debug("Forwarding WebRTC candidate for session %s to HA", session_id)
+                _LOGGER.debug(
+                    "Forwarding WebRTC candidate for session %s to HA", session_id
+                )
                 send_message(candidate)
             # Otherwise, store it temporarily until the answer is processed
             else:
                 _LOGGER.debug("Queueing WebRTC candidate for session %s", session_id)
                 self.pending_candidates.setdefault(session_id, []).append(candidate)
-            connection.send_result(msg["id"]) # Acknowledge
-
+            connection.send_result(msg["id"])  # Acknowledge
 
         @websocket_api.websocket_command(
             {
                 vol.Required("type"): "habitron/snapshot_result",
                 vol.Required("request_id"): str,
-                vol.Optional("data"): str, # Base64 encoded image data
-                vol.Optional("error"): str, # Error message if snapshot failed
+                vol.Optional("data"): str,  # Base64 encoded image data
+                vol.Optional("error"): str,  # Error message if snapshot failed
             }
         )
         @websocket_api.async_response
@@ -712,7 +824,11 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
             ].done():
                 if error_msg := msg.get("error"):
                     # Set exception if client reported an error
-                    _LOGGER.error("Snapshot request %s failed on client: %s", request_id, error_msg)
+                    _LOGGER.error(
+                        "Snapshot request %s failed on client: %s",
+                        request_id,
+                        error_msg,
+                    )
                     data["future"].set_exception(
                         HomeAssistantError(f"Snapshot failed on client: {error_msg}")
                     )
@@ -720,29 +836,111 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
                     # Decode base64 data and set result
                     try:
                         snapshot_data = base64.b64decode(msg["data"])
-                        _LOGGER.debug("Received snapshot data for request %s (%d bytes)", request_id, len(snapshot_data))
+                        _LOGGER.debug(
+                            "Received snapshot data for request %s (%d bytes)",
+                            request_id,
+                            len(snapshot_data),
+                        )
                         data["future"].set_result(snapshot_data)
                     except (TypeError, ValueError) as e:
-                        _LOGGER.error("Failed to decode snapshot data for request %s: %s", request_id, e)
+                        _LOGGER.error(
+                            "Failed to decode snapshot data for request %s: %s",
+                            request_id,
+                            e,
+                        )
                         data["future"].set_exception(
                             HomeAssistantError(f"Failed to decode snapshot: {e}")
                         )
                 else:
                     # No data and no error - treat as failure
-                    _LOGGER.error("Snapshot result for request %s missing data and error.", request_id)
+                    _LOGGER.error(
+                        "Snapshot result for request %s missing data and error",
+                        request_id,
+                    )
                     data["future"].set_exception(
-                            HomeAssistantError("Snapshot result missing data and error.")
-                        )
+                        HomeAssistantError("Snapshot result missing data and error.")
+                    )
             else:
-                _LOGGER.warning("Received snapshot result for unknown or completed request %s", request_id)
-            connection.send_result(msg["id"]) # Acknowledge
+                _LOGGER.warning(
+                    "Received snapshot result for unknown or completed request %s",
+                    request_id,
+                )
+            connection.send_result(msg["id"])  # Acknowledge
 
+        @websocket_api.websocket_command(
+            {
+                vol.Required("type"): "habitron/call_announcement",
+                vol.Required("message"): str,  # message to announce
+            }
+        )
+        @websocket_api.async_response
+        async def handle_call_announcement(
+            hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+        ):
+            """Announce message from client."""
+            stream_name = next(
+                (n for n, c in self.active_ws_connections.items() if c == connection),
+                None,
+            )
+            if not stream_name:
+                _LOGGER.warning(
+                    f"Received call_announcement from unknown client {connection}"  # noqa: G004
+                )
+                connection.send_result(
+                    msg["id"], {"success": False, "error": "Unknown client"}
+                )
+                return
+            # Extract the message text from the payload
+            message_text = msg.get("message")
+            if not message_text:
+                # Handle missing message text
+                _LOGGER.warning(
+                    "Received call_announcement from %s with no message", stream_name
+                )
+                connection.send_result(
+                    msg["id"], {"success": False, "error": "No message provided"}
+                )
+                return
+
+            # Find the corresponding satellite entity for this stream
+            satellite = self.assist_satellites.get(stream_name)
+            if not satellite:
+                # Handle missing satellite entity
+                _LOGGER.warning(
+                    "Received call_announcement for stream '%s', but no satellite entity is registered",
+                    stream_name,
+                )
+                connection.send_result(
+                    msg["id"], {"success": False, "error": "Satellite not registered"}
+                )
+                return
+
+            # Call the satellite's internal announce method to trigger TTS
+            try:
+                _LOGGER.debug(
+                    "Triggering internal announcement for %s: '%s'",
+                    stream_name,
+                    message_text,
+                )
+                # This helper method generates the TTS audio and then calls
+                # satellite.async_announce() to send the media URL to the client.
+                await satellite.async_internal_announce(
+                    message=message_text, preannounce=True
+                )
+                # Send success result to the client
+                connection.send_result(msg["id"])
+            except Exception as e:
+                # Handle any errors during the announcement process
+                _LOGGER.exception(
+                    "Error processing call_announcement for %s: %s", stream_name, e
+                )
+                connection.send_result(msg["id"], {"success": False, "error": str(e)})
 
         @websocket_api.websocket_command(
             {
                 vol.Required("type"): "habitron/update_media_state",
-                vol.Required("state"): str, # e.g., "playing", "paused", "idle"
-                vol.Optional("attributes"): dict, # e.g., {"volume_level": 0.5}
+                vol.Required("state"): str,  # e.g., "playing", "paused", "idle"
+                vol.Optional("attributes"): dict,  # e.g., {"volume_level": 0.5}
             }
         )
         @websocket_api.async_response
@@ -755,22 +953,29 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
                 None,
             )
             if not stream_name:
-                _LOGGER.warning("Received media state update from unknown client")
-                connection.send_result(msg["id"], {"success": False, "error": "Unknown client"})
+                _LOGGER.warning(
+                    f"Received media state update from unknown client {connection}"  # noqa: G004
+                )
+                connection.send_result(
+                    msg["id"], {"success": False, "error": "Unknown client"}
+                )
                 return
 
             # Find the corresponding media player entity and update its state
             if player := self.media_players.get(stream_name):
-                _LOGGER.debug("Updating state for %s from client: %s", player.name, msg["state"])
+                _LOGGER.debug(
+                    "Updating state for %s from client: %s", player.name, msg["state"]
+                )
                 player.update_from_client(msg["state"], msg.get("attributes", {}))
-                connection.send_result(msg["id"]) # Acknowledge update
+                connection.send_result(msg["id"])  # Acknowledge update
             else:
                 _LOGGER.warning(
                     "Received media state update for unregistered player: %s",
                     stream_name,
                 )
-                connection.send_result(msg["id"], {"success": False, "error": "Player not registered"})
-
+                connection.send_result(
+                    msg["id"], {"success": False, "error": "Player not registered"}
+                )
 
         @websocket_api.websocket_command(
             {vol.Required("type"): "habitron/media_next_track"}
@@ -791,10 +996,11 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
                     await player.async_media_next_track()
                     success = True
                 except Exception:
-                    _LOGGER.exception("Error calling async_media_next_track for %s", player.name)
+                    _LOGGER.exception(
+                        "Error calling async_media_next_track for %s", player.name
+                    )
 
             connection.send_result(msg["id"], {"success": success})
-
 
         @websocket_api.websocket_command(
             {vol.Required("type"): "habitron/media_previous_track"}
@@ -810,22 +1016,27 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
             )
             success = False
             if stream_name and (player := self.media_players.get(stream_name)):
-                _LOGGER.debug("Forwarding previous_track command to player %s", player.name)
+                _LOGGER.debug(
+                    "Forwarding previous_track command to player %s", player.name
+                )
                 try:
                     await player.async_media_previous_track()
                     success = True
                 except Exception:
-                     _LOGGER.exception("Error calling async_media_previous_track for %s", player.name)
+                    _LOGGER.exception(
+                        "Error calling async_media_previous_track for %s", player.name
+                    )
 
             connection.send_result(msg["id"], {"success": success})
-
 
         # --- REGISTRATION OF ALL HANDLERS ---
         websocket_api.async_register_command(self.hass, handle_register_stream)
         websocket_api.async_register_command(self.hass, handle_webrtc_answer)
         websocket_api.async_register_command(self.hass, handle_webrtc_candidate)
+        websocket_api.async_register_command(self.hass, handle_call_announcement)
         websocket_api.async_register_command(self.hass, handle_snapshot_result)
         websocket_api.async_register_command(self.hass, handle_update_media_state)
+        websocket_api.async_register_command(self.hass, handle_voice_pipeline_status)
         websocket_api.async_register_command(self.hass, handle_voice_pipeline_start)
         websocket_api.async_register_command(self.hass, handle_voice_audio_chunk)
         websocket_api.async_register_command(self.hass, handle_voice_pipeline_end)

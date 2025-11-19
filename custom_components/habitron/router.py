@@ -246,6 +246,14 @@ class HbtnRouter:
                 return module
         return None
 
+    def get_module_by_stream(self, stream_name) -> HbtnModule | None:
+        """Return module based on stream name."""
+        for module in self.modules:
+            if module.type == "Smart Controller Touch":
+                if module.stream_name == stream_name:
+                    return module
+        return None
+
     async def get_modules(self, mod_groups) -> list[ModuleDescriptor]:
         """Get summary of all Habitron modules."""
         desc: list[ModuleDescriptor] = []
