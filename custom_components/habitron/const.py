@@ -1,6 +1,6 @@
 """Constants for the Habitron integration."""
 
-from typing import Final
+from typing import Final, TypedDict
 
 DOMAIN = "habitron"  # This is the internal name of the integration, it should also match the directory
 CONF_DEFAULT_HOST = "local"  # default host string of SmartCenter, uses own ip

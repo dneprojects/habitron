@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import logging
 from pathlib import Path
 import socket
@@ -92,7 +93,12 @@ class HbtnComm:
         self._name: str = "HbtnComm"
         self._host_conf: str = config.data.__getitem__("habitron_host")
         self.logger = logging.getLogger(__name__)
-        self._host: str = get_host_ip(self._host_conf)
+        if self.is_valid_ipv4(self._host_conf):
+            self._host = self._host_conf
+        elif self._host_conf == "local":
+            self._host = get_own_ip()
+        else:
+            self._host: str = get_host_ip(self._host_conf)
         self.logger.info(f"Initializing hub, got own ip: {self._host}")  # noqa: G004
         self._port: int = 7777
 
@@ -147,6 +153,15 @@ class HbtnComm:
     def com_hwtype(self) -> str:
         """Firmware version of SmartHub."""
         return self._hwtype
+
+    def is_valid_ipv4(self, ip_string: str) -> bool:
+        """Check if a string is a valid IPv4 address."""
+        try:
+            ipaddress.IPv4Address(ip_string)
+        except ValueError:
+            return False
+        else:
+            return True
 
     async def set_host(self, host: str):
         """Update host information for integration re-configuration."""
