@@ -2,12 +2,9 @@
 
 import asyncio
 import base64
-import hashlib
 import logging
 import os
-from pathlib import Path
 import re
-import shutil
 import socket
 import struct
 from typing import TYPE_CHECKING, Any
@@ -932,7 +929,7 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
             except Exception as e:
                 # Handle any errors during the announcement process
                 _LOGGER.exception(
-                    "Error processing call_announcement for %s: %s", stream_name, e
+                    "Error processing call_announcement for %s", stream_name
                 )
                 connection.send_result(msg["id"], {"success": False, "error": str(e)})
 
