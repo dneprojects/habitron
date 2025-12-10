@@ -1,7 +1,6 @@
 # Latest changes
 
-## v2.3.3
+## v2.3.6
 
-###  New
-- Smart Touch OTA update
-- Privacy settings
+### Fix
+- Config flow

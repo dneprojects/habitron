@@ -113,6 +113,13 @@ class HbtnModule:
         """Initialize module instance."""
         await self.get_names()
         await self.get_settings()
+        # if self.hw_version == "0010032427800006":
+        #     self.typ = b"\x01\x04"  # Smart Controller Touch for module "Habitron-Küche"
+        #     self.type = MODULE_CODES[self.typ]
+        #     self.stream_name: str = (
+        #         self.name.lower().replace(" ", "_") + f"_{self.raddr}"
+        #     )
+        #     self.client_version = "unknown"
         device_registry = dr.async_get(self._hass)
         self.status = self.extract_status(sys_status)
         self.uid = self.hw_version
