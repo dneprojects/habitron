@@ -209,9 +209,9 @@ class HbtnComm:
 
     def get_smhub_info(self) -> dict[str, str]:
         """Get basic infos of SmartHub."""
-        smhub_info = query_smarthub(self._host)  # get info from query port
-        if not smhub_info:
-            raise (TimeoutError)
+        # smhub_info = query_smarthub(self._host)  # get info from query port
+        # if not smhub_info:
+        #     raise (TimeoutError)
         sck = socket.socket()  # Create a socket object
         try:
             sck.connect((self._host, self._port))
@@ -284,42 +284,58 @@ class HbtnComm:
     async def async_send_command(self, cmd_string: str, time_out_sec=10) -> bytes:
         """General function for communication via SmartHub."""
         try:
-            sck = socket.socket()  # Create a socket object
-            sck.connect((self._host, self._port))
-            sck.settimeout(time_out_sec)  # 8 seconds
-            full_string = wrap_command(cmd_string)
-            res = await async_send_receive(sck, full_string)
-            sck.close()
-            return res[0]
+            # Run the synchronous blocking call in the executor
+            res = await self._hass.async_add_executor_job(
+                self._send_command_sync, cmd_string, time_out_sec
+            )
         except TimeoutError as err_msg:
-            sck.close()
             self.logger.error(f"Error connecting to Smart Hub: {err_msg}")  # noqa: G004
             return b""
         except ConnectionRefusedError:
-            sck.close()
             self.logger.info("Smart Hub not available, probably rebooting.")
             return b""
+        else:
+            return res
+
+    def _send_command_sync(self, cmd_string: str, time_out_sec=10) -> bytes:
+        """Synchronous version of send command."""
+        sck = socket.socket()
+        sck.connect((self._host, self._port))
+        sck.settimeout(time_out_sec)
+        full_string = wrap_command(cmd_string)
+        resp_bytes = send_receive(sck, full_string)
+        sck.close()
+        return resp_bytes
 
     async def async_send_command_crc(
         self, cmd_string: str, time_out_sec=10
     ) -> tuple[bytes, int]:
         """General function for communication via SmartHub, returns additional crc."""
         try:
-            sck = socket.socket()  # Create a socket object
-            sck.connect((self._host, self._port))
-            sck.settimeout(time_out_sec)  # default: 10 seconds
-            full_string = wrap_command(cmd_string)
-            res = await async_send_receive(sck, full_string)
-            sck.close()
-            return res[0], res[1]
+            # Run the synchronous blocking call in the executor
+            res = await self._hass.async_add_executor_job(
+                self._send_command_crc_sync, cmd_string, time_out_sec
+            )
         except TimeoutError as err_msg:
-            sck.close()
             self.logger.error("Error connecting to Smart Hub: %s", err_msg)
             return b"", 0
         except ConnectionRefusedError:
-            sck.close()
             self.logger.info("Smart Hub not available.")
             return b"", 0
+        else:
+            return res
+
+    def _send_command_crc_sync(
+        self, cmd_string: str, time_out_sec=10
+    ) -> tuple[bytes, int]:
+        """Synchronous version of send command crc."""
+        sck = socket.socket()
+        sck.connect((self._host, self._port))
+        sck.settimeout(time_out_sec)
+        full_string = wrap_command(cmd_string)
+        resp_bytes, crc = send_receive_crc(sck, full_string)
+        sck.close()
+        return resp_bytes, crc
 
     async def async_get_router_status(self, rtr_id) -> bytes:
         """Get router status."""
@@ -764,7 +780,7 @@ class HbtnComm:
         else:
             # router restart
             cmd_str = SMHUB_COMMANDS["REBOOT_ROUTER"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+            cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
         await self.async_send_command(cmd_str)
 
     async def restart_fwd_tbl(self, rtr_id: int) -> None:
@@ -817,7 +833,7 @@ class HbtnComm:
         cmd_str = SMHUB_COMMANDS["POWER_UP_CHAN"]
         cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
         cmd_str = cmd_str.replace("<msk>", chr(mask))
-        [resp_bytes, crc] = await self.async_send_command_crc(
+        [_resp_bytes, _crc] = await self.async_send_command_crc(
             cmd_str, time_out_sec=1000
         )
 
@@ -933,7 +949,7 @@ class HbtnComm:
                 )
 
 
-async def test_connection(host_name) -> tuple[bool, str]:
+def test_connection(host_name) -> tuple[bool, str]:
     """Test connectivity to SmartHub is OK."""
     port = 7777
     try:
@@ -985,7 +1001,7 @@ def send_receive(sck, cmd_str: str) -> bytes:
     return resp_bytes
 
 
-async def async_send_receive(sck, cmd_str: str) -> tuple[bytes, int]:
+def send_receive_crc(sck, cmd_str: str) -> tuple[bytes, int]:
     """Send string to SmartHub and wait for response with timeout."""
     try:
         sck.send(cmd_str.encode("iso8859-1"))  # Send command
