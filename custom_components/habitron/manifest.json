@@ -12,7 +12,9 @@
   "requirements": [
     "apkutils", "awesomeversion", "aiohttp", "wyoming"
   ],
-  "ssdp": [],
-  "version": "2.3.5",
+  "ssdp": [{
+    "st": "urn:habitron-com:device:SmartHub:1"
+  }],
+  "version": "2.3.6",
   "zeroconf": []
 }
