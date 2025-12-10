@@ -34,6 +34,7 @@ DISCOVERY_MESSAGE = b"habitron_discovery"
 def _get_local_ip() -> str:
     """Get local IP address via synchronous socket call."""
     try:
+        # Create a dummy socket to detect own IP
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
         ip = s.getsockname()[0]
@@ -46,19 +47,21 @@ def _get_local_ip() -> str:
 
 async def validate_input(hass: HomeAssistant, data: dict) -> dict[str, Any]:
     """Validate the user input allows us to connect."""
-    # Run synchronous network I/O in the executor to prevent blocking the loop
+    # Run synchronous network I/O in the executor
     own_ip = await hass.async_add_executor_job(_get_local_ip)
 
-    # Do not end user visible strings with a period
+    # Log own IP without trailing period
     _LOGGER.info(f"Smart Center own IP: {own_ip}")  # noqa: G004
 
     host_to_test = data["habitron_host"]
     if host_to_test == "local":
         host_to_test = own_ip
 
+    # Basic length check
     if len(host_to_test) < 4:
         raise InvalidHost
 
+    # Validate interval type and range
     if not (isinstance(data["update_interval"], int)):
         raise InvalidInterval
 
@@ -69,6 +72,7 @@ async def validate_input(hass: HomeAssistant, data: dict) -> dict[str, Any]:
         raise IntervalTooLong
 
     try:
+        # Test actual connection
         result, host_name = test_connection(host_to_test)
     except socket.gaierror as exc:
         raise socket.gaierror from exc
@@ -95,6 +99,7 @@ class UDPDiscoveryProtocol(asyncio.DatagramProtocol):
         if sock:
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
 
+        # Send discovery packet
         self.transport.sendto(DISCOVERY_MESSAGE, ("255.255.255.255", DISCOVERY_PORT))
 
     def datagram_received(self, data, addr):
@@ -134,6 +139,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def _discover_habitron(self) -> list[dict[str, Any]]:
         """Run a quick UDP scan to find devices."""
         loop = asyncio.get_running_loop()
+        # Create datagram endpoint for discovery
         transport, protocol = await loop.create_datagram_endpoint(
             lambda: UDPDiscoveryProtocol(),
             local_addr=("0.0.0.0", 0),
@@ -154,17 +160,17 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # Extract host from SSDP location URL
         host = urlparse(discovery_info.ssdp_location).hostname
 
-        # Verify via UDP to get full details (Serial, MAC) for Unique ID
+        # Verify via UDP to get full details (Serial, MAC)
         devices = await self._discover_habitron()
         target_device = next((d for d in devices if d.get("ip") == host), None)
 
         if not target_device:
-            # Fallback if UDP fails but SSDP worked: use host as ID
+            # Fallback if UDP fails but SSDP worked
             _LOGGER.debug("SSDP found %s but UDP probe failed", host)
             unique_id = f"habitron_{host}"
             self._discovered_device = {"host": host, "ip": host}
         else:
-            # Use serial if available, else host
+            # Use serial if available
             unique_id = target_device.get("serial", f"habitron_{host}")
             self._discovered_device = target_device
 
@@ -214,7 +220,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             discovered = await self._discover_habitron()
             if discovered:
                 device = discovered[0]
-                # Prefer 'host' (e.g. 'local') over 'ip'
+                # Prefer 'host' over 'ip'
                 default_host = device.get("host", device.get("ip", CONF_DEFAULT_HOST))
                 _LOGGER.debug(
                     "Discovered Habitron device via active scan: %s", default_host
@@ -274,10 +280,12 @@ class MyOptionsFlowHandler(config_entries.OptionsFlow):
     ) -> config_entries.ConfigFlowResult:
         """Manage the options."""
         if user_input is None:
+            # Load current settings from config entry
             default_host = self.config_entry.data["habitron_host"]
             default_interval = self.config_entry.data["update_interval"]
             default_enablestate = True
         else:
+            # Use user provided input
             default_host = user_input["habitron_host"]
             default_interval = user_input["update_interval"]
             default_enablestate = user_input["updates_enabled"]
@@ -306,11 +314,11 @@ class MyOptionsFlowHandler(config_entries.OptionsFlow):
         if user_input is not None:
             try:
                 info = await validate_input(self.hass, user_input)
+                # Update main config entry data
                 self.hass.config_entries.async_update_entry(
                     self.config_entry,
                     data=user_input,
                     options=self.config_entry.options,
-                    # short comments
                 )
                 return self.async_create_entry(title=info["title"], data=user_input)
             except CannotConnect:
