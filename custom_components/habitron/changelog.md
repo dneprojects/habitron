@@ -1,6 +1,6 @@
 # Latest changes
 
-## v2.3.6
+## v2.3.7
 
 ### Fix
-- Config flow
+- Async communication with lock

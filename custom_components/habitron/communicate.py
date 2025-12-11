@@ -114,10 +114,15 @@ class HbtnComm:
         # self._websck_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJjMWI1ZjgyNmUxMDg0MjFhYWFmNTZlYWQ0ZThkZGNiZSIsImlhdCI6MTY5NDUzNTczOCwiZXhwIjoyMDA5ODk1NzM4fQ.0YZWyuQn5DgbCAfEWZXbQZWaViNBsR4u__LjC4Zf2lY"
         # self._websck_token = ""
         self._loop = asyncio.get_event_loop()
+        # Lock to ensure sequential access to the socket even when running in executor threads
+        self._api_lock = asyncio.Lock()
         self.crc: int = 0
         self.router: HbtnRouter
         self.update_suspended: bool = False
         self.is_addon: bool = True  # will be set in get_smhub_info()
+
+        # Note: get_smhub_info is blocking, should ideally be async or run in executor
+        # but is kept here to match initialization flow.
         self.info: dict[str, str] = self.get_smhub_info()
         self.grp_modes: dict = {}
         self._hbtn_version: str = self._hass.data["integrations"]["habitron"].manifest[
@@ -224,9 +229,7 @@ class HbtnComm:
 
     def get_smhub_info(self) -> dict[str, str]:
         """Get basic infos of SmartHub."""
-        # smhub_info = query_smarthub(self._host)  # get info from query port
-        # if not smhub_info:
-        #     raise (TimeoutError)
+        # Note: This is synchronous/blocking.
         sck = socket.socket()  # Create a socket object
         try:
             sck.connect((self._host, self._port))
@@ -240,7 +243,7 @@ class HbtnComm:
 
         info = yaml.load(resp_bytes.decode("iso8859-1"), Loader=yaml.Loader)
         if isinstance(info, str):
-            self.logger.error("Error getting SmartHub info: %s", info)
+            self.logger.warning("Error getting SmartHub info: %s", info)
             raise (TimeoutError)
         self._version = info["software"]["version"]
         self._hwtype = info["hardware"]["platform"]["type"]
@@ -290,27 +293,34 @@ class HbtnComm:
 
     def send_only(self, cmd_string: str) -> None:
         """Send string and return."""
-        sck = socket.socket()  # Create a socket object
-        sck.connect((self._host, self._port))
-        full_string = wrap_command(cmd_string)
-        sck.send(full_string.encode("iso8859-1"))  # Send command
-        sck.close()
+        # Fire-and-forget sync call.
+        # Warning: This blocks. Use async_send_command if possible.
+        try:
+            sck = socket.socket()  # Create a socket object
+            sck.connect((self._host, self._port))
+            full_string = wrap_command(cmd_string)
+            sck.send(full_string.encode("iso8859-1"))  # Send command
+            sck.close()
+        except Exception as e:
+            self.logger.warning(f"Error in send_only: {e}")
 
     async def async_send_command(self, cmd_string: str, time_out_sec=10) -> bytes:
         """General function for communication via SmartHub."""
-        try:
-            # Run the synchronous blocking call in the executor
-            res = await self._hass.async_add_executor_job(
-                self._send_command_sync, cmd_string, time_out_sec
-            )
-        except TimeoutError as err_msg:
-            self.logger.error(f"Error connecting to Smart Hub: {err_msg}")  # noqa: G004
-            return b""
-        except ConnectionRefusedError:
-            self.logger.info("Smart Hub not available, probably rebooting.")
-            return b""
-        else:
-            return res
+        # Acquire lock to ensure only one thread accesses the socket at a time
+        async with self._api_lock:
+            try:
+                # Run the synchronous blocking call in the executor
+                res = await self._hass.async_add_executor_job(
+                    self._send_command_sync, cmd_string, time_out_sec
+                )
+            except TimeoutError as err_msg:
+                self.logger.error(f"Error connecting to Smart Hub: {err_msg}")  # noqa: G004
+                return b""
+            except ConnectionRefusedError:
+                self.logger.info("Smart Hub not available, probably rebooting.")
+                return b""
+            else:
+                return res
 
     def _send_command_sync(self, cmd_string: str, time_out_sec=10) -> bytes:
         """Synchronous version of send command."""
@@ -326,19 +336,20 @@ class HbtnComm:
         self, cmd_string: str, time_out_sec=10
     ) -> tuple[bytes, int]:
         """General function for communication via SmartHub, returns additional crc."""
-        try:
-            # Run the synchronous blocking call in the executor
-            res = await self._hass.async_add_executor_job(
-                self._send_command_crc_sync, cmd_string, time_out_sec
-            )
-        except TimeoutError as err_msg:
-            self.logger.error("Error connecting to Smart Hub: %s", err_msg)
-            return b"", 0
-        except ConnectionRefusedError:
-            self.logger.info("Smart Hub not available.")
-            return b"", 0
-        else:
-            return res
+        async with self._api_lock:
+            try:
+                # Run the synchronous blocking call in the executor
+                res = await self._hass.async_add_executor_job(
+                    self._send_command_crc_sync, cmd_string, time_out_sec
+                )
+            except TimeoutError as err_msg:
+                self.logger.error("Error connecting to Smart Hub: %s", err_msg)
+                return b"", 0
+            except ConnectionRefusedError:
+                self.logger.info("Smart Hub not available.")
+                return b"", 0
+            else:
+                return res
 
     def _send_command_crc_sync(
         self, cmd_string: str, time_out_sec=10

@@ -374,8 +374,18 @@ class HbtnModuleUpdate(UpdateEntity):
             resp = await self._module.comm.handle_firmware(
                 int(self._module.mod_addr / 100) * 100, self._module.raddr
             )
+        if len(resp) == 0:
+            _LOGGER.warning("No response for firmware version check, crc error")
+            return
         versions = resp.decode("iso8859-1").split("\n")
         if len(versions) == 2:
             self._attr_latest_version = versions[1]
             self._attr_installed_version = versions[0]
+            if self._attr_latest_version != self._attr_installed_version:
+                _LOGGER.warning(
+                    "Firmware update available for module %s: %s -> %s",
+                    self._module.name,
+                    self._attr_installed_version,
+                    self._attr_latest_version,
+                )
             self.async_write_ha_state()
