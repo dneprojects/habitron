@@ -53,6 +53,10 @@ async def validate_input(hass: HomeAssistant, data: dict) -> dict[str, Any]:
     # Log own IP without trailing period
     _LOGGER.info(f"Smart Center own IP: {own_ip}")  # noqa: G004
 
+    # If the entered IP matches our own IP, save as 'local' to be robust against IP changes
+    if data["habitron_host"] == own_ip:
+        data["habitron_host"] = "local"
+
     host_to_test = data["habitron_host"]
     if host_to_test == "local":
         host_to_test = own_ip
@@ -72,8 +76,10 @@ async def validate_input(hass: HomeAssistant, data: dict) -> dict[str, Any]:
         raise IntervalTooLong
 
     try:
-        # Test actual connection
-        result, host_name = test_connection(host_to_test)
+        # Test actual connection via executor because test_connection is sync
+        result, host_name = await hass.async_add_executor_job(
+            test_connection, host_to_test
+        )
     except socket.gaierror as exc:
         raise socket.gaierror from exc
     except ConnectionRefusedError as exc:
@@ -136,6 +142,16 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Create the options flow."""
         return MyOptionsFlowHandler()
 
+    def _is_device_already_configured(self, host: str, ip: str | None = None) -> bool:
+        """Check if a device with this host or IP is already configured."""
+        existing_entries = self.hass.config_entries.async_entries(DOMAIN)
+        for entry in existing_entries:
+            entry_host = entry.data.get("habitron_host")
+            # Check match against stored host OR ip if provided
+            if entry_host == host or (ip and entry_host == ip):
+                return True
+        return False
+
     async def _discover_habitron(self) -> list[dict[str, Any]]:
         """Run a quick UDP scan to find devices."""
         loop = asyncio.get_running_loop()
@@ -160,6 +176,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # Extract host from SSDP location URL
         host = urlparse(discovery_info.ssdp_location).hostname
 
+        # 1. Fast check: Is this IP already configured?
+        # If so, abort immediately to prevent "new device" notification
+        if self._is_device_already_configured(str(host)):
+            return self.async_abort(reason="already_configured")
+
         # Verify via UDP to get full details (Serial, MAC)
         devices = await self._discover_habitron()
         target_device = next((d for d in devices if d.get("ip") == host), None)
@@ -174,6 +195,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             unique_id = target_device.get("serial", f"habitron_{host}")
             self._discovered_device = target_device
 
+        # 2. Check if Unique ID matches (standard check)
         await self.async_set_unique_id(unique_id)
         self._abort_if_unique_id_configured(updates={"habitron_host": str(host)})
 
@@ -218,15 +240,25 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # Try UDP discovery if opening fresh form
         if user_input is None:
             discovered = await self._discover_habitron()
-            if discovered:
-                device = discovered[0]
+
+            # Filter: Keep only devices that are NOT yet configured
+            valid_devices = [
+                d
+                for d in discovered
+                if not self._is_device_already_configured(d.get("host"), d.get("ip"))  # type: ignore  # noqa: PGH003
+            ]
+
+            if valid_devices:
                 # Prefer 'host' over 'ip'
+                device = valid_devices[0]
                 default_host = device.get("host", device.get("ip", CONF_DEFAULT_HOST))
                 _LOGGER.debug(
-                    "Discovered Habitron device via active scan: %s", default_host
+                    "Discovered new Habitron device via active scan: %s", default_host
                 )
 
         if user_input is not None:
+            # Note: For manual entry, we construct ID from input.
+            # Ideally this would also probe for serial to match SSDP behavior.
             unique_id = f"habitron_{user_input['habitron_host']}"
             await self.async_set_unique_id(unique_id)
             self._abort_if_unique_id_configured()
