@@ -18,12 +18,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Wichtig für den Merge
+          fetch-depth: 0 # important for merge
 
       - name: Get version from manifest
         id: version
         run: |
-          # Liest die Version aus der JSON Datei
+          # Reads version from JSON file
           VERSION=$(jq -r '.version' custom_components/habitron/manifest.json)
           echo "Version found: $VERSION"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
@@ -55,7 +55,7 @@ jobs:
         with:
           tag_name: v${{ steps.version.outputs.version }}
           name: Release v${{ steps.version.outputs.version }}
-          body: "Automatisches Release basierend auf Update der manifest.json"
+          body: "Automatic release based on update of manifest.json"
           draft: false
           prerelease: false
         env:
