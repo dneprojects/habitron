@@ -1,6 +1,6 @@
 # Latest changes
 
-## v2.3.7
+## v2.3.2
 
-### Fix
-- Async communication with lock
+### Improvements
+- Smart Touch voice satellite
