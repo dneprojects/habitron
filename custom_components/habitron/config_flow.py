@@ -21,10 +21,8 @@ from .communicate import test_connection
 from .const import (
     CONF_DEFAULT_HOST,
     CONF_DEFAULT_INTERVAL,
-    CONF_HOST,
     CONF_MAX_INTERVAL,
     CONF_MIN_INTERVAL,
-    CONF_SCAN_INTERVAL,
     DOMAIN,
 )
 
@@ -34,14 +32,17 @@ DISCOVERY_PORT = 7777
 DISCOVERY_TIMEOUT = 3.0
 DISCOVERY_MESSAGE = b"habitron_discovery"
 
+KEY_HOST = "habitron_host"
+KEY_INTERVAL = "update_interval"
+KEY_TOKEN = "websock_token"
+KEY_UPDATES_ENABLED = "updates_enabled"
+
 
 async def _get_local_ip(hass: HomeAssistant) -> str:
     """Get the local IP address using HA network utilities."""
     try:
-        # Versucht, die IP zu finden, die für das Standard-Interface genutzt wird
         return await network.async_get_source_ip(hass, target_ip="8.8.8.8")
     except Exception:  # pylint: disable=broad-except  # noqa: BLE001
-        # Fallback auf Loopback, falls nichts gefunden wird
         return "127.0.0.1"
 
 
@@ -52,12 +53,12 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     own_ip = await _get_local_ip(hass)
     _LOGGER.info("Smart Center own IP: %s", own_ip)
 
-    host_input = data[CONF_HOST]
+    host_input = data[KEY_HOST]
 
-    # If the entered IP matches our own IP, save as 'local' to be robust against IP changes
+    # If the entered IP matches our own IP, save as 'local'
     if host_input == own_ip:
         host_input = "local"
-        data[CONF_HOST] = "local"
+        data[KEY_HOST] = "local"
 
     host_to_test = host_input
     if host_to_test == "local":
@@ -67,13 +68,13 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     if len(host_to_test) < 4:
         raise InvalidHost
 
-    if not isinstance(data[CONF_SCAN_INTERVAL], int):
+    if not isinstance(data[KEY_INTERVAL], int):
         raise InvalidInterval
 
-    if data[CONF_SCAN_INTERVAL] < CONF_MIN_INTERVAL:
+    if data[KEY_INTERVAL] < CONF_MIN_INTERVAL:
         raise IntervalTooShort
 
-    if data[CONF_SCAN_INTERVAL] > CONF_MAX_INTERVAL:
+    if data[KEY_INTERVAL] > CONF_MAX_INTERVAL:
         raise IntervalTooLong
 
     # 3. Connection Test
@@ -157,7 +158,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Check if a device with this host or IP is already configured."""
         existing_entries = self.hass.config_entries.async_entries(DOMAIN)
         for entry in existing_entries:
-            entry_host = entry.data.get(CONF_HOST)
+            entry_host = entry.data.get(KEY_HOST)
             if entry_host == host or (ip and entry_host == ip):
                 return True
         return False
@@ -215,7 +216,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         # 2. Check if Unique ID matches (standard check)
         await self.async_set_unique_id(unique_id)
-        self._abort_if_unique_id_configured(updates={CONF_HOST: host_str})
+        self._abort_if_unique_id_configured(updates={KEY_HOST: host_str})
 
         self.context["title_placeholders"] = {"name": host_str}
         return await self.async_step_discovery_confirm()
@@ -227,11 +228,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             # Create entry with discovered data
             data = {
-                CONF_HOST: self._discovered_device.get(
+                KEY_HOST: self._discovered_device.get(
                     "host", self._discovered_device.get("ip")
                 ),
-                CONF_SCAN_INTERVAL: 10,
-                "websock_token": "",
+                KEY_INTERVAL: 10,
+                KEY_TOKEN: "",
             }
             try:
                 info = await validate_input(self.hass, data)
@@ -275,7 +276,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             # Use host as unique ID for manual entry if serial unknown
             # Best practice: Try to fetch serial in validate_input if possible
-            unique_id = f"habitron_{user_input[CONF_HOST]}"
+            unique_id = f"habitron_{user_input[KEY_HOST]}"
             await self.async_set_unique_id(unique_id)
             self._abort_if_unique_id_configured()
 
@@ -287,7 +288,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             except HostNotFound:
                 errors["base"] = "host_not_found"
             except InvalidHost:
-                errors["base"] = "invalid_host"  # specific key
+                errors["base"] = "host_not_found"
             except InvalidInterval:
                 errors["base"] = "invalid_interval"
             except IntervalTooShort:
@@ -298,17 +299,17 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
 
-            # If we failed, keep the input
-            default_host = user_input[CONF_HOST]
-            default_interval = user_input[CONF_SCAN_INTERVAL]
+            default_host = user_input[KEY_HOST]
+            default_interval = user_input[KEY_INTERVAL]
 
+        # Verwendung der Strings passend zur JSON (habitron_host, update_interval)
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_HOST, default=default_host): str,
-                    vol.Required(CONF_SCAN_INTERVAL, default=default_interval): int,
-                    vol.Optional("websock_token", default=""): str,
+                    vol.Required(KEY_HOST, default=default_host): str,
+                    vol.Required(KEY_INTERVAL, default=default_interval): int,
+                    vol.Optional(KEY_TOKEN, default=""): str,
                 }
             ),
             errors=errors,
@@ -332,34 +333,33 @@ class MyOptionsFlowHandler(config_entries.OptionsFlow):
                 # Note: Host change in OptionsFlow needs reload normally
                 self.hass.config_entries.async_update_entry(
                     self.config_entry,
-                    data=user_input,  # Entire data is replaced in OptionsFlow
+                    data=user_input,
                 )
-
                 await self.hass.config_entries.async_reload(self.config_entry.entry_id)
-
                 return self.async_create_entry(title="", data={})
             except CannotConnect:
                 errors["base"] = "cannot_connect"
+            except IntervalTooShort:
+                errors["base"] = "interval_too_short"
+            except IntervalTooLong:
+                errors["base"] = "interval_too_long"
             except Exception:  # pylint: disable=broad-except
                 _LOGGER.exception("Options flow error")
                 errors["base"] = "unknown"
 
-        # Load default values from existing config
         current_config = self.config_entry.data
 
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_HOST, default=current_config.get(CONF_HOST)): str,
+                    vol.Required(KEY_HOST, default=current_config.get(KEY_HOST)): str,
                     vol.Required(
-                        CONF_SCAN_INTERVAL,
-                        default=current_config.get(
-                            CONF_SCAN_INTERVAL, CONF_DEFAULT_INTERVAL
-                        ),
+                        KEY_INTERVAL,
+                        default=current_config.get(KEY_INTERVAL, CONF_DEFAULT_INTERVAL),
                     ): int,
                     vol.Optional(
-                        "websock_token", default=current_config.get("websock_token", "")
+                        KEY_TOKEN, default=current_config.get(KEY_TOKEN, "")
                     ): str,
                 }
             ),
