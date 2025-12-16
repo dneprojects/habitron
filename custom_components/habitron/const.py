@@ -20,8 +20,6 @@ FILE_MOD_NMBR = "mod_nmbr"
 LOC_FLAG_OFFS = 100
 GLOB_FLAG_OFFS = 132
 LOGIC_INP_OFFS = 164
-CONF_HOST = "habitron_host"
-CONF_SCAN_INTERVAL = "update_interval"
 
 
 MODULE_CODES: Final[dict[bytes, str]] = {
