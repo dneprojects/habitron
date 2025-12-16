@@ -55,8 +55,8 @@ jobs:
         id: extract_release_notes
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          # Dieser Befehl sucht nach der Überschrift "## VERSION" oder "## vVERSION"
-          # und nimmt alles bis zur nächsten Überschrift.
+          # Look for header "## VERSION" or "## vVERSION"
+          # and takes all until next header.
           awk "/^## v?$VERSION/{flag=1; next} /^## /{flag=0} flag" changelog.md > release_notes.md
           
           # Fallback use standard text
@@ -70,6 +70,7 @@ jobs:
         with:
           tag_name: v${{ steps.version.outputs.version }}
           name: Release v${{ steps.version.outputs.version }}
+          body_path: release_notes.md
           draft: false
           prerelease: false
         env:
