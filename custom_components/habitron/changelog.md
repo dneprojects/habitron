@@ -1,6 +1,6 @@
 # Latest changes
 
-## v2.3.2
+## v2.3.8
 
-### Improvements
-- Smart Touch voice satellite
+### Modification
+- Config flow
