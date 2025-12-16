@@ -225,6 +225,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     except (TimeoutError, TimeoutException) as ex:
         raise ConfigEntryNotReady("Timeout while connecting to SmartHub") from ex
+    except ConnectionRefusedError as ex:
+        raise ConfigEntryNotReady(f"Connection refused to SmartHub: {ex}") from ex
+    except Exception as ex:
+        raise ConfigEntryNotReady(f"Error connecting to SmartHub: {ex}") from ex
 
 
 async def async_remove_config_entry_device(
