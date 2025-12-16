@@ -1,6 +1,6 @@
 """Constants for the Habitron integration."""
 
-from typing import Final, TypedDict
+from typing import Final
 
 DOMAIN = "habitron"  # This is the internal name of the integration, it should also match the directory
 CONF_DEFAULT_HOST = "local"  # default host string of SmartCenter, uses own ip
@@ -20,6 +20,9 @@ FILE_MOD_NMBR = "mod_nmbr"
 LOC_FLAG_OFFS = 100
 GLOB_FLAG_OFFS = 132
 LOGIC_INP_OFFS = 164
+CONF_HOST = "habitron_host"
+CONF_SCAN_INTERVAL = "update_interval"
+
 
 MODULE_CODES: Final[dict[bytes, str]] = {
     b"\x01\x01": "Smart Controller XL-1",
