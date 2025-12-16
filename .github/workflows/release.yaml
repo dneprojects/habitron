@@ -48,6 +48,21 @@ jobs:
           git checkout main
           git merge origin/dev
           git push origin main
+      
+      # Extract notes from changelog.md
+      - name: Extract Release Notes
+        if: steps.check_tag.outputs.exists == 'false'
+        id: extract_release_notes
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          # Dieser Befehl sucht nach der Überschrift "## VERSION" oder "## vVERSION"
+          # und nimmt alles bis zur nächsten Überschrift.
+          awk "/^## v?$VERSION/{flag=1; next} /^## /{flag=0} flag" changelog.md > release_notes.md
+          
+          # Fallback use standard text
+          if [ ! -s release_notes.md ]; then
+            echo "Release v$VERSION" > release_notes.md
+          fi
 
       - name: Create Release
         if: steps.check_tag.outputs.exists == 'false'
@@ -55,7 +70,6 @@ jobs:
         with:
           tag_name: v${{ steps.version.outputs.version }}
           name: Release v${{ steps.version.outputs.version }}
-          generate_release_notes: true
           draft: false
           prerelease: false
         env:
