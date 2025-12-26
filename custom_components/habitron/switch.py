@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from config.custom_components.habitron.interfaces import AreaDescriptor
 from homeassistant.components.switch import SwitchDeviceClass, SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import (
@@ -69,6 +71,24 @@ async def async_setup_entry(
         await hbtn_cord.async_config_entry_first_refresh()
         async_add_entities(new_devices)
 
+    registry: er.EntityRegistry = er.async_get(hass)
+    area_names: dict[int, AreaDescriptor] = hbtn_rt.areas
+
+    for hbt_module in hbtn_rt.modules:
+        for mod_output in hbt_module.outputs:
+            if (
+                abs(mod_output.type) == 1
+                and mod_output.area > 0
+                and mod_output.area != hbt_module.area_member
+            ):  # standard
+                entity_entry = registry.async_get_entity_id(
+                    "switch", DOMAIN, f"Mod_{hbt_module.uid}_out{mod_output.nmbr}"
+                )
+                if entity_entry:
+                    registry.async_update_entity(
+                        entity_entry, area_id=area_names[mod_output.area].get_name_id()
+                    )
+
 
 class SwitchedOutput(CoordinatorEntity, SwitchEntity):
     """Representation of habitron outout as switch entities."""
@@ -87,6 +107,7 @@ class SwitchedOutput(CoordinatorEntity, SwitchEntity):
         super().__init__(coord, context=idx)
         self.idx: int = idx
         self._output: IfDescriptor = output
+        self._area_member: int = output.area
         self._module: HbtnModule = module
         if output.name.strip() == "":
             self._attr_name = f"Out {output.nmbr + 1}"
@@ -163,7 +184,7 @@ class SwitchedLed(CoordinatorEntity, SwitchEntity):
         self._attr_name: str | None = led.name
         self._nmbr: int = led.nmbr
         self._state: bool = False
-        self._attr_unique_id: str | None = f"Mod_{self._module.uid}_led{self.idx}"
+        self._attr_unique_id: str | None = f"Mod_{self._module.uid}_led{led.nmbr}"
         self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
 
     async def async_added_to_hass(self) -> None:
