@@ -15,10 +15,6 @@ from .module import HbtnModule
 from .router import HbtnRouter
 
 
-# See cover.py for more details.
-# Note how both entities for each module sensor (battry and illuminance) are added at
-# the same time to the same list. This way only a single async_add_devices call is
-# required.
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,

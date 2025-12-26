@@ -14,6 +14,7 @@ from homeassistant.components.cover import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
@@ -21,7 +22,7 @@ from homeassistant.helpers.update_coordinator import (
 )
 
 from .const import DOMAIN
-from .interfaces import CovDescriptor
+from .interfaces import AreaDescriptor, CovDescriptor
 from .module import HbtnModule
 from .router import HbtnRouter
 
@@ -53,6 +54,24 @@ async def async_setup_entry(
         hbtn_cord.data = new_devices  # type: ignore  # noqa: PGH003
         async_add_entities(new_devices)
 
+    registry: er.EntityRegistry = er.async_get(hass)
+    area_names: dict[int, AreaDescriptor] = hbtn_rt.areas
+
+    for hbt_module in hbtn_rt.modules:
+        for mod_cover in hbt_module.covers:
+            if (
+                mod_cover.nmbr >= 0
+                and mod_cover.area > 0
+                and mod_cover.area != hbt_module.area_member
+            ):  # different than device area
+                entity_entry = registry.async_get_entity_id(
+                    "cover", DOMAIN, f"Mod_{hbt_module.uid}_cover{mod_cover.nmbr}"
+                )
+                if entity_entry:
+                    registry.async_update_entity(
+                        entity_entry, area_id=area_names[mod_cover.area].get_name_id()
+                    )
+
 
 # This entire class could be written to extend a base class to ensure common attributes
 # are kept identical/in sync. It's broken apart here between the Cover and Sensors to
@@ -82,6 +101,7 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
         super().__init__(coord, context=idx)
         self.idx: int = idx
         self._cover: CovDescriptor = cover
+        self._area_member: int = cover.area
         self._module: HbtnModule = module
         if cover.name.strip() == "":
             self._attr_name = f"Out {cover.nmbr + 1}"

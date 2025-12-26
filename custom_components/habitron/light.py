@@ -12,6 +12,7 @@ from homeassistant.components.light import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
@@ -19,7 +20,7 @@ from homeassistant.helpers.update_coordinator import (
 )
 
 from .const import DOMAIN
-from .interfaces import CLedDescriptor, IfDescriptor
+from .interfaces import AreaDescriptor, CLedDescriptor, IfDescriptor
 from .module import HbtnModule
 from .router import HbtnRouter
 
@@ -38,7 +39,7 @@ async def async_setup_entry(
         for mod_output in hbt_module.outputs:
             # other type numbers disable output
             # type == 1, standard output: -> switch entities
-            if abs(mod_output.type) == 2:  # dimmer
+            if mod_output.type == 2:  # dimmer
                 new_devices.append(
                     DimmedOutputPush(
                         mod_output, hbt_module, hbtn_cord, len(new_devices)
@@ -58,6 +59,24 @@ async def async_setup_entry(
     if new_devices:
         await hbtn_cord.async_config_entry_first_refresh()
         async_add_entities(new_devices)
+
+    registry: er.EntityRegistry = er.async_get(hass)
+    area_names: dict[int, AreaDescriptor] = hbtn_rt.areas
+
+    for hbt_module in hbtn_rt.modules:
+        for mod_output in hbt_module.outputs:
+            if (
+                mod_output.type == 2
+                and mod_output.area > 0
+                and mod_output.area != hbt_module.area_member
+            ):  # dimmer
+                entity_entry = registry.async_get_entity_id(
+                    "light", DOMAIN, f"Mod_{hbt_module.uid}_out{mod_output.nmbr}"
+                )
+                if entity_entry:
+                    registry.async_update_entity(
+                        entity_entry, area_id=area_names[mod_output.area].get_name_id()
+                    )
 
 
 class SwitchedLight(CoordinatorEntity, LightEntity):
