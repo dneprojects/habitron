@@ -11,6 +11,7 @@ from homeassistant.components.binary_sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import (
@@ -19,7 +20,7 @@ from homeassistant.helpers.update_coordinator import (
 )
 
 from .const import DOMAIN
-from .interfaces import TYPE_DIAG, IfDescriptor, StateDescriptor
+from .interfaces import TYPE_DIAG, AreaDescriptor, IfDescriptor, StateDescriptor
 
 if TYPE_CHECKING:
     from .module import HbtnModule
@@ -64,6 +65,24 @@ async def async_setup_entry(
         await hbtn_cord.async_config_entry_first_refresh()
         hbtn_cord.data = new_devices  # type: ignore  # noqa: PGH003
         async_add_entities(new_devices)
+
+    registry: er.EntityRegistry = er.async_get(hass)
+    area_names: dict[int, AreaDescriptor] = hbtn_rt.areas
+
+    for hbt_module in hbtn_rt.modules:
+        for mod_input in hbt_module.inputs:
+            if (
+                abs(mod_input.type) == 2
+                and mod_input.area > 0
+                and mod_input.area != hbt_module.area_member
+            ):  # switch
+                entity_entry = registry.async_get_entity_id(
+                    "binary_sensor", DOMAIN, f"Mod_{hbt_module.uid}_in{mod_input.nmbr}"
+                )
+                if entity_entry:
+                    registry.async_update_entity(
+                        entity_entry, area_id=area_names[mod_input.area].get_name_id()
+                    )
 
 
 class HbtnBinSensor(CoordinatorEntity, BinarySensorEntity):
