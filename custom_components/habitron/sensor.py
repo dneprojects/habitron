@@ -16,18 +16,15 @@ from homeassistant.const import (
     UnitOfTemperature,
 )
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .interfaces import TYPE_DIAG
+from .interfaces import TYPE_DIAG, AreaDescriptor
 
 
-# See cover.py for more details.
-# Note how both entities for each module sensor (battry and illuminance) are added at
-# the same time to the same list. This way only a single async_add_devices call is
-# required.
 async def async_setup_entry(  # noqa: C901
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -134,6 +131,25 @@ async def async_setup_entry(  # noqa: C901
         hbtn_cord.data = new_devices
         async_add_entities(new_devices)
 
+    registry: er.EntityRegistry = er.async_get(hass)
+    area_names: dict[int, AreaDescriptor] = hbtn_rt.areas
+
+    for hbt_module in hbtn_rt.modules:
+        if hbt_module.typ in [b"\x01\x03", b"\x0b\x1f"]:
+            for ain in hbt_module.analogins:
+                if (
+                    ain.type == 3
+                    and ain.area > 0
+                    and ain.area != hbt_module.area_member
+                ):
+                    entity_entry = registry.async_get_entity_id(
+                        "sensor", DOMAIN, f"Mod_{hbt_module.uid}_adin{ain.nmbr}"
+                    )
+                    if entity_entry:
+                        registry.async_update_entity(
+                            entity_entry, area_id=area_names[ain.area].get_name_id()
+                        )
+
 
 class HbtnSensor(CoordinatorEntity, SensorEntity):
     """Base representation of a Habitron sensor."""
@@ -150,7 +166,7 @@ class HbtnSensor(CoordinatorEntity, SensorEntity):
         self._sensor_idx = sensor.nmbr
         self._attr_state: float | int
         self._value = 0
-        self._attr_unique_id = f"Mod_{self._module.uid}_snsr{idx}"
+        self._attr_unique_id = f"Mod_{self._module.uid}_snsr{sensor.nmbr}"
         self._attr_name = sensor.name
 
     # To link this entity to its device, this property must return an
@@ -182,7 +198,7 @@ class AnalogSensor(HbtnSensor):
         """Initialize the sensor."""
         super().__init__(module, sensor, coord, idx)
         self._attr_icon = "mdi:chart-bell-curve-cumulative"
-        self._attr_unique_id = f"Mod_{self._module.uid}_adin{self._sensor_idx}"
+        self._attr_unique_id = f"Mod_{self._module.uid}_adin{sensor.nmbr}"
         self._attr_name = self._attr_name
         self.sensor = sensor
 
