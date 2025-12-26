@@ -90,7 +90,7 @@ class HbtnRouter:
         self.cover_autostop_del = 5
         self.modules_desc = list
         self.modules: list[HbtnModule] = []
-        self.areas: list[AreaDescriptor] = []
+        self.areas: dict[int, AreaDescriptor] = {}
         self.coll_commands: list[CmdDescriptor] = []
         self.flags: list[StateDescriptor] = []
         self.chan_timeouts = [
@@ -302,7 +302,7 @@ class HbtnRouter:
             elif content_code == 2303:  # FF 08: alarm commands
                 pass
             elif content_code == 2815:  # FF 0A: areas
-                self.areas.append(AreaDescriptor(entry_name, entry_no))
+                self.areas[entry_no] = AreaDescriptor(entry_name, entry_no)
             elif content_code == 3071:  # FF 0B: cover autostop counter
                 self.cover_autostop_del = entry_no
             else:

@@ -8,11 +8,14 @@ from collections.abc import Callable
 class IfDescriptor:
     """Habitron interface descriptor."""
 
-    def __init__(self, iname, inmbr, itype, ivalue) -> None:
+    def __init__(
+        self, iname: str, inmbr: int, itype: int, ivalue: float, iarea: int = 0
+    ) -> None:
         """Initialize interface."""
         self.name: str = iname
         self.nmbr: int = inmbr
         self.type: int = itype
+        self.area: int = iarea  # area number, 0 = device area
         if isinstance(ivalue, list):
             pass
         else:
@@ -47,18 +50,26 @@ class IfDescriptor:
 class CLedDescriptor(IfDescriptor):
     """Habitron cover interface descriptor."""
 
-    def __init__(self, iname, inmbr, itype, ivalue: list[int]) -> None:
+    def __init__(self, iname: str, inmbr: int, itype: int, ivalue: list[int]) -> None:
         """Initialize interface."""
-        super().__init__(iname, inmbr, itype, ivalue)
+        super().__init__(iname, inmbr, itype, ivalue[0])
         self.value: list[int] = ivalue
 
 
 class CovDescriptor(IfDescriptor):
     """Habitron cover interface descriptor."""
 
-    def __init__(self, iname, inmbr, itype, ivalue, itilt) -> None:
+    def __init__(
+        self,
+        iname: str,
+        inmbr: int,
+        itype: int,
+        ivalue: int,
+        itilt: int,
+        iarea: int = 0,
+    ) -> None:
         """Initialize interface."""
-        super().__init__(iname, inmbr, itype, ivalue)
+        super().__init__(iname, inmbr, itype, ivalue, iarea)
         self.tilt: int = itilt
 
 
@@ -76,6 +87,14 @@ class AreaDescriptor(IfDescriptor):
     def __init__(self, aname, anmbr) -> None:
         """Initialize interface."""
         super().__init__(aname, anmbr, 0, 0)
+
+    def get_name(self) -> str:
+        """Get area name."""
+        return self.name
+
+    def get_name_id(self) -> str:
+        """Get area id."""
+        return self.name.lower().replace(" ", "_")
 
 
 class LgcDescriptor(IfDescriptor):
