@@ -38,6 +38,7 @@ class SmartHub:
 
     def __init__(self, hass: HomeAssistant, config: ConfigEntry) -> None:
         """Init SmartHub."""
+
         self.hass: HomeAssistant = hass
         self.config: ConfigEntry = config
         self._name: str = config.title
@@ -48,7 +49,7 @@ class SmartHub:
         self._version: str = self.comm.com_version
         self._type: str = self.comm.com_hwtype
         self.router = hbtr(self.hass, self.config, self)
-        self.addon_slug: str = "aed76be6_smart_hub"
+        self.addon_slug: str = self.comm.slugname
         if self.comm.is_addon:
             self.base_url: str = f"http://api/ingress/{self.addon_slug}"
         else:
