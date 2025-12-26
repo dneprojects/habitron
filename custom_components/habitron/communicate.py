@@ -123,6 +123,7 @@ class HbtnComm:
 
         # Note: get_smhub_info is blocking, should ideally be async or run in executor
         # but is kept here to match initialization flow.
+        self.slugname: str = ""
         self.info: dict[str, str] = self.get_smhub_info()
         self.grp_modes: dict = {}
         self._hbtn_version: str = self._hass.data["integrations"]["habitron"].manifest[
@@ -158,6 +159,11 @@ class HbtnComm:
     def com_hwtype(self) -> str:
         """Firmware version of SmartHub."""
         return self._hwtype
+
+    @property
+    def hostname(self) -> str:
+        """Hostname of SmartHub."""
+        return self._hostname
 
     def is_valid_ipv4(self, ip_string: str) -> bool:
         """Check if a string is a valid IPv4 address."""
@@ -251,6 +257,8 @@ class HbtnComm:
         self._hostname = info["hardware"]["network"]["host"]
         self._mac = info["hardware"]["network"]["lan mac"]
         self.is_addon = self._hostname.split(".")[0].find("smart-hub") > 0
+        if info["software"].get("slug") is not None:
+            self.slugname = info["software"]["slug"] if self.is_addon else ""
         self.logger.debug(f"SmartHub info - host name: {self._hostname}")  # noqa: G004
         self.logger.debug(f"SmartHub info - ip: {self._hostip}")  # noqa: G004
         self.logger.debug(f"SmartHub info - version: {self._version}")  # noqa: G004

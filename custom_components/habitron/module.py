@@ -22,6 +22,8 @@ from .interfaces import (
 )
 
 if TYPE_CHECKING:
+    from config.custom_components.habitron.communicate import HbtnComm
+
     from .media_player import HbtnMediaPlayer
 
 
@@ -44,8 +46,8 @@ class HbtnModule:
         self.b_uid: str = b_uid
         self.name: str = mod_descriptor.name
         self.area_member: int = 0
-        self.comm = comm
-        self.logger = logging.getLogger(__name__)
+        self.comm: HbtnComm = comm
+        self.logger: logging.Logger = logging.getLogger(__name__)
         self.sw_version: str = ""
         self.hw_version: str = ""
         self.uid: str = ""
@@ -78,7 +80,7 @@ class HbtnModule:
         self.flags: list[StateDescriptor] = []
         self.logic: list[LgcDescriptor] = []
         self.fingers: list[IfDescriptor] = []
-        self.diags = [IfDescriptor("", 0, 0, 0)]
+        self.diags: list[IfDescriptor] = [IfDescriptor("", 0, 0, 0)]
         self.diags.append(IfDescriptor("Status", 0, 1, 0))
         self.vce_stat: ListeningStatusSensor | None = None
         if self.type == "Smart Controller Touch":
@@ -105,8 +107,8 @@ class HbtnModule:
     @property
     def area(self) -> str:
         """Area of module."""
-        if self.area_member in range(1, len(self.comm.router.areas) + 1):
-            return self.comm.router.areas[self.area_member - 1].name
+        if self.area_member in self.comm.router.areas:
+            return self.comm.router.areas[self.area_member].name
         return "House"
 
     async def initialize(self, sys_status) -> None:
@@ -202,16 +204,17 @@ class HbtnModule:
                             if self.mod_type == "Smart Controller Mini":
                                 if arg_code in range(44, 48):
                                     self.inputs[arg_code - 42] = IfDescriptor(
-                                        text, arg_code - 42, 1, 0
+                                        text, arg_code - 42, 1, 0, line[1]
                                     )
                             else:
                                 self.inputs[arg_code - 32] = IfDescriptor(
-                                    text, arg_code - 32, 1, 0
+                                    text, arg_code - 32, 1, 0, line[1]
                                 )
                         elif arg_code in range(50, 52):
                             # Description of  Inputs
                             if self.mod_type[:16] == "Smart Controller":
                                 self.analogins[arg_code - 50].name = text
+                                self.analogins[arg_code - 50].area = line[1]
                         elif arg_code in range(110, 120):
                             # Description of logic units
                             for lgc in self.logic:
@@ -238,11 +241,12 @@ class HbtnModule:
                         elif self.mod_type[0:9] == "Smart Out":
                             # Description of outputs in Out modules
                             self.outputs[arg_code - 60] = IfDescriptor(
-                                text, arg_code - 60, 1, 0
+                                text, arg_code - 60, 1, 0, line[1]
                             )
                         else:
                             # Description of outputs
                             self.outputs[arg_code - 60].name = text
+                            self.outputs[arg_code - 60].area = line[1]
                     except Exception as err_msg:  # noqa: BLE001
                         self.logger.warning(
                             "Error processing line '%s': %s", line, err_msg
@@ -257,10 +261,55 @@ class HbtnModule:
                 led.type = 4
             return True
         if self.mod_type[:16] == "Smart Controller":
-            self.dimmers[0] = IfDescriptor(self.outputs[10].name, 0, 2, 0)
-            self.dimmers[1] = IfDescriptor(self.outputs[11].name, 1, 2, 0)
-            self.outputs[10].type = 2
-            self.outputs[11].type = 2
+            self.dimmers[0] = IfDescriptor(
+                self.outputs[10].name, 0, 2, 0, self.outputs[10].area
+            )
+            self.dimmers[1] = IfDescriptor(
+                self.outputs[11].name, 1, 2, 0, self.outputs[11].area
+            )
+            if self.outputs[10].type < 0:
+                self.dimmers[0].type = -2  # disable
+                self.outputs[10].type = -2  # disable
+            else:
+                self.outputs[10].type = 2
+            if self.outputs[11].type < 0:
+                self.dimmers[1].type = -2  # disable
+                self.outputs[11].type = -2  # disable
+            else:
+                self.outputs[11].type = 2
+        elif self.typ in [b"\x0a\x14", b"\x0a\x15", b"\x0a\x16"]:  # "Smart Dimm"
+            self.dimmers[0] = IfDescriptor(
+                self.outputs[0].name, 0, 2, 0, self.outputs[0].area
+            )
+            if self.outputs[0].type < 0:
+                self.dimmers[0].type = -2  # disable
+                self.outputs[0].type = -2  # disable
+            else:
+                self.outputs[0].type = 2
+            self.dimmers[1] = IfDescriptor(
+                self.outputs[1].name, 1, 2, 0, self.outputs[1].area
+            )
+            if self.outputs[1].type < 0:
+                self.dimmers[1].type = -2  # disable
+                self.outputs[1].type = -2  # disable
+            else:
+                self.outputs[1].type = 2
+            self.dimmers[2] = IfDescriptor(
+                self.outputs[2].name, 2, 2, 0, self.outputs[2].area
+            )
+            if self.outputs[2].type < 0:
+                self.dimmers[2].type = -2  # disable
+                self.outputs[2].type = -2  # disable
+            else:
+                self.outputs[2].type = 2
+            self.dimmers[3] = IfDescriptor(
+                self.outputs[3].name, 3, 2, 0, self.outputs[3].area
+            )
+            if self.outputs[3].type < 0:
+                self.dimmers[3].type = -2  # disable
+                self.outputs[3].type = -2  # disable
+            else:
+                self.outputs[3].type = 2
         return True
 
     async def get_settings(self) -> bool:
@@ -293,6 +342,7 @@ class HbtnModule:
                 inp.type = 3  # analog input
                 self.analogins[inp.nmbr - 2].type = 3
                 self.analogins[inp.nmbr - 2].name = inp.name
+                self.analogins[inp.nmbr - 2].area = inp.area
             elif inp_state & (0x01 << inp.nmbr) > 0:
                 inp.type *= 2  # switch
 
@@ -330,7 +380,10 @@ class HbtnModule:
                     self.covers[c_idx].nmbr = abs(self.covers[c_idx].nmbr) * (
                         -1
                     )  # disable
-                self.covers[c_idx] = CovDescriptor(cname.strip(), c_idx, pol, 0, 0)
+                carea = self.outputs[2 * c_idx].area
+                self.covers[c_idx] = CovDescriptor(
+                    cname.strip(), c_idx, pol, 0, 0, carea
+                )
                 self.outputs[2 * c_idx].type = -10  # disable light output
                 self.outputs[2 * c_idx + 1].type = -10
         return True
@@ -664,8 +717,6 @@ class SmartDimm(HbtnModule):
         super().__init__(mod_descriptor, hass, config, b_uid, comm)
 
         self.outputs = [IfDescriptor("", i, 2, 0) for i in range(4)]
-        for outp in self.outputs:
-            outp.name = f"DOut{outp.nmbr + 1}"
         self.dimmers = [IfDescriptor("", i, 2, 0) for i in range(4)]
         # self.inputs = [IfDescriptor("", i, 1, 0) for i in range(4)]
         for mod_inp in self.inputs:
