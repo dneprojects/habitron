@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-# Import the device class from the component that you want to support
-from config.custom_components.habitron.interfaces import AreaDescriptor
 from homeassistant.components.event import EventDeviceClass, EventEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
@@ -12,6 +10,9 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
+
+# Import the device class from the component that you want to support
+from .interfaces import AreaDescriptor
 
 
 async def async_setup_entry(
