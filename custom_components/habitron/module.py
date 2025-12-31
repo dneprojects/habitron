@@ -22,8 +22,7 @@ from .interfaces import (
 )
 
 if TYPE_CHECKING:
-    from config.custom_components.habitron.communicate import HbtnComm
-
+    from .communicate import HbtnComm
     from .media_player import HbtnMediaPlayer
 
 

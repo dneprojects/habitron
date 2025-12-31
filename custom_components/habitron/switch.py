@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from config.custom_components.habitron.interfaces import AreaDescriptor
 from homeassistant.components.switch import SwitchDeviceClass, SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
@@ -17,7 +16,7 @@ from homeassistant.helpers.update_coordinator import (
 )
 
 from .const import DOMAIN
-from .interfaces import IfDescriptor, StateDescriptor
+from .interfaces import AreaDescriptor, IfDescriptor, StateDescriptor
 from .module import HbtnModule
 from .router import HbtnRouter
 
