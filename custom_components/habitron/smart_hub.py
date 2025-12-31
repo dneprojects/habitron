@@ -16,7 +16,6 @@ from .communicate import HbtnComm as hbtn_com
 from .const import DOMAIN
 from .interfaces import IfDescriptor
 from .router import HbtnRouter as hbtr
-
 from .ws_provider import HabitronWebRTCProvider
 
 
@@ -42,49 +41,26 @@ class SmartHub:
         self.hass: HomeAssistant = hass
         self.config: ConfigEntry = config
         self._name: str = config.title
-        self.comm = hbtn_com(hass, config)
+        self.comm = hbtn_com(hass, config, self)
+
+        # Temporary placeholders until async_setup runs
+        self._mac = "00:00:00:00:00:00"
+        self.uid = "pending"
+        self._version = "0.0.0"
+        self._type = "Unknown"
+
         self.online: bool = True
-        self._mac: str = self.comm.com_mac
-        self.uid: str = self._mac.replace(":", "")
-        self._version: str = self.comm.com_version
-        self._type: str = self.comm.com_hwtype
         self.router = hbtr(self.hass, self.config, self)
-        self.addon_slug: str = self.comm.slugname
-        if self.comm.is_addon:
-            self.base_url: str = f"http://api/ingress/{self.addon_slug}"
-        else:
-            self.base_url: str = f"http://{self.comm.com_ip}:7780"
+        self.addon_slug: str = ""
+        self.base_url: str = ""
         self.host = self.comm.com_ip
         self._port = self.comm.com_port
-        conf_url = f"{self.base_url}/hub" if self.host else None
+        conf_url = ""
 
-        device_registry = dr.async_get(hass)
-        device_registry.async_get_or_create(
-            config_entry_id=config.entry_id,
-            configuration_url=conf_url,
-            connections={(dr.CONNECTION_NETWORK_MAC, self._mac)},
-            identifiers={(DOMAIN, self.uid)},
-            manufacturer="Habitron GmbH",
-            suggested_area="House",
-            name=self._name,
-            model=self._name,
-            sw_version=self._version,
-            hw_version=self._type,
-        )
-        # Habitron iconset
         self.sensors: list[IfDescriptor] = []
         self.diags: list[IfDescriptor] = []
         self.loglvl: list[IfDescriptor] = []
-        if self._type[:12] == "Raspberry Pi":
-            self.diags.append(IfDescriptor("CPU Frequency", 0, 10, 0))
-            self.diags.append(IfDescriptor("CPU load", 1, 10, 0))
-            self.diags.append(IfDescriptor("CPU Temperature", 2, 10, 0))
-            self.sensors.append(IfDescriptor("Memory free", 0, 2, 0))
-            self.sensors.append(IfDescriptor("Disk free", 1, 2, 0))
-            self.loglvl.append(IfDescriptor("Logging level console", 0, 2, 0))
-            self.loglvl.append(IfDescriptor("Logging level file", 1, 2, 0))
         self.ws_provider: HabitronWebRTCProvider | None = None
-        self.update()
 
     @property
     def smhub_version(self) -> str:
@@ -112,6 +88,11 @@ class SmartHub:
         self.loglvl[0].value = int(info["software"]["loglevel"]["console"])
         self.loglvl[1].value = int(info["software"]["loglevel"]["file"])
 
+    async def async_update(self) -> None:
+        """Async wrapper for the update method."""
+        # This offloads the blocking 'update' call to a thread pool
+        await self.hass.async_add_executor_job(self.update)
+
     async def get_version(self) -> str:
         """Test connectivity to SmartHub is OK."""
         resp = await self.comm.get_smhub_version()
@@ -119,31 +100,60 @@ class SmartHub:
         return ver_string[9:] if ver_string.startswith("SmartIP") else "0.0.0"
 
     async def async_setup(self) -> None:
-        """Initialize SmartHub instance."""
-        if self.ws_provider is None:
-            raise RuntimeError(
-                "HabitronWebRTCProvider has not been attached to SmartHub before setup."
-            )
+        """Initialize SmartHub instance and register device."""
 
-        await self.comm.reinit_hub(100, 0)  # force Opr mode to stop
+        # 1. Fetch info from Hub (Offload blocking socket to executor)
+        # This populates self.comm.info
+        await self.hass.async_add_executor_job(self.comm.get_smhub_info)
+
+        # 2. Update local variables with real data
+        self._mac = self.comm.com_mac
+        self.uid = self._mac.replace(":", "")
+        self._version = self.comm.com_version
+        self._type = self.comm.com_hwtype
+        self.host = self.comm.com_ip
+        self.addon_slug = self.comm.slugname
+
+        if self.comm.is_addon:
+            self.base_url: str = f"http://api/ingress/{self.addon_slug}"
+        else:
+            self.base_url: str = f"http://{self.host}:7780"
+
+        conf_url = f"{self.base_url}/hub" if self.host else None
+
+        # 3. Register device in HA with MAC and UID
+        device_registry = dr.async_get(self.hass)
+        device_registry.async_get_or_create(
+            config_entry_id=self.config.entry_id,
+            configuration_url=conf_url,
+            connections={(dr.CONNECTION_NETWORK_MAC, self._mac)},
+            identifiers={(DOMAIN, self.uid)},
+            manufacturer="Habitron GmbH",
+            suggested_area="House",
+            name=self._name,
+            model=self._name,
+            sw_version=self._version,
+            hw_version=self._type,
+        )
+
+        # 4. Initialize Diagnostics (Logic depends on self._type)
+        if self._type[:12] == "Raspberry Pi":
+            self.diags.append(IfDescriptor("CPU Frequency", 0, 10, 0))
+            self.diags.append(IfDescriptor("CPU load", 1, 10, 0))
+            self.diags.append(IfDescriptor("CPU Temperature", 2, 10, 0))
+            self.sensors.append(IfDescriptor("Memory free", 0, 2, 0))
+            self.sensors.append(IfDescriptor("Disk free", 1, 2, 0))
+            self.loglvl.append(IfDescriptor("Logging level console", 0, 2, 0))
+            self.loglvl.append(IfDescriptor("Logging level file", 1, 2, 0))
+
+        # 5. Rest of setup
+        await self.comm.reinit_hub(100, 0)
         await self.comm.send_network_info(self.config.data["websock_token"])
-        with contextlib.suppress(Exception):
-            # if multiple hub instances or restart
-            files_path = Path(__file__).parent / "logos"
-            await self.hass.http.async_register_static_paths(
-                [
-                    StaticPathConfig(
-                        "/habitronfiles/hbt-icons.js",
-                        str(files_path / "hbt-icons.js"),
-                        False,
-                    )
-                ]
-            )
-            add_extra_js_url(self.hass, "/habitronfiles/hbt-icons.js")
-
         await self.router.initialize()
+        await self.comm.reinit_hub(100, 1)
 
-        await self.comm.reinit_hub(100, 1)  # restart event server
+        # 6. First data update
+        await self.hass.async_add_executor_job(self.update)
 
     async def restart(self, rt_id) -> None:
         """Restart hub."""
