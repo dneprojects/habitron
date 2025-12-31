@@ -9,7 +9,6 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, issue_registry as ir
 
-# for more information.
 from .const import DOMAIN, FALSE_VAL, TRUE_VAL, ModuleDescriptor, MStatIdx, RoutIdx
 from .coordinator import HbtnCoordinator
 from .interfaces import (
@@ -88,11 +87,13 @@ class HbtnRouter:
         self.module_grp = []
         self.max_group = 0
         self.cover_autostop_del = 5
-        self.modules_desc = list
+        self.modules_desc = []
         self.modules: list[HbtnModule] = []
         self.areas: dict[int, AreaDescriptor] = {}
         self.coll_commands: list[CmdDescriptor] = []
         self.flags: list[StateDescriptor] = []
+
+        # UI descriptors
         self.chan_timeouts = [
             IfDescriptor(f"Timeouts channel {i + 1}", i, TYPE_DIAG, 0) for i in range(4)
         ]
@@ -123,78 +124,85 @@ class HbtnRouter:
         return len(self.modules)
 
     async def initialize(self) -> bool:
-        """Initialize router instance."""
-
+        """Initialize router instance without blocking MainThread."""
         self.comm.set_router(self)
+
+        # 1. Fetch definitions and descriptions (Uses async comm methods)
         await self.get_definitions()
         await self.get_descriptions()  # No descriptions for modules expected!
 
-        device_registry: dr.DeviceRegistry = dr.async_get(self.hass)
+        # 2. Device Registration
+        device_registry = dr.async_get(self.hass)
         device_registry.async_get_or_create(
             config_entry_id=self.config.entry_id,
             configuration_url=f"{self.smhub.base_url}/router",
             identifiers={(DOMAIN, self.uid)},
             manufacturer="Habitron GmbH",
-            suggested_area="House",
             name=self.name,
             model="Smart Router",
             sw_version=self.version,
             hw_version=self.serial,
             via_device=(DOMAIN, self.smhub.uid),
         )
-        # Further initialization of module instances
-        self.modules_desc = await self.get_modules(self.module_grp)
-        await self.comm.async_system_update()  # Inital update
 
+        # 3. Get module descriptors
+        self.modules_desc = await self.get_modules(self.module_grp)
+        await self.comm.async_system_update()  # Initial update
+
+        # 4. Create module instances
         for mod_desc in self.modules_desc:
-            if (mod_desc.mtype[0] == 10) and (mod_desc.mtype[1] in [1, 2, 50, 51]):
-                self.modules.append(
-                    hbtoutm(mod_desc, self.hass, self.config, self.b_uid, self.comm)
+            module_instance = None
+            m0, m1 = mod_desc.mtype[0], mod_desc.mtype[1]
+
+            if m0 == 10 and m1 in [1, 2, 50, 51]:
+                module_instance = hbtoutm(
+                    mod_desc, self.hass, self.config, self.b_uid, self.comm
                 )
-            elif (mod_desc.mtype[0] == 10) and (mod_desc.mtype[1] in [20, 21, 22]):
-                self.modules.append(
-                    hbtdimm(mod_desc, self.hass, self.config, self.b_uid, self.comm)
+            elif m0 == 10 and m1 in [20, 21, 22]:
+                module_instance = hbtdimm(
+                    mod_desc, self.hass, self.config, self.b_uid, self.comm
                 )
-            elif (mod_desc.mtype[0] == 10) and (mod_desc.mtype[1] in [30]):
-                self.modules.append(
-                    hbtio2(mod_desc, self.hass, self.config, self.b_uid, self.comm)
+            elif m0 == 10 and m1 == 30:
+                module_instance = hbtio2(
+                    mod_desc, self.hass, self.config, self.b_uid, self.comm
                 )
-            elif mod_desc.mtype[0] == 11:
-                self.modules.append(
-                    hbtinm(mod_desc, self.hass, self.config, self.b_uid, self.comm)
+            elif m0 == 11:
+                module_instance = hbtinm(
+                    mod_desc, self.hass, self.config, self.b_uid, self.comm
                 )
-            elif mod_desc.mtype[0] == 80:
-                self.modules.append(
-                    hbtsdm(mod_desc, self.hass, self.config, self.b_uid, self.comm)
+            elif m0 == 80:
+                module_instance = hbtsdm(
+                    mod_desc, self.hass, self.config, self.b_uid, self.comm
                 )
-            elif mod_desc.mtype[0] == 20:
-                self.modules.append(
-                    hbtsnm(mod_desc, self.hass, self.config, self.b_uid, self.comm)
+            elif m0 == 20:
+                module_instance = hbtsnm(
+                    mod_desc, self.hass, self.config, self.b_uid, self.comm
                 )
-            elif mod_desc.mtype[0] == 50 and (mod_desc.mtype[1] in [1]):
-                self.modules.append(
-                    hbtscmm(mod_desc, self.hass, self.config, self.b_uid, self.comm)
+            elif m0 == 50 and m1 == 1:
+                module_instance = hbtscmm(
+                    mod_desc, self.hass, self.config, self.b_uid, self.comm
                 )
-            elif mod_desc.mtype[0] == 50 and (mod_desc.mtype[1] in [40]):
-                self.modules.append(
-                    hbtsens(mod_desc, self.hass, self.config, self.b_uid, self.comm)
+            elif m0 == 50 and m1 == 40:
+                module_instance = hbtsens(
+                    mod_desc, self.hass, self.config, self.b_uid, self.comm
                 )
-            elif mod_desc.mtype[0] == 1:
-                self.modules.append(
-                    hbtscm(mod_desc, self.hass, self.config, self.b_uid, self.comm)
+            elif m0 == 1:
+                module_instance = hbtscm(
+                    mod_desc, self.hass, self.config, self.b_uid, self.comm
                 )
-            elif (mod_desc.mtype[0] == 30) and (mod_desc.mtype[1] == 1):
-                self.modules.append(
-                    hbtkey(mod_desc, self.hass, self.config, self.b_uid, self.comm)
+            elif m0 == 30 and m1 == 1:
+                module_instance = hbtkey(
+                    mod_desc, self.hass, self.config, self.b_uid, self.comm
                 )
-            elif (mod_desc.mtype[0] == 30) and (mod_desc.mtype[1] == 3):
-                self.modules.append(
-                    hbtgsm(mod_desc, self.hass, self.config, self.b_uid, self.comm)
+            elif m0 == 30 and m1 == 3:
+                module_instance = hbtgsm(
+                    mod_desc, self.hass, self.config, self.b_uid, self.comm
                 )
-            else:
-                continue  # Prevent dealing with unknown modules
-                # self.modules.append(hbtm(mod_desc, self.hass, self.config, self.comm))
-            await self.modules[-1].initialize(self.sys_status)
+
+            if module_instance:
+                self.modules.append(module_instance)
+                # Initialize module in executor because it performs sync socket I/O
+                await module_instance.initialize(self.sys_status)
 
         return True
 
@@ -322,33 +330,35 @@ class HbtnRouter:
         return ret_bytes
 
     async def update_system_status(self, sys_status) -> None:
-        """Distribute module status to all modules and update self status."""
+        """Update system status and distribute to modules."""
         self.sys_status = sys_status
-        # update not always
-        self.smhub.update()
+
+        # 1. Update SmHub (Move blocking call to executor)
+        await self.hass.async_add_executor_job(self.smhub.update)
+
+        # 2. Get Router status
         self.status = await self.comm.async_get_router_status(self.id)
-        if not (len(self.status) >= RoutIdx.MIRROR_STARTED):
-            self.logger.warning(f"Router status too short, length: {len(self.status)}")  # noqa: G004
+        if len(self.status) < RoutIdx.MIRROR_STARTED:
             return
+
+        # 3. Parse Router values
         self.mode.value = int(self.status[RoutIdx.MODE0])
         self.comm.grp_modes[0] = self.mode.value
+
+        # Flags
         flags_state = int.from_bytes(
-            self.status[RoutIdx.FLAG_GLOB : RoutIdx.FLAG_GLOB + 2],
-            "little",
+            self.status[RoutIdx.FLAG_GLOB : RoutIdx.FLAG_GLOB + 2], "little"
         )
         for flg in self.flags:
             flg.value = int((flags_state & (0x01 << flg.nmbr - 1)) > 0)
+
+        # Currents and Voltages
         for time_out in self.chan_timeouts:
             time_out.value = self.status[RoutIdx.TIME_OUT + time_out.nmbr]
         for curr in self.chan_currents:
-            i_0 = RoutIdx.CURRENTS + curr.nmbr * 2
-            curr.value = (
-                int.from_bytes(
-                    self.status[i_0 : i_0 + 2],
-                    "little",
-                )
-                / 1000
-            )
+            idx = RoutIdx.CURRENTS + curr.nmbr * 2
+            curr.value = int.from_bytes(self.status[idx : idx + 2], "little") / 1000
+
         self.voltages[0].value = (
             int.from_bytes(
                 self.status[RoutIdx.VOLTAGE_5 : RoutIdx.VOLTAGE_5 + 2], "little"
@@ -361,13 +371,17 @@ class HbtnRouter:
             )
             / 10
         )
+
         self._sys_ok = self.status[RoutIdx.ERR_SYSTEM] == FALSE_VAL
         self._mirror_started = self.status[RoutIdx.MIRROR_STARTED] == TRUE_VAL
         self.states[0].value = self._sys_ok
         self.states[1].value = self._mirror_started
-        if not (self._mirror_started):
+
+        # 4. Handle Mirror and Issues
+        if not self._mirror_started:
             await self.comm.async_start_mirror(self.id)
-        if not (self._sys_ok):
+
+        if not self._sys_ok:
             ir.async_create_issue(
                 self.hass,
                 DOMAIN,
@@ -377,21 +391,17 @@ class HbtnRouter:
                 translation_key="router_system_error",
             )
         else:
-            ir.async_delete_issue(
-                self.hass,
-                DOMAIN,
-                "router_system_error",
-            )
+            ir.async_delete_issue(self.hass, DOMAIN, "router_system_error")
 
-        for m_idx in range(len(self.modules)):
+        # 5. Distribute status to modules (Sync call within module)
+        for m_idx, _module in enumerate(self.modules):
             mod_status = self.sys_status[
                 m_idx * MStatIdx.END : (m_idx + 1) * MStatIdx.END
             ]
-            if len(mod_status) > 0:
-                # Disabled modules return empty status
+            if mod_status:
                 mod_addr = mod_status[MStatIdx.ADDR] + self.id
-                self.modules[self.mod_reg[mod_addr]].update(mod_status)
-        return
+                if mod_addr in self.mod_reg:
+                    self.modules[self.mod_reg[mod_addr]].update(mod_status)
 
     async def async_reset(self) -> None:
         """Call reset command for self."""
