@@ -8,7 +8,7 @@ import logging
 from pathlib import Path
 import socket
 import struct
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
 import anyio
 import yaml
@@ -19,6 +19,10 @@ import homeassistant.exceptions as HAexceptions
 
 from .const import DOMAIN, HaEvents
 from .router import HbtnRouter
+
+if TYPE_CHECKING:
+    from .smart_hub import SmartHub
+
 
 BASE_PATH_COMPONENT = "./homeassistant/components"
 BASE_PATH_CUSTOM_COMPONENT = "./custom_components"
@@ -88,10 +92,13 @@ SMHUB_COMMANDS: Final[dict[str, str]] = {
 class HbtnComm:
     """Habitron communication class."""
 
-    def __init__(self, hass: HomeAssistant, config: ConfigEntry) -> None:
+    def __init__(
+        self, hass: HomeAssistant, config: ConfigEntry, smhub: SmartHub
+    ) -> None:
         """Init CommTest for connection test."""
         self._name: str = "HbtnComm"
         self._host_conf: str = config.data.__getitem__("habitron_host")
+        self.smhub: SmartHub = smhub
         self.logger = logging.getLogger(__name__)
         if self.is_valid_ipv4(self._host_conf):
             self._host = self._host_conf
@@ -117,18 +124,22 @@ class HbtnComm:
         # Lock to ensure sequential access to the socket even when running in executor threads
         self._api_lock = asyncio.Lock()
         self.crc: int = 0
-        self.router: HbtnRouter
+        self._rtr: HbtnRouter
         self.update_suspended: bool = False
         self.is_addon: bool = True  # will be set in get_smhub_info()
-
-        # Note: get_smhub_info is blocking, should ideally be async or run in executor
-        # but is kept here to match initialization flow.
         self.slugname: str = ""
-        self.info: dict[str, str] = self.get_smhub_info()
+        self.info: dict[str, str] = {}
         self.grp_modes: dict = {}
         self._hbtn_version: str = self._hass.data["integrations"]["habitron"].manifest[
             "version"
         ]
+
+    @property
+    def router(self) -> HbtnRouter:
+        """Return the router instance."""
+        if not hasattr(self, "_rtr"):
+            return self.smhub.router
+        return self._rtr
 
     @property
     def com_ip(self) -> str:
@@ -227,43 +238,61 @@ class HbtnComm:
 
     def set_router(self, rtr) -> None:
         """Register the router instance."""
-        self.router = rtr
+        self._rtr = rtr
 
     async def get_smhub_version(self) -> bytes:
         """Query of SmartHub firmware."""
         return await self.async_send_command(SMHUB_COMMANDS["GET_SMHUB_FIRMWARE"])
 
     def get_smhub_info(self) -> dict[str, str]:
-        """Get basic infos of SmartHub."""
-        # Note: This is synchronous/blocking.
-        sck = socket.socket()  # Create a socket object
+        """Get basic infos of SmartHub (blocking, run in executor)."""
+        # Use a shorter connect timeout for responsiveness
+        sck = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sck.settimeout(10.0)  # Set timeout BEFORE connect
+
         try:
             sck.connect((self._host, self._port))
-        except ConnectionRefusedError as exc:
-            raise ConnectionRefusedError from exc
-        sck.settimeout(8)  # 8 seconds
-        cmd_str = SMHUB_COMMANDS["GET_SMHUB_INFO"]
-        full_string = wrap_command(cmd_str)
-        resp_bytes = send_receive(sck, full_string)
-        sck.close()
 
-        info = yaml.load(resp_bytes.decode("iso8859-1"), Loader=yaml.Loader)
-        if isinstance(info, str):
-            self.logger.warning("Error getting SmartHub info: %s", info)
-            raise (TimeoutError)
-        self._version = info["software"]["version"]
-        self._hwtype = info["hardware"]["platform"]["type"]
-        self._hostip = info["hardware"]["network"]["ip"]
-        self._hostname = info["hardware"]["network"]["host"]
-        self._mac = info["hardware"]["network"]["lan mac"]
-        self.is_addon = self._hostname.split(".")[0].find("smart-hub") > 0
-        if info["software"].get("slug") is not None:
-            self.slugname = info["software"]["slug"] if self.is_addon else ""
-        self.logger.debug(f"SmartHub info - host name: {self._hostname}")  # noqa: G004
-        self.logger.debug(f"SmartHub info - ip: {self._hostip}")  # noqa: G004
-        self.logger.debug(f"SmartHub info - version: {self._version}")  # noqa: G004
-        self.logger.debug(f"SmartHub info - hw type: {self._hwtype}")  # noqa: G004
-        return info
+            cmd_str = SMHUB_COMMANDS["GET_SMHUB_INFO"]
+            full_string = wrap_command(cmd_str)
+
+            # Communication
+            resp_bytes = send_receive(sck, full_string)
+
+            # Close connection immediately after receiving
+            sck.close()
+
+            # Parse data
+            decoded_resp = resp_bytes.decode("iso8859-1")
+            info = yaml.load(decoded_resp, Loader=yaml.Loader)
+
+            if not isinstance(info, dict):
+                self.logger.warning("Invalid SmartHub info received")
+                raise TimeoutError("Invalid response format")  # noqa: TRY301
+
+            # Update internal state
+            self.info = info  # Store full dict
+            self._version = info["software"]["version"]
+            self._hwtype = info["hardware"]["platform"]["type"]
+            self._hostip = info["hardware"]["network"]["ip"]
+            self._hostname = info["hardware"]["network"]["host"]
+            self._mac = info["hardware"]["network"]["lan mac"]
+
+            # Detect addon environment
+            self.is_addon = "smart-hub" in self._hostname.split(".")[0]
+            self.slugname = info["software"].get("slug", "") if self.is_addon else ""
+
+        except TimeoutError as exc:
+            self.logger.error("Timeout connecting to SmartHub at %s", self._host)
+            raise TimeoutException(f"Hub at {self._host} not responding") from exc
+        except Exception as exc:
+            self.logger.error("Error during SmartHub info fetch: %s", exc)
+            raise
+        else:
+            return info
+        finally:
+            # Ensure socket is closed even if yaml.load fails
+            sck.close()
 
     def get_smhub_update(self):
         """Get current sensor and status values."""
