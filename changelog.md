@@ -1,6 +1,7 @@
 # Latest changes
 
-## v2.4.1
+## v2.4.2
 
-### Modification
-- Areas set in Habitron configurations for individual oin-/outputs are set in Home Assistant accodringly.
+### Fix
+- Installation of iconset
+- Outdoor temperatures: data format of negative temperatures
