@@ -17,7 +17,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 import homeassistant.exceptions as HAexceptions
 
-from .const import DOMAIN, HaEvents
+from .const import DOMAIN, SMHUB_COMMANDS, HaEvents
 from .router import HbtnRouter
 
 if TYPE_CHECKING:
@@ -28,65 +28,6 @@ BASE_PATH_COMPONENT = "./homeassistant/components"
 BASE_PATH_CUSTOM_COMPONENT = "./custom_components"
 DATA_FILES_ADDON_DIR = "/addon_configs/"
 DEF_TOKEN_FILE = "def_token.set"
-
-SMHUB_COMMANDS: Final[dict[str, str]] = {
-    "GET_MODULES": "\x0a\1\2<rtr>\0\0\0",
-    "GET_MODULE_SMG": "\x0a\2\7<rtr><mod>\0\0",
-    "GET_MODULE_SMC": "\x0a\3\7<rtr><mod>\0\0",
-    "GET_ROUTER_SMR": "\x0a\4\3<rtr>\0\0\0",
-    "GET_ROUTER_STATUS": "\x0a\4\4<rtr>\0\0\0",
-    "GET_ROUTER_FW_FILEVS": "\x0a\4\x0a<rtr>\0\0\0",
-    "GET_MODULE_FW_FILEVS": "\x0a\5\x0a<rtr><mod>\0\0",
-    "GET_MODULE_STATUS": "\x0a\5\1<rtr><mod>\0\0",
-    "GET_COMPACT_STATUS": "\x0a\5\2<rtr>\xff\0\0",  # compact status of all modules (0xFF)
-    "GET_SMHUB_BOOT_STATUS": "\x0a\6\1\0\0\0\0",
-    "GET_SMHUB_INFO": "\x0a\6\2\0\0\0\0",
-    "GET_SMHUB_UPDATE": "\x0a\6\3\0\0<len><vlen><vers>",
-    "GET_GLOBAL_DESCRIPTIONS": "\x0a\7\1<rtr>\0\0\0",  # Flags, Command collections
-    "GET_SMHUB_STATUS": "\x14\0\0\0\0\0\0",
-    "GET_SMHUB_FIRMWARE": "\x14\x1e\0\0\0\0\0",
-    "GET_GROUP_MODE": "\x14\2\1<rtr><mod>\0\0",  # <Group 0..>
-    "GET_GROUP_MODE0": "\x14\2\1<rtr>\0\0\0",
-    "SET_GROUP_MODE": "\x14\2\2<rtr><mod>\3\0<rtr><mod><arg1>",  # <Group 0..><Mode>
-    "GET_ROUTER_MODES": "\x14\2\3<rtr><mod>\3\0<rtr><mod>\0",
-    "START_MIRROR": "\x14\x28\1<rtr>\0\0\0",
-    "STOP_MIRROR": "\x14\x28\2<rtr>\0\0\0",
-    "CHECK_COMM_STATUS": "\x14\x64\0\0\0\0\0",
-    "SET_OUTPUT_ON": "\x1e\1\1<rtr><mod>\3\0<rtr><mod><arg1>",
-    "SET_OUTPUT_OFF": "\x1e\1\2<rtr><mod>\3\0<rtr><mod><arg1>",
-    "SET_DIMMER_VALUE": "\x1e\1\3<rtr><mod>\4\0<rtr><mod><arg1><arg2>",  # <Module><DimNo><DimVal>
-    "SET_SHUTTER_POSITION": "\x1e\1\4<rtr>\0\5\0<rtr><mod>\1<arg1><arg2>",  # <Module><RollNo><RolVal>
-    "SET_BLIND_TILT": "\x1e\1\4<rtr>\0\5\0<rtr><mod>\2<arg1><arg2>",
-    "SET_SETPOINT_VALUE": "\x1e\2\1<rtr>\0\5\0<rtr><mod><arg1><arg2><arg3>",  # <Module><ValNo><ValL><ValH>
-    "CALL_DIR_COMMAND": "\x1e\5\1<rtr><mod>\1\0<cno>",  # <CmdNo>
-    "CALL_VIS_COMMAND": "\x1e\3\1\0\0\4\0<rtr><mod><visl><vish>",  # <Module><VisNoL><VisNoH>
-    "CALL_COLL_COMMAND": "\x1e\4\1<rtr><cno>\0\0",  # <CmdNo>
-    "READ_MODULE_MIRR_STATUS": "\x64\1\5<rtr><mod>\0\0",  # <Module>
-    "SET_FLAG_OFF": "\x1e\x0f\0<rtr><mod>\1\0<fno>",
-    "SET_FLAG_ON": "\x1e\x0f\1<rtr><mod>\1\0<fno>",
-    "COUNTR_UP": "\x1e\x10\2<rtr><mod>\1\0<cno>",
-    "COUNTR_DOWN": "\x1e\x10\3<rtr><mod>\1\0<cno>",
-    "COUNTR_VAL": "\x1e\x10\4<rtr><mod>\2\0<cno><val>",
-    "SET_RGB_OFF": "\x1e\x0c\x00<rtr><mod>\1\0<lno>",
-    "SET_RGB_ON": "\x1e\x0c\x01<rtr><mod>\1\0<lno>",
-    "SET_RGB_COL": "\x1e\x0c\x04<rtr><mod>\4\0<lno><rd><gn><bl>",
-    "SEND_MESSAGE": "\x1e\x11\3<rtr><mod>\xff\xff<tim><msg>",
-    "SEND_SMS": "\x1e\x11\x0b<rtr><mod>\xff\xff<sms><msg>",
-    "GET_LAST_IR_CODE": "\x32\2\1<rtr><mod>\0\0",
-    "REINIT_HUB": "\x3c\x00\x00<rtr><opr>\0\0",
-    "RESTART_HUB": "\x3c\x00\x02<rtr>\0\0\0",
-    "REBOOT_HUB": "\x3c\x00\x03\0\0\0\0",
-    "SEND_NETWORK_INFO": "\x3c\x00\x04\0\0<len><iplen><ipv4><toklen><tok><vlen><vers>",
-    "SET_LOG_LEVEL": "\x3c\x00\x05<hdlr><lvl>\0\0",  # Set logging level of console/file handler
-    "RESTART_FORWARD_TABLE": "\x3c\x01\x01<rtr>\0\0\0",  # Weiterleitungstabelle löschen und -automatik starten
-    "GET_CURRENT_ERROR": "\x3c\x01\x02<rtr>\0\0\0",
-    "GET_LAST_ERROR": "\x3c\x01\x03<rtr>\0\0\0",
-    "REBOOT_ROUTER": "\x3c\x01\x04<rtr>\0\0\0",
-    "POWER_UP_CHAN": "\x3c\x01\x06<rtr><msk>\0\0",
-    "POWER_DWN_CHAN": "\x3c\x01\x07<rtr><msk>\0\0",
-    "DO_FW_UPDATE": "\x3c\x01\x14<rtr><mod>\0\0",
-    "REBOOT_MODULE": "\x3c\x03\x01<rtr><mod>\0\0",  # <Module> or 0xFF for all modules
-}
 
 
 class HbtnComm:
@@ -106,7 +47,7 @@ class HbtnComm:
             self._host = get_own_ip()
         else:
             self._host: str = get_host_ip(self._host_conf)
-        self.logger.info(f"Initializing hub, got own ip: {self._host}")  # noqa: G004
+        self.logger.info("Initializing hub, got own ip: %s", self._host)
         self._port: int = 7777
 
         self._hass: HomeAssistant = hass
@@ -117,7 +58,7 @@ class HbtnComm:
         self._hwtype: str = ""
         self._version: str = ""
         self._network_ip: str = hass.data["network"].adapters[0]["ipv4"][0]["address"]
-        self.logger.info(f"Got network ip: {self._network_ip}")  # noqa: G004
+        self.logger.info("Got network ip: %s", self._network_ip)
         # self._websck_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJjMWI1ZjgyNmUxMDg0MjFhYWFmNTZlYWQ0ZThkZGNiZSIsImlhdCI6MTY5NDUzNTczOCwiZXhwIjoyMDA5ODk1NzM4fQ.0YZWyuQn5DgbCAfEWZXbQZWaViNBsR4u__LjC4Zf2lY"
         # self._websck_token = ""
         self._loop = asyncio.get_event_loop()
@@ -222,7 +163,7 @@ class HbtnComm:
         )
         await self.async_send_command(cmd_str)
         self.logger.warning(
-            f"Sent network info to hub (ip and token) - ip: {ipv4} - token: {tok}"  # noqa: G004
+            "Sent network info to hub (ip and token) - ip: %s - token: %s", ipv4, tok
         )
 
     async def reinit_hub(self, rtr_id, mode):
@@ -233,7 +174,7 @@ class HbtnComm:
         resp = await self.async_send_command(
             cmd_str, time_out_sec=12
         )  # extended time-out 12 s
-        self.logger.info(f"Re-initialized hub with mode {mode}")  # noqa: G004
+        self.logger.info("Re-initialized hub with mode %s", mode)
         return resp
 
     def set_router(self, rtr) -> None:
@@ -281,6 +222,7 @@ class HbtnComm:
             # Detect addon environment
             self.is_addon = "smart-hub" in self._hostname.split(".")[0]
             self.slugname = info["software"].get("slug", "") if self.is_addon else ""
+            self.logger.warning("SmartHub slugname: %s", self.slugname)
 
         except TimeoutError as exc:
             self.logger.error("Timeout connecting to SmartHub at %s", self._host)
@@ -338,8 +280,8 @@ class HbtnComm:
             full_string = wrap_command(cmd_string)
             sck.send(full_string.encode("iso8859-1"))  # Send command
             sck.close()
-        except Exception as e:
-            self.logger.warning(f"Error in send_only: {e}")
+        except Exception as e:  # noqa: BLE001
+            self.logger.warning("Error in send_only: %s", e)
 
     async def async_send_command(self, cmd_string: str, time_out_sec=10) -> bytes:
         """General function for communication via SmartHub."""
@@ -351,7 +293,7 @@ class HbtnComm:
                     self._send_command_sync, cmd_string, time_out_sec
                 )
             except TimeoutError as err_msg:
-                self.logger.error(f"Error connecting to Smart Hub: {err_msg}")  # noqa: G004
+                self.logger.error("Error connecting to Smart Hub: %s", err_msg)
                 return b""
             except ConnectionRefusedError:
                 self.logger.info("Smart Hub not available, probably rebooting.")
@@ -464,7 +406,7 @@ class HbtnComm:
             return
         if len(sys_status) < 10:
             self.logger.warning(
-                f"Received compact system status too short, length: {len(sys_status)}"  # noqa: G004
+                "Received compact system status too short, length: %s", len(sys_status)
             )
             return
         await self.router.update_system_status(sys_status)
@@ -889,18 +831,14 @@ class HbtnComm:
         cmd_str = SMHUB_COMMANDS["POWER_DWN_CHAN"]
         cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
         cmd_str = cmd_str.replace("<msk>", chr(mask))
-        [resp_bytes, crc] = await self.async_send_command_crc(
-            cmd_str, time_out_sec=1000
-        )
+        await self.async_send_command_crc(cmd_str, time_out_sec=1000)
         await asyncio.sleep(2)
         cmd_str = SMHUB_COMMANDS["POWER_UP_CHAN"]
         cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
         cmd_str = cmd_str.replace("<msk>", chr(mask))
-        [_resp_bytes, _crc] = await self.async_send_command_crc(
-            cmd_str, time_out_sec=1000
-        )
+        await self.async_send_command_crc(cmd_str, time_out_sec=1000)
 
-    async def update_entity(self, hub_id, rtr_id, mod_id, evnt, arg1, arg2):  # noqa: C901
+    async def update_entity(self, hub_id, _rtr_id, mod_id, evnt, arg1, arg2):  # noqa: C901
         """Event server handler to receive entity updates."""
         inp_event_types = ["inactive", "single_press", "long_press", "long_press_end"]
         if self._hostip != hub_id:
@@ -929,12 +867,16 @@ class HbtnComm:
             module = self.router.get_module(mod_id)
         except Exception as err_msg:  # pylint: disable=broad-exception-caught  # noqa: BLE001
             self.logger.warning(
-                f"Error handling habitron event {evnt} with arg1 {arg1} of module {mod_id}: {err_msg}"  # noqa: G004
+                "Error handling habitron event %s with arg1 %s of module %s: %s",
+                evnt,
+                arg1,
+                mod_id,
+                err_msg,
             )
             return
         if module is None:
             self.logger.error(
-                f"Error in update_entity: No module found for mod_id {mod_id}"  # noqa: G004
+                "Error in update_entity: No module found for mod_id %s", mod_id
             )
         else:
             try:
@@ -1008,7 +950,11 @@ class HbtnComm:
                     await module.logic[arg1].handle_upd_event()
             except Exception as err_msg:  # pylint: disable=broad-exception-caught  # noqa: BLE001
                 self.logger.warning(
-                    f"Error handling habitron event {evnt} with arg1 {arg1} of module {mod_id}: {err_msg}"  # noqa: G004
+                    "Error handling habitron event %s with arg1 %s of module %s: %s",
+                    evnt,
+                    arg1,
+                    mod_id,
+                    err_msg,
                 )
 
 
@@ -1183,7 +1129,7 @@ def discover_smarthubs():
             response, address_info = network_socket.recvfrom(1024)
 
             smhub_ip = address_info[0]
-            logger.info(f"SmartHub found at address {smhub_ip}")  # noqa: G004
+            logger.info("SmartHub found at address %s", smhub_ip)
 
             if response[0:4] == resp_header and smhub_ip != "0.0.0.0":
                 smhub_version = f"{response[7]}.{response[6]}.{response[5]}"
@@ -1218,6 +1164,7 @@ def query_smarthub(smhub_ip) -> dict[str, str]:
     :param smhub_ip: ip address of a single smartip
     """
 
+    smartip_info: dict[str, str] = {}
     smhub_port = 30718
     timeout = 1
 
@@ -1268,7 +1215,7 @@ def query_smarthub(smhub_ip) -> dict[str, str]:
     network_socket.close()
     try:
         smartip_info["hostname"] = socket.gethostbyaddr(smhub_ip)[0].split(".")[0]
-    except:  # noqa: E722
+    except (socket.herror, socket.gaierror, OSError, TimeoutException):
         smartip_info["hostname"] = ""
     return smartip_info
 
