@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 from enum import Enum
 from pathlib import Path
 
@@ -67,38 +66,6 @@ class SmartHub:
         """Version for SmartHub."""
         return self._version
 
-    def update(self) -> None:
-        """Update in a module specific method. Reads and parses status."""
-        info = self.comm.get_smhub_update()
-        if not info or not self.diags:
-            return
-        self.diags[0].value = float(
-            info["hardware"]["cpu"]["frequency current"].replace("MHz", "")
-        )
-        self.diags[1].value = float(info["hardware"]["cpu"]["load"].replace("%", ""))
-        self.diags[2].value = float(
-            info["hardware"]["cpu"]["temperature"].replace("°C", "")
-        )
-        self.sensors[0].value = float(
-            info["hardware"]["memory"]["percent"].replace("%", "")
-        )
-        self.sensors[1].value = float(
-            info["hardware"]["disk"]["percent"].replace("%", "")
-        )
-        self.loglvl[0].value = int(info["software"]["loglevel"]["console"])
-        self.loglvl[1].value = int(info["software"]["loglevel"]["file"])
-
-    async def async_update(self) -> None:
-        """Async wrapper for the update method."""
-        # This offloads the blocking 'update' call to a thread pool
-        await self.hass.async_add_executor_job(self.update)
-
-    async def get_version(self) -> str:
-        """Test connectivity to SmartHub is OK."""
-        resp = await self.comm.get_smhub_version()
-        ver_string = resp.decode("iso8859-1")
-        return ver_string[9:] if ver_string.startswith("SmartIP") else "0.0.0"
-
     async def async_setup(self) -> None:
         """Initialize SmartHub instance and register device."""
 
@@ -113,6 +80,7 @@ class SmartHub:
         self._type = self.comm.com_hwtype
         self.host = self.comm.com_ip
         self.addon_slug = self.comm.slugname
+        self.router.b_uid = self.uid
 
         if self.comm.is_addon:
             self.base_url: str = f"http://api/ingress/{self.addon_slug}"
@@ -170,6 +138,38 @@ class SmartHub:
 
         # 6. First data update
         await self.hass.async_add_executor_job(self.update)
+
+    def update(self) -> None:
+        """Update in a module specific method. Reads and parses status."""
+        info = self.comm.get_smhub_update()
+        if not info or not self.diags:
+            return
+        self.diags[0].value = float(
+            info["hardware"]["cpu"]["frequency current"].replace("MHz", "")
+        )
+        self.diags[1].value = float(info["hardware"]["cpu"]["load"].replace("%", ""))
+        self.diags[2].value = float(
+            info["hardware"]["cpu"]["temperature"].replace("°C", "")
+        )
+        self.sensors[0].value = float(
+            info["hardware"]["memory"]["percent"].replace("%", "")
+        )
+        self.sensors[1].value = float(
+            info["hardware"]["disk"]["percent"].replace("%", "")
+        )
+        self.loglvl[0].value = int(info["software"]["loglevel"]["console"])
+        self.loglvl[1].value = int(info["software"]["loglevel"]["file"])
+
+    async def async_update(self) -> None:
+        """Async wrapper for the update method."""
+        # This offloads the blocking 'update' call to a thread pool
+        await self.hass.async_add_executor_job(self.update)
+
+    async def get_version(self) -> str:
+        """Test connectivity to SmartHub is OK."""
+        resp = await self.comm.get_smhub_version()
+        ver_string = resp.decode("iso8859-1")
+        return ver_string[9:] if ver_string.startswith("SmartIP") else "0.0.0"
 
     async def restart(self, rt_id) -> None:
         """Restart hub."""

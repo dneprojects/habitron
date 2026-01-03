@@ -97,19 +97,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         # 1. Create the main SmartHub instance.
         smhub = SmartHub(hass, entry)
 
-        # 2. Create the provider, passing it the router from the SmartHub.
-        provider = HabitronWebRTCProvider(hass, smhub.router)
+        # 2. Run the setup which initializes router, etc.
+        await smhub.async_setup()
 
-        # 3. Attach the provider to the SmartHub instance.
+        # 3. Create the provider, passing it the router from the SmartHub.
+        provider = HabitronWebRTCProvider(hass, smhub.router)
         smhub.ws_provider = provider
 
         # 4. Store ONLY the smhub object. Other platforms will access .router and .ws_provider from it.
         hass.data.setdefault(DOMAIN, {})[entry.entry_id] = smhub
 
-        # 5. Now, run the setup which initializes router, etc.
-        await smhub.async_setup()
-
-        # 6. Register websocket handlers from the provider instance.
+        # 5. Register websocket handlers from the provider instance.
         provider.async_register_websocket_handlers()
 
         entry.async_on_unload(entry.add_update_listener(update_listener))
@@ -120,7 +118,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
             await smhub.comm.hub_restart(rtr_id)
 
-        async def reboot_hub(call: ServiceCall):
+        async def reboot_hub(_call: ServiceCall):
             """Handle the service call."""
             await smhub.comm.hub_reboot()
 
