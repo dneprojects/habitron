@@ -5,7 +5,7 @@ from __future__ import annotations
 from homeassistant.components.number import NumberDeviceClass, NumberEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -58,7 +58,7 @@ class HbtnNumber(CoordinatorEntity, NumberEntity):
         self._module = module
         self._nmbr = setval.nmbr
         self._attr_name = setval.name
-        self._attr_unique_id = f"Mod_{self._module.uid}_number{48+setval.nmbr}"
+        self._attr_unique_id = f"Mod_{self._module.uid}_number{48 + setval.nmbr}"
         self._attr_native_value = setval.value
 
     @property

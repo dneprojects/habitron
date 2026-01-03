@@ -5,20 +5,18 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from homeassistant.components.camera import (
-    Camera,
-    CameraEntityFeature,
-    RTCIceCandidateInit,
-    async_get_supported_provider,
-)
+from webrtc_models import RTCIceCandidateInit
+
+from homeassistant.components.camera import Camera, CameraEntityFeature
+from homeassistant.components.camera.webrtc import async_get_supported_provider
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
-from .smart_hub import SmartHub
 from .module import HbtnModule
 from .router import HbtnRouter
+from .smart_hub import SmartHub
 from .ws_provider import HabitronWebRTCProvider
 
 _LOGGER = logging.getLogger(__name__)
