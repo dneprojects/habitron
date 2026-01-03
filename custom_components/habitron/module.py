@@ -963,13 +963,15 @@ class SmartNature(HbtnModule):
     def update(self, mod_status) -> None:
         """Update with module specific method. Reads and parses status."""
         super().update(mod_status)
-        self.sensors[0].value = (
-            int.from_bytes(
-                mod_status[MStatIdx.TEMP_ROOM : MStatIdx.TEMP_ROOM + 2],
-                "little",
-            )
-            / 10
-        )  # current temperature
+        _temp_value = int.from_bytes(
+            mod_status[MStatIdx.TEMP_ROOM : MStatIdx.TEMP_ROOM + 2],
+            "little",
+        )
+        if _temp_value > 32767:
+            # negative temp
+            _temp_value = _temp_value & 0x7FFF
+            _temp_value = -_temp_value
+        self.sensors[0].value = _temp_value / 10  # current outdoor temperature
         self.sensors[1].value = int(mod_status[MStatIdx.HUM])  # current humidity
         self.sensors[2].value = int.from_bytes(
             mod_status[MStatIdx.LUM : MStatIdx.LUM + 2],
@@ -1003,13 +1005,15 @@ class SmartSensor(HbtnModule):
     def update(self, mod_status) -> None:
         """Update with module specific method. Reads and parses status."""
         super().update(mod_status)
-        self.sensors[0].value = (
-            int.from_bytes(
-                self.status[MStatIdx.TEMP_ROOM : MStatIdx.TEMP_ROOM + 2],
-                "little",
-            )
-            / 10
-        )  # current room temperature
+        _temp_value: int = int.from_bytes(
+            self.status[MStatIdx.TEMP_ROOM : MStatIdx.TEMP_ROOM + 2],
+            "little",
+        )
+        if _temp_value > 32767:
+            # negative temp
+            _temp_value = _temp_value & 0x7FFF
+            _temp_value = -_temp_value
+        self.sensors[0].value = _temp_value / 10  # current room temperature
         self.setvalues[0].value = (
             int.from_bytes(
                 self.status[MStatIdx.T_SETP_0 : MStatIdx.T_SETP_0 + 2],

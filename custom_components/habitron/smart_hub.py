@@ -121,7 +121,7 @@ class SmartHub:
 
         conf_url = f"{self.base_url}/hub" if self.host else None
 
-        # 3. Register device in HA with MAC and UID
+        # 3. Register device in HA with MAC and UID, iconset
         device_registry = dr.async_get(self.hass)
         device_registry.async_get_or_create(
             config_entry_id=self.config.entry_id,
@@ -135,6 +135,22 @@ class SmartHub:
             sw_version=self._version,
             hw_version=self._type,
         )
+
+        # Habitron iconset
+        files_path = Path(__file__).parent / "logos"
+        path_config = StaticPathConfig(
+            "/habitronfiles/hbt-icons.js",
+            str(files_path / "hbt-icons.js"),
+            False,
+        )
+        try:
+            await self.hass.http.async_register_static_paths(
+                [path_config],
+            )
+            add_extra_js_url(self.hass, "/habitronfiles/hbt-icons.js")
+        except Exception:  # noqa: BLE001
+            # install only once
+            pass
 
         # 4. Initialize Diagnostics (Logic depends on self._type)
         if self._type[:12] == "Raspberry Pi":
