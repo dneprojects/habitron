@@ -22,7 +22,7 @@ from homeassistant.components.update import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
@@ -69,6 +69,8 @@ class SCTouchAppUpdate(UpdateEntity):
         self._router = router
         self._hass = router.hass
 
+        self.firmware_dir: Path
+
         self._attr_unique_id = f"mod_{self._module.uid}_app_update"
         self._attr_device_info = {"identifiers": {(DOMAIN, module.uid)}}
         self._attr_installed_version = getattr(self._module, "client_version", "0.0.0")
@@ -76,76 +78,86 @@ class SCTouchAppUpdate(UpdateEntity):
         self._latest_apk_filename: str | None = None
 
     # --- Private Helper Methods ---
+    def scan_firmware_dir_blocking(self):
+        """This function contains all the blocking I/O."""
+        if not self.firmware_dir.is_dir():
+            _LOGGER.debug("Firmware directory not found: %s", self.firmware_dir)
+            return None, None
+
+        latest_version = parse_version("0.0.0")
+        latest_filename = None
+
+        try:
+            # This is all blocking, so it's fine inside the executor job
+            for file_path in self.firmware_dir.iterdir():
+                if file_path.name.startswith("sctouch_") and file_path.suffix == ".apk":
+                    # --- Suppress 'axml' log spam ---
+                    axml_logger = logging.getLogger("axml")
+                    original_level = axml_logger.level
+                    axml_logger.setLevel(logging.WARNING)
+
+                    version_name = None
+                    apk = None
+                    try:
+                        apk = apkutils.APK.from_file(str(file_path))
+                        apk.get_manifest()
+                        version_name = apk.version_name
+                        _LOGGER.warning(
+                            "Parsed APK %s, found version %s",
+                            file_path.name,
+                            version_name,
+                        )
+                    except Exception as e:  # noqa: BLE001
+                        _LOGGER.warning("Failed to parse APK %s: %s", file_path.name, e)
+                    finally:
+                        if apk:
+                            apk.close()
+                        axml_logger.setLevel(original_level)
+                    # --- End of suppression ---
+
+                    if not version_name:
+                        _LOGGER.warning(
+                            "Could not read version from %s", file_path.name
+                        )
+                        continue
+
+                    apk_version_obj = parse_version(str(version_name))
+                    if apk_version_obj > latest_version:
+                        latest_version = apk_version_obj
+                        latest_filename = file_path.name
+
+            if latest_filename:
+                return str(latest_version), latest_filename
+
+        except Exception as e:  # noqa: BLE001
+            _LOGGER.error("Error iterating firmware directory: %s", e)
+
+        return None, None
 
     async def _find_latest_apk(self) -> tuple[str | None, str | None]:
         """Return latest APK version and filename."""
-        firmware_dir = (
-            Path(self._hass.config.path()) / "custom_components" / DOMAIN / "firmware"
-        )
-
-        def _scan_firmware_dir_blocking():
-            """This function contains all the blocking I/O."""
-            if not firmware_dir.is_dir():
-                _LOGGER.debug("Firmware directory not found: %s", firmware_dir)
-                return None, None
-
-            latest_version = parse_version("0.0.0")
-            latest_filename = None
-
-            try:
-                # This is all blocking, so it's fine inside the executor job
-                for file_path in firmware_dir.iterdir():
-                    if (
-                        file_path.name.startswith("sctouch_")
-                        and file_path.suffix == ".apk"
-                    ):
-                        # --- Suppress 'axml' log spam ---
-                        axml_logger = logging.getLogger("axml")
-                        original_level = axml_logger.level
-                        axml_logger.setLevel(logging.WARNING)
-
-                        version_name = None
-                        apk = None
-                        try:
-                            apk = apkutils.APK.from_file(str(file_path))
-                            apk.get_manifest()
-                            version_name = apk.version_name
-                        except Exception as e:  # noqa: BLE001
-                            _LOGGER.warning(
-                                "Failed to parse APK %s: %s", file_path.name, e
-                            )
-                        finally:
-                            if apk:
-                                apk.close()
-                            axml_logger.setLevel(original_level)
-                        # --- End of suppression ---
-
-                        if not version_name:
-                            _LOGGER.warning(
-                                "Could not read version from %s", file_path.name
-                            )
-                            continue
-
-                        apk_version_obj = parse_version(str(version_name))
-                        if apk_version_obj > latest_version:
-                            latest_version = apk_version_obj
-                            latest_filename = file_path.name
-
-                if latest_filename:
-                    return str(latest_version), latest_filename
-
-            except Exception as e:  # noqa: BLE001
-                _LOGGER.error("Error iterating firmware directory: %s", e)
-
-            return None, None
+        if self._router.smhub.addon_slug == "":
+            _LOGGER.debug("No addon slug available, try local firmware directory")
+            self.firmware_dir = (
+                Path(self._hass.config.path())
+                / "custom_components"
+                / DOMAIN
+                / "firmware"
+            )
+        else:
+            self.firmware_dir = (
+                Path(self._hass.config.path().replace("config", "addon_configs"))
+                / self._router.smhub.addon_slug
+                / "firmware"
+            )
 
         # Run the entire blocking function in an executor thread
-        return await self._hass.async_add_executor_job(_scan_firmware_dir_blocking)
+        return await self._hass.async_add_executor_job(self.scan_firmware_dir_blocking)
 
     async def _copy_apk_to_www(self, filename: str) -> tuple[str | None, str | None]:
         """Copy APK to /www/ and calculate checksum."""
         config_dir = Path(self._hass.config.path())
-        source_file = config_dir / "custom_components" / DOMAIN / "firmware" / filename
+        source_file = self.firmware_dir / filename
         public_dir = config_dir / "www" / "firmware"
         public_file = public_dir / filename
 
