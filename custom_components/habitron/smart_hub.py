@@ -83,7 +83,9 @@ class SmartHub:
         self.router.b_uid = self.uid
 
         if self.comm.is_addon:
-            self.base_url: str = f"http://{self.host}:8123/{self.addon_slug}/ingress"
+            self.base_url: str = (
+                f"http://{self.host}:8123/{self.addon_slug}/ingress?index="
+            )
         else:
             self.base_url: str = f"http://{self.host}:7780"
 
