@@ -11,7 +11,14 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
 from .binary_sensor import ListeningStatusSensor
-from .const import DOMAIN, MODULE_CODES, ModuleDescriptor, MSetIdx, MStatIdx
+from .const import (
+    DOMAIN,
+    MODULE_CODES,
+    SMHUB_COMMANDS,
+    ModuleDescriptor,
+    MSetIdx,
+    MStatIdx,
+)
 from .interfaces import (
     CLedDescriptor,
     CmdDescriptor,
@@ -60,6 +67,7 @@ class HbtnModule:
         self.shutter_state = []
         self.climate_settings: int = 0
         self.id: str = f"Mod_{mod_descriptor.uid}_{self.b_uid}"
+        self.devreg_id = ""
         self.group: int = mod_descriptor.group
         self.mode: IfDescriptor = IfDescriptor("Mode", 0, 1, 1)
 
@@ -136,7 +144,20 @@ class HbtnModule:
             hw_version=self.hw_version,
             via_device=(DOMAIN, self.comm.router.uid),
         )
+        dev = device_registry.async_get_device(identifiers={(DOMAIN, self.uid)})
+        if dev:
+            self.devreg_id = dev.id
         self.update(self.status)
+        await self.send_devregid()
+
+    async def send_devregid(self) -> None:
+        """Send device registry id to module."""
+        cmd_str = SMHUB_COMMANDS["SEND_MD_ID"]
+        cmd_str = cmd_str.replace("<rtr>", chr(int(self.comm.router.id / 100)))
+        cmd_str = cmd_str.replace("<mod>", chr(self.raddr))
+        cmd_str = cmd_str.replace("<len>", chr(len(self.devreg_id)))
+        cmd_str = cmd_str.replace("<id>", self.devreg_id)
+        await self.comm.async_send_command(cmd_str)
 
     def get_cover_index(self, out_no: int) -> int:
         """Return cover index based on output number."""

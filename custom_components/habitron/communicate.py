@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import ipaddress
 import logging
+import os
 from pathlib import Path
 import socket
 import struct
@@ -220,7 +221,7 @@ class HbtnComm:
             self._mac = info["hardware"]["network"]["lan mac"]
 
             # Detect addon environment
-            self.is_addon = "smart-hub" in self._hostname.split(".")[0]
+            self.is_addon = os.getenv("SUPERVISOR_TOKEN") is not None
             self.slugname = info["software"].get("slug", "") if self.is_addon else ""
             self.logger.warning("SmartHub slugname: %s", self.slugname)
 
@@ -300,6 +301,13 @@ class HbtnComm:
                 return b""
             else:
                 return res
+
+    async def send_devreg_ids(self) -> None:
+        """Send device registry ids to all modules."""
+        for module in self.router.modules:
+            if module.devreg_id != "":
+                await module.send_devregid()
+                self.logger.info("Sent device registry id to module %s", module.name)
 
     def _send_command_sync(self, cmd_string: str, time_out_sec=10) -> bytes:
         """Synchronous version of send command."""
