@@ -68,6 +68,9 @@ instance/
 # Scrapy stuff:
 .scrapy
 
+# app firmware
+*.apk
+
 # Sphinx documentation
 docs/_build/
 
