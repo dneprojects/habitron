@@ -9,7 +9,15 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, issue_registry as ir
 
-from .const import DOMAIN, FALSE_VAL, TRUE_VAL, ModuleDescriptor, MStatIdx, RoutIdx
+from .const import (
+    DOMAIN,
+    FALSE_VAL,
+    SMHUB_COMMANDS,
+    TRUE_VAL,
+    ModuleDescriptor,
+    MStatIdx,
+    RoutIdx,
+)
 from .coordinator import HbtnCoordinator
 from .interfaces import (
     TYPE_DIAG,
@@ -79,6 +87,7 @@ class HbtnRouter:
         self.logger = logging.getLogger(__name__)
         self.coord: HbtnCoordinator = HbtnCoordinator(hass, config, self.comm)
         self.name = f"Router {smhub.uid}"
+        self.devreg_id = ""
         self.version = ""
         self.serial = ""
         self.status = ""
@@ -144,6 +153,11 @@ class HbtnRouter:
             hw_version=self.serial,
             via_device=(DOMAIN, self.smhub.uid),
         )
+
+        dev = device_registry.async_get_device(identifiers={(DOMAIN, self.uid)})
+        if dev:
+            self.devreg_id = dev.id
+        await self.send_devregid()
 
         # 3. Get module descriptors
         self.modules_desc = await self.get_modules(self.module_grp)
@@ -376,6 +390,7 @@ class HbtnRouter:
         self._mirror_started = self.status[RoutIdx.MIRROR_STARTED] == TRUE_VAL
         self.states[0].value = self._sys_ok
         self.states[1].value = self._mirror_started
+        await self.send_devregid()
 
         # 4. Handle Mirror and Issues
         if not self._mirror_started:
@@ -402,6 +417,7 @@ class HbtnRouter:
                 mod_addr = mod_status[MStatIdx.ADDR] + self.id
                 if mod_addr in self.mod_reg:
                     self.modules[self.mod_reg[mod_addr]].update(mod_status)
+                    await self.modules[self.mod_reg[mod_addr]].send_devregid()
 
     async def async_reset(self) -> None:
         """Call reset command for self."""
@@ -418,3 +434,12 @@ class HbtnRouter:
     def unit_not_exists(self, mod_units: list[IfDescriptor], entry_name: str) -> bool:
         """Check for existing unit based on name."""
         return all(exist_unit.name != entry_name for exist_unit in mod_units)
+
+    async def send_devregid(self) -> None:
+        """Send device registry id to module."""
+        cmd_str = SMHUB_COMMANDS["SEND_MD_ID"]
+        cmd_str = cmd_str.replace("<rtr>", chr(int(self.comm.router.id / 100)))
+        cmd_str = cmd_str.replace("<mod>", chr(0))  # module 0 = router
+        cmd_str = cmd_str.replace("<len>", chr(len(self.devreg_id)))
+        cmd_str = cmd_str.replace("<id>", self.devreg_id)
+        await self.comm.async_send_command(cmd_str)
