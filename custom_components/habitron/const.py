@@ -106,6 +106,7 @@ SMHUB_COMMANDS: Final[dict[str, str]] = {
     "POWER_DWN_CHAN": "\x3c\x01\x07<rtr><msk>\0\0",
     "DO_FW_UPDATE": "\x3c\x01\x14<rtr><mod>\0\0",
     "REBOOT_MODULE": "\x3c\x03\x01<rtr><mod>\0\0",  # <Module> or 0xFF for all modules
+    "SEND_MD_ID": "\x3c\x03\x09<rtr><mod><len>\x00<id>",
 }
 
 
