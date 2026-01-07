@@ -3,6 +3,9 @@
 ## v2.4.3
 
 ### Fix
+- Forward link to configurator
+
+### Fix
 - Changed init sequence for better stability
 
 ## v2.4.2
