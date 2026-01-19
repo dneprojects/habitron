@@ -59,9 +59,9 @@ SMHUB_COMMANDS: Final[dict[str, str]] = {
     "GET_MODULE_FW_FILEVS": "\x0a\5\x0a<rtr><mod>\0\0",
     "GET_MODULE_STATUS": "\x0a\5\1<rtr><mod>\0\0",
     "GET_COMPACT_STATUS": "\x0a\5\2<rtr>\xff\0\0",  # compact status of all modules (0xFF)
-    "GET_SMHUB_BOOT_STATUS": "\x0a\6\1\0\0\0\0",
-    "GET_SMHUB_INFO": "\x0a\6\2\0\0\0\0",
-    "GET_SMHUB_UPDATE": "\x0a\6\3\0\0<len><vlen><vers>",
+    "GET_SMHUB_BOOT_STATUS": "\x0a\6\1\1\0\0\0",
+    "GET_SMHUB_INFO": "\x0a\6\2\1\0\0\0",
+    "GET_SMHUB_UPDATE": "\x0a\6\3\1\0<len><vlen><vers>",
     "GET_GLOBAL_DESCRIPTIONS": "\x0a\7\1<rtr>\0\0\0",  # Flags, Command collections
     "GET_SMHUB_STATUS": "\x14\0\0\0\0\0\0",
     "GET_SMHUB_FIRMWARE": "\x14\x1e\0\0\0\0\0",
