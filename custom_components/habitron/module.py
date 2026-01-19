@@ -281,6 +281,7 @@ class HbtnModule:
                 led.type = 4
             return True
         if self.mod_type[:16] == "Smart Controller":
+            self.outputs[15].type = 8  # analog output
             self.dimmers[0] = IfDescriptor(
                 self.outputs[10].name, 0, 2, 0, self.outputs[10].area
             )
@@ -483,7 +484,7 @@ class SmartController(HbtnModule):
                 IfDescriptor(f"A/D-Kanal {i + 1}", i, 3, 0) for i in range(2)
             ]
         self.inputs = [IfDescriptor("", i, 1, 0) for i in range(18)]
-        self.outputs = [IfDescriptor("", i, 1, 0) for i in range(15)]
+        self.outputs = [IfDescriptor("", i, 1, 0) for i in range(16)]
         self.covers = [CovDescriptor("", -1, 0, 0, 0) for i in range(5)]
         self.dimmers = [IfDescriptor("", i, -1, 0) for i in range(2)]
         self.leds = [IfDescriptor("", i, 0, 0) for i in range(9)]
@@ -546,8 +547,9 @@ class SmartController(HbtnModule):
             self.status[MStatIdx.OUT_1_8 : MStatIdx.OUT_1_8 + 3],
             "little",
         )
-        for outpt in self.outputs:
+        for outpt in self.outputs[:-1]:
             outpt.value = int((out_state & (0x01 << outpt.nmbr)) > 0)
+        self.outputs[15].value = int(self.status[MStatIdx.AOUT_1])
 
         self.dimmers[0].value = int(self.status[MStatIdx.DIM_1])
         self.dimmers[1].value = int(self.status[MStatIdx.DIM_2])

@@ -223,7 +223,7 @@ class HbtnComm:
             # Detect addon environment
             self.is_addon = os.getenv("SUPERVISOR_TOKEN") is not None
             self.slugname = info["software"].get("slug", "") if self.is_addon else ""
-            self.logger.warning("SmartHub slugname: %s", self.slugname)
+            self.logger.debug("SmartHub slugname: %s", self.slugname)
 
         except TimeoutError as exc:
             self.logger.error("Timeout connecting to SmartHub at %s", self._host)
@@ -599,6 +599,10 @@ class HbtnComm:
         cmd_str = cmd_str.replace("<arg3>", chr(hi_val))
         cmd_str = cmd_str.replace("<arg2>", chr(lo_val))
         await self.async_send_command(cmd_str)
+
+    async def async_set_analog_val(self, mod_id, nmbr, val) -> None:
+        """Send byte value for analog output definition."""
+        await self.async_set_dimmval(mod_id, 3, val)  # analog output is dimm output 3
 
     async def async_call_dir_command(self, mod_id, nmbr) -> None:
         """Call of direct command of nmbr."""
