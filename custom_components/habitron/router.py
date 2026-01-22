@@ -348,7 +348,7 @@ class HbtnRouter:
         self.sys_status = sys_status
 
         # 1. Update SmHub (Move blocking call to executor)
-        await self.hass.async_add_executor_job(self.smhub.update)
+        self.smhub.update()
 
         # 2. Get Router status
         self.status = await self.comm.async_get_router_status(self.id)

@@ -6,6 +6,7 @@ from typing import Any
 
 from homeassistant.components.switch import SwitchDeviceClass, SwitchEntity
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -58,6 +59,9 @@ async def async_setup_entry(
         for mod_flg in hbt_module.flags:
             new_devices.append(HbtnFlagPush(mod_flg, hbt_module, hbtn_cord, flg_idx))
             flg_idx += 1  # noqa: SIM113
+
+        if hbt_module.mod_type.startswith("Smart Controller"):
+            new_devices.append(ClimateCtlSwitch(hbt_module))
 
         if hbt_module.mod_type == "Smart Controller Touch":
             new_devices.append(MicrophoneSwitch(hbt_module))
@@ -195,12 +199,12 @@ class SwitchedLed(CoordinatorEntity, SwitchEntity):
         # The call back registration is done once this entity is registered with HA
         # (rather than in the __init__)
         await super().async_added_to_hass()
-        self._module.leds[self._nmbr].register_callback(self.async_write_ha_state)
+        self._led.register_callback(self._handle_coordinator_update)
 
     async def async_will_remove_from_hass(self) -> None:
         """Entity being removed from hass."""
         # The opposite of async_added_to_hass. Remove any registered call backs here.
-        self._module.leds[self._nmbr].remove_callback(self.async_write_ha_state)
+        self._led.remove_callback(self._handle_coordinator_update)
 
     @property
     def is_on(self) -> bool:
@@ -231,9 +235,7 @@ class SwitchedLed(CoordinatorEntity, SwitchEntity):
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Instruct the led to turn off."""
-        await self._module.comm.async_set_output(
-            self._module.mod_addr, self._nmbr + len(self._module.outputs) + 1, 0
-        )
+        await self._module.comm.async_set_led_outp(self._module.mod_addr, self._nmbr, 0)
         self._state = False
 
 
@@ -373,3 +375,65 @@ class MicrophoneSwitch(SwitchEntity):
                 {"type": "habitron/set_webrtc_audio_mode", "audio_enabled": False}
             )
         self._state = False
+
+
+class ClimateCtlSwitch(SwitchEntity):
+    """Representation of a button to trigger a speech command."""
+
+    _attr_has_entity_name = True
+    _attr_should_poll = True
+
+    def __init__(self, module) -> None:
+        """Initialize a switch for the microphone."""
+        self._name = "Climate Contoller 2"
+        self._module = module
+        self._attr_unique_id = f"Mod_{self._module.uid}_{self._name}"
+        self._attr_name = self._name
+        self._attr_icon = "mdi:heat-pump-outline"  # "mdi:home-climate-outline"
+        self._attr_entity_category = EntityCategory.CONFIG
+        self._attr_entity_registry_enabled_default = (
+            False  # Entity will initally be disabled
+        )
+        self._state = self._module.climate_ctl12 == 2
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self._state = self._module.climate_ctl12 == 2
+        self.async_write_ha_state()
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return information to link this entity with the correct device."""
+        return {"identifiers": {(DOMAIN, self._module.uid)}}
+
+    @property
+    def is_on(self) -> bool:
+        """Return status of output."""
+        self._state = self._module.climate_ctl12 == 2
+        return self._state
+
+    @property
+    def icon(self) -> str:
+        """Icon of the switch, based on state."""
+        if self.is_on:
+            return "mdi:heat-pump"  # "mdi:home-climate"
+        return "mdi:heat-pump-outline"  # "mdi:home-climate-outline"
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Instruct the flag to turn on."""
+        self._module.climate_ctl12 = 2
+        await self._module.comm.async_set_climate_mode(
+            self._module.mod_addr,
+            self._module.climate_settings,
+            self._module.climate_ctl12,
+        )
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Instruct the flag to turn off."""
+        self._module.climate_ctl12 = 1
+        await self._module.comm.async_set_climate_mode(
+            self._module.mod_addr,
+            self._module.climate_settings,
+            self._module.climate_ctl12,
+        )
