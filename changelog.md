@@ -1,5 +1,13 @@
 # Latest changes
 
+## v2.4.5
+
+### New feature
+- Climate control mode / controller no can be modified
+
+### Fix
+- LED numbering and event
+
 ## v2.4.4
 
 ### New feature
