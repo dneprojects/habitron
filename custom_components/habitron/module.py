@@ -66,6 +66,7 @@ class HbtnModule:
         self.mstatus = ""
         self.shutter_state = []
         self.climate_settings: int = 0
+        self.climate_ctl12: int = 1
         self.id: str = f"Mod_{mod_descriptor.uid}_{self.b_uid}"
         self.devreg_id = ""
         self.group: int = mod_descriptor.group
@@ -354,6 +355,8 @@ class HbtnModule:
             resp[MSetIdx.SW_VERS : MSetIdx.SW_VERS_].decode("iso8859-1").strip()
         )
         self.climate_settings = int(resp[MSetIdx.CLIM_MODE])
+        self.climate_ctl12 = int(resp[MSetIdx.CLIM_CTL12])
+
         inp_state = int.from_bytes(
             resp[MSetIdx.INP_STATE : MSetIdx.INP_STATE + 3], "little"
         )
@@ -594,6 +597,7 @@ class SmartController(HbtnModule):
             / 10
         )
         self.climate_settings = int(self.status[MStatIdx.CLIM_MODE])
+        self.climate_ctl12 = int(self.status[MStatIdx.CLIM_CTL12])
 
 
 class SmartControllerMini(HbtnModule):
@@ -689,6 +693,7 @@ class SmartControllerMini(HbtnModule):
 
         self.diags[0].value = self.status[MStatIdx.MODULE_STAT]
         self.climate_settings = int(self.status[MStatIdx.CLIM_MODE])
+        self.climate_ctl12 = int(self.status[MStatIdx.CLIM_CTL12])
 
 
 class SmartOutput(HbtnModule):
