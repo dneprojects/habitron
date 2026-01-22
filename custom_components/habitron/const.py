@@ -92,6 +92,7 @@ SMHUB_COMMANDS: Final[dict[str, str]] = {
     "SET_RGB_COL": "\x1e\x0c\x04<rtr><mod>\4\0<lno><rd><gn><bl>",
     "SEND_MESSAGE": "\x1e\x11\3<rtr><mod>\xff\xff<tim><msg>",
     "SEND_SMS": "\x1e\x11\x0b<rtr><mod>\xff\xff<sms><msg>",
+    "SET_CLIM_MODE": "\x1e\x13\x01<rtr><mod>\2\0<cmode><ctl12>",
     "GET_LAST_IR_CODE": "\x32\2\1<rtr><mod>\0\0",
     "REINIT_HUB": "\x3c\x00\x00<rtr><opr>\0\0",
     "RESTART_HUB": "\x3c\x00\x02<rtr>\0\0\0",
@@ -149,6 +150,7 @@ class MSetIdx:
     HW_VERS_ = 100
     SW_VERS = 100
     SW_VERS_ = 122
+    CLIM_CTL12 = 131
     SHUTTER_STAT = 132
     AD_STATE = 153
 
@@ -192,7 +194,8 @@ class MStatIdx:
     BLAD_POS = 41  # 1..8: 41..48
     T_SETP_0 = 49  # low/high
     T_SETP_1 = 51  # low/high
-    CLIM_MODE = 53  # Klima mode, nachträglich in SMHUB eingefügt
+    CLIM_MODE = 53  # climate mode (new in smhub)
+    CLIM_CTL12 = 54  # climate controller 1 or 2 (new in smhub)
     GEN_3 = 53  # General field 3
     GEN_4 = 54  # General field 4
     RAIN = 53
@@ -262,6 +265,7 @@ class MirrIdx:
     MOV_LVL = 91
     MOV_TIME = 92
     MODULE_STAT = 163
+    CLIM_CTL12 = 173
     ROLL_SETTINGS = 176
     ROLL_POL = 177  # 1..4, 178 5..8 val 1 = down dez.42 bei 175? Mod0: 42/0/2/2/2, RC2,3: 42/0/1/1/1 RC4: 42 0 1 2 1 RC8: 0 0 1 1 1
     COUNTER = 187  # type, max_cnt, val;    logic 1..10

@@ -106,14 +106,14 @@ class HbtnSetTemperature(CoordinatorEntity, NumberEntity):
     async def async_set_native_value(self, value: float) -> None:
         """Set the new value."""
         self._attr_native_value = value
-        int_val = int(self._attr_native_value)
+        int_val = int(self._attr_native_value) * 10
         await self._module.comm.async_set_setpoint(
             self._module.mod_addr,
             self._setval.nmbr + 1,
             int_val,
         )
         # Update the data
-        # await self.coordinator.async_request_refresh()
+        await self.coordinator.async_request_refresh()
 
 
 class HbtnAnalogOutput(CoordinatorEntity, NumberEntity):
