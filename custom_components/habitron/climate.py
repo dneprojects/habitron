@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from homeassistant.components.climate import ClimateEntity
-from homeassistant.components.climate.const import (
+from homeassistant.components.climate import (
+    ClimateEntity,
     ClimateEntityFeature,
     HVACAction,
     HVACMode,
@@ -64,6 +64,7 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
     )
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _enable_turn_on_off_backwards_compatibility = False
+    _attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT, HVACMode.COOL, HVACMode.HEAT_COOL]
 
     def __init__(
         self,
@@ -202,12 +203,18 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
         if len(self._module.sensors) > 1:
-            self._curr_temperature = self._module.sensors[1].value
+            if self._module.climate_ctl12 == 2:
+                self._curr_temperature = self._module.sensors[2].value
+            else:
+                self._curr_temperature = self._module.sensors[1].value
             self._curr_humidity = self._module.sensors[3].value
         else:
             self._curr_temperature = self._module.sensors[0].value
             self._curr_humidity = None
-        self._target_temperature = self._module.setvalues[0].value
+        if self._module.climate_ctl12 == 2:
+            self._target_temperature = self._module.setvalues[1].value
+        else:
+            self._target_temperature = self._module.setvalues[0].value
         self._get_hvac_mode()
         self.update_action()
         self.async_write_ha_state()
@@ -216,25 +223,39 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
         """Set new target temperature."""
         self._target_temperature = kwargs.get(ATTR_TEMPERATURE)
         int_val = int(self.target_temperature * 10)
-        await self._module.comm.async_set_setpoint(self._module.mod_addr, 1, int_val)
+        await self._module.comm.async_set_setpoint(
+            self._module.mod_addr, self._module.climate_ctl12, int_val
+        )
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Set new target hvac mode."""
         self._curr_hvac_mode = hvac_mode
+        match hvac_mode:
+            case HVACMode.HEAT:
+                self._module.climate_settings = 1
+            case HVACMode.COOL:
+                self._module.climate_settings = 2
+            case HVACMode.HEAT_COOL:
+                self._module.climate_settings = 3
+            case HVACMode.OFF:
+                self._module.climate_settings = 4
+            case _:
+                self._module.climate_settings = 4
+        await self._module.comm.async_set_climate_mode(
+            self._module.mod_addr,
+            self._module.climate_settings,
+            self._module.climate_ctl12,
+        )
 
     def _get_hvac_mode(self) -> None:
         if self._module.climate_settings == 1:
-            self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
             self._curr_hvac_mode = HVACMode.HEAT
         elif self._module.climate_settings == 2:
-            self._attr_hvac_modes = [HVACMode.OFF, HVACMode.COOL]
             self._curr_hvac_mode = HVACMode.COOL
         elif self._module.climate_settings == 3:
-            self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT_COOL]
             self._curr_hvac_mode = HVACMode.HEAT_COOL
         elif self._module.climate_settings == 4:
             self._attr_hvac_modes = [HVACMode.OFF]
             self._curr_hvac_mode = HVACMode.OFF
         else:
-            self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
             self._curr_hvac_mode = HVACMode.HEAT

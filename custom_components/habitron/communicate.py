@@ -496,7 +496,7 @@ class HbtnComm:
         mod = self.router.get_module(mod_addr)
         await self.async_set_output(
             mod_id,
-            nmbr + len(mod.outputs) + 1,  # type: ignore  # noqa: PGH003
+            nmbr + len(mod.outputs),  # type: ignore  # noqa: PGH003
             val,
         )
 
@@ -603,6 +603,17 @@ class HbtnComm:
     async def async_set_analog_val(self, mod_id, nmbr, val) -> None:
         """Send byte value for analog output definition."""
         await self.async_set_dimmval(mod_id, 3, val)  # analog output is dimm output 3
+
+    async def async_set_climate_mode(self, mod_id, cmode: int, ctl12: int) -> None:
+        """Set climate mode for given module."""
+        rtr_nmbr = int(mod_id / 100)
+        mod_addr = int(mod_id - 100 * rtr_nmbr)
+        cmd_str = SMHUB_COMMANDS["SET_CLIM_MODE"]
+        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
+        cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
+        cmd_str = cmd_str.replace("<cmode>", chr(cmode))
+        cmd_str = cmd_str.replace("<ctl12>", chr(ctl12))
+        await self.async_send_command(cmd_str)
 
     async def async_call_dir_command(self, mod_id, nmbr) -> None:
         """Call of direct command of nmbr."""
