@@ -1,5 +1,10 @@
 # Latest changes
 
+## v2.4.6
+
+### Fix
+- Analog output only available  for Smart Controllers
+
 ## v2.4.5
 
 ### New feature
