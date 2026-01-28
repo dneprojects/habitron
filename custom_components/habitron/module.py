@@ -274,6 +274,10 @@ class HbtnModule:
                         )
 
             resp = resp[line_len : len(resp)]  # Strip processed line
+        if self.typ[0] == 1:
+            self.outputs[15].type = 8  # analog output
+            if self.outputs[15].name.strip() == "":
+                self.outputs[15].type = -8  # disable
         self.set_default_names(self.inputs, "Inp")
         self.set_default_names(self.outputs, "Out")
         if self.mod_type == "Smart Controller Mini":
@@ -282,7 +286,6 @@ class HbtnModule:
                 led.type = 4
             return True
         if self.mod_type[:16] == "Smart Controller":
-            self.outputs[15].type = 8  # analog output
             self.dimmers[0] = IfDescriptor(
                 self.outputs[10].name, 0, 2, 0, self.outputs[10].area
             )
