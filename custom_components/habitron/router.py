@@ -353,6 +353,7 @@ class HbtnRouter:
         # 2. Get Router status
         self.status = await self.comm.async_get_router_status(self.id)
         if len(self.status) < RoutIdx.MIRROR_STARTED:
+            self.logger.warning(f"Router status too short, length: {len(self.status)}")  # noqa: G004
             return
 
         # 3. Parse Router values
