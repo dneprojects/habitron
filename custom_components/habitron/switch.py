@@ -98,7 +98,7 @@ async def async_setup_entry(
                         hbt_module.uid,
                         mod_output.nmbr,
                     )
-            if mod_output.area <= 0:
+            elif mod_output.area <= 0:
                 logging.getLogger(__name__).warning(
                     "Set area 0 for switch, output area is 0: Mod_%s_out%s",
                     hbt_module.uid,
