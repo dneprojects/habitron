@@ -1,5 +1,10 @@
 # Latest changes
 
+## v2.4.7
+
+### Fix
+- Correct assignment of areas with German letters ä,ö,ü,ß
+
 ## v2.4.6
 
 ### Fix
