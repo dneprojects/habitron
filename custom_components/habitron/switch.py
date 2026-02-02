@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from homeassistant.components.switch import SwitchDeviceClass, SwitchEntity
@@ -91,6 +92,32 @@ async def async_setup_entry(
                     registry.async_update_entity(
                         entity_entry, area_id=area_names[mod_output.area].get_name_id()
                     )
+                else:
+                    logging.getLogger(__name__).warning(
+                        "Set area for switch, entity not found for output: Mod_%s_out%s",
+                        hbt_module.uid,
+                        mod_output.nmbr,
+                    )
+            if mod_output.area <= 0:
+                logging.getLogger(__name__).warning(
+                    "Set area 0 for switch, output area is 0: Mod_%s_out%s",
+                    hbt_module.uid,
+                    mod_output.nmbr,
+                )
+            elif mod_output.area == hbt_module.area_member:
+                logging.getLogger(__name__).warning(
+                    "Set area %s for switch, output area same as module area: Mod_%s_out%s",
+                    area_names[mod_output.area].get_name_id(),
+                    hbt_module.uid,
+                    mod_output.nmbr,
+                )
+            else:
+                logging.getLogger(__name__).warning(
+                    "Set area %s for switch, output not in area: Mod_%s_out%s",
+                    area_names[mod_output.area].get_name_id(),
+                    hbt_module.uid,
+                    mod_output.nmbr,
+                )
 
 
 class SwitchedOutput(CoordinatorEntity, SwitchEntity):
