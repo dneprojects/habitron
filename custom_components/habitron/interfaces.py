@@ -94,7 +94,14 @@ class AreaDescriptor(IfDescriptor):
 
     def get_name_id(self) -> str:
         """Get area id."""
-        return self.name.lower().replace(" ", "_")
+        return (
+            self.name.lower()
+            .replace(" ", "_")
+            .replace("ä", "a")
+            .replace("ö", "o")
+            .replace("ü", "u")
+            .replace("ß", "ss")
+        )
 
 
 class LgcDescriptor(IfDescriptor):
