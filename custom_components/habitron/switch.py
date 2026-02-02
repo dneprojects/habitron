@@ -98,26 +98,6 @@ async def async_setup_entry(
                         hbt_module.uid,
                         mod_output.nmbr,
                     )
-            elif mod_output.area <= 0:
-                logging.getLogger(__name__).warning(
-                    "Set area 0 for switch, output area is 0: Mod_%s_out%s",
-                    hbt_module.uid,
-                    mod_output.nmbr,
-                )
-            elif mod_output.area == hbt_module.area_member:
-                logging.getLogger(__name__).warning(
-                    "Set area %s for switch, output area same as module area: Mod_%s_out%s",
-                    area_names[mod_output.area].get_name_id(),
-                    hbt_module.uid,
-                    mod_output.nmbr,
-                )
-            else:
-                logging.getLogger(__name__).warning(
-                    "Set area %s for switch, output not in area: Mod_%s_out%s",
-                    area_names[mod_output.area].get_name_id(),
-                    hbt_module.uid,
-                    mod_output.nmbr,
-                )
 
 
 class SwitchedOutput(CoordinatorEntity, SwitchEntity):
