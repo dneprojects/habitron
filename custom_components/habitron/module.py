@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import area_registry as ar, device_registry as dr
 
 from .binary_sensor import ListeningStatusSensor
 from .const import (
@@ -146,8 +146,11 @@ class HbtnModule:
             via_device=(DOMAIN, self.comm.router.uid),
         )
         dev = device_registry.async_get_device(identifiers={(DOMAIN, self.uid)})
-        if dev:
+        area_reg = ar.async_get(self._hass)
+        _area = area_reg.async_get_or_create(self.area)  # ensure area exists
+        if dev is not None:
             self.devreg_id = dev.id
+            device_registry.async_update_device(dev.id, area_id=_area.id)
         self.update(self.status)
         await self.send_devregid()
 
