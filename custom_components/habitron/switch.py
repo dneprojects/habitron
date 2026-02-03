@@ -92,6 +92,18 @@ async def async_setup_entry(
                     registry.async_update_entity(
                         entity_entry, area_id=area_names[mod_output.area].get_name_id()
                     )
+                    entity: er.RegistryEntry | None = registry.async_get(entity_entry)
+                    if entity is not None and entity.hidden:
+                        device_entities: list[er.RegistryEntry] = (
+                            er.async_entries_for_device(registry, entity.device_id)  # type: ignore
+                        )
+                        for dev_entity in device_entities:
+                            if dev_entity.original_name == entity.original_name:
+                                registry.async_update_entity(
+                                    dev_entity.entity_id,
+                                    area_id=area_names[mod_output.area].get_name_id(),
+                                )
+
                 else:
                     logging.getLogger(__name__).warning(
                         "Set area for switch, entity not found for output: Mod_%s_out%s",
