@@ -59,18 +59,20 @@ async def async_setup_entry(
 
     for hbt_module in hbtn_rt.modules:
         for mod_cover in hbt_module.covers:
-            if (
-                mod_cover.nmbr >= 0
-                and mod_cover.area > 0
-                and mod_cover.area != hbt_module.area_member
-            ):  # different than device area
+            if mod_cover.nmbr >= 0:
                 entity_entry = registry.async_get_entity_id(
                     "cover", DOMAIN, f"Mod_{hbt_module.uid}_cover{mod_cover.nmbr}"
                 )
                 if entity_entry:
-                    registry.async_update_entity(
-                        entity_entry, area_id=area_names[mod_cover.area].get_name_id()
-                    )
+                    area_index = mod_cover.area
+                    if area_index in [0, hbt_module.area_member]:
+                        registry.async_update_entity(
+                            entity_entry, area_id=None
+                        )  # default
+                    else:
+                        registry.async_update_entity(
+                            entity_entry, area_id=area_names[area_index].get_name_id()
+                        )
 
 
 # This entire class could be written to extend a base class to ensure common attributes

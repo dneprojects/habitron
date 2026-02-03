@@ -4,12 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from homeassistant.components.light import (
-    ATTR_BRIGHTNESS,
-    ATTR_RGB_COLOR,
-    ColorMode,
-    LightEntity,
-)
+from homeassistant.components.light import ATTR_BRIGHTNESS, ATTR_RGB_COLOR, LightEntity
+from homeassistant.components.light.const import ColorMode
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
@@ -65,18 +61,20 @@ async def async_setup_entry(
 
     for hbt_module in hbtn_rt.modules:
         for mod_output in hbt_module.outputs:
-            if (
-                mod_output.type == 2
-                and mod_output.area > 0
-                and mod_output.area != hbt_module.area_member
-            ):  # dimmer
+            if mod_output.type == 2:  # dimmer
                 entity_entry = registry.async_get_entity_id(
                     "light", DOMAIN, f"Mod_{hbt_module.uid}_out{mod_output.nmbr}"
                 )
                 if entity_entry:
-                    registry.async_update_entity(
-                        entity_entry, area_id=area_names[mod_output.area].get_name_id()
-                    )
+                    area_index = mod_output.area
+                    if area_index in [0, hbt_module.area_member]:
+                        registry.async_update_entity(
+                            entity_entry, area_id=None
+                        )  # default
+                    else:
+                        registry.async_update_entity(
+                            entity_entry, area_id=area_names[area_index].get_name_id()
+                        )
 
 
 class SwitchedLight(CoordinatorEntity, LightEntity):
