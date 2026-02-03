@@ -1,5 +1,10 @@
 # Latest changes
 
+## v2.4.9
+
+### Fix
+- hvac_modes remain if hvac set to off
+
 ## v2.4.8
 
 ### Fix
