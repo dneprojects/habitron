@@ -138,18 +138,21 @@ async def async_setup_entry(  # noqa: C901
     for hbt_module in hbtn_rt.modules:
         if hbt_module.typ in [b"\x01\x03", b"\x0b\x1f"]:
             for ain in hbt_module.analogins:
-                if (
-                    ain.type == 3
-                    and ain.area > 0
-                    and ain.area != hbt_module.area_member
-                ):
+                if ain.type == 3:  # analog input
                     entity_entry = registry.async_get_entity_id(
                         "sensor", DOMAIN, f"Mod_{hbt_module.uid}_adin{ain.nmbr}"
                     )
                     if entity_entry:
-                        registry.async_update_entity(
-                            entity_entry, area_id=area_names[ain.area].get_name_id()
-                        )
+                        area_index = ain.area
+                        if area_index in [0, hbt_module.area_member]:
+                            registry.async_update_entity(
+                                entity_entry, area_id=None
+                            )  # default
+                        else:
+                            registry.async_update_entity(
+                                entity_entry,
+                                area_id=area_names[area_index].get_name_id(),
+                            )
 
 
 class HbtnSensor(CoordinatorEntity, SensorEntity):

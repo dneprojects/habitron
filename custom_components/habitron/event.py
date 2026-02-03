@@ -48,18 +48,20 @@ async def async_setup_entry(
 
     for hbt_module in hbtn_rt.modules:
         for mod_input in hbt_module.inputs:
-            if (
-                abs(mod_input.type) == 1
-                and mod_input.area > 0
-                and mod_input.area != hbt_module.area_member
-            ):  # pulse switch
+            if abs(mod_input.type) == 1:  # pulse switch
                 entity_entry = registry.async_get_entity_id(
                     "event", DOMAIN, f"Mod_{hbt_module.uid}_evnt{mod_input.nmbr}"
                 )
                 if entity_entry:
-                    registry.async_update_entity(
-                        entity_entry, area_id=area_names[mod_input.area].get_name_id()
-                    )
+                    area_index = mod_input.area
+                    if area_index in [0, hbt_module.area_member]:
+                        registry.async_update_entity(
+                            entity_entry, area_id=None
+                        )  # default
+                    else:
+                        registry.async_update_entity(
+                            entity_entry, area_id=area_names[area_index].get_name_id()
+                        )
 
 
 class HbtnEvent(EventEntity):
