@@ -80,29 +80,36 @@ async def async_setup_entry(
 
     for hbt_module in hbtn_rt.modules:
         for mod_output in hbt_module.outputs:
-            if (
-                abs(mod_output.type) == 1
-                and mod_output.area > 0
-                and mod_output.area != hbt_module.area_member
-            ):  # standard
+            if abs(mod_output.type) == 1:  # standard
                 entity_entry = registry.async_get_entity_id(
                     "switch", DOMAIN, f"Mod_{hbt_module.uid}_out{mod_output.nmbr}"
                 )
                 if entity_entry:
-                    registry.async_update_entity(
-                        entity_entry, area_id=area_names[mod_output.area].get_name_id()
-                    )
+                    area_index = mod_output.area
+                    if area_index in [0, hbt_module.area_member]:
+                        registry.async_update_entity(
+                            entity_entry, area_id=None
+                        )  # default
+                    else:
+                        registry.async_update_entity(
+                            entity_entry, area_id=area_names[area_index].get_name_id()
+                        )
                     entity: er.RegistryEntry | None = registry.async_get(entity_entry)
                     if entity is not None and entity.hidden:
                         device_entities: list[er.RegistryEntry] = (
-                            er.async_entries_for_device(registry, entity.device_id)  # type: ignore
+                            er.async_entries_for_device(registry, entity.device_id)  # type: ignore  # noqa: PGH003
                         )
                         for dev_entity in device_entities:
                             if dev_entity.original_name == entity.original_name:
-                                registry.async_update_entity(
-                                    dev_entity.entity_id,
-                                    area_id=area_names[mod_output.area].get_name_id(),
-                                )
+                                if area_index in [0, hbt_module.area_member]:
+                                    registry.async_update_entity(
+                                        dev_entity.entity_id, area_id=None
+                                    )
+                                else:
+                                    registry.async_update_entity(
+                                        dev_entity.entity_id,
+                                        area_id=area_names[area_index].get_name_id(),
+                                    )
 
                 else:
                     logging.getLogger(__name__).warning(
@@ -110,6 +117,8 @@ async def async_setup_entry(
                         hbt_module.uid,
                         mod_output.nmbr,
                     )
+            else:
+                pass
 
 
 class SwitchedOutput(CoordinatorEntity, SwitchEntity):
