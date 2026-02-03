@@ -4,6 +4,8 @@
 
 from collections.abc import Callable
 
+from homeassistant.util import slugify
+
 
 class IfDescriptor:
     """Habitron interface descriptor."""
@@ -94,14 +96,7 @@ class AreaDescriptor(IfDescriptor):
 
     def get_name_id(self) -> str:
         """Get area id."""
-        return (
-            self.name.lower()
-            .replace(" ", "_")
-            .replace("ä", "a")
-            .replace("ö", "o")
-            .replace("ü", "u")
-            .replace("ß", "ss")
-        )
+        return slugify(self.name)
 
 
 class LgcDescriptor(IfDescriptor):

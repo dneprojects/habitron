@@ -1,5 +1,10 @@
 # Latest changes
 
+## v2.4.8
+
+### Fix
+- Set areas for substituted switch entities
+
 ## v2.4.7
 
 ### Fix
