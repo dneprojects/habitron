@@ -255,7 +255,6 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
         elif self._module.climate_settings == 3:
             self._curr_hvac_mode = HVACMode.HEAT_COOL
         elif self._module.climate_settings == 4:
-            self._attr_hvac_modes = [HVACMode.OFF]
             self._curr_hvac_mode = HVACMode.OFF
         else:
             self._curr_hvac_mode = HVACMode.HEAT
