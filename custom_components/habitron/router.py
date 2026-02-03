@@ -334,6 +334,13 @@ class HbtnRouter:
 
             resp = resp[line_len:]
 
+    def get_area_id(self, area_slugid: str) -> int:
+        """Return area id for given slug id."""
+        for area_id in self.areas:
+            if self.areas[area_id].get_name_id() == area_slugid:
+                return area_id
+        return 0
+
     async def get_comm_errors(self) -> bytes:
         """Get current communication errors."""
         resp = await self.comm.async_get_error_status(self.id)
