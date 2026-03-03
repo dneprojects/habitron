@@ -1,5 +1,9 @@
 """Platform for sensor integration."""
 
+from __future__ import annotations
+
+from typing import Any
+
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
@@ -16,7 +20,7 @@ from homeassistant.const import (
     UnitOfSpeed,
     UnitOfTemperature,
 )
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -24,6 +28,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .interfaces import TYPE_DIAG, AreaDescriptor
+from .module import SmartController
 
 
 async def async_setup_entry(  # noqa: C901
@@ -60,7 +65,66 @@ async def async_setup_entry(  # noqa: C901
             new_devices.append(
                 TemperatureDSensor(smhub, smhub_diag, hbtn_cord, len(new_devices))
             )
+
+    # --- Client Device Sensor Definitions ---
+    # Definitions for Smart Touch device sensors (Battery, Health, etc.)
+    client_sensor_definitions = [
+        (
+            "battery_level",
+            "Battery Level",
+            SensorDeviceClass.BATTERY,
+            PERCENTAGE,
+            None,
+            0,  # 0 decimals for percentage
+        ),
+        (
+            "battery_health",
+            "Battery Health",
+            None,
+            None,
+            "mdi:battery-heart-variant",
+            None,  # No decimals (text)
+        ),
+        (
+            "temperature",
+            "Device Temp",
+            SensorDeviceClass.TEMPERATURE,
+            UnitOfTemperature.CELSIUS,
+            None,
+            1,  # 1 decimal for temp
+        ),
+        (
+            "voltage",
+            "Battery Voltage",
+            SensorDeviceClass.VOLTAGE,
+            UnitOfElectricPotential.VOLT,
+            None,
+            2,  # 2 decimals for voltage
+        ),
+        ("cycles", "Battery Cycles", None, None, "mdi:battery-sync", 0),
+        (
+            "soh",
+            "Battery SoH",
+            SensorDeviceClass.BATTERY,
+            PERCENTAGE,
+            "mdi:battery-heart",
+            0,
+        ),
+    ]
+
+    # --- Module Iteration ---
     for hbt_module in hbtn_rt.modules:
+        if (
+            isinstance(hbt_module, SmartController)
+            and hbt_module.mod_type == "Smart Controller Touch"
+        ):
+            for key, name, dev_class, unit, icon, decimals in client_sensor_definitions:
+                new_devices.append(
+                    HabitronClientSensor(
+                        hbt_module, key, name, dev_class, unit, icon, decimals
+                    )
+                )
+
         if hbt_module.typ in [b"\x01\x03", b"\x0b\x1f"]:
             for ain in hbt_module.analogins:
                 if ain.type == 3:
@@ -132,6 +196,7 @@ async def async_setup_entry(  # noqa: C901
         hbtn_cord.data = new_devices
         async_add_entities(new_devices)
 
+    # --- Area Registry Handling ---
     registry: er.EntityRegistry = er.async_get(hass)
     area_names: dict[int, AreaDescriptor] = hbtn_rt.areas
 
@@ -574,3 +639,81 @@ class FrequencySensor(HbtnSensor):
         else:
             self._attr_native_value = self._module.sensors[self._sensor_idx].value
         self.async_write_ha_state()
+
+
+class HabitronClientSensor(SensorEntity):
+    """Representation of a sensor reported by the Habitron App Client."""
+
+    _attr_should_poll = False
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        module: Any,
+        json_key: str,
+        name: str,
+        device_class: SensorDeviceClass | None,
+        unit_of_measurement: str | None,
+        icon: str | None,
+        decimals: int | None = None,
+    ) -> None:
+        """Initialize the client sensor."""
+        self._module = module
+        self._json_key = json_key
+        self._attr_name = name
+        self._attr_device_class = device_class
+        self._attr_native_unit_of_measurement = unit_of_measurement
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC
+        self._attr_entity_registry_enabled_default = (
+            False  # Entity will initally be disabled
+        )
+        if icon:
+            self._attr_icon = icon
+        if decimals is not None:
+            self._attr_suggested_display_precision = decimals
+        if device_class in [
+            SensorDeviceClass.BATTERY,
+            SensorDeviceClass.TEMPERATURE,
+            SensorDeviceClass.VOLTAGE,
+        ]:
+            self._attr_state_class = SensorStateClass.MEASUREMENT
+
+        # Link to the specific module's Unique ID
+        self._attr_unique_id = f"Mod_{self._module.uid}_client_{json_key}"
+
+        # Generate the stream name expected from this module (to filter events)
+        # Logic matches media_player.py: name + "_" + raddr
+        self._target_stream_name = (
+            module.name.lower().replace(" ", "_") + f"_{module.raddr}"
+        )
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return information to link this entity with the correct device."""
+        # Attach to the specific Module device, not the Hub
+        return {"identifiers": {(DOMAIN, self._module.uid)}}
+
+    async def async_added_to_hass(self) -> None:
+        """Register callbacks when entity is added."""
+        # Listen to the event fired by the WebSocket provider
+        self.async_on_remove(
+            self.hass.bus.async_listen(
+                "habitron_device_update", self._handle_device_update
+            )
+        )
+
+    @callback
+    def _handle_device_update(self, event: Event) -> None:
+        """Handle incoming device update events."""
+        # 1. Filter: Check if this event is for ME (my stream name)
+        if event.data.get("stream_name") != self._target_stream_name:
+            return
+
+        # 2. Update state if key exists
+        if not event.data or "data" not in event.data:
+            return
+
+        payload = event.data["data"]
+        if self._json_key in payload:
+            self._attr_native_value = payload[self._json_key]
+            self.async_write_ha_state()
