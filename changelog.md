@@ -1,5 +1,10 @@
 # Latest changes
 
+## v2.5.0
+
+### New feature
+- Additional battery sensors for Smart Touch
+
 ## v2.4.9
 
 ### Fix
