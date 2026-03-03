@@ -1026,6 +1026,40 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
 
             connection.send_result(msg["id"], {"success": success})
 
+        @websocket_api.websocket_command(
+            {
+                vol.Required("type"): "habitron/report_state",
+                vol.Required("payload"): dict,
+            }
+        )
+        @websocket_api.async_response
+        async def handle_report_state(
+            hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+        ) -> None:
+            """Handle device state reports (battery, temp, etc.) from client."""
+            stream_name = next(
+                (n for n, c in self.active_ws_connections.items() if c == connection),
+                None,
+            )
+            if not stream_name:
+                _LOGGER.warning(
+                    f"Received report_state from unknown client {connection}"  # noqa: G004
+                )
+                return
+
+            payload = msg["payload"]
+            _LOGGER.debug(
+                "Received device state report for %s: %s", stream_name, payload
+            )
+
+            # Fire an event so sensors can listen to it and update their state
+            hass.bus.async_fire(
+                "habitron_device_update",
+                {"stream_name": stream_name, "data": payload},
+            )
+
+            connection.send_result(msg["id"])
+
         # --- REGISTRATION OF ALL HANDLERS ---
         websocket_api.async_register_command(self.hass, handle_register_stream)
         websocket_api.async_register_command(self.hass, handle_webrtc_answer)
@@ -1040,3 +1074,4 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
         websocket_api.async_register_command(self.hass, handle_media_next_track)
         websocket_api.async_register_command(self.hass, handle_media_previous_track)
         websocket_api.async_register_command(self.hass, handle_tts_playback_finished)
+        websocket_api.async_register_command(self.hass, handle_report_state)
