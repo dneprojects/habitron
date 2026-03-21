@@ -17,11 +17,12 @@
     "apkutils",
     "awesomeversion",
     "aiohttp",
+    "packaging",
     "wyoming"
   ],
   "ssdp": [{
     "st": "urn:habitron-com:device:SmartHub:1"
   }],
-  "version": "2.5.0",
+  "version": "2.5.1",
   "zeroconf": []
 }
