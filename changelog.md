@@ -1,5 +1,10 @@
 # Latest changes
 
+## v2.5.1
+
+### New feature
+- External climate controller appears as 2nd controller if enabled
+
 ## v2.5.0
 
 ### New feature

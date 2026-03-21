@@ -24,6 +24,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 
@@ -313,7 +314,7 @@ class SCTouchAppUpdate(UpdateEntity):
         return f"Latest version found in firmware folder: {self.latest_version}"
 
 
-class HbtnModuleUpdate(UpdateEntity):
+class HbtnModuleUpdate(CoordinatorEntity, UpdateEntity):
     """Representation of habitron event."""
 
     _attr_device_class = UpdateDeviceClass.FIRMWARE
@@ -324,7 +325,7 @@ class HbtnModuleUpdate(UpdateEntity):
 
     def __init__(self, module, coord, idx) -> None:
         """Initialize an HbtnEvent, pass coordinator to CoordinatorEntity."""
-        super().__init__()
+        super().__init__(coord)
         self.idx = idx
         self._module = module
         self._attr_name = "Firmware"

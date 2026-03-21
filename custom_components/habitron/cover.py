@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Any
 
 from homeassistant.components.cover import (
@@ -25,6 +26,9 @@ from .const import DOMAIN
 from .interfaces import AreaDescriptor, CovDescriptor
 from .module import HbtnModule
 from .router import HbtnRouter
+
+# Initialize logger for this module
+_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
@@ -188,15 +192,29 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
 
     async def _stop_cover_after_delay(self, delay_time: int) -> None:
         await asyncio.sleep(delay_time)
-        if self._moving == 1:
-            await self._module.comm.async_set_output(
-                self._module.mod_addr, self._out_up + 1, 0
+        # Handle network failures gracefully
+        try:
+            if self._moving == 1:
+                await self._module.comm.async_set_output(
+                    self._module.mod_addr, self._out_up + 1, 0
+                )
+            else:
+                await self._module.comm.async_set_output(
+                    self._module.mod_addr, self._out_down + 1, 0
+                )
+        except TimeoutError:
+            # Log specific timeout error without period
+            _LOGGER.error(
+                "Timeout occurred while trying to stop cover %s", self._attr_name
             )
-        else:
-            await self._module.comm.async_set_output(
-                self._module.mod_addr, self._out_down + 1, 0
+        except Exception as exc:
+            # Log any other unexpected exception without period
+            _LOGGER.error(
+                "Unexpected error stopping cover %s: %s", self._attr_name, exc
             )
-        self._moving = 0
+        finally:
+            # Ensure the moving state is always reset
+            self._moving = 0
 
     # These methods allow HA to tell the actual device what to do. In this case, move
     # the cover to the desired position, or open and close it all the way.
