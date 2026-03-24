@@ -86,5 +86,23 @@
         "title": "Router system error",
         "description": "The habitron router detected an error, e.g. a module communication error."
       }
+    },
+  "device_automation": {
+    "trigger_type": {
+      "single_press": "Button {entity_name} pressed",
+      "long_press": "Button {entity_name} long pressed",
+      "long_press_end": "Button {entity_name} long press released",
+      "finger": "{entity_name} any finger",
+      "finger_1": "{entity_name}: small finger left",
+      "finger_2": "{entity_name}: ring finger left",
+      "finger_3": "{entity_name}: middle finger left",
+      "finger_4": "{entity_name}: index finger left",
+      "finger_5": "{entity_name}: thumb left",
+      "finger_6": "{entity_name}: thumb right",
+      "finger_7": "{entity_name}: index finger right",
+      "finger_8": "{entity_name}: middle finger right",
+      "finger_9": "{entity_name}: ring finger right",
+      "finger_10": "{entity_name}: small finger right"
     }
+  }
 }

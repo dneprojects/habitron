@@ -1,5 +1,10 @@
 # Latest changes
 
+## v2.5.2
+
+# New feature
+- Improved event triggers for buttons and ekey fingers
+
 ## v2.5.1
 
 ### New feature
