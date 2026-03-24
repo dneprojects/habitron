@@ -86,5 +86,23 @@
         "title": "Router Systemfehler",
         "description": "Der Habitron-Router hat einen Fehler festgestellt, z. B. einen Kommunikationsfehler mit einem Modul."
       }
+    },
+  "device_automation": {
+    "trigger_type": {
+      "single_press": "Taste{entity_name} kurz gedrückt",
+      "long_press": "Taste {entity_name} lange gedrückt",
+      "long_press_end": "Tastendruck {entity_name} lang beendet",
+      "finger": "{entity_name} beliebiger Finger",
+      "finger_1": "{entity_name}: Kleiner Finger links",
+      "finger_2": "{entity_name}: Ringfinger links",
+      "finger_3": "{entity_name}: Mittelfinger links",
+      "finger_4": "{entity_name}: Zeigefinger links",
+      "finger_5": "{entity_name}: Daumen links",
+      "finger_6": "{entity_name}: Daumen rechts",
+      "finger_7": "{entity_name}: Zeigefinger rechts",
+      "finger_8": "{entity_name}: Mittelfinger rechts",
+      "finger_9": "{entity_name}: Ringfinger rechts",
+      "finger_10": "{entity_name}: Kleiner Finger rechts"
     }
+  }
 }
