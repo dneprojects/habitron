@@ -45,9 +45,9 @@ async def async_get_triggers(
         capabilities = entry.capabilities or {}
         event_types = capabilities.get("event_types", [])
 
-        for evt_type in event_types:
-            # Add a dropdown entry for every event_type the entity supports
-            triggers.extend(
+        # Add all supported event types using list comprehension
+        triggers.extend(
+            [
                 {
                     "platform": "device",
                     "domain": DOMAIN,
@@ -55,7 +55,9 @@ async def async_get_triggers(
                     "entity_id": entry.entity_id,
                     "type": evt_type,
                 }
-            )
+                for evt_type in event_types
+            ]
+        )
 
     return triggers
 
