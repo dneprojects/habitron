@@ -56,6 +56,7 @@ async def async_get_triggers(
                     "type": evt_type,
                 }
                 for evt_type in event_types
+                if evt_type != "inactive"  # Exclude 'inactive' events from triggers
             ]
         )
 
