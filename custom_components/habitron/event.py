@@ -90,7 +90,7 @@ class HbtnEvent(EventEntity):
         self.idx = idx
         self._if = event_if
         self._module = module
-        self._attr_name = f"{module.name} {event_if.name}"
+        self._attr_name = f"{event_if.name}"
         self._nmbr = event_if.nmbr
         self._state = None
         self._brightness = None
@@ -124,6 +124,7 @@ class InputPressed(HbtnEvent):
     """Representation of habitron button short press event."""
 
     _attr_device_class = EventDeviceClass.BUTTON
+    _attr_has_entity_name = True
     _attr_event_types = ["inactive", "single_press", "long_press", "long_press_end"]
 
     @callback
@@ -194,6 +195,7 @@ class EkeyUserEvent(HbtnEvent):
     """Representation of a specific user event."""
 
     _attr_device_class = EventDeviceClass.BUTTON
+    _attr_has_entity_name = True
 
     def __init__(self, event_if, module, coord, idx, u_id, u_name) -> None:
         """Initialize specific user event."""
@@ -204,7 +206,7 @@ class EkeyUserEvent(HbtnEvent):
         self._attr_event_types = [f"finger_{i}" for i in range(1, 11)]
 
         # Name formulation
-        self._attr_name = f"{module.name} {u_name}"
+        self._attr_name = f"{u_name}"
         self._attr_unique_id = f"Mod_{self._module.uid}_u{u_id}"
 
     @callback

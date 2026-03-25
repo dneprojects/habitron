@@ -89,20 +89,20 @@
     },
   "device_automation": {
     "trigger_type": {
-      "single_press": "Button {entity_name} pressed",
-      "long_press": "Button {entity_name} long pressed",
-      "long_press_end": "Button {entity_name} long press released",
-      "finger": "{entity_name} any finger",
-      "finger_1": "{entity_name}: small finger left",
-      "finger_2": "{entity_name}: ring finger left",
-      "finger_3": "{entity_name}: middle finger left",
-      "finger_4": "{entity_name}: index finger left",
-      "finger_5": "{entity_name}: thumb left",
-      "finger_6": "{entity_name}: thumb right",
-      "finger_7": "{entity_name}: index finger right",
-      "finger_8": "{entity_name}: middle finger right",
-      "finger_9": "{entity_name}: ring finger right",
-      "finger_10": "{entity_name}: small finger right"
+      "single_press": "{entity_name} short pressed",
+      "long_press": "{entity_name} long pressed",
+      "long_press_end": "{entity_name} long press released",
+      "finger": "{entity_name} (General): Any finger",
+      "finger_1": "User {entity_name}: small finger left",
+      "finger_2": "User {entity_name}: ring finger left",
+      "finger_3": "User {entity_name}: middle finger left",
+      "finger_4": "User {entity_name}: index finger left",
+      "finger_5": "User {entity_name}: thumb left",
+      "finger_6": "User {entity_name}: thumb right",
+      "finger_7": "User {entity_name}: index finger right",
+      "finger_8": "User {entity_name}: middle finger right",
+      "finger_9": "User {entity_name}: ring finger right",
+      "finger_10": "User {entity_name}: small finger right"
     }
   }
 }
