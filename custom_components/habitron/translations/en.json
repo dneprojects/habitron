@@ -48,6 +48,30 @@
                     "vacation": "Vacation"
                 }
             }
+        },
+        "event": {
+            "hbtn_event": {
+                "state_attributes": {
+                    "event_type": {
+                        "state": {
+                            "inactive": "Inactive",
+                            "single_press": "short pressed",
+                            "long_press": "long pressed",
+                            "long_press_end": "long press released",
+                            "left_pinky": "small finger left",
+                            "left_ring": "ring finger left",
+                            "left_middle": "middle finger left",
+                            "left_index": "index finger left",
+                            "left_thumb": "thumb left",
+                            "right_thumb": "thumb right",
+                            "right_index": "index finger right",
+                            "right_middle": "middle finger right",
+                            "right_ring": "ring finger right",
+                            "right_pinky": "small finger right"
+                        }
+                    }
+                }
+            }
         }
     },
     "options": {
@@ -93,16 +117,16 @@
       "long_press": "{entity_name} long pressed",
       "long_press_end": "{entity_name} long press released",
       "finger": "{entity_name} (General): Any finger",
-      "finger_1": "User {entity_name}: small finger left",
-      "finger_2": "User {entity_name}: ring finger left",
-      "finger_3": "User {entity_name}: middle finger left",
-      "finger_4": "User {entity_name}: index finger left",
-      "finger_5": "User {entity_name}: thumb left",
-      "finger_6": "User {entity_name}: thumb right",
-      "finger_7": "User {entity_name}: index finger right",
-      "finger_8": "User {entity_name}: middle finger right",
-      "finger_9": "User {entity_name}: ring finger right",
-      "finger_10": "User {entity_name}: small finger right"
+      "left_pinky": "User {entity_name}: small finger left",
+      "left_ring": "User {entity_name}: ring finger left",
+      "left_middle": "User {entity_name}: middle finger left",
+      "left_index": "User {entity_name}: index finger left",
+      "left_thumb": "User {entity_name}: thumb left",
+      "right_thumb": "User {entity_name}: thumb right",
+      "right_index": "User {entity_name}: index finger right",
+      "right_middle": "User {entity_name}: middle finger right",
+      "right_ring": "User {entity_name}: ring finger right",
+      "right_pinky": "User {entity_name}: small finger right"
     }
   }
 }

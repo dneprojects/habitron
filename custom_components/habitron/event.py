@@ -84,6 +84,8 @@ async def async_setup_entry(
 class HbtnEvent(EventEntity):
     """Representation of habitron event."""
 
+    _attr_translation_key = "hbtn_event"
+
     def __init__(self, event_if, module, coord, idx) -> None:
         """Initialize an HbtnEvent, pass coordinator to CoordinatorEntity."""
         super().__init__()
@@ -133,16 +135,6 @@ class InputPressed(HbtnEvent):
         # Call standard trigger for the event entity
         self._trigger_event(event, {"extra_data": 123})
 
-        # Prepare data for the custom event
-        event_data = {
-            "entity_id": self.entity_id,
-            "event_type": event,
-            "module_uid": self._module.uid,
-        }
-
-        # Fire an explicit event to the HA event bus
-        self.hass.bus.async_fire("hbtn_input_pressed", event_data)
-
         # Update the state of the entity
         self.async_write_ha_state()
 
@@ -177,17 +169,6 @@ class FingerDetected(HbtnEvent):
             "last_finger": finger,
         }
 
-        # Fire an explicit event to the HA event bus
-        self.hass.bus.async_fire(
-            "hbtn_finger_detected",
-            {
-                "entity_id": self.entity_id,
-                "event_type": event,
-                "user": user,
-                "finger": finger,
-            },
-        )
-
         self.async_write_ha_state()
 
 
@@ -203,7 +184,7 @@ class EkeyUserEvent(HbtnEvent):
         self._u_id = u_id
 
         # Technical keys for UI mapping
-        self._attr_event_types = [f"finger_{i}" for i in range(1, 11)]
+        self._attr_event_types = [f"{self._get_finger_name(i)}" for i in range(1, 11)]
 
         # Name formulation
         self._attr_name = f"{u_name}"
@@ -223,22 +204,27 @@ class EkeyUserEvent(HbtnEvent):
         if calc_user == self._u_id:
             if 1 <= calc_finger <= 10:
                 # Use technical key for the triggered event
-                finger_event_type = f"finger_{calc_finger}"
+                finger_event_type = f"{self._get_finger_name(calc_finger)}"
 
                 self._trigger_event(finger_event_type, {"finger_id": calc_finger})
 
-                # Fire the bus event so device_trigger.py can catch it
-                self.hass.bus.async_fire(
-                    "habitron_finger_detected",
-                    {
-                        "entity_id": self.entity_id,
-                        "event_type": finger_event_type,
-                        "user": calc_user,
-                        "finger": calc_finger,
-                    },
-                )
-
                 self.async_write_ha_state()
+
+    def _get_finger_name(self, finger_id: int) -> str:
+        """Helper method to get a user-friendly name for the finger."""
+        finger_names = {
+            1: "left_pinky",
+            2: "left_ring",
+            3: "left_middle",
+            4: "left_index",
+            5: "left_thumb",
+            6: "right_thumb",
+            7: "right_index",
+            8: "right_middle",
+            9: "right_ring",
+            10: "right_pinky",
+        }
+        return finger_names.get(finger_id, f"Finger {finger_id}")
 
 
 # End of file event classes.
