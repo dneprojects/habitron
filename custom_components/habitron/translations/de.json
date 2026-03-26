@@ -72,7 +72,31 @@
             "critical": "Critical"
           }
         }
-      }
+      },
+        "event": {
+            "hbtn_event": {
+                "state_attributes": {
+                    "event_type": {
+                        "state": {
+                          "inactive": "Inaktiv",
+                          "single_press": "kurz gedrückt",
+                          "long_press": "lange gedrückt",
+                          "long_press_end": "langer Tastendruck beendet",
+                          "left_pinky": "Kleiner Finger links",
+                          "left_ring": "Ringfinger links",
+                          "left_middle": "Mittelfinger links",
+                          "left_index": "Zeigefinger links",
+                          "left_thumb": "Daumen links",
+                          "right_thumb": "Daumen rechts",
+                          "right_index": "Zeigefinger rechts",
+                          "right_middle": "Mittelfinger rechts",
+                          "right_ring": "Ringfinger rechts",
+                          "right_pinky": "Kleiner Finger rechts"
+                        }
+                    }
+                }
+            }
+        }
     },
     "system_health": {
     "info": {
@@ -93,16 +117,16 @@
       "long_press": "{entity_name} lange gedrückt",
       "long_press_end": "{entity_name} langer Tastendruck beendet",
       "finger": "{entity_name} (Allgemein): Beliebiger Finger",
-      "finger_1": "User {entity_name}: Kleiner Finger links",
-      "finger_2": "User {entity_name}: Ringfinger links",
-      "finger_3": "User {entity_name}: Mittelfinger links",
-      "finger_4": "User {entity_name}: Zeigefinger links",
-      "finger_5": "User {entity_name}: Daumen links",
-      "finger_6": "User {entity_name}: Daumen rechts",
-      "finger_7": "User {entity_name}: Zeigefinger rechts",
-      "finger_8": "User {entity_name}: Mittelfinger rechts",
-      "finger_9": "User {entity_name}: Ringfinger rechts",
-      "finger_10": "User {entity_name}: Kleiner Finger rechts"
+      "left_pinky": "User {entity_name}: Kleiner Finger links",
+      "left_ring": "User {entity_name}: Ringfinger links",
+      "left_middle": "User {entity_name}: Mittelfinger links",
+      "left_index": "User {entity_name}: Zeigefinger links",
+      "left_thumb": "User {entity_name}: Daumen links",
+      "right_thumb": "User {entity_name}: Daumen rechts",
+      "right_index": "User {entity_name}: Zeigefinger rechts",
+      "right_middle": "User {entity_name}: Mittelfinger rechts",
+      "right_ring": "User {entity_name}: Ringfinger rechts",
+      "right_pinky": "User {entity_name}: Kleiner Finger rechts"
     }
   }
 }
