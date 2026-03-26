@@ -1,5 +1,10 @@
 # Latest changes
 
+## v2.5.3
+
+# New feature
+- Event triggers compatible to HA 2024.4 ff.
+
 ## v2.5.2
 
 # New feature
