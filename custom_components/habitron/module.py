@@ -496,7 +496,11 @@ class SmartController(HbtnModule):
         self.outputs = [IfDescriptor("", i, 1, 0) for i in range(16)]
         self.covers = [CovDescriptor("", -1, 0, 0, 0) for i in range(5)]
         self.dimmers = [IfDescriptor("", i, -1, 0) for i in range(2)]
-        self.leds = [IfDescriptor("", i, 0, 0) for i in range(9)]
+        if self.typ[1] == 4:  # Smart Touch
+            self.leds = [IfDescriptor("", i, 0, 0) for i in range(9)]
+            self.cleds: list[CLedDescriptor] = [
+                CLedDescriptor("", i, 4, [0, 0, 0, 0]) for i in range(5)
+            ]
         self.diags = [IfDescriptor("", i, 0, 0) for i in range(2)]
         self.setvalues = [IfDescriptor("Set temperature", 0, 2, 20.0)]
         self.setvalues.append(IfDescriptor("Set temperature 2", 1, 2, 20.0))
