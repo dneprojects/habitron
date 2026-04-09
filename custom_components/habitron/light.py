@@ -43,14 +43,30 @@ async def async_setup_entry(
                 )
         for mod_led in hbt_module.leds:
             if isinstance(mod_led, CLedDescriptor):
-                led_name = "RGB LED"
-                led_no = mod_led.nmbr
-                if mod_led.name.strip() == "":
-                    mod_led.set_name(f"{led_name} {led_no}")
+                if mod_led.nmbr == 0:
+                    led_name = "Color Ambient"
                 else:
-                    mod_led.set_name(f"{led_name} {led_no}: {mod_led.name}")
+                    led_name = f"Color Corner {mod_led.nmbr}"
+                if mod_led.name.strip() == "":
+                    mod_led.set_name(f"{led_name}")
+                else:
+                    mod_led.set_name(f"{led_name}: {mod_led.name}")
                 new_devices.append(
                     ColorLed(mod_led, hbt_module, hbtn_cord, len(new_devices))
+                )
+        if hbt_module.typ == b"\x01\x04":
+            for cled in hbt_module.cleds:
+                led_name = "Color Corner"
+                if cled.nmbr == 0:
+                    led_name = "Color Ambient"
+                else:
+                    led_name = f"Color Corner {cled.nmbr}"
+                if cled.name.strip() == "":
+                    cled.set_name(f"{led_name}")
+                else:
+                    cled.set_name(f"{led_name}: {cled.name}")
+                new_devices.append(
+                    ColorLed(cled, hbt_module, hbtn_cord, len(new_devices))
                 )
     if new_devices:
         await hbtn_cord.async_config_entry_first_refresh()
