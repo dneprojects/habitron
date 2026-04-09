@@ -1,5 +1,13 @@
 # Latest changes
 
+## v2.5.4
+
+### New feature
+- Color leds for Smart Touch
+
+### Fix
+- Event triggers tested with HA 2024.4
+
 ## v2.5.3
 
 # New feature

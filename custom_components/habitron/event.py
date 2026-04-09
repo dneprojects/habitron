@@ -127,7 +127,7 @@ class InputPressed(HbtnEvent):
 
     _attr_device_class = EventDeviceClass.BUTTON
     _attr_has_entity_name = True
-    _attr_event_types = ["inactive", "single_press", "long_press", "long_press_end"]
+    _attr_event_types = ["single_press", "long_press", "long_press_end"]
 
     @callback
     def _async_handle_event(self, event: str) -> None:
@@ -143,7 +143,7 @@ class FingerDetected(HbtnEvent):
     """Representation of habitron button short press event."""
 
     _attr_device_class = EventDeviceClass.BUTTON
-    _attr_event_types = ["inactive", "finger"]
+    _attr_event_types = ["finger"]
 
     def __init__(self, event_if, module, coord, idx) -> None:
         """Initialize FingerDetected and setup extra attributes."""
