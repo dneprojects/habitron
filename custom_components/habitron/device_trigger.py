@@ -3,9 +3,9 @@
 import voluptuous as vol
 
 from homeassistant.components.device_automation import DEVICE_TRIGGER_BASE_SCHEMA
-from homeassistant.components.homeassistant.triggers import state as state_trigger
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.helpers import config_validation as cv, entity_registry as er
+from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.trigger import TriggerActionType, TriggerInfo
 from homeassistant.helpers.typing import ConfigType
 
@@ -37,6 +37,7 @@ async def async_get_triggers(
         capabilities = entry.capabilities or {}
         event_types = capabilities.get("event_types", [])
 
+        # Create trigger list based on capabilities
         triggers.extend(
             [
                 {
@@ -64,30 +65,46 @@ async def async_attach_trigger(
     trigger_type = config["type"]
     entity_id = config["entity_id"]
 
-    # Use native state trigger to listen to EventEntity timestamp changes
-    state_config = {
-        state_trigger.CONF_PLATFORM: "state",
-        state_trigger.CONF_ENTITY_ID: entity_id,
-    }
-    state_config = state_trigger.TRIGGER_SCHEMA(state_config)
-
+    # Use native state event listener to catch all fast changes
     @callback
-    async def filter_event_type_action(variables, context=None):
+    async def filter_event_type_action(event):
         """Filter the state change by event_type attribute."""
-        to_state = variables.get("trigger", {}).get("to_state")
+        new_state = event.data.get("new_state")
+        old_state = event.data.get("old_state")
+
+        # Ignore if entity was removed
+        if new_state is None:
+            return
+
+        new_event_type = new_state.attributes.get("event_type")
+        old_event_type = old_state.attributes.get("event_type") if old_state else None
 
         # Only execute if the event_type matches our selected UI trigger
-        if to_state and to_state.attributes.get("event_type") == trigger_type:
-            await action(variables, context=context)
+        if new_event_type == trigger_type and new_event_type != old_event_type:
+            # Build variables payload for automation execution
+            variables = {
+                "trigger": {
+                    "platform": "device",
+                    "domain": DOMAIN,
+                    "device_id": config["device_id"],
+                    "entity_id": entity_id,
+                    "type": trigger_type,
+                    "description": f"habitron event {trigger_type}",
+                }
+            }
 
-    # Attach the state trigger using our filter callback
-    return await state_trigger.async_attach_trigger(
-        hass,
-        state_config,
-        filter_event_type_action,
-        trigger_info,
-        platform_type="device",
-    )
+            # Map optional trigger info properties
+            if "id" in trigger_info:
+                variables["trigger"]["id"] = trigger_info["id"]
+            if "idx" in trigger_info:
+                variables["trigger"]["idx"] = trigger_info["idx"]
+            if "alias" in trigger_info:
+                variables["trigger"]["alias"] = trigger_info["alias"]
+
+            await action(variables, context=event.context)
+
+    # Attach the state trigger using our filter callback directly on the event bus
+    return async_track_state_change_event(hass, [entity_id], filter_event_type_action)
 
 
 # End of file device triggers
