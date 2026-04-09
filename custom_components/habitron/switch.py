@@ -43,19 +43,23 @@ async def async_setup_entry(
                 )
         for mod_led in hbt_module.leds:
             if mod_led.type == 0:
-                if mod_led.nmbr == 0:
-                    led_name = "LED white"
-                    led_no = ""
+                if hbt_module.typ == b"\x01\x04" and mod_led.nmbr == 0:
+                    # CLED 0 is used for ambient light, so skip it for RGB LED entities
+                    pass
                 else:
-                    led_name = "LED red"
-                    led_no = mod_led.nmbr
-                if mod_led.name.strip() == "":
-                    mod_led.set_name(f"{led_name} {led_no}")
-                else:
-                    mod_led.set_name(f"{led_name} {led_no}: {mod_led.name}")
-                new_devices.append(
-                    SwitchedLed(mod_led, hbt_module, hbtn_cord, len(new_devices))
-                )
+                    if mod_led.nmbr == 0:
+                        led_name = "LED white"
+                        led_no = ""
+                    else:
+                        led_name = "LED red"
+                        led_no = mod_led.nmbr
+                    if mod_led.name.strip() == "":
+                        mod_led.set_name(f"{led_name} {led_no}")
+                    else:
+                        mod_led.set_name(f"{led_name} {led_no}: {mod_led.name}")
+                    new_devices.append(
+                        SwitchedLed(mod_led, hbt_module, hbtn_cord, len(new_devices))
+                    )
         flg_idx = 0
         for mod_flg in hbt_module.flags:
             new_devices.append(HbtnFlagPush(mod_flg, hbt_module, hbtn_cord, flg_idx))
