@@ -101,6 +101,14 @@ async def async_setup_entry(  # noqa: C901
             None,
             2,  # 2 decimals for voltage
         ),
+        (
+            "current",
+            "Battery Current",
+            SensorDeviceClass.CURRENT,
+            UnitOfElectricCurrent.MILLIAMPERE,
+            None,
+            0,  # 0 decimals for mA current
+        ),
         ("cycles", "Battery Cycles", None, None, "mdi:battery-sync", 0),
         (
             "soh",
@@ -675,6 +683,7 @@ class HabitronClientSensor(SensorEntity):
             SensorDeviceClass.BATTERY,
             SensorDeviceClass.TEMPERATURE,
             SensorDeviceClass.VOLTAGE,
+            SensorDeviceClass.CURRENT,
         ]:
             self._attr_state_class = SensorStateClass.MEASUREMENT
 
