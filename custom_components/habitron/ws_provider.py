@@ -637,7 +637,7 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
                 try:
                     audio_data = base64.b64decode(msg["payload"])
                     await queue.put(audio_data)
-                except (TypeError, ValueError):
+                except TypeError, ValueError:
                     _LOGGER.error(
                         "Failed to decode base64 audio chunk for %s", stream_name
                     )
@@ -646,6 +646,31 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
                         "Audio queue full for %s, dropping chunk", stream_name
                     )
             # No result message is sent back for chunks to minimize overhead
+
+        @websocket_api.websocket_command(
+            {vol.Required("type"): "habitron/voice_pipeline_abort"}
+        )
+        @websocket_api.async_response
+        async def handle_voice_pipeline_abort(hass: HomeAssistant, connection, msg):
+            """Handle explicit abort from client on timeout."""
+            stream_name = next(
+                (n for n, c in self.active_ws_connections.items() if c == connection),
+                None,
+            )
+            if stream_name:
+                _LOGGER.warning(
+                    "Client forced voice pipeline abort for %s", stream_name
+                )
+                # Cancel task if running
+                if pipeline_data := self.voice_pipelines.pop(stream_name, None):
+                    if not pipeline_data["task"].done():
+                        pipeline_data["task"].cancel()
+
+                # Reset satellite state to IDLE
+                if satellite := self.assist_satellites.get(stream_name):
+                    satellite.set_idle()
+
+            connection.send_result(msg["id"])
 
         @websocket_api.websocket_command(
             {vol.Required("type"): "habitron/voice_pipeline_end"}

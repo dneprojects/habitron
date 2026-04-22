@@ -1,5 +1,11 @@
 # Latest changes
 
+## v2.5.5
+
+### New feature
+- Battery current for Smart Touch
+- Abort recognition
+
 ## v2.5.4
 
 ### New feature
