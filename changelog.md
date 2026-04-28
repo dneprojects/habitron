@@ -1,5 +1,13 @@
 # Latest changes
 
+## v2.5.6
+
+### New feature
+- Remote reset for Smart Touch
+
+### Fix
+- Handling of undefined area indices
+
 ## v2.5.5
 
 ### New feature
