@@ -8,7 +8,6 @@ from typing import Any
 from webrtc_models import RTCIceCandidateInit
 
 from homeassistant.components.camera import Camera, CameraEntityFeature
-from homeassistant.components.camera.webrtc import async_get_supported_provider
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -123,9 +122,9 @@ class HbtnCam(Camera):
         if not self._attr_is_on:
             _LOGGER.warning("Attempted to start stream on a camera that is off")
             raise RuntimeError("Cannot start stream when the camera is off")
-        if not (provider := await async_get_supported_provider(self.hass, self)):
+        if not self._provider:
             raise RuntimeError("No WebRTC provider available for this camera")
-        await provider.async_handle_async_webrtc_offer(
+        await self._provider.async_handle_async_webrtc_offer(
             camera=self,
             offer_sdp=offer_sdp,
             session_id=session_id,
@@ -136,15 +135,6 @@ class HbtnCam(Camera):
         self, session_id: str, candidate: RTCIceCandidateInit
     ) -> None:
         """Forward frontend ICE candidates to the provider."""
-        if not (provider := await async_get_supported_provider(self.hass, self)):
+        if not self._provider:
             return
-        await provider.async_on_webrtc_candidate(session_id, candidate)
-
-    # @callback
-    # def close_webrtc_session(self, session_id: str) -> None:
-    #     """Called by HA when the WS subscription is closed; notify provider."""
-    #     _LOGGER.debug("WebRTC session %s closed by frontend", session_id)
-
-    # def async_get_webrtc_client_configuration(self) -> WebRTCClientConfiguration:
-    #     """Optionally provide client ICE config."""
-    #     return WebRTCClientConfiguration()
+        await self._provider.async_on_webrtc_candidate(session_id, candidate)
