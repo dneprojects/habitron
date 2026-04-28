@@ -125,3 +125,35 @@ save_router_status:
         number:
           min: 1
           max: 8
+sc_system_command:
+  name: Smart Touch System Command
+  description: Executes a restart or factory reset of a specific Smart Touch Controller App
+  fields:
+    target_device:
+      name: Target Modules
+      description: Select Habitron's modules
+      required: true
+      selector:
+        device:
+          integration: habitron
+          entity:
+            domain: assist_satellite
+          multiple: true
+    command:
+      name: Command
+      description: The system command to execute
+      required: true
+      default: "restart"
+      selector:
+        select:
+          options:
+            - label: "Soft Restart (Reconnect)"
+              value: "restart"
+            - label: "Factory Reset (Clear Data)"
+              value: "factory_reset"
+    new_ip:
+      name: New Home Assistant IP / Route
+      description: (Optional) Changes the stored IP/Route in the app BEFORE restarting
+      required: false
+      selector:
+        text:
