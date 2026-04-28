@@ -154,7 +154,7 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
         _LOGGER.info("Received WebRTC offer for session: %s", session_id)
         stream_source = await camera.stream_source()
         if not stream_source:
-            raise HomeAssistantError("Stream source unavailable.")
+            raise HomeAssistantError("Stream source unavailable")
 
         stream_name = stream_source.replace("habitron://", "")
         if not self.active_ws_connections.get(stream_name):
@@ -166,25 +166,28 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
             self.session_to_stream_map[session_id] = stream_name
             self.webrtc_send_message_callbacks[session_id] = send_message
 
-            # Try to determine the local IP address visible to the client
-            local_ip = "127.0.0.1"  # Default fallback
-            try:
-                # Check for Docker environment variables
-                if os.environ.get("DOCKER_HOST") or os.environ.get(
-                    "HOMEASSISTANT_DOCKER"
-                ):
-                    local_ip = (
-                        "host.docker.internal"  # Special hostname for Docker host
-                    )
-                else:
-                    # Try getting the hostname's IP (might not always be correct)
-                    local_ip = socket.gethostbyname(socket.gethostname())
-            except Exception as e:  # noqa: BLE001
-                _LOGGER.warning("Failed to determine local IP: %s", e)
+            # # Try to determine the local IP address visible to the client
+            # local_ip = "127.0.0.1"  # Default fallback
+            # try:
+            #     # Check for Docker environment variables
+            #     if os.environ.get("DOCKER_HOST") or os.environ.get(
+            #         "HOMEASSISTANT_DOCKER"
+            #     ):
+            #         local_ip = (
+            #             "host.docker.internal"  # Special hostname for Docker host
+            #         )
+            #     else:
+            #         # Try getting the hostname's IP (might not always be correct)
+            #         local_ip = socket.gethostbyname(socket.gethostname())
+            # except Exception as e:  # noqa: BLE001
+            #     _LOGGER.warning("Failed to determine local IP: %s", e)
 
-            # Modify SDP: Filter IPv6, replace localhost IP
+            # # Modify SDP: Filter IPv6, replace localhost IP
+            # modified_offer_sdp = _filter_ipv6_candidates(offer_sdp)
+            # modified_offer_sdp = modified_offer_sdp.replace("127.0.0.1", local_ip)
+
+            # Modify SDP: Filter IPv6 (Do NOT touch the IP addresses, let P2P handle it!)
             modified_offer_sdp = _filter_ipv6_candidates(offer_sdp)
-            modified_offer_sdp = modified_offer_sdp.replace("127.0.0.1", local_ip)
 
             # Send the modified offer to the Flutter client
             await self.async_send_json_message(
@@ -208,7 +211,7 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
             except TimeoutError:
                 _LOGGER.error("WebRTC answer timed out for session %s", session_id)
                 send_message(
-                    WebRTCError(code="timeout", message="WebRTC answer timed out.")
+                    WebRTCError(code="timeout", message="WebRTC answer timed out")
                 )
             finally:
                 # Send any candidates that arrived before the answer was processed
@@ -242,7 +245,7 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
     async def async_take_snapshot(self, stream_name: str) -> bytes:
         """Request a snapshot from the connected client."""
         if not self.active_ws_connections.get(stream_name):
-            raise HomeAssistantError(f"No active client for stream '{stream_name}'.")
+            raise HomeAssistantError(f"No active client for stream '{stream_name}'")
 
         request_id = uuid.uuid4().hex
         fut: asyncio.Future = asyncio.Future()
@@ -257,7 +260,7 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
         try:
             return await asyncio.wait_for(fut, timeout=5)
         except TimeoutError as err:
-            raise HomeAssistantError("Snapshot request timed out.") from err
+            raise HomeAssistantError("Snapshot request timed out") from err
         finally:
             self.snapshot_futures.pop(request_id, None)  # Clean up future
 
@@ -526,19 +529,20 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
         @websocket_api.async_response
         async def handle_voice_pipeline_status(hass: HomeAssistant, connection, msg):
             """Handle request from client to start the voice pipeline."""
-            stream_name = next(
-                (n for n, c in self.active_ws_connections.items() if c == connection),
-                None,
-            )
-            # Ignore if client unknown or pipeline already running for this client
-            if not stream_name or stream_name in self.voice_pipelines:
+            stream_name = self._get_stream_or_send_error(connection, msg)
+            if not stream_name:
+                return
+
+            # Ignore if pipeline already running for this client
+            if stream_name in self.voice_pipelines:
                 _LOGGER.debug(
-                    "Ignoring voice_pipeline_status for %s (unknown)",
+                    "Ignoring voice_pipeline_status for %s (already running)",
                     stream_name,
                 )
                 # Still send a result so the client isn't waiting indefinitely
                 connection.send_result(msg["id"])
                 return
+
             disabled = msg["disabled"]  # Get the disabled status
             _LOGGER.info(
                 "Received voice_pipeline_status for %s: disabled=%s",
@@ -554,6 +558,7 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
                     "No assist_satellite found for stream '%s' to update recognition_disabled",
                     stream_name,
                 )
+            connection.send_result(msg["id"])
 
         @websocket_api.websocket_command(
             {
@@ -564,14 +569,14 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
         @websocket_api.async_response
         async def handle_voice_pipeline_start(hass: HomeAssistant, connection, msg):
             """Handle request from client to start the voice pipeline."""
-            stream_name = next(
-                (n for n, c in self.active_ws_connections.items() if c == connection),
-                None,
-            )
-            # Ignore if client unknown or pipeline already running for this client
-            if not stream_name or stream_name in self.voice_pipelines:
+            stream_name = self._get_stream_or_send_error(connection, msg)
+            if not stream_name:
+                return
+
+            # Ignore if pipeline already running for this client
+            if stream_name in self.voice_pipelines:
                 _LOGGER.debug(
-                    "Ignoring voice_pipeline_start for %s (unknown or already running)",
+                    "Ignoring voice_pipeline_start for %s (already running)",
                     stream_name,
                 )
                 # Still send a result so the client isn't waiting indefinitely
@@ -642,15 +647,13 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
         @websocket_api.async_response  # Use async_response for commands that don't need a result
         async def handle_voice_audio_chunk(hass: HomeAssistant, connection, msg):
             """Handle incoming audio chunks from the client."""
-            stream_name = next(
-                (n for n, c in self.active_ws_connections.items() if c == connection),
-                None,
-            )
+            stream_name = self._get_stream_or_send_error(connection, msg)
+            if not stream_name:
+                return
+
             # Find the running pipeline and its audio queue
-            if not stream_name or not (
-                pipeline_data := self.voice_pipelines.get(stream_name)
-            ):
-                # _LOGGER.warning("Received audio chunk for unknown or inactive pipeline: %s", stream_name)
+            if not (pipeline_data := self.voice_pipelines.get(stream_name)):
+                # _LOGGER.warning("Received audio chunk for inactive pipeline: %s", stream_name)
                 return  # Ignore chunks if pipeline isn't running
 
             # Put the decoded audio data into the queue
@@ -674,22 +677,19 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
         @websocket_api.async_response
         async def handle_voice_pipeline_abort(hass: HomeAssistant, connection, msg):
             """Handle explicit abort from client on timeout."""
-            stream_name = next(
-                (n for n, c in self.active_ws_connections.items() if c == connection),
-                None,
-            )
-            if stream_name:
-                _LOGGER.warning(
-                    "Client forced voice pipeline abort for %s", stream_name
-                )
-                # Cancel task if running
-                if pipeline_data := self.voice_pipelines.pop(stream_name, None):
-                    if not pipeline_data["task"].done():
-                        pipeline_data["task"].cancel()
+            stream_name = self._get_stream_or_send_error(connection, msg)
+            if not stream_name:
+                return
 
-                # Reset satellite state to IDLE
-                if satellite := self.assist_satellites.get(stream_name):
-                    satellite.set_idle()
+            _LOGGER.warning("Client forced voice pipeline abort for %s", stream_name)
+            # Cancel task if running
+            if pipeline_data := self.voice_pipelines.pop(stream_name, None):
+                if not pipeline_data["task"].done():
+                    pipeline_data["task"].cancel()
+
+            # Reset satellite state to IDLE
+            if satellite := self.assist_satellites.get(stream_name):
+                satellite.set_idle()
 
             connection.send_result(msg["id"])
 
@@ -699,15 +699,13 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
         @websocket_api.async_response
         async def handle_voice_pipeline_end(_, connection, msg):
             """Handle signal from client that audio streaming is finished."""
-            stream_name = next(
-                (n for n, c in self.active_ws_connections.items() if c == connection),
-                None,
-            )
-            if not stream_name or not (
-                pipeline_data := self.voice_pipelines.get(stream_name)
-            ):
+            stream_name = self._get_stream_or_send_error(connection, msg)
+            if not stream_name:
+                return
+
+            if not (pipeline_data := self.voice_pipelines.get(stream_name)):
                 _LOGGER.debug(
-                    "Ignoring voice_pipeline_end for unknown or inactive pipeline: %s",
+                    "Ignoring voice_pipeline_end for inactive pipeline: %s",
                     stream_name,
                 )
                 connection.send_result(msg["id"])  # Still acknowledge
@@ -730,29 +728,26 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
             hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
         ) -> None:
             """Handle signal from client that TTS playback has finished."""
-            stream_name = next(
-                (n for n, c in self.active_ws_connections.items() if c == connection),
-                None,
-            )
+            stream_name = self._get_stream_or_send_error(connection, msg)
+            if not stream_name:
+                return
+
             # Find the running pipeline and trigger its wait event
-            if stream_name and (pipeline_data := self.voice_pipelines.get(stream_name)):
+            if pipeline_data := self.voice_pipelines.get(stream_name):
                 if event := pipeline_data.get("playback_event"):
                     _LOGGER.debug(
                         "Setting playback_finished_event for stream %s", stream_name
                     )
                     event.set()
 
-            if stream_name and (satellite := self.assist_satellites.get(stream_name)):
+            if satellite := self.assist_satellites.get(stream_name):
                 _LOGGER.info(
                     "Client finished TTS playback, setting satellite %s state to IDLE",
                     satellite.entity_id,
                 )
                 # Call inherited method to set state to IDLE
                 satellite.set_idle()
-            else:
-                _LOGGER.warning(
-                    "Received tts_playback_finished for unknown stream: %s", stream_name
-                )
+
             connection.send_result(msg["id"])  # Acknowledge command
 
         @websocket_api.websocket_command(
@@ -778,7 +773,6 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
                         "Stream '%s' re-registered by new client, disconnecting old one",
                         stream_name,
                     )
-            _LOGGER.info("Client registered stream '%s'", stream_name)
             self.active_ws_connections[stream_name] = connection
             # Register disconnect handler
             connection.subscriptions[msg["id"]] = lambda: _async_on_ws_disconnect(
@@ -791,8 +785,8 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
             {
                 vol.Required("type"): "habitron/webrtc_answer",
                 vol.Required("session_id"): str,
-                vol.Required("sdp"): str,
-                vol.Required("stream_name"): str,
+                vol.Required("sdp"): vol.Any(str, None),
+                vol.Required("stream_name"): vol.Any(str, None),
             }
         )
         @websocket_api.async_response
@@ -800,6 +794,10 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
             hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
         ):
             """Handle the WebRTC answer SDP from the client."""
+            stream_name = self._get_stream_or_send_error(connection, msg)
+            if not stream_name:
+                return
+
             session_id = msg["session_id"]
             # Find the corresponding future and set the result
             if (fut := self.webrtc_futures.get(session_id)) and not fut.done():
@@ -814,11 +812,11 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
 
         @websocket_api.websocket_command(
             {
-                "type": "habitron/webrtc_candidate",
-                "session_id": str,
-                "candidate": str,
-                "sdp_mid": str,
-                "sdp_m_line_index": int,
+                vol.Required("type"): "habitron/webrtc_candidate",
+                vol.Required("session_id"): str,
+                vol.Optional("candidate"): vol.Any(str, None),
+                vol.Optional("sdp_mid"): vol.Any(str, None),
+                vol.Optional("sdp_m_line_index"): vol.Any(int, None),
             }
         )
         @websocket_api.async_response
@@ -826,6 +824,10 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
             hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
         ):
             """Handle an ICE candidate received from the client."""
+            stream_name = self._get_stream_or_send_error(connection, msg)
+            if not stream_name:
+                return
+
             session_id = msg["session_id"]
             send_message = self.webrtc_send_message_callbacks.get(session_id)
             candidate_init = RTCIceCandidateInit(
@@ -860,6 +862,10 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
             hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
         ):
             """Handle the snapshot result (image data or error) from the client."""
+            stream_name = self._get_stream_or_send_error(connection, msg)
+            if not stream_name:
+                return
+
             request_id = msg["request_id"]
             # Find the corresponding future
             if (data := self.snapshot_futures.get(request_id)) and not data[
@@ -901,7 +907,7 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
                         request_id,
                     )
                     data["future"].set_exception(
-                        HomeAssistantError("Snapshot result missing data and error.")
+                        HomeAssistantError("Snapshot result missing data and error")
                     )
             else:
                 _LOGGER.warning(
@@ -921,18 +927,10 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
             hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
         ):
             """Announce message from client."""
-            stream_name = next(
-                (n for n, c in self.active_ws_connections.items() if c == connection),
-                None,
-            )
+            stream_name = self._get_stream_or_send_error(connection, msg)
             if not stream_name:
-                _LOGGER.warning(
-                    f"Received call_announcement from unknown client {connection}"  # noqa: G004
-                )
-                connection.send_result(
-                    msg["id"], {"success": False, "error": "Unknown client"}
-                )
                 return
+
             # Extract the message text from the payload
             message_text = msg.get("message")
             if not message_text:
@@ -991,17 +989,8 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
             hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
         ):
             """Handle media player state updates pushed from the client."""
-            stream_name = next(
-                (n for n, c in self.active_ws_connections.items() if c == connection),
-                None,
-            )
+            stream_name = self._get_stream_or_send_error(connection, msg)
             if not stream_name:
-                _LOGGER.warning(
-                    f"Received media state update from unknown client {connection}"  # noqa: G004
-                )
-                connection.send_result(
-                    msg["id"], {"success": False, "error": "Unknown client"}
-                )
                 return
 
             # Find the corresponding media player entity and update its state
@@ -1028,12 +1017,12 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
             hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
         ) -> None:
             """Handle skip to next track command triggered from the client UI."""
-            stream_name = next(
-                (n for n, c in self.active_ws_connections.items() if c == connection),
-                None,
-            )
+            stream_name = self._get_stream_or_send_error(connection, msg)
+            if not stream_name:
+                return
+
             success = False
-            if stream_name and (player := self.media_players.get(stream_name)):
+            if player := self.media_players.get(stream_name):
                 _LOGGER.debug("Forwarding next_track command to player %s", player.name)
                 try:
                     await player.async_media_next_track()
@@ -1053,12 +1042,12 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
             hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
         ) -> None:
             """Handle skip to previous track command triggered from the client UI."""
-            stream_name = next(
-                (n for n, c in self.active_ws_connections.items() if c == connection),
-                None,
-            )
+            stream_name = self._get_stream_or_send_error(connection, msg)
+            if not stream_name:
+                return
+
             success = False
-            if stream_name and (player := self.media_players.get(stream_name)):
+            if player := self.media_players.get(stream_name):
                 _LOGGER.debug(
                     "Forwarding previous_track command to player %s", player.name
                 )
@@ -1083,15 +1072,9 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
             hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
         ) -> None:
             """Handle device state reports (battery, temp, etc.) from client."""
-            stream_name = next(
-                (n for n, c in self.active_ws_connections.items() if c == connection),
-                None,
-            )
+            stream_name = self._get_stream_or_send_error(connection, msg)
             if not stream_name:
-                _LOGGER.warning(
-                    f"Received report_state from unknown client {connection}"  # noqa: G004
-                )
-                return
+                return  # Stream unknown, error already sent
 
             payload = msg["payload"]
             _LOGGER.debug(
@@ -1121,3 +1104,26 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
         websocket_api.async_register_command(self.hass, handle_media_previous_track)
         websocket_api.async_register_command(self.hass, handle_tts_playback_finished)
         websocket_api.async_register_command(self.hass, handle_report_state)
+
+    def _get_stream_or_send_error(
+        self, connection: websocket_api.ActiveConnection, msg: dict
+    ) -> str | None:
+        """Helper to get stream name or send an unregistered error if unknown."""
+        stream_name = next(
+            (n for n, c in self.active_ws_connections.items() if c == connection),
+            None,
+        )
+
+        if not stream_name:
+            _LOGGER.warning(
+                "Received command '%s' from unknown client %s, forcing reconnect",
+                msg.get("type", "unknown"),
+                connection,
+            )
+            # Send error to Dart to trigger _forceDisconnect()
+            connection.send_error(
+                msg["id"], "unregistered", "Client not registered. Please reconnect"
+            )
+            return None
+
+        return stream_name
