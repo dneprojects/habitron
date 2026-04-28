@@ -11,6 +11,7 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceEntry
 
 from .communicate import TimeoutException
@@ -84,6 +85,14 @@ SERVICE_UPDATE_ENTITY_SCHEMA = vol.Schema(
         vol.Required(EVNT_TYPE): int,
         vol.Required(EVNT_ARG1): int,
         vol.Required(EVNT_ARG2): int,
+    }
+)
+
+SERVICE_SC_SYSTEM_COMMAND_SCHEMA = vol.Schema(
+    {
+        vol.Required("target_device"): vol.Any(str, list),
+        vol.Optional("command", default="restart"): str,
+        vol.Optional("new_ip"): str,
     }
 )
 
@@ -176,6 +185,65 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     )
                     break
 
+        async def sc_system_command(call: ServiceCall):
+            """Handle the system command service call by accessing module properties."""
+            target_devices = call.data.get("target_device", [])
+            command = call.data.get("command", "restart")
+            new_ip = call.data.get("new_ip")
+
+            if not hasattr(smhub, "ws_provider") or not smhub.ws_provider:
+                _LOGGER.error("WebSocket provider not initialized on SmartHub")
+                return
+
+            if isinstance(target_devices, str):
+                target_devices = [target_devices]
+
+            if not target_devices:
+                _LOGGER.warning("No target devices provided for system command")
+                return
+
+            # Access the device registry instead of the entity registry
+            dev_reg = dr.async_get(hass)
+
+            for device_id in target_devices:
+                device = dev_reg.async_get(device_id)
+                if not device:
+                    continue
+
+                module_found = False
+
+                # Iterate through identifiers to find the Habitron mapping
+                for identifier in device.identifiers:
+                    if identifier[0] == DOMAIN:
+                        try:
+                            mod_uid = str(identifier[1])
+
+                            # Get the module instance directly from the router
+                            module = smhub.router.get_module_by_uid(mod_uid)
+
+                            # Check if it's a Smart Controller
+                            if module and getattr(module, "typ", None) == b"\x01\x04":
+                                # Directly access the stream_name property
+                                stream_id = getattr(module, "stream_name", None)
+
+                                if stream_id:
+                                    await smhub.ws_provider.async_send_system_command(
+                                        stream_id, command, new_ip
+                                    )
+                                    module_found = True
+                                    break
+                                _LOGGER.warning(
+                                    "Module %s is missing the stream_name property",
+                                    module.name,
+                                )
+                        except ValueError, IndexError:
+                            pass
+
+                if not module_found:
+                    _LOGGER.warning(
+                        "No valid Smart Touch module found for device %s", device_id
+                    )
+
         hass.services.async_register(
             DOMAIN, "hub_restart", restart_hub, schema=SERVICE_HUB_RESTART_SCHEMA
         )
@@ -215,9 +283,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             update_entity,
             schema=SERVICE_UPDATE_ENTITY_SCHEMA,
         )
+        hass.services.async_register(
+            DOMAIN,
+            "sc_system_command",
+            sc_system_command,
+            schema=SERVICE_SC_SYSTEM_COMMAND_SCHEMA,
+        )
 
-        # This creates each HA object for each platform your device requires.
-        # It's done by calling the `async_setup_entry` function in each platform module.
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
         return True  # noqa: TRY300
 

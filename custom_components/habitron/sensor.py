@@ -217,6 +217,8 @@ async def async_setup_entry(  # noqa: C901
                     )
                     if entity_entry:
                         area_index = ain.area
+                        if area_index > len(area_names) - 1:
+                            area_index = 0
                         if area_index in [0, hbt_module.area_member]:
                             registry.async_update_entity(
                                 entity_entry, area_id=None
