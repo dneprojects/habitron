@@ -117,6 +117,27 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
             )
             ws_connection.send_message(msg)
 
+    async def async_send_system_command(
+        self, stream_id: str, command: str, new_ip: str = None
+    ) -> None:
+        """Send a system command like 'restart' to a specific Habitron client."""
+        ws_connection = self.active_ws_connections.get(stream_id)
+
+        # Log error and abort if client is not connected
+        if not ws_connection:
+            _LOGGER.error(
+                "Failed to send command: No client connected for stream %s", stream_id
+            )
+            return
+
+        payload = {"type": "habitron/system_command", "command": command}
+        if new_ip is not None:
+            payload["new_ip"] = new_ip
+        ws_connection.send_message(payload)
+
+        # Log success
+        _LOGGER.info("Sent %s command to client %s", command, stream_id)
+
     @callback
     def async_is_supported(self, stream_source: str) -> bool:
         """Return True if the stream source is supported by this provider."""

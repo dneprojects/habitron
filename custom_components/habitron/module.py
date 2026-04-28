@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import area_registry as ar, device_registry as dr
+from homeassistant.helpers.config_validation import slugify
 
 from .binary_sensor import ListeningStatusSensor
 from .const import (
@@ -92,9 +93,7 @@ class HbtnModule:
         self.diags.append(IfDescriptor("Status", 0, 1, 0))
         self.vce_stat: ListeningStatusSensor | None = None
         if self.type == "Smart Controller Touch":
-            self.stream_name: str = (
-                self.name.lower().replace(" ", "_") + f"_{self.raddr}"
-            )
+            self.stream_name: str = slugify(self.name) + f"_{self.raddr}"
             self.client_version = "unknown"
 
     @property
@@ -123,13 +122,6 @@ class HbtnModule:
         """Initialize module instance."""
         await self.get_names()
         await self.get_settings()
-        # if self.hw_version == "0010032427800006":
-        #     self.typ = b"\x01\x04"  # Smart Controller Touch for module "Habitron-Küche"
-        #     self.type = MODULE_CODES[self.typ]
-        #     self.stream_name: str = (
-        #         self.name.lower().replace(" ", "_") + f"_{self.raddr}"
-        #     )
-        #     self.client_version = "unknown"
         device_registry = dr.async_get(self._hass)
         self.status = self.extract_status(sys_status)
         self.uid = self.hw_version

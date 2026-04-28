@@ -268,6 +268,13 @@ class HbtnRouter:
                 return module
         return None
 
+    def get_module_by_uid(self, mod_uid) -> HbtnModule | None:
+        """Return module based on uid."""
+        for module in self.modules:
+            if module.uid == mod_uid:
+                return module
+        return None
+
     def get_module_by_stream(self, stream_name) -> HbtnModule | None:
         """Return module based on stream name."""
         for module in self.modules:

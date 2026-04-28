@@ -128,5 +128,35 @@
       "right_ring": "User {entity_name}: Ringfinger rechts",
       "right_pinky": "User {entity_name}: Kleiner Finger rechts"
     }
+  },
+  "services": {
+    "sc_system_command": {
+      "name": "Smart Touch Systembefehl",
+      "description": "Führt einen Neustart oder Factory Reset der App eines spezifischen Smart Touch Moduls aus.",
+      "fields": {
+        "target_device": {
+          "name": "Module",
+          "description": "Auswahl der Ziel-Module."
+        },
+        "command": {
+          "name": "Befehl",
+          "description": "Der auszuführende Systembefehl."
+        },
+        "new_ip": {
+          "name": "Neue Home Assistant IP / Route",
+          "description": "(Optional) Ändert die gespeicherte IP/Route in der App VOR einem Neustart."
+        }
+      }
+    },
+    "mod_restart": {
+      "name": "Modul Neustart",
+      "description": "Startet ein oder alle Habitron Module neu.",
+      "fields": {
+        "mod_nmbr": {
+          "name": "Modul Nummer",
+          "description": "Habitron Modul-Adresse, Standard 0xFF für alle"
+        }
+      }
+    }
   }
 }
