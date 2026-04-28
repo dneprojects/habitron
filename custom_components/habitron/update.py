@@ -78,6 +78,26 @@ class SCTouchAppUpdate(UpdateEntity):
         self._attr_latest_version = None
         self._latest_apk_filename: str | None = None
 
+    async def async_added_to_hass(self) -> None:
+        """Register event listener when entity is added."""
+        await super().async_added_to_hass()
+
+        async def handle_device_update(event):
+            """Update version when the app reports its state."""
+            stream_name = event.data.get("stream_name")
+            if stream_name == getattr(self._module, "stream_name", None):
+                payload = event.data.get("data", {})
+                new_version = payload.get("version")
+
+                if new_version and new_version != self._attr_installed_version:
+                    self._attr_installed_version = new_version
+                    self.async_write_ha_state()
+
+        # Connects the entity with the event bus
+        self.async_on_remove(
+            self._hass.bus.async_listen("habitron_device_update", handle_device_update)
+        )
+
     # --- Private Helper Methods ---
     def scan_firmware_dir_blocking(self):
         """This function contains all the blocking I/O."""
