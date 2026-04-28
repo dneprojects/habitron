@@ -1,5 +1,10 @@
 # Latest changes
 
+## v2.5.8
+
+### Fix
+- Update of sw sc_touch version
+
 ## v2.5.7
 
 ### Fix

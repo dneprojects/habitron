@@ -23,6 +23,6 @@
   "ssdp": [{
     "st": "urn:habitron-com:device:SmartHub:1"
   }],
-  "version": "2.5.7",
+  "version": "2.5.8",
   "zeroconf": []
 }
