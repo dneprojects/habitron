@@ -1,5 +1,10 @@
 # Latest changes
 
+## v2.5.7
+
+### Fix
+- Improved robustness of webrtc connection
+
 ## v2.5.6
 
 ### New feature
