@@ -1,5 +1,10 @@
 # Latest changes
 
+## v2.5.10
+
+### Fix
+- Find correct apk version
+
 ## v2.5.9
 
 ### Fix
