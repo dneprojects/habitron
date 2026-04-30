@@ -1081,6 +1081,11 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
                 "Received device state report for %s: %s", stream_name, payload
             )
 
+            module = self.rtr.get_module_by_stream(stream_name)
+            if module:
+                fw_version = payload.get("version", "0.0.0")
+                module.client_version = fw_version
+
             # Fire an event so sensors can listen to it and update their state
             hass.bus.async_fire(
                 "habitron_device_update",
