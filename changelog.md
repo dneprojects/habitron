@@ -1,5 +1,11 @@
 # Latest changes
 
+## v2.5.9
+
+### Fix
+- Firmware in share
+- Missing LEDs
+
 ## v2.5.8
 
 ### Fix
