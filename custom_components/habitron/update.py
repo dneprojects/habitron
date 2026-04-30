@@ -112,6 +112,7 @@ class SCTouchAppUpdate(UpdateEntity):
                     apk = None
                     try:
                         apk = apkutils.APK.from_file(str(file_path))
+                        apk.get_manifest()
                         version_name = apk.version_name
                         _LOGGER.warning(
                             "Parsed APK %s, found version %s",
