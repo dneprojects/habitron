@@ -114,7 +114,7 @@ class SCTouchAppUpdate(UpdateEntity):
                         apk = apkutils.APK.from_file(str(file_path))
                         apk.get_manifest()
                         version_name = apk.version_name
-                        _LOGGER.warning(
+                        _LOGGER.debug(
                             "Parsed APK %s, found version %s",
                             file_path.name,
                             version_name,
@@ -173,7 +173,7 @@ class SCTouchAppUpdate(UpdateEntity):
 
         if latest_ver and self._attr_installed_version:
             if parse_version(latest_ver) > parse_version(self._attr_installed_version):
-                _LOGGER.warning(
+                _LOGGER.debug(
                     "App update available: %s -> %s",
                     self._attr_installed_version,
                     latest_ver,
