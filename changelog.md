@@ -1,5 +1,10 @@
 # Latest changes
 
+## v2.6.0
+
+### Fix
+- Sensor name from module
+
 ## v2.5.10
 
 ### Fix

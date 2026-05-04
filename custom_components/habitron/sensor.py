@@ -692,11 +692,7 @@ class HabitronClientSensor(SensorEntity):
         # Link to the specific module's Unique ID
         self._attr_unique_id = f"Mod_{self._module.uid}_client_{json_key}"
 
-        # Generate the stream name expected from this module (to filter events)
-        # Logic matches media_player.py: name + "_" + raddr
-        self._target_stream_name = (
-            module.name.lower().replace(" ", "_") + f"_{module.raddr}"
-        )
+        self._target_stream_name = getattr(module, "stream_name", None)
 
     @property
     def device_info(self) -> DeviceInfo:
