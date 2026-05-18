@@ -12,14 +12,7 @@ from homeassistant.helpers import area_registry as ar, device_registry as dr
 from homeassistant.helpers.config_validation import slugify
 
 from .binary_sensor import ListeningStatusSensor
-from .const import (
-    DOMAIN,
-    MODULE_CODES,
-    SMHUB_COMMANDS,
-    ModuleDescriptor,
-    MSetIdx,
-    MStatIdx,
-)
+from .const import DOMAIN, MODULE_CODES, ModuleDescriptor, MSetIdx, MStatIdx
 from .interfaces import (
     CLedDescriptor,
     CmdDescriptor,
@@ -148,12 +141,7 @@ class HbtnModule:
 
     async def send_devregid(self) -> None:
         """Send device registry id to module."""
-        cmd_str = SMHUB_COMMANDS["SEND_MD_ID"]
-        cmd_str = cmd_str.replace("<rtr>", chr(int(self.comm.router.id / 100)))
-        cmd_str = cmd_str.replace("<mod>", chr(self.raddr))
-        cmd_str = cmd_str.replace("<len>", chr(len(self.devreg_id)))
-        cmd_str = cmd_str.replace("<id>", self.devreg_id)
-        await self.comm.async_send_command(cmd_str)
+        await self.comm.send_devregid(self.raddr, self.devreg_id)
 
     def get_cover_index(self, out_no: int) -> int:
         """Return cover index based on output number."""
@@ -214,7 +202,10 @@ class HbtnModule:
                             pass
                         elif arg_code in range(18, 26):
                             # Description of module LEDs
-                            self.leds[arg_code - 17].name = text
+                            if self.mod_type == "Smart Controller Mini":
+                                self.cleds[arg_code - 17].name = text
+                            else:
+                                self.leds[arg_code - 17].name = text
                         elif arg_code in range(40, 50):
                             # Description of  Inputs
                             if self.mod_type == "Smart Controller Mini":
@@ -276,7 +267,7 @@ class HbtnModule:
         self.set_default_names(self.inputs, "Inp")
         self.set_default_names(self.outputs, "Out")
         if self.mod_type == "Smart Controller Mini":
-            self.leds[0].name = "Ambient"
+            self.cleds[0].name = "Ambient"
             for led in self.leds:
                 led.type = 4
             return True
@@ -480,7 +471,7 @@ class SmartController(HbtnModule):
     ) -> None:
         """Init Habitron SmartController module."""
         super().__init__(mod_descriptor, hass, config, b_uid, comm)
-        if self.typ[1] == 3:
+        if self.typ[1] > 2:
             self.analogins = [
                 IfDescriptor(f"A/D-Kanal {i + 1}", i, 3, 0) for i in range(2)
             ]
@@ -563,6 +554,14 @@ class SmartController(HbtnModule):
         for led in self.leds:
             led.value = int((led_state & (0x01 << led.nmbr)) > 0)
 
+        if self.typ[1] == 4:  # Smart Touch
+            cled_state = self.status[MStatIdx.RGB_MASK]
+            for cled in self.cleds:
+                cled.value[0] = int((cled_state & (0x01 << cled.nmbr)) > 0)
+                cled.value[1] = int(self.status[MStatIdx.RGB_MASK + 3 * cled.nmbr + 1])
+                cled.value[2] = int(self.status[MStatIdx.RGB_MASK + 3 * cled.nmbr + 2])
+                cled.value[3] = int(self.status[MStatIdx.RGB_MASK + 3 * cled.nmbr + 3])
+
         for cover in self.covers:
             if cover.nmbr >= 0:
                 cm_idx = cover.nmbr - 2
@@ -586,7 +585,7 @@ class SmartController(HbtnModule):
         for flg in self.flags:
             flg.value = int((flags_state & (0x01 << flg.nmbr - 1)) > 0)
 
-        if self.typ[1] == 3:
+        if self.typ[1] > 2:
             self.analogins[0].value = self.status[MStatIdx.AD_1]
             self.analogins[1].value = self.status[MStatIdx.AD_2]
 
@@ -620,7 +619,7 @@ class SmartControllerMini(HbtnModule):
         self.outputs = [IfDescriptor("", i, 1, 0) for i in range(2)]
         self.covers = [CovDescriptor("", -1, 0, 0, 0) for i in range(0)]
         self.dimmers = [IfDescriptor("", i, -1, 0) for i in range(0)]
-        self.leds: list[CLedDescriptor] = [
+        self.cleds: list[CLedDescriptor] = [
             CLedDescriptor("", i, 4, [0, 0, 0, 0]) for i in range(5)
         ]
         self.diags = [IfDescriptor("", i, 0, 0) for i in range(1)]
@@ -670,8 +669,8 @@ class SmartControllerMini(HbtnModule):
         for outpt in self.outputs:
             outpt.value = int((out_state & (0x01 << outpt.nmbr)) > 0)
 
-        for led in self.leds:
-            led.value[0] = int((out_state & (0x01 << led.nmbr + 15)) > 0)
+        for cled in self.cleds:
+            cled.value[0] = int((out_state & (0x01 << cled.nmbr + 15)) > 0)
 
             # Get color status for rgb leds
             # led.value[1] = int(self.status[MStatIdx.ROLL_POS + led.nmbr * 3])
