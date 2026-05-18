@@ -9,15 +9,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, issue_registry as ir
 
-from .const import (
-    DOMAIN,
-    FALSE_VAL,
-    SMHUB_COMMANDS,
-    TRUE_VAL,
-    ModuleDescriptor,
-    MStatIdx,
-    RoutIdx,
-)
+from .const import DOMAIN, FALSE_VAL, TRUE_VAL, ModuleDescriptor, MStatIdx, RoutIdx
 from .coordinator import HbtnCoordinator
 from .interfaces import (
     TYPE_DIAG,
@@ -222,8 +214,8 @@ class HbtnRouter:
 
     async def get_definitions(self) -> None:
         """Parse router smr info and set values."""
-        self.status = await self.comm.async_get_router_status(self.id)
-        self.smr = await self.comm.get_smr(self.id)
+        self.status = await self.comm.async_get_router_status()
+        self.smr = await self.comm.get_smr()
         # self.group_list = []
         ptr = 1
         max_mod_no = 0
@@ -287,7 +279,7 @@ class HbtnRouter:
         """Get summary of all Habitron modules."""
         desc: list[ModuleDescriptor] = []
         addr_dict = {}
-        resp = await self.comm.async_get_router_modules(self.id)
+        resp = await self.comm.async_get_router_modules()
         mod_string = resp.decode("iso8859-1")
         while len(resp) > 0:
             mod_uid = self.b_uid + f"{resp[0]}"
@@ -307,7 +299,7 @@ class HbtnRouter:
 
     async def get_descriptions(self) -> str | None:
         """Get descriptions of commands, etc."""
-        resp = await self.comm.get_global_descriptions(self.id)
+        resp = await self.comm.get_global_descriptions()
 
         no_lines = int.from_bytes(resp[:2], "little")
         resp = resp[4:]
@@ -350,7 +342,7 @@ class HbtnRouter:
 
     async def get_comm_errors(self) -> bytes:
         """Get current communication errors."""
-        resp = await self.comm.async_get_error_status(self.id)
+        resp = await self.comm.async_get_error_status()
         err_cnt = resp[0]
         ret_bytes = b""
         for e_idx in range(err_cnt):
@@ -365,7 +357,7 @@ class HbtnRouter:
         self.smhub.update()
 
         # 2. Get Router status
-        self.status = await self.comm.async_get_router_status(self.id)
+        self.status = await self.comm.async_get_router_status()
         if len(self.status) < RoutIdx.MIRROR_STARTED:
             self.logger.warning(f"Router status too short, length: {len(self.status)}")  # noqa: G004
             return
@@ -409,7 +401,7 @@ class HbtnRouter:
 
         # 4. Handle Mirror and Issues
         if not self._mirror_started:
-            await self.comm.async_start_mirror(self.id)
+            await self.comm.async_start_mirror()
 
         if not self._sys_ok:
             ir.async_create_issue(
@@ -436,15 +428,15 @@ class HbtnRouter:
 
     async def async_reset(self) -> None:
         """Call reset command for self."""
-        await self.comm.module_restart(self.id, 0)
+        await self.comm.module_restart(0)
 
     async def async_restart_fwd_tbl(self) -> None:
         """Call reset command for self."""
-        await self.comm.restart_fwd_tbl(self.id)
+        await self.comm.restart_fwd_tbl()
 
     async def async_reset_all_modules(self) -> None:
         """Call reset command for all modules."""
-        await self.comm.module_restart(self.id, 0xFF)
+        await self.comm.module_restart(0xFF)
 
     def unit_not_exists(self, mod_units: list[IfDescriptor], entry_name: str) -> bool:
         """Check for existing unit based on name."""
@@ -452,9 +444,4 @@ class HbtnRouter:
 
     async def send_devregid(self) -> None:
         """Send device registry id to module."""
-        cmd_str = SMHUB_COMMANDS["SEND_MD_ID"]
-        cmd_str = cmd_str.replace("<rtr>", chr(int(self.comm.router.id / 100)))
-        cmd_str = cmd_str.replace("<mod>", chr(0))  # module 0 = router
-        cmd_str = cmd_str.replace("<len>", chr(len(self.devreg_id)))
-        cmd_str = cmd_str.replace("<id>", self.devreg_id)
-        await self.comm.async_send_command(cmd_str)
+        await self.comm.send_devregid(0, self.devreg_id)
