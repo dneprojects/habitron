@@ -9,6 +9,8 @@ import socket
 from typing import Any
 from urllib.parse import urlparse
 
+# pylint:disable=unused-import
+from habitron_client import test_connection
 import voluptuous as vol
 
 from homeassistant import config_entries, exceptions
@@ -16,8 +18,6 @@ from homeassistant.components import network
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.service_info.ssdp import SsdpServiceInfo
 
-# pylint:disable=unused-import
-from .communicate import test_connection
 from .const import (
     CONF_DEFAULT_HOST,
     CONF_DEFAULT_INTERVAL,
@@ -107,7 +107,7 @@ class UDPDiscoveryProtocol(asyncio.DatagramProtocol):
 
     def connection_made(self, transport: asyncio.BaseTransport) -> None:
         """Set up transport for broadcast."""
-        self.transport = transport  # type: ignore
+        self.transport = transport
         sock = transport.get_extra_info("socket")
         if sock:
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
@@ -182,7 +182,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             transport.close()
 
         # cast because protocol is typed as BaseProtocol in create_datagram_endpoint return
-        return protocol.found_devices  # type: ignore
+        return protocol.found_devices
 
     async def async_step_ssdp(
         self, discovery_info: SsdpServiceInfo
