@@ -1,5 +1,10 @@
 # Latest changes
 
+## v2.6.1
+
+### Fix
+- Improved suppert for color
+
 ## v2.6.0
 
 ### Fix
