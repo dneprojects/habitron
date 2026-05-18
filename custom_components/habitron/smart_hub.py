@@ -54,7 +54,6 @@ class SmartHub:
         self.base_url: str = ""
         self.host = self.comm.com_ip
         self._port = self.comm.com_port
-        conf_url = ""
 
         self.sensors: list[IfDescriptor] = []
         self.diags: list[IfDescriptor] = []
@@ -133,10 +132,10 @@ class SmartHub:
             self.loglvl.append(IfDescriptor("Logging level file", 1, 2, 0))
 
         # 5. Rest of setup
-        await self.comm.reinit_hub(100, 0)
+        await self.comm.reinit_hub(0)
         await self.comm.send_network_info(self.config.data["websock_token"])
         await self.router.initialize()
-        await self.comm.reinit_hub(100, 1)
+        await self.comm.reinit_hub(1)
 
         # 6. First data update
         await self.hass.async_add_executor_job(self.update)

@@ -1,29 +1,32 @@
-"""Communicate class for Habitron system."""
+"""Communicate class for Habitron system integration."""
 
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 import ipaddress
 import logging
 import os
 from pathlib import Path
-import socket
-import struct
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Any
 
 import anyio
-import yaml
+from habitron_client import (
+    HabitronClient,
+    TimeoutException,
+    format_block_output,
+    get_host_ip,
+    get_own_ip,
+)
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-import homeassistant.exceptions as HAexceptions
 
-from .const import DOMAIN, SMHUB_COMMANDS, HaEvents
-from .router import HbtnRouter
+from .const import DOMAIN, HaEvents
 
 if TYPE_CHECKING:
+    from .router import HbtnRouter
     from .smart_hub import SmartHub
-
 
 BASE_PATH_COMPONENT = "./homeassistant/components"
 BASE_PATH_CUSTOM_COMPONENT = "./custom_components"
@@ -32,7 +35,7 @@ DEF_TOKEN_FILE = "def_token.set"
 
 
 class HbtnComm:
-    """Habitron communication class."""
+    """Habitron communication wrapper class mapping to Home Assistant."""
 
     def __init__(
         self, hass: HomeAssistant, config: ConfigEntry, smhub: SmartHub
@@ -42,14 +45,19 @@ class HbtnComm:
         self._host_conf: str = config.data.__getitem__("habitron_host")
         self.smhub: SmartHub = smhub
         self.logger = logging.getLogger(__name__)
+
         if self.is_valid_ipv4(self._host_conf):
             self._host = self._host_conf
         elif self._host_conf == "local":
             self._host = get_own_ip()
         else:
             self._host: str = get_host_ip(self._host_conf)
+
         self.logger.info("Initializing hub, got own ip: %s", self._host)
         self._port: int = 7777
+
+        # Initialize client instance
+        self.client = HabitronClient(self._host, self._port)
 
         self._hass: HomeAssistant = hass
         self._config: ConfigEntry = config
@@ -59,12 +67,14 @@ class HbtnComm:
         self._hwtype: str = ""
         self._version: str = ""
         self._network_ip: str = hass.data["network"].adapters[0]["ipv4"][0]["address"]
+
         self.logger.info("Got network ip: %s", self._network_ip)
-        # self._websck_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJjMWI1ZjgyNmUxMDg0MjFhYWFmNTZlYWQ0ZThkZGNiZSIsImlhdCI6MTY5NDUzNTczOCwiZXhwIjoyMDA5ODk1NzM4fQ.0YZWyuQn5DgbCAfEWZXbQZWaViNBsR4u__LjC4Zf2lY"
-        # self._websck_token = ""
+
         self._loop = asyncio.get_event_loop()
+
         # Lock to ensure sequential access to the socket even when running in executor threads
         self._api_lock = asyncio.Lock()
+
         self.crc: int = 0
         self._rtr: HbtnRouter
         self.update_suspended: bool = False
@@ -127,6 +137,15 @@ class HbtnComm:
         else:
             return True
 
+    def _convert_mod_id(self, mod_id: int) -> int:
+        """Helper to calculate module address."""
+        return int(mod_id - 100)
+
+    async def _async_exec(self, func: Callable, *args: Any) -> Any:
+        """Execute a blocking client call in the Home Assistant executor."""
+        async with self._api_lock:
+            return await self._hass.async_add_executor_job(func, *args)
+
     async def set_host(self, host: str):
         """Update host information for integration re-configuration."""
         self._hass.config_entries.async_update_entry(
@@ -136,45 +155,28 @@ class HbtnComm:
             return
         self._host_conf = host
         self._host = get_host_ip(self._host_conf)
+        self.client.host = self._host
         await self._hass.config_entries.async_reload(self._config.entry_id)
 
     async def send_network_info(self, tok: str):
         """Send home assistant ipv4."""
-        if tok == "":
-            return
-        cmd_str = SMHUB_COMMANDS["SEND_NETWORK_INFO"]
-        ipv4 = self._network_ip
-        ip_len = len(ipv4)
-        tk_len = len(tok)
-        if not self.is_addon:
-            nmbrs = self._mac.split(":")
-            for i in range(len(nmbrs)):
-                idx = int("0x" + nmbrs[len(nmbrs) - i - 1], 0) & 0x7F
-                if idx < tk_len:
-                    tok = tok[:idx] + tok[idx + 1 :] + tok[idx]
-        args_len = ip_len + tk_len + 2
-        len_l = args_len & 0xFF
-        len_h = args_len >> 8
-        cmd_str = (
-            cmd_str.replace("<len>", chr(len_l) + chr(len_h))
-            .replace("<iplen>", chr(ip_len))
-            .replace("<ipv4>", ipv4)
-            .replace("<toklen>", chr(tk_len))
-            .replace("<tok>", tok)
+        await self._async_exec(
+            self.client.send_network_info,
+            self._network_ip,
+            tok,
+            self._mac,
+            self.is_addon,
+            self._hbtn_version,
         )
-        await self.async_send_command(cmd_str)
         self.logger.warning(
-            "Sent network info to hub (ip and token) - ip: %s - token: %s", ipv4, tok
+            "Sent network info to hub (ip and token) - ip: %s - token: %s",
+            self._network_ip,
+            tok,
         )
 
-    async def reinit_hub(self, rtr_id, mode):
+    async def reinit_hub(self, mode: int):
         """Restart event server on hub."""
-        rtr_nmbr = int(rtr_id / 100)
-        cmd_str = SMHUB_COMMANDS["REINIT_HUB"].replace("<rtr>", chr(rtr_nmbr))
-        cmd_str = cmd_str.replace("<opr>", chr(mode))
-        resp = await self.async_send_command(
-            cmd_str, time_out_sec=12
-        )  # extended time-out 12 s
+        resp = await self._async_exec(self.client.reinit_hub, mode)
         self.logger.info("Re-initialized hub with mode %s", mode)
         return resp
 
@@ -184,48 +186,22 @@ class HbtnComm:
 
     async def get_smhub_version(self) -> bytes:
         """Query of SmartHub firmware."""
-        return await self.async_send_command(SMHUB_COMMANDS["GET_SMHUB_FIRMWARE"])
+        return await self._async_exec(self.client.get_smhub_version)
 
     def get_smhub_info(self) -> dict[str, str]:
         """Get basic infos of SmartHub (blocking, run in executor)."""
-        # Use a shorter connect timeout for responsiveness
-        sck = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sck.settimeout(10.0)  # Set timeout BEFORE connect
-
         try:
-            sck.connect((self._host, self._port))
-
-            cmd_str = SMHUB_COMMANDS["GET_SMHUB_INFO"]
-            full_string = wrap_command(cmd_str)
-
-            # Communication
-            resp_bytes = send_receive(sck, full_string)
-
-            # Close connection immediately after receiving
-            sck.close()
-
-            # Parse data
-            decoded_resp = resp_bytes.decode("iso8859-1")
-            info = yaml.load(decoded_resp, Loader=yaml.Loader)
-
-            if not isinstance(info, dict):
-                self.logger.warning("Invalid SmartHub info received")
-                raise TimeoutError("Invalid response format")  # noqa: TRY301
-
-            # Update internal state
-            self.info = info  # Store full dict
+            info = self.client.get_smhub_info()
+            self.info = info
             self._version = info["software"]["version"]
             self._hwtype = info["hardware"]["platform"]["type"]
             self._hostip = info["hardware"]["network"]["ip"]
             self._hostname = info["hardware"]["network"]["host"]
             self._mac = info["hardware"]["network"]["lan mac"]
-
-            # Detect addon environment
             self.is_addon = os.getenv("SUPERVISOR_TOKEN") is not None
             self.slugname = info["software"].get("slug", "") if self.is_addon else ""
             self.logger.debug("SmartHub slugname: %s", self.slugname)
-
-        except TimeoutError as exc:
+        except TimeoutException as exc:
             self.logger.error("Timeout connecting to SmartHub at %s", self._host)
             raise TimeoutException(f"Hub at {self._host} not responding") from exc
         except Exception as exc:
@@ -233,74 +209,14 @@ class HbtnComm:
             raise
         else:
             return info
-        finally:
-            # Ensure socket is closed even if yaml.load fails
-            sck.close()
 
     def get_smhub_update(self):
         """Get current sensor and status values."""
-        sck = socket.socket()  # Create a socket object
-        try:
-            sck.connect((self._host, self._port))
-        except ConnectionRefusedError as exc:
-            raise ConnectionRefusedError from exc
-        sck.settimeout(8)  # 8 seconds
-        vlen = len(self._hbtn_version)
-        args_len = vlen + 1
-        len_l = args_len & 0xFF
-        len_h = args_len >> 8
-        cmd_str = SMHUB_COMMANDS["GET_SMHUB_UPDATE"]
-        cmd_str = (
-            cmd_str.replace("<len>", chr(len_l) + chr(len_h))
-            .replace("<vlen>", chr(vlen))
-            .replace("<vers>", self._hbtn_version)
-        )
-        full_string = wrap_command(cmd_str)
-        resp_bytes = send_receive(sck, full_string)
-        sck.close()
-        return yaml.load(resp_bytes.decode("iso8859-1"), Loader=yaml.Loader)
+        return self.client.get_smhub_update(self._hbtn_version)
 
-    async def get_smr(self, rtr_id) -> bytes:
+    async def get_smr(self) -> bytes:
         """Get router SMR information."""
-        rtr_nmbr = int(rtr_id / 100)
-        cmd_str = SMHUB_COMMANDS["GET_ROUTER_SMR"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        resp = await self.async_send_command(cmd_str, time_out_sec=15)
-        router_string = resp.decode("iso8859-1")
-        if router_string[0:5] == "Error":
-            return b""
-        return resp
-
-    def send_only(self, cmd_string: str) -> None:
-        """Send string and return."""
-        # Fire-and-forget sync call.
-        # Warning: This blocks. Use async_send_command if possible.
-        try:
-            sck = socket.socket()  # Create a socket object
-            sck.connect((self._host, self._port))
-            full_string = wrap_command(cmd_string)
-            sck.send(full_string.encode("iso8859-1"))  # Send command
-            sck.close()
-        except Exception as e:  # noqa: BLE001
-            self.logger.warning("Error in send_only: %s", e)
-
-    async def async_send_command(self, cmd_string: str, time_out_sec=10) -> bytes:
-        """General function for communication via SmartHub."""
-        # Acquire lock to ensure only one thread accesses the socket at a time
-        async with self._api_lock:
-            try:
-                # Run the synchronous blocking call in the executor
-                res = await self._hass.async_add_executor_job(
-                    self._send_command_sync, cmd_string, time_out_sec
-                )
-            except TimeoutError as err_msg:
-                self.logger.error("Error connecting to Smart Hub: %s", err_msg)
-                return b""
-            except ConnectionRefusedError:
-                self.logger.info("Smart Hub not available, probably rebooting.")
-                return b""
-            else:
-                return res
+        return await self._async_exec(self.client.get_smr)
 
     async def send_devreg_ids(self) -> None:
         """Send device registry ids to all modules."""
@@ -309,108 +225,37 @@ class HbtnComm:
                 await module.send_devregid()
                 self.logger.info("Sent device registry id to module %s", module.name)
 
-    def _send_command_sync(self, cmd_string: str, time_out_sec=10) -> bytes:
-        """Synchronous version of send command."""
-        sck = socket.socket()
-        sck.connect((self._host, self._port))
-        sck.settimeout(time_out_sec)
-        full_string = wrap_command(cmd_string)
-        resp_bytes = send_receive(sck, full_string)
-        sck.close()
-        return resp_bytes
-
-    async def async_send_command_crc(
-        self, cmd_string: str, time_out_sec=10
-    ) -> tuple[bytes, int]:
-        """General function for communication via SmartHub, returns additional crc."""
-        async with self._api_lock:
-            try:
-                # Run the synchronous blocking call in the executor
-                res = await self._hass.async_add_executor_job(
-                    self._send_command_crc_sync, cmd_string, time_out_sec
-                )
-            except TimeoutError as err_msg:
-                self.logger.error("Error connecting to Smart Hub: %s", err_msg)
-                return b"", 0
-            except ConnectionRefusedError:
-                self.logger.info("Smart Hub not available.")
-                return b"", 0
-            else:
-                return res
-
-    def _send_command_crc_sync(
-        self, cmd_string: str, time_out_sec=10
-    ) -> tuple[bytes, int]:
-        """Synchronous version of send command crc."""
-        sck = socket.socket()
-        sck.connect((self._host, self._port))
-        sck.settimeout(time_out_sec)
-        full_string = wrap_command(cmd_string)
-        resp_bytes, crc = send_receive_crc(sck, full_string)
-        sck.close()
-        return resp_bytes, crc
-
-    async def async_get_router_status(self, rtr_id) -> bytes:
+    async def async_get_router_status(self) -> bytes:
         """Get router status."""
-        rtr_nmbr = int(rtr_id / 100)
-        cmd_str = SMHUB_COMMANDS["GET_ROUTER_STATUS"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        resp = await self.async_send_command(cmd_str)
-        if resp[0:5].decode("iso8859-1") == "Error":
-            return b""
-        return resp
+        return await self._async_exec(self.client.get_router_status)
 
-    async def async_get_router_modules(self, rtr_id) -> bytes:
+    async def async_get_router_modules(self) -> bytes:
         """Get summary of all Habitron modules of a router."""
-        rtr_nmbr = int(rtr_id / 100)
-        cmd_str = SMHUB_COMMANDS["GET_MODULES"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        resp = await self.async_send_command(cmd_str)
-        if resp[0:5].decode("iso8859-1") == "Error":
-            return b""
-        return resp
+        return await self._async_exec(self.client.get_router_modules)
 
-    async def get_global_descriptions(self, rtr_id) -> bytes:
+    async def get_global_descriptions(self) -> bytes:
         """Get descriptions of commands, etc."""
-        rtr_nmbr = int(rtr_id / 100)
-        cmd_str = SMHUB_COMMANDS["GET_GLOBAL_DESCRIPTIONS"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        return await self.async_send_command(cmd_str)
+        return await self._async_exec(self.client.get_global_descriptions)
 
-    async def async_get_error_status(self, rtr_id) -> bytes:
+    async def async_get_error_status(self) -> bytes:
         """Get error byte for each module."""
-        rtr_nmbr = int(rtr_id / 100)
-        cmd_str = SMHUB_COMMANDS["GET_CURRENT_ERROR"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        return await self.async_send_command(cmd_str)
+        return await self._async_exec(self.client.get_error_status)
 
-    async def async_start_mirror(self, rtr_id) -> None:
+    async def async_start_mirror(self) -> None:
         """Start mirror on specified router."""
-        rtr_nmbr = int(rtr_id / 100)
-        cmd_str = SMHUB_COMMANDS["START_MIRROR"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        if self.router.version.split("/")[1] == "2024":
-            # Quick fix for problems with router-fw
-            self.send_only(cmd_str)
-        else:
-            await self.async_send_command(cmd_str)
+        await self._async_exec(self.client.start_mirror)
 
-    async def async_stop_mirror(self, rtr_id) -> None:
+    async def async_stop_mirror(self) -> None:
         """Start mirror on specified router."""
-        rtr_nmbr = int(rtr_id / 100)
-        cmd_str = SMHUB_COMMANDS["STOP_MIRROR"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        await self.async_send_command(cmd_str)
+        await self._async_exec(self.client.stop_mirror)
 
     async def async_system_update(self) -> None:
         """Trigger update of Habitron states, must poll all routers."""
-
         if self.update_suspended:
             # disable update to avoid conflict with SmartConfig or other communication
             return
-        sys_status = await self.get_compact_status(self.router.id)
+        sys_status = await self.get_compact_status()
         if sys_status == b"":
-            # self.logger.debug("No changes in compact system status, update skipped")
             return
         if len(sys_status) < 10:
             self.logger.warning(
@@ -419,294 +264,158 @@ class HbtnComm:
             return
         await self.router.update_system_status(sys_status)
 
-    async def async_set_group_mode(self, rtr_id, grp_no, new_mode) -> None:
+    async def async_set_group_mode(self, grp_no: int, new_mode: int) -> None:
         """Set mode for given group."""
-        rtr_nmbr = int(rtr_id / 100)
-        cmd_str = SMHUB_COMMANDS["SET_GROUP_MODE"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        cmd_str = cmd_str.replace("<mod>", chr(grp_no))
-        cmd_str = cmd_str.replace("<arg1>", chr(new_mode))
-        await self.async_send_command(cmd_str)
+        await self._async_exec(self.client.set_group_mode, grp_no, new_mode)
 
-    async def async_set_daytime_mode(self, rtr_id, grp_no, new_mode) -> None:
+    async def async_set_daytime_mode(self, grp_no: int, new_mode: int) -> None:
         """Set mode for given group."""
-        rtr_nmbr = int(rtr_id / 100)
-        if new_mode == 1:
-            mode = 0x42
-        elif new_mode == 2:
-            mode = 0x43
-        else:
+        mode = 0x42 if new_mode == 1 else 0x43 if new_mode == 2 else None
+        if not mode:
             return
-        cmd_str = SMHUB_COMMANDS["SET_GROUP_MODE"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        cmd_str = cmd_str.replace("<mod>", chr(grp_no))
-        cmd_str = cmd_str.replace("<arg1>", chr(mode))
-        await self.async_send_command(cmd_str)
+        await self._async_exec(self.client.set_group_mode, grp_no, mode)
 
-    async def async_set_alarm_mode(self, rtr_id, grp_no, alarm_mode) -> None:
+    async def async_set_alarm_mode(self, grp_no: int, alarm_mode: bool) -> None:
         """Set mode for given group."""
-        rtr_nmbr = int(rtr_id / 100)
-        if alarm_mode:
-            mode = 0x40
-        else:
-            mode = 0x41
-        cmd_str = SMHUB_COMMANDS["SET_GROUP_MODE"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        cmd_str = cmd_str.replace("<mod>", chr(grp_no))
-        cmd_str = cmd_str.replace("<arg1>", chr(mode))
-        await self.async_send_command(cmd_str)
+        mode = 0x40 if alarm_mode else 0x41
+        await self._async_exec(self.client.set_group_mode, grp_no, mode)
 
-    async def async_set_log_level(self, hdlr, level) -> None:
+    async def async_set_log_level(self, hdlr: int, level: int) -> None:
         """Set new logging level."""
-        cmd_str = SMHUB_COMMANDS["SET_LOG_LEVEL"]
-        cmd_str = cmd_str.replace("<hdlr>", chr(hdlr))
-        cmd_str = cmd_str.replace("<lvl>", chr(level))
-        await self.async_send_command(cmd_str)
+        await self._async_exec(self.client.set_log_level, hdlr, level)
 
-    def set_output(self, mod_id, nmbr, val) -> None:
+    def set_output(self, mod_id: int, nmbr: int, val: bool) -> None:
+        """Send turn_on/turn_off command synchronously."""
+        self.client.set_output(self._convert_mod_id(mod_id), nmbr, val)
+
+    async def async_set_output(self, mod_id: int, nmbr: int, val: bool) -> None:
         """Send turn_on/turn_off command."""
-        rtr_nmbr = int(mod_id / 100)
-        mod_addr = int(mod_id - 100 * rtr_nmbr)
-        if val:
-            cmd_str = SMHUB_COMMANDS["SET_OUTPUT_ON"]
-        else:
-            cmd_str = SMHUB_COMMANDS["SET_OUTPUT_OFF"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
-        cmd_str = cmd_str.replace("<arg1>", chr(nmbr))
-        self.send_only(cmd_str)
-
-    async def async_set_output(self, mod_id, nmbr, val) -> None:
-        """Send turn_on/turn_off command."""
-        rtr_nmbr = int(mod_id / 100)
-        mod_addr = int(mod_id - 100 * rtr_nmbr)
-        if val:
-            cmd_str = SMHUB_COMMANDS["SET_OUTPUT_ON"]
-        else:
-            cmd_str = SMHUB_COMMANDS["SET_OUTPUT_OFF"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
-        cmd_str = cmd_str.replace("<arg1>", chr(nmbr))
-        await self.async_send_command(cmd_str)
-
-    async def async_set_led_outp(self, mod_id, nmbr, val) -> None:
-        """Translate led nmbr to output nmbr and send on/off command."""
-        rtr_nmbr = int(mod_id / 100)
-        mod_addr = int(mod_id - 100 * rtr_nmbr)
-        mod = self.router.get_module(mod_addr)
-        await self.async_set_output(
-            mod_id,
-            nmbr + len(mod.outputs),  # type: ignore  # noqa: PGH003
-            val,
+        await self._async_exec(
+            self.client.set_output, self._convert_mod_id(mod_id), nmbr, val
         )
 
-    async def async_set_dimmval(self, mod_id, nmbr, val) -> None:
-        """Send value to dimm output."""
-        rtr_nmbr = int(mod_id / 100)
-        mod_addr = int(mod_id - 100 * rtr_nmbr)
-        cmd_str = SMHUB_COMMANDS["SET_DIMMER_VALUE"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
-        cmd_str = cmd_str.replace("<arg1>", chr(nmbr))
-        cmd_str = cmd_str.replace("<arg2>", chr(val))
-        await self.async_send_command(cmd_str)
+    async def async_set_led_outp(self, mod_id: int, nmbr: int, val: bool) -> None:
+        """Translate led nmbr to output nmbr and send on/off command."""
+        mod = self.router.get_module(self._convert_mod_id(mod_id))
+        await self.async_set_output(mod_id, nmbr + len(mod.outputs), val)
 
-    async def async_set_rgb_output(self, mod_id, nmbr, val) -> None:
+    async def async_set_dimmval(self, mod_id: int, nmbr: int, val: int) -> None:
+        """Send value to dimm output."""
+        await self._async_exec(
+            self.client.set_dimmval, self._convert_mod_id(mod_id), nmbr, val
+        )
+
+    async def async_set_rgb_output(self, mod_id: int, nmbr: int, val: bool) -> None:
         """Turn RGB light on/off."""
-        rtr_nmbr = int(mod_id / 100)
-        mod_addr = int(mod_id - 100 * rtr_nmbr)
-        if val:
-            cmd_str = SMHUB_COMMANDS["SET_RGB_ON"]
-        else:
-            cmd_str = SMHUB_COMMANDS["SET_RGB_OFF"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
-        cmd_str = cmd_str.replace("<lno>", chr(nmbr))
-        await self.async_send_command(cmd_str)
+        await self._async_exec(
+            self.client.set_rgb_output, self._convert_mod_id(mod_id), nmbr, val
+        )
 
-    async def async_set_rgbval(self, mod_id, nmbr, val) -> None:
+    async def async_set_rgbval(self, mod_id: int, nmbr: int, val: list) -> None:
         """Send value to dimm output."""
-        rtr_nmbr = int(mod_id / 100)
-        mod_addr = int(mod_id - 100 * rtr_nmbr)
-        cmd_str = SMHUB_COMMANDS["SET_RGB_COL"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
-        cmd_str = cmd_str.replace("<lno>", chr(nmbr))
-        cmd_str = cmd_str.replace("<rd>", chr(val[0]))
-        cmd_str = cmd_str.replace("<gn>", chr(val[1]))
-        cmd_str = cmd_str.replace("<bl>", chr(val[2]))
-        await self.async_send_command(cmd_str)
+        await self._async_exec(
+            self.client.set_rgbval, self._convert_mod_id(mod_id), nmbr, val
+        )
 
-    async def async_set_shutterpos(self, mod_id, nmbr, val) -> None:
+    async def async_set_shutterpos(self, mod_id: int, nmbr: int, val: int) -> None:
         """Send value to dimm output."""
-        rtr_nmbr = int(mod_id / 100)
-        mod_addr = int(mod_id - 100 * rtr_nmbr)
-        cmd_str = SMHUB_COMMANDS["SET_SHUTTER_POSITION"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
-        cmd_str = cmd_str.replace("<arg1>", chr(nmbr))
-        cmd_str = cmd_str.replace("<arg2>", chr(val))
-        await self.async_send_command(cmd_str)
+        await self._async_exec(
+            self.client.set_shutterpos, self._convert_mod_id(mod_id), nmbr, val
+        )
 
-    async def async_set_blindtilt(self, mod_id, nmbr, val) -> None:
+    async def async_set_blindtilt(self, mod_id: int, nmbr: int, val: int) -> None:
         """Send value to dimm output."""
-        rtr_nmbr = int(mod_id / 100)
-        mod_addr = int(mod_id - 100 * rtr_nmbr)
-        cmd_str = SMHUB_COMMANDS["SET_BLIND_TILT"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
-        cmd_str = cmd_str.replace("<arg1>", chr(nmbr))
-        cmd_str = cmd_str.replace("<arg2>", chr(val))
-        await self.async_send_command(cmd_str)
+        await self._async_exec(
+            self.client.set_blindtilt, self._convert_mod_id(mod_id), nmbr, val
+        )
 
-    async def async_set_flag(self, mod_id, nmbr, val) -> None:
+    async def async_set_flag(self, mod_id: int, nmbr: int, val: bool) -> None:
         """Send flag on/flag off command."""
-        rtr_nmbr = int(mod_id / 100)
-        mod_addr = int(mod_id - 100 * rtr_nmbr)
-        # if zero, global flag
-        if val:
-            cmd_str = SMHUB_COMMANDS["SET_FLAG_ON"]
-        else:
-            cmd_str = SMHUB_COMMANDS["SET_FLAG_OFF"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
-        cmd_str = cmd_str.replace("<fno>", chr(nmbr))
-        await self.async_send_command(cmd_str)
+        await self._async_exec(
+            self.client.set_flag, self._convert_mod_id(mod_id), nmbr, val
+        )
 
-    async def async_inc_dec_counter(self, mod_id, nmbr, val) -> None:
+    async def async_inc_dec_counter(self, mod_id: int, nmbr: int, val: int) -> None:
         """Send flag on/flag off command."""
-        rtr_nmbr = int(mod_id / 100)
-        mod_addr = int(mod_id - 100 * rtr_nmbr)
-        if val == 1:
-            cmd_str = SMHUB_COMMANDS["COUNTR_UP"]
-        else:
-            cmd_str = SMHUB_COMMANDS["COUNTR_DOWN"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
-        cmd_str = cmd_str.replace("<cno>", chr(nmbr))
-        await self.async_send_command(cmd_str)
+        await self._async_exec(
+            self.client.inc_dec_counter, self._convert_mod_id(mod_id), nmbr, val
+        )
 
-    async def async_set_setpoint(self, mod_id, nmbr, val) -> None:
+    async def async_set_setpoint(self, mod_id: int, nmbr: int, val: int) -> None:
         """Send two byte value for setpoint definition."""
-        rtr_nmbr = int(mod_id / 100)
-        mod_addr = int(mod_id - 100 * rtr_nmbr)
-        cmd_str = SMHUB_COMMANDS["SET_SETPOINT_VALUE"]
-        hi_val = int(val / 256)
-        lo_val = val - 256 * hi_val
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
-        cmd_str = cmd_str.replace("<arg1>", chr(nmbr))
-        cmd_str = cmd_str.replace("<arg3>", chr(hi_val))
-        cmd_str = cmd_str.replace("<arg2>", chr(lo_val))
-        await self.async_send_command(cmd_str)
+        await self._async_exec(
+            self.client.set_setpoint, self._convert_mod_id(mod_id), nmbr, val
+        )
 
-    async def async_set_analog_val(self, mod_id, nmbr, val) -> None:
+    async def async_set_analog_val(self, mod_id: int, nmbr: int, val: int) -> None:
         """Send byte value for analog output definition."""
         await self.async_set_dimmval(mod_id, 3, val)  # analog output is dimm output 3
 
-    async def async_set_climate_mode(self, mod_id, cmode: int, ctl12: int) -> None:
+    async def async_set_climate_mode(self, mod_id: int, cmode: int, ctl12: int) -> None:
         """Set climate mode for given module."""
-        rtr_nmbr = int(mod_id / 100)
-        mod_addr = int(mod_id - 100 * rtr_nmbr)
-        cmd_str = SMHUB_COMMANDS["SET_CLIM_MODE"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
-        cmd_str = cmd_str.replace("<cmode>", chr(cmode))
-        cmd_str = cmd_str.replace("<ctl12>", chr(ctl12))
-        await self.async_send_command(cmd_str)
+        await self._async_exec(
+            self.client.set_climate_mode, self._convert_mod_id(mod_id), cmode, ctl12
+        )
 
-    async def async_call_dir_command(self, mod_id, nmbr) -> None:
+    async def async_call_dir_command(self, mod_id: int, nmbr: int) -> None:
         """Call of direct command of nmbr."""
-        rtr_nmbr = int(mod_id / 100)
-        mod_addr = int(mod_id - 100 * rtr_nmbr)
-        cmd_str = SMHUB_COMMANDS["CALL_DIR_COMMAND"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
-        cmd_str = cmd_str.replace("<cno>", chr(nmbr))
-        await self.async_send_command(cmd_str)
+        await self._async_exec(
+            self.client.call_dir_command, self._convert_mod_id(mod_id), nmbr
+        )
 
-    async def async_call_vis_command(self, mod_id, nmbr) -> None:
+    async def async_call_vis_command(self, mod_id: int, nmbr: int) -> None:
         """Call of visualization command of nmbr."""
-        rtr_nmbr = int(mod_id / 100)
-        mod_addr = int(mod_id - 100 * rtr_nmbr)
-        cmd_str = SMHUB_COMMANDS["CALL_VIS_COMMAND"]
-        hi_no = int(nmbr / 256)
-        lo_no = nmbr - 256 * hi_no
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
-        cmd_str = cmd_str.replace("<vish>", chr(hi_no))
-        cmd_str = cmd_str.replace("<visl>", chr(lo_no))
-        await self.async_send_command(cmd_str)
+        await self._async_exec(
+            self.client.call_vis_command, self._convert_mod_id(mod_id), nmbr
+        )
 
-    async def async_call_coll_command(self, rtr_id, nmbr) -> None:
+    async def async_call_coll_command(self, nmbr: int) -> None:
         """Call collective command of nmbr."""
-        rtr_nmbr = int(rtr_id / 100)
-        cmd_str = SMHUB_COMMANDS["CALL_COLL_COMMAND"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        cmd_str = cmd_str.replace("<cno>", chr(nmbr))
-        await self.async_send_command(cmd_str)
+        await self._async_exec(self.client.call_coll_command, nmbr)
 
-    async def get_compact_status(self, rtr_id) -> bytes:
+    async def get_compact_status(self) -> bytes:
         """Get compact status for all modules, if changed crc."""
-        rtr_nmbr = int(rtr_id / 100)
-        cmd_str = SMHUB_COMMANDS["GET_COMPACT_STATUS"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        [resp_bytes, crc] = await self.async_send_command_crc(cmd_str, time_out_sec=15)
+        resp_bytes, crc = await self._async_exec(self.client.get_compact_status)
         if crc == self.crc:
             return b""
         self.crc = crc
         return resp_bytes
 
-    async def get_module_status(self, mod_id) -> bytes:
+    async def get_module_status(self, mod_id: int) -> bytes:
         """Get compact status for all modules, if changed crc."""
-        rtr_nmbr = int(mod_id / 100)
-        mod_nmbr = mod_id - rtr_nmbr * 100
-        cmd_str = SMHUB_COMMANDS["GET_MODULE_STATUS"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        cmd_str = cmd_str.replace("<mod>", chr(mod_nmbr))
-        [resp_bytes, crc] = await self.async_send_command_crc(cmd_str, time_out_sec=15)
+        resp_bytes, crc = await self._async_exec(
+            self.client.get_module_status, self._convert_mod_id(mod_id)
+        )
         if crc == self.crc:
             return b""
         self.crc = crc
         return resp_bytes
 
-    async def async_get_module_definitions(self, mod_id) -> bytes:
+    async def async_get_module_definitions(self, mod_id: int) -> bytes:
         """Get summary of Habitron module: names, commands, etc."""
-        rtr_nmbr = int(mod_id / 100)
-        mod_addr = int(mod_id - 100 * rtr_nmbr)
-        cmd_str = SMHUB_COMMANDS["GET_MODULE_SMC"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
-        resp = await self.async_send_command(cmd_str)
-        if resp[0:5].decode("iso8859-1") == "Error":
-            return b""
-        return resp
+        return await self._async_exec(
+            self.client.get_module_definitions, self._convert_mod_id(mod_id)
+        )
 
-    async def async_get_module_settings(self, mod_id) -> bytes:
+    async def async_get_module_settings(self, mod_id: int) -> bytes:
         """Get settings of Habitron module."""
-        rtr_nmbr = int(mod_id / 100)
-        mod_addr = int(mod_id - 100 * rtr_nmbr)
-        cmd_str = SMHUB_COMMANDS["GET_MODULE_SMG"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
-        resp = await self.async_send_command(cmd_str)
-        if resp[0:5].decode("iso8859-1") == "Error":
-            return b""
-        return resp
+        return await self._async_exec(
+            self.client.get_module_settings, self._convert_mod_id(mod_id)
+        )
 
-    async def save_module_status(self, mod_id) -> None:
+    async def save_module_status(self, mod_id: int) -> None:
         """Get module module status and saves it to file."""
         data = await self.get_module_status(mod_id)
         file_name = f"Module_{mod_id}.mstat"
         await self.save_config_data(file_name, format_block_output(data))
 
-    async def save_router_status(self, rtr_id) -> None:
+    async def save_router_status(self) -> None:
         """Get module mirror status and saves it to file."""
-        data = await self.async_get_router_status(rtr_id)
-        file_name = f"Router_{rtr_id}.rstat"
+        data = await self.async_get_router_status()
+        file_name = "Router_1.rstat"
         await self.save_config_data(file_name, format_block_output(data))
 
-    async def save_smc_file(self, mod_id) -> None:
+    async def save_smc_file(self, mod_id: int) -> None:
         """Get module definitions (smc) and saves them to file."""
         data = await self.async_get_module_definitions(mod_id)
         file_name = f"Module_{mod_id}.smc"
@@ -723,7 +432,7 @@ class HbtnComm:
             data = data[b_idx + 1 : len(data)]
         await self.save_config_data(file_name, str_data)
 
-    async def save_smg_file(self, mod_id) -> None:
+    async def save_smg_file(self, mod_id: int) -> None:
         """Get module settings (smg) and saves them to file."""
         data = await self.async_get_module_settings(mod_id)
         file_name = f"Module_{mod_id}.smg"
@@ -732,10 +441,10 @@ class HbtnComm:
             str_data += f"{byt};"
         await self.save_config_data(file_name, str_data)
 
-    async def save_smr_file(self, rtr_id) -> None:
+    async def save_smr_file(self) -> None:
         """Get router settings (smr) and saves them to file."""
-        data = await self.get_smr(rtr_id)
-        file_name = f"Router_{rtr_id}.smr"
+        data = await self.get_smr()
+        file_name = "Router_1.smr"
         str_data = ""
         for byt in data:
             str_data += f"{byt};"
@@ -743,7 +452,6 @@ class HbtnComm:
 
     async def save_config_data(self, file_name: str, str_data: str) -> None:
         """Save config info to text file."""
-
         if Path(BASE_PATH_COMPONENT).is_dir():
             data_path = f"{BASE_PATH_COMPONENT}/{DOMAIN}/data/"
         else:
@@ -758,110 +466,69 @@ class HbtnComm:
 
     async def send_message(self, mod_id: int, msg_id: int | str) -> None:
         """Send message to module."""
-        rtr_nmbr = int(mod_id / 100)
-        mod_addr = int(mod_id - 100 * rtr_nmbr)
-        cmd_str = SMHUB_COMMANDS["SEND_MESSAGE"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
-        cmd_str = cmd_str.replace("<tim>", chr(15))  # 15 s
-        if isinstance(msg_id, int):
-            cmd_str = cmd_str.replace("<msg>", chr(msg_id))
-        else:
-            cmd_str = cmd_str.replace("<msg>", msg_id)
-        await self.async_send_command(cmd_str)
+        await self._async_exec(
+            self.client.send_message, self._convert_mod_id(mod_id), msg_id
+        )
 
     async def send_sms(self, mod_id: int, msg_id: int | str, ct_id: int) -> None:
         """Send sms message to module."""
-        rtr_nmbr = int(mod_id / 100)
-        mod_addr = int(mod_id - 100 * rtr_nmbr)
-        cmd_str = SMHUB_COMMANDS["SEND_SMS"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        cmd_str = cmd_str.replace("<mod>", chr(mod_addr))
-        cmd_str = cmd_str.replace("<sms>", chr(ct_id))
-        if isinstance(msg_id, int):
-            cmd_str = cmd_str.replace("<msg>", chr(msg_id))
-        else:
-            cmd_str = cmd_str.replace("<msg>", msg_id)
-        await self.async_send_command(cmd_str)
+        await self._async_exec(
+            self.client.send_sms, self._convert_mod_id(mod_id), msg_id, ct_id
+        )
 
-    async def hub_restart(self, rtr_id: int) -> None:
+    async def hub_restart(self) -> None:
         """Restart hub."""
-        rtr_nmbr = int(rtr_id / 100)
-        cmd_str = SMHUB_COMMANDS["RESTART_HUB"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        await self.async_send_command(cmd_str)
+        await self._async_exec(self.client.hub_restart)
 
     async def hub_reboot(self) -> None:
         """Reboot hub."""
-        cmd_str = SMHUB_COMMANDS["REBOOT_HUB"]
-        await self.async_send_command(cmd_str)
+        await self._async_exec(self.client.hub_reboot)
 
-    async def module_restart(self, rtr_id: int, mod_nmbr: int) -> None:
+    async def module_restart(self, mod_nmbr: int) -> None:
         """Restart a single module or all with arg 0xFF or router if arg 0."""
-        rtr_nmbr = int(rtr_id / 100)
-        if mod_nmbr > 0:
-            # module restart
-            cmd_str = SMHUB_COMMANDS["REBOOT_MODULE"]
-            cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-            cmd_str = cmd_str.replace("<mod>", chr(mod_nmbr))
+        await self._async_exec(self.client.module_restart, mod_nmbr)
 
-        else:
-            # router restart
-            cmd_str = SMHUB_COMMANDS["REBOOT_ROUTER"]
-            cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        await self.async_send_command(cmd_str)
-
-    async def restart_fwd_tbl(self, rtr_id: int) -> None:
+    async def restart_fwd_tbl(self) -> None:
         """Restart forwarding table of router."""
-        rtr_nmbr = int(rtr_id / 100)
-        cmd_str = SMHUB_COMMANDS["RESTART_FORWARD_TABLE"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        await self.async_send_command(cmd_str)
+        await self._async_exec(self.client.restart_fwd_tbl)
 
-    async def handle_firmware(self, rtr_id: int, mod_nmbr: int) -> bytes:
+    async def handle_firmware(self, mod_nmbr: int) -> bytes:
         """Handle router/module firmware update file status."""
-        rtr_nmbr = int(rtr_id / 100)
-        if mod_nmbr:
-            cmd_str = SMHUB_COMMANDS["GET_MODULE_FW_FILEVS"]
-        else:
-            cmd_str = SMHUB_COMMANDS["GET_ROUTER_FW_FILEVS"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        cmd_str = cmd_str.replace("<mod>", chr(mod_nmbr))
-        [resp_bytes, crc] = await self.async_send_command_crc(cmd_str, time_out_sec=5)
+        resp_bytes, crc = await self._async_exec(self.client.handle_firmware, mod_nmbr)
         if crc == self.crc:
             return b""
         self.crc = crc
         return resp_bytes
 
-    async def update_firmware(self, rtr_id: int, mod_nmbr: int) -> bytes:
+    async def update_firmware(self, mod_nmbr: int) -> bytes:
         """Start router/module firmware updates."""
-        rtr_nmbr = int(rtr_id / 100)
-        cmd_str = SMHUB_COMMANDS["DO_FW_UPDATE"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        cmd_str = cmd_str.replace("<mod>", chr(mod_nmbr))
-        [resp_bytes, crc] = await self.async_send_command_crc(
-            cmd_str, time_out_sec=1000
-        )
+        resp_bytes, crc = await self._async_exec(self.client.update_firmware, mod_nmbr)
         if crc == self.crc:
             return b""
         self.crc = crc
         return resp_bytes
 
-    async def async_power_cycle_channel(self, rtr_id: int, channel: int) -> None:
+    async def async_power_cycle_channel(self, channel: int) -> None:
         """Power down a router channel and set power on again."""
-        rtr_nmbr = int(rtr_id / 100)
-        mask = 1 << (channel - 1)
-        cmd_str = SMHUB_COMMANDS["POWER_DWN_CHAN"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        cmd_str = cmd_str.replace("<msk>", chr(mask))
-        await self.async_send_command_crc(cmd_str, time_out_sec=1000)
+        await self._async_exec(self.client.power_cycle_channel_down, channel)
         await asyncio.sleep(2)
-        cmd_str = SMHUB_COMMANDS["POWER_UP_CHAN"]
-        cmd_str = cmd_str.replace("<rtr>", chr(rtr_nmbr))
-        cmd_str = cmd_str.replace("<msk>", chr(mask))
-        await self.async_send_command_crc(cmd_str, time_out_sec=1000)
+        await self._async_exec(self.client.power_cycle_channel_up, channel)
 
-    async def update_entity(self, hub_id, _rtr_id, mod_id, evnt, arg1, arg2):  # noqa: C901
+    async def send_devregid(self, mod_nmbr: int, devreg_id: str) -> None:
+        """Send device registry id to module."""
+        await self._async_exec(self.client.send_devregid, mod_nmbr, devreg_id)
+
+    async def update_entity(  # noqa: C901
+        self,
+        hub_id: str,
+        mod_id: int,
+        evnt: int,
+        arg1: int,
+        arg2: int,
+        arg3: int = 0,
+        arg4: int = 0,
+        arg5: int = 0,
+    ):
         """Event server handler to receive entity updates."""
         inp_event_types = ["inactive", "single_press", "long_press", "long_press_end"]
         if self._hostip != hub_id:
@@ -888,7 +555,7 @@ class HbtnComm:
             return
         try:
             module = self.router.get_module(mod_id)
-        except Exception as err_msg:  # pylint: disable=broad-exception-caught  # noqa: BLE001
+        except Exception as err_msg:  # noqa: BLE001
             self.logger.warning(
                 "Error handling habitron event %s with arg1 %s of module %s: %s",
                 evnt,
@@ -897,6 +564,7 @@ class HbtnComm:
                 err_msg,
             )
             return
+
         if module is None:
             self.logger.error(
                 "Error in update_entity: No module found for mod_id %s", mod_id
@@ -931,13 +599,19 @@ class HbtnComm:
                         module.outputs[arg1 - 1].value = arg2
                         await module.outputs[arg1 - 1].handle_upd_event()
                         if (c_idx := module.get_cover_index(arg1)) >= 0:
-                            # module.covers[c_idx].value = module.status[
-                            #     MStatIdx.ROLL_POS + c_idx
-                            # ]
-                            # module.covers[c_idx].tilt = module.status[
-                            #     MStatIdx.BLAD_POS + c_idx
-                            # ]
                             await module.covers[c_idx].handle_upd_event()
+                elif evnt == HaEvents.RGB:
+                    # RGB output changed
+                    idx = arg1
+                    if arg2 == 2:
+                        # RGB value change, arg1 is RGB output nmbr, arg2 is 2 for rgb value change, arg3 is R/G/B index, arg4 is new value
+                        module.cleds[idx].value[0] = 1
+                        module.cleds[idx].value[1] = arg3
+                        module.cleds[idx].value[2] = arg4
+                        module.cleds[idx].value[3] = arg5
+                    else:
+                        module.cleds[idx].value[0] = arg2
+                    await module.cleds[idx].handle_upd_event()
                 elif evnt == HaEvents.FINGER:
                     # Ekey input detected
                     if arg2 <= 10:
@@ -947,9 +621,8 @@ class HbtnComm:
                     await module.sensors[0].handle_upd_event()
                     await module.fingers[0].handle_upd_event("finger", arg1, arg2)
                     await asyncio.sleep(0.2)
-                    await module.fingers[0].handle_upd_event(
-                        "inactive", 0, 0
-                    )  # set back to 'None'
+                    # set back to 'None'
+                    await module.fingers[0].handle_upd_event("inactive", 0, 0)
                 elif evnt == HaEvents.DIM_VAL:
                     module.dimmers[arg1].value = arg2
                     await module.dimmers[arg1].handle_upd_event()
@@ -971,7 +644,7 @@ class HbtnComm:
                 elif evnt == HaEvents.CNT_VAL:
                     module.logic[arg1].value = arg2
                     await module.logic[arg1].handle_upd_event()
-            except Exception as err_msg:  # pylint: disable=broad-exception-caught  # noqa: BLE001
+            except Exception as err_msg:  # noqa: BLE001
                 self.logger.warning(
                     "Error handling habitron event %s with arg1 %s of module %s: %s",
                     evnt,
@@ -981,267 +654,4 @@ class HbtnComm:
                 )
 
 
-def test_connection(host_name) -> tuple[bool, str]:
-    """Test connectivity to SmartHub is OK."""
-    port = 7777
-    try:
-        host = get_host_ip(host_name)
-    except socket.gaierror as exc:
-        raise socket.gaierror from exc
-    sck = socket.socket()  # Create a socket object
-    try:
-        sck.connect((host, port))
-    except ConnectionRefusedError as exc:
-        raise ConnectionRefusedError from exc
-    sck.settimeout(15)  # 15 seconds
-    # router restart
-    cmd_str = SMHUB_COMMANDS["CHECK_COMM_STATUS"]
-    full_string = wrap_command(cmd_str)
-    resp_bytes = send_receive(sck, full_string)
-    sck.close()
-    resp_string = resp_bytes.decode("iso8859-1")
-    conn_ok = resp_string[0:2] == "OK"
-    smhub_info = query_smarthub(host)
-    if conn_ok:
-        host_name = smhub_info["name"]
-    else:
-        host_name = ""
-    return conn_ok, host_name
-
-
-def get_host_ip(host_name: str) -> str:
-    """Get IP from DNS host name, error handling."""
-    return socket.gethostbyname(host_name)
-
-
-def send_receive(sck, cmd_str: str) -> bytes:
-    """Send string to SmartHub and wait for response with timeout."""
-    try:
-        sck.send(cmd_str.encode("iso8859-1"))  # Send command
-
-        resp_bytes = sck.recv(30)
-        if len(resp_bytes) < 30:
-            return b"OK"
-        resp_len = resp_bytes[29] * 256 + resp_bytes[28]
-        resp_bytes = b""
-        while len(resp_bytes) < resp_len + 3:
-            buffer = sck.recv(resp_len + 3)
-            resp_bytes = resp_bytes + buffer
-        resp_bytes = resp_bytes[0:resp_len]
-    except TimeoutError as exc:
-        raise TimeoutException from exc
-    return resp_bytes
-
-
-def send_receive_crc(sck, cmd_str: str) -> tuple[bytes, int]:
-    """Send string to SmartHub and wait for response with timeout."""
-    try:
-        sck.send(cmd_str.encode("iso8859-1"))  # Send command
-
-        resp_bytes = sck.recv(30)
-        if len(resp_bytes) < 30:
-            return b"OK", 0
-        resp_len = resp_bytes[29] * 256 + resp_bytes[28]
-        resp_bytes = b""
-        while len(resp_bytes) < resp_len + 3:
-            buffer = sck.recv(resp_len + 3)
-            resp_bytes = resp_bytes + buffer
-        crc = resp_bytes[-2] * 256 + resp_bytes[-3]
-        resp_bytes = resp_bytes[0:resp_len]
-    except TimeoutError as exc:
-        raise TimeoutException from exc
-    return resp_bytes, crc
-
-
-def init_crc16_tbl() -> list[int]:
-    """Prepare the crc16 table."""
-    res: list[int] = []
-    for byte in range(256):
-        crc = 0x0000
-        for _ in range(8):
-            if (byte ^ crc) & 0x0001:
-                crc = (crc >> 1) ^ 0xA001
-            else:
-                crc >>= 1
-            byte >>= 1
-        res.append(crc)
-    return res
-
-
-__crc16_tbl: list[int] = init_crc16_tbl()
-
-
-def calc_crc(data: bytes) -> int:
-    """Calculate a crc16 for the given byte string."""
-    crc = 0xFFFF
-    for byt in data:
-        idx = __crc16_tbl[(crc ^ int(byt)) & 0xFF]
-        crc = ((crc >> 8) & 0xFF) ^ idx
-    return ((crc << 8) & 0xFF00) | ((crc >> 8) & 0x00FF)
-
-
-def check_crc(msg) -> bool:
-    """Check crc of message."""
-    msg_crc = int.from_bytes(msg[-3:-1], "little")
-    return calc_crc(msg[:-3]) == msg_crc
-
-
-def wrap_command(cmd_string: str) -> str:
-    """Take command and add prefix, crc, postfix."""
-    cmd_prefix = "¨\0\0\x0bSmartConfig\x05michlS\x05"
-    cmd_postfix = "\x3f"
-    full_string = cmd_prefix + cmd_string
-    cmd_len = len(full_string) + 3
-    full_string = full_string[0] + chr(cmd_len) + full_string[2 : cmd_len - 3]
-    cmd_crc = calc_crc(full_string.encode("iso8859-1"))
-    crc_low = cmd_crc & 0xFF
-    crc_high = (cmd_crc - crc_low) >> 8
-    cmd_postfix = chr(crc_high) + chr(crc_low) + cmd_postfix
-    return full_string + cmd_postfix
-
-
-def format_block_output(byte_str: bytes) -> str:
-    """Format block hex output with lines."""
-    lbs = len(byte_str)
-    res_str = ""
-    ptr = 0
-    while ptr < lbs:
-        line = ""
-        end_l = min([ptr + 10, lbs])
-        for i in range(end_l - ptr):
-            line = line + f"{f'{byte_str[ptr + i]:02X}'} "
-        res_str += f"{f'{ptr:03d}'}  {line}{chr(13)}"
-        ptr += 10
-    return res_str
-
-
-def get_own_ip():
-    """Return string of own ip."""
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.connect(("8.8.8.8", 80))
-    own_ip = s.getsockname()[0]
-    s.close()
-    return own_ip
-
-
-def discover_smarthubs():
-    """Discover SmartHub and SmartServer hardware on the network."""
-    smhub_port = 30718
-    own_ip = get_own_ip()
-    timeout = 2
-    logger = logging.getLogger(__name__)
-
-    req_header_data = [0x00, 0x00, 0x00, 0xF6]
-    req_header = struct.pack("B" * len(req_header_data), *req_header_data)
-    resp_header_data = [0x00, 0x00, 0x00, 0xF7]
-    resp_header = struct.pack("B" * len(resp_header_data), *resp_header_data)
-
-    network_socket = socket.socket(
-        socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP
-    )
-    network_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, True)
-    network_socket.settimeout(timeout)
-    network_socket.bind((own_ip, 0))
-
-    network_socket.sendto(req_header, ("<broadcast>", smhub_port))
-
-    smarthubs = []
-
-    try:
-        while True:
-            response, address_info = network_socket.recvfrom(1024)
-
-            smhub_ip = address_info[0]
-            logger.info("SmartHub found at address %s", smhub_ip)
-
-            if response[0:4] == resp_header and smhub_ip != "0.0.0.0":
-                smhub_version = f"{response[7]}.{response[6]}.{response[5]}"
-                smhub_mac = f"{response[24]:02X}:{response[25]:02X}:{response[26]:02X}:{response[27]:02X}:{response[28]:02X}:{response[29]:02X}"
-                smhub_serial = (
-                    f"{response[20]:c}{response[21]:c}{response[22]:c}{response[23]:c}"
-                )
-                smhub_type = f"{response[8]:c}-{response[9]:c}"
-                smarthub_info = {
-                    "type": smhub_type,
-                    "version": smhub_version,
-                    "serial": smhub_serial,
-                    "mac": smhub_mac,
-                    "ip": smhub_ip,
-                }
-
-                smarthubs.append(smarthub_info)
-
-            else:
-                pass
-
-    except TimeoutError:
-        pass
-
-    network_socket.close()
-    return smarthubs
-
-
-def query_smarthub(smhub_ip) -> dict[str, str]:
-    """Read properties of identified SmartIP or SmartHub.
-
-    :param smhub_ip: ip address of a single smartip
-    """
-
-    smartip_info: dict[str, str] = {}
-    smhub_port = 30718
-    timeout = 1
-
-    req_header_data = [0x00, 0x00, 0x00, 0xF6]
-    req_header = struct.pack("B" * len(req_header_data), *req_header_data)
-    resp_header_data = [0x00, 0x00, 0x00, 0xF7]
-    resp_header = struct.pack("B" * len(resp_header_data), *resp_header_data)
-
-    network_socket = socket.socket(
-        socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP
-    )
-    network_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, True)
-    network_socket.settimeout(timeout)
-
-    try:
-        network_socket.sendto(req_header, (smhub_ip, smhub_port))
-        response, address_info = network_socket.recvfrom(1024)
-
-        smhub_ip = address_info[0]
-
-        if response[0:4] == resp_header and smhub_ip != "0.0.0.0":
-            smhub_version = f"{response[7]}.{response[6]}.{response[5]}"
-            smhub_mac = f"{response[24]:02X}:{response[25]:02X}:{response[26]:02X}:{response[27]:02X}:{response[28]:02X}:{response[29]:02X}"
-            smhub_serial = (
-                f"{response[20]:c}{response[21]:c}{response[22]:c}{response[23]:c}"
-            )
-            smhub_type = f"{response[8]:c}-{response[9]:c}"
-            if smhub_type == "E-5":
-                # Classic SmartIP
-                smhub_name = f"SmartIP_{smhub_mac.replace(':', '')}"
-            else:
-                # Smart Hub
-                smhub_name = f"SmartHub_{smhub_mac.replace(':', '')}"
-
-            smartip_info = {
-                "name": smhub_name,
-                "hostname": "",
-                "type": smhub_type,
-                "version": smhub_version,
-                "serial": smhub_serial,
-                "mac": smhub_mac,
-                "ip": smhub_ip,
-            }
-    except TimeoutError:
-        network_socket.close()
-        return {}
-
-    network_socket.close()
-    try:
-        smartip_info["hostname"] = socket.gethostbyaddr(smhub_ip)[0].split(".")[0]
-    except (socket.herror, socket.gaierror, OSError, TimeoutException):
-        smartip_info["hostname"] = ""
-    return smartip_info
-
-
-class TimeoutException(HAexceptions.HomeAssistantError):
-    """Error to indicate timeout."""
+# End of communicate definition.
