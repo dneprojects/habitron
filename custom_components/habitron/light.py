@@ -4,8 +4,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from homeassistant.components.light import ATTR_BRIGHTNESS, ATTR_RGB_COLOR, LightEntity
-from homeassistant.components.light.const import ColorMode
+from homeassistant.components.light import (
+    ATTR_BRIGHTNESS,
+    ATTR_RGB_COLOR,
+    ColorMode,
+    LightEntity,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
@@ -14,6 +18,7 @@ from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
     DataUpdateCoordinator,
 )
+import homeassistant.util.color as color_util
 
 from .const import DOMAIN
 from .interfaces import AreaDescriptor, CLedDescriptor, IfDescriptor
@@ -41,20 +46,8 @@ async def async_setup_entry(
                         mod_output, hbt_module, hbtn_cord, len(new_devices)
                     )
                 )
-        for mod_led in hbt_module.leds:
-            if isinstance(mod_led, CLedDescriptor):
-                if mod_led.nmbr == 0:
-                    led_name = "Color Ambient"
-                else:
-                    led_name = f"Color Corner {mod_led.nmbr}"
-                if mod_led.name.strip() == "":
-                    mod_led.set_name(f"{led_name}")
-                else:
-                    mod_led.set_name(f"{led_name}: {mod_led.name}")
-                new_devices.append(
-                    ColorLed(mod_led, hbt_module, hbtn_cord, len(new_devices))
-                )
-        if hbt_module.typ == b"\x01\x04":
+
+        if hbt_module.typ in [b"\x01\x04", b"\x32\x01"]:
             for cled in hbt_module.cleds:
                 led_name = "Color Corner"
                 if cled.nmbr == 0:
@@ -305,6 +298,8 @@ class ColorLed(CoordinatorEntity, LightEntity):
         self._out_offs: int = 0
         self._brightness: int = 255
         self._rgb_color: tuple[int, int, int] = (50, 50, 50)
+        self._org_color: tuple[int, int, int] = (50, 50, 50)
+        self._hs_color: tuple[float, float] = (0.0, 0.0)
         self._attr_unique_id: str | None = f"Mod_{self._module.uid}_rgbled{led.nmbr}"
         self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
         if led.type < 0:
@@ -363,25 +358,61 @@ class ColorLed(CoordinatorEntity, LightEntity):
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
         self._attr_is_on = self._led.value[0] == 1
-        self._rgb_color = self._led.value[1], self._led.value[2], self._led.value[3]
+        r_dimmed = self._led.value[1]
+        g_dimmed = self._led.value[2]
+        b_dimmed = self._led.value[3]
+        max_channel = max(r_dimmed, g_dimmed, b_dimmed)
+        if max_channel > 0:
+            # 1. Calculate brightness (0..255) based on the highest channel
+            self._brightness = max_channel
+            # 2. Re-calculate the original 100% color for the HA color picker
+            self._rgb_color = (
+                min(round((r_dimmed / max_channel) * 255), 255),
+                min(round((g_dimmed / max_channel) * 255), 255),
+                min(round((b_dimmed / max_channel) * 255), 255),
+            )
+        else:
+            # Fallback if the light is completely off (all channels are 0)
+            # We keep the last known color or default to white, but brightness is 0
+            self._brightness = 0
+            if not hasattr(self, "_rgb_color") or self._rgb_color is None:
+                self._rgb_color = (255, 255, 255)
         self.async_write_ha_state()
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Instruct the light to turn on."""
-        self._rgb_color = kwargs.get(ATTR_RGB_COLOR, self._rgb_color)
+
+        # Update the un-dimmed base color if provided by the color picker
+        if ATTR_RGB_COLOR in kwargs:
+            self._rgb_color = kwargs[ATTR_RGB_COLOR]
+        elif not hasattr(self, "_rgb_color") or self._rgb_color is None:
+            # Fallback to white if no color was ever set
+            self._rgb_color = (255, 255, 255)
+
+        # Update brightness if provided by the brightness slider
+        if ATTR_BRIGHTNESS in kwargs:
+            self._brightness = kwargs[ATTR_BRIGHTNESS]
+        elif not hasattr(self, "_brightness") or self._brightness is None:
+            # Fallback to full brightness if not set yet
+            self._brightness = 255
+
+        # Calculate the dimmed color for your hardware based on current brightness
+        # We use a float factor to avoid early truncation during calculation
+        bright_factor = self._brightness / 255.0
+
+        dimmed_col = (
+            max(round(self._rgb_color[0] * bright_factor), 1),
+            max(round(self._rgb_color[1] * bright_factor), 1),
+            max(round(self._rgb_color[2] * bright_factor), 1),
+        )
+        # Update the LED indicator value with the 100% color
         self._led.value = [
             1,
-            self._rgb_color[0],
-            self._rgb_color[1],
-            self._rgb_color[2],
+            dimmed_col[0],
+            dimmed_col[1],
+            dimmed_col[2],
         ]
-        self._brightness = kwargs.get(ATTR_BRIGHTNESS, self._brightness)
-        dimmed_col = self._rgb_color
-        dimmed_col = (
-            round(dimmed_col[0] * self._brightness / 256),
-            round(dimmed_col[1] * self._brightness / 256),
-            round(dimmed_col[2] * self._brightness / 256),
-        )
+
         await self._module.comm.async_set_rgbval(
             self._module.mod_addr,
             self._nmbr,

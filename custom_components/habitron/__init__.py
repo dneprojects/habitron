@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import logging
 
+from habitron_client import TimeoutException
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry
@@ -14,11 +15,13 @@ from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceEntry
 
-from .communicate import TimeoutException
 from .const import (
     DOMAIN,
     EVNT_ARG1,
     EVNT_ARG2,
+    EVNT_ARG3,
+    EVNT_ARG4,
+    EVNT_ARG5,
     EVNT_TYPE,
     FILE_MOD_NMBR,
     HUB_UID,
@@ -49,42 +52,31 @@ PLATFORMS: list[str] = [
     "text",
     "update",
 ]
-SERVICE_HUB_RESTART_SCHEMA = vol.Schema(
-    {
-        vol.Required(ROUTER_NMBR, default=1): int,  # type: ignore  # noqa: PGH003
-    }
-)
+SERVICE_HUB_RESTART_SCHEMA = vol.Schema({})
 SERVICE_HUB_REBOOT_SCHEMA = vol.Schema({})
 SERVICE_MOD_RESTART_SCHEMA = vol.Schema(
     {
-        vol.Required(ROUTER_NMBR, default=1): int,  # type: ignore  # noqa: PGH003
         vol.Optional(RESTART_KEY_NMBR, default=1): int,  # type: ignore  # noqa: PGH003
     }
 )
 SERVICE_MOD_FILE_SCHEMA = vol.Schema(
     {
-        vol.Required(ROUTER_NMBR, default=1): int,  # type: ignore  # noqa: PGH003
         vol.Required(FILE_MOD_NMBR, default=1): int,  # type: ignore  # noqa: PGH003
     }
 )
-SERVICE_RTR_FILE_SCHEMA = vol.Schema(
-    {
-        vol.Required(ROUTER_NMBR, default=1): int,  # type: ignore  # noqa: PGH003
-    }
-)
-SERVICE_RTR_RESTART_SCHEMA = vol.Schema(
-    {
-        vol.Required(ROUTER_NMBR, default=1): int,  # type: ignore  # noqa: PGH003
-    }
-)
+SERVICE_RTR_FILE_SCHEMA = vol.Schema({})
+SERVICE_RTR_RESTART_SCHEMA = vol.Schema({})
 SERVICE_UPDATE_ENTITY_SCHEMA = vol.Schema(
     {
         vol.Required(HUB_UID): str,
-        vol.Required(ROUTER_NMBR, default=1): int,  # type: ignore  # noqa: PGH003
+        vol.Required(ROUTER_NMBR, default=1): int,
         vol.Required(MOD_NMBR): int,
         vol.Required(EVNT_TYPE): int,
         vol.Required(EVNT_ARG1): int,
         vol.Required(EVNT_ARG2): int,
+        vol.Optional(EVNT_ARG3): int,
+        vol.Optional(EVNT_ARG4): int,
+        vol.Optional(EVNT_ARG5): int,
     }
 )
 
@@ -99,7 +91,7 @@ SERVICE_SC_SYSTEM_COMMAND_SCHEMA = vol.Schema(
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:  # noqa: C901
     """Set up Habitron from a config entry."""
 
     try:
@@ -122,10 +114,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry.async_on_unload(entry.add_update_listener(update_listener))
 
         # --- Service Registration ---
-        async def restart_hub(call: ServiceCall):
+        async def restart_hub(_call: ServiceCall):
             """Handle the service call."""
-            rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
-            await smhub.comm.hub_restart(rtr_id)
+            await smhub.comm.hub_restart()
 
         async def reboot_hub(_call: ServiceCall):
             """Handle the service call."""
@@ -133,55 +124,51 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         async def restart_module(call: ServiceCall):
             """Handle the service call."""
-            rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
             mod_nmbr = call.data.get(RESTART_KEY_NMBR, RESTART_ALL)
-            await smhub.comm.module_restart(rtr_id, rtr_id + mod_nmbr)
+            await smhub.comm.module_restart(100 + mod_nmbr)
 
-        async def restart_router(call: ServiceCall):
+        async def restart_router(_call: ServiceCall):
             """Handle the service call."""
-            rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
-            await smhub.comm.module_restart(rtr_id, 0)
+            await smhub.comm.module_restart(0)
 
         async def save_module_smc(call: ServiceCall):
             """Handle the service call."""
-            rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
             mod_nmbr = call.data.get(FILE_MOD_NMBR, 1)
-            await smhub.comm.save_smc_file(rtr_id + mod_nmbr)
+            await smhub.comm.save_smc_file(100 + mod_nmbr)
 
         async def save_module_smg(call: ServiceCall):
             """Handle the service call."""
-            rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
             mod_nmbr = call.data.get(FILE_MOD_NMBR, 1)
-            await smhub.comm.save_smg_file(rtr_id + mod_nmbr)
+            await smhub.comm.save_smg_file(100 + mod_nmbr)
 
-        async def save_router_smr(call: ServiceCall):
+        async def save_router_smr(_call: ServiceCall):
             """Handle the service call."""
-            rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
-            await smhub.comm.save_smr_file(rtr_id)
+            await smhub.comm.save_smr_file()
 
         async def save_module_status(call: ServiceCall):
             """Handle the service call."""
-            rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
             mod_nmbr = call.data.get(FILE_MOD_NMBR, 1)
-            await smhub.comm.save_module_status(rtr_id + mod_nmbr)
+            await smhub.comm.save_module_status(100 + mod_nmbr)
 
-        async def save_router_status(call: ServiceCall):
+        async def save_router_status(_call: ServiceCall):
             """Handle the service call."""
-            rtr_id = call.data.get(ROUTER_NMBR, 1) * 100
-            await smhub.comm.save_router_status(rtr_id)
+            await smhub.comm.save_router_status()
 
         async def update_entity(call: ServiceCall):
             """Handle the update service call."""
             hub_id = call.data.get(HUB_UID)
-            rtr_id = call.data.get(ROUTER_NMBR, 1)
+            _rt_id = call.data.get(ROUTER_NMBR)
             mod_id = call.data.get(MOD_NMBR)
             evnt = call.data.get(EVNT_TYPE)
             arg1 = call.data.get(EVNT_ARG1)
             arg2 = call.data.get(EVNT_ARG2)
-            for hub in smhub.hass.data["habitron"]:
-                if smhub.hass.data["habitron"][hub].host == hub_id:
-                    await smhub.hass.data["habitron"][hub].comm.update_entity(
-                        hub_id, rtr_id, mod_id, evnt, arg1, arg2
+            arg3 = call.data.get(EVNT_ARG3, 0)  # optional, Default 0
+            arg4 = call.data.get(EVNT_ARG4, 0)  # optional, Default 0
+            arg5 = call.data.get(EVNT_ARG5, 0)  # optional, Default 0
+            for hub_instance in hass.data.get(DOMAIN, {}).values():
+                if hub_instance.host == hub_id:
+                    await hub_instance.comm.update_entity(
+                        hub_id, mod_id, evnt, arg1, arg2, arg3, arg4, arg5
                     )
                     break
 
