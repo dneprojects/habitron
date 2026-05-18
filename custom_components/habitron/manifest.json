@@ -17,12 +17,13 @@
     "apkutils",
     "awesomeversion",
     "aiohttp",
+    "habitron_client",
     "packaging",
     "wyoming"
   ],
   "ssdp": [{
     "st": "urn:habitron-com:device:SmartHub:1"
   }],
-  "version": "2.6.0",
+  "version": "2.6.1",
   "zeroconf": []
 }

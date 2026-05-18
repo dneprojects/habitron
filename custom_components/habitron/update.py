@@ -8,7 +8,6 @@ import logging
 from pathlib import Path
 import shutil
 
-import apkutils
 from packaging.version import parse as parse_version
 
 from homeassistant.components.update import (
@@ -69,7 +68,7 @@ class SCTouchAppUpdate(UpdateEntity):
         self._module = module
         self._router = router
         self._hass = router.hass
-        self.firmware_dir = Path("")
+        self.firmware_dir = Path("")  # noqa: PTH201
 
         self._attr_unique_id = f"mod_{self._module.uid}_app_update"
         self._attr_device_info = {"identifiers": {(DOMAIN, module.uid)}}
@@ -93,6 +92,9 @@ class SCTouchAppUpdate(UpdateEntity):
 
     def scan_firmware_dir_blocking(self):
         """Blocking job to scan for APK files."""
+
+        import apkutils  # noqa: PLC0415
+
         if not self.firmware_dir.is_dir():
             _LOGGER.warning("Firmware directory not found: %s", self.firmware_dir)
             return None, None
@@ -136,7 +138,7 @@ class SCTouchAppUpdate(UpdateEntity):
             if latest_filename:
                 return str(latest_version), latest_filename
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             _LOGGER.error("Error scanning firmware directory: %s", e)
 
         return None, None
@@ -194,7 +196,7 @@ class SCTouchAppUpdate(UpdateEntity):
                 shutil.copy2(source_file, public_file)
 
                 sha256 = hashlib.sha256()
-                with open(public_file, "rb") as f:
+                with Path.open(public_file, "rb") as f:
                     for chunk in iter(lambda: f.read(65536), b""):
                         sha256.update(chunk)
 
@@ -297,12 +299,10 @@ class HbtnModuleUpdate(CoordinatorEntity, UpdateEntity):
             if isinstance(self._module, HbtnRouter):
                 await self._module.get_definitions()
                 self._attr_installed_version = self._module.version
-                resp = await self._module.comm.handle_firmware(self._module.id, 0)
+                resp = await self._module.comm.handle_firmware(0)
             else:
                 self._attr_installed_version = self._module.sw_version
-                resp = await self._module.comm.handle_firmware(
-                    int(self._module.mod_addr / 100) * 100, self._module.raddr
-                )
+                resp = await self._module.comm.handle_firmware(self._module.raddr)
             if len(resp) == 0:
                 _LOGGER.warning("No response for firmware version check, crc error")
                 return
