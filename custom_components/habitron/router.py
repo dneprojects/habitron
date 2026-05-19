@@ -349,9 +349,31 @@ class HbtnRouter:
             ret_bytes += resp[2 * e_idx + 1] + resp[2 * e_idx + 2]
         return ret_bytes
 
+    @staticmethod
+    def _pad_sys_status(sys_status: bytes) -> bytes:
+        """Pad each compact-status block to MStatIdx.END bytes.
+
+        SmartHub may still send the legacy 92-byte compact status (no RGB).
+        We zero-pad shorter blocks up to MStatIdx.END so the rest of the
+        integration can rely on a fixed block size. Blocks that already meet
+        or exceed MStatIdx.END are passed through unchanged.
+        """
+        if not sys_status:
+            return sys_status
+        blk_len = sys_status[MStatIdx.BYTE_COUNT]
+        if blk_len == 0 or len(sys_status) % blk_len != 0:
+            return sys_status  # unknown layout -> pass through
+        if blk_len >= MStatIdx.END:
+            return sys_status  # already at (or beyond) target length
+        no_mods = len(sys_status) // blk_len
+        pad = b"\x00" * (MStatIdx.END - blk_len)
+        return b"".join(
+            sys_status[i * blk_len : (i + 1) * blk_len] + pad for i in range(no_mods)
+        )
+
     async def update_system_status(self, sys_status) -> None:
         """Update system status and distribute to modules."""
-        self.sys_status = sys_status
+        self.sys_status = self._pad_sys_status(sys_status)
 
         # 1. Update SmHub (Move blocking call to executor)
         self.smhub.update()
@@ -416,6 +438,7 @@ class HbtnRouter:
             ir.async_delete_issue(self.hass, DOMAIN, "router_system_error")
 
         # 5. Distribute status to modules (Sync call within module)
+        # sys_status was padded to MStatIdx.END-sized blocks in update_system_status.
         for m_idx, _module in enumerate(self.modules):
             mod_status = self.sys_status[
                 m_idx * MStatIdx.END : (m_idx + 1) * MStatIdx.END
