@@ -1,5 +1,10 @@
 # Latest changes
 
+## v2.6.1
+
+### Fix
+- Improved support for colors
+
 ## v2.6.0
 
 ### Fix
