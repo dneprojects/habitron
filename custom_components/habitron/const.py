@@ -166,7 +166,7 @@ class MStatIdx:
     RGB_C4_R = 105
     RGB_C4_G = 106
     RGB_C4_B = 107
-    END = 108  # incl. byte_count
+    END = 108  # incl. byte_count -- new (extended) compact-status block length
 
 
 class MirrIdx:

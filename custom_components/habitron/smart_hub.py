@@ -70,6 +70,7 @@ class SmartHub:
 
         # 1. Fetch info from Hub (Offload blocking socket to executor)
         # This populates self.comm.info
+        await self.comm.async_setup()
         await self.hass.async_add_executor_job(self.comm.get_smhub_info)
 
         # 2. Update local variables with real data
