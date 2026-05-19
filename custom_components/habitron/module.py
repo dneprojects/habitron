@@ -425,8 +425,10 @@ class HbtnModule:
     def extract_status(self, sys_status) -> bytes:
         """Extract status of Habitron module from system status."""
         stat_len = MStatIdx.END
-        no_mods = int(len(sys_status) / stat_len)
+        no_mods = len(sys_status) // stat_len
         m_addr = self._addr - int(self._addr / 100) * 100
+        found_module = False
+        m_idx = 0
         for m_idx in range(no_mods):
             if int(sys_status[m_idx * stat_len + MStatIdx.ADDR]) == m_addr:
                 self.logger.info("Found module %s, extracting status", m_addr)
@@ -438,6 +440,7 @@ class HbtnModule:
                 m_addr,
                 len(sys_status),
             )
+            return b""
         return sys_status[m_idx * stat_len : (m_idx + 1) * stat_len]
 
     def set_default_names(self, mod_entities, def_name: str) -> None:

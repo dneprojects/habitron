@@ -3,7 +3,7 @@
 ## v2.6.1
 
 ### Fix
-- Improved suppert for color
+- Improved support for colors
 
 ## v2.6.0
 
