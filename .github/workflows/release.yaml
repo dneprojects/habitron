@@ -1,8 +1,6 @@
 name: Auto Release from Manifest
 
 on:
-  # 1. Manual trigger
-  workflow_dispatch
   push:
     branches:
       - dev
