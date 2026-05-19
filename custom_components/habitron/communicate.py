@@ -19,6 +19,7 @@ from habitron_client import (
     get_own_ip,
 )
 
+from homeassistant.components import network
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
@@ -66,7 +67,7 @@ class HbtnComm:
         self._mac: str = ""
         self._hwtype: str = ""
         self._version: str = ""
-        self._network_ip: str = hass.data["network"].adapters[0]["ipv4"][0]["address"]
+        self._network_ip: str = ""
 
         self.logger.info("Got network ip: %s", self._network_ip)
 
@@ -127,6 +128,13 @@ class HbtnComm:
     def hostname(self) -> str:
         """Hostname of SmartHub."""
         return self._hostname
+
+    async def async_setup(self) -> None:
+        """Async post-init: resolve own network IP via HA helper."""
+        self._network_ip = await network.async_get_source_ip(
+            self._hass, target_ip=self._host
+        )
+        self.logger.info("Resolved network ip: %s", self._network_ip)
 
     def is_valid_ipv4(self, ip_string: str) -> bool:
         """Check if a string is a valid IPv4 address."""
