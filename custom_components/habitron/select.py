@@ -161,7 +161,7 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
             await self.hbtnr.comm.async_set_group_mode(self.hbtnr.id, 0, self._mode)
         else:
             await self._module.comm.async_set_group_mode(
-                self._module.mod_addr, self._module.group, self._mode
+                self._module.group, self._mode
             )
 
 
@@ -205,11 +205,9 @@ class HbtnSelectDaytimeMode(HbtnMode):
         """Change the selected option."""
         mode_val = self._enum[option].value
         if isinstance(self._module, HbtnRouter):
-            await self.hbtnr.comm.async_set_daytime_mode(self.hbtnr.id, 0, mode_val)
+            await self.hbtnr.comm.async_set_daytime_mode(0, mode_val)
         else:
-            await self._module.comm.async_set_daytime_mode(
-                self._module.mod_addr, self._module.group, mode_val
-            )
+            await self._module.comm.async_set_daytime_mode(self._module.group, mode_val)
 
 
 class HbtnSelectAlarmMode(HbtnMode):
@@ -242,9 +240,7 @@ class HbtnSelectAlarmMode(HbtnMode):
             # router
             await self.hbtnr.comm.async_set_alarm_mode(self.hbtnr.id, 0, set_val)
         else:
-            await self._module.comm.async_set_alarm_mode(
-                self._module.mod_addr, self._module.group, set_val
-            )
+            await self._module.comm.async_set_alarm_mode(self._module.group, set_val)
 
 
 class HbtnSelectGroupMode(HbtnMode):
@@ -294,9 +290,7 @@ class HbtnSelectGroupMode(HbtnMode):
             # router
             await self.hbtnr.comm.async_set_group_mode(self.hbtnr.id, 0, set_val)
         else:
-            await self._module.comm.async_set_group_mode(
-                self._module.mod_addr, self._module.group, set_val
-            )
+            await self._module.comm.async_set_group_mode(self._module.group, set_val)
 
 
 class HbtnSelectDaytimeModePush(HbtnSelectDaytimeMode):
