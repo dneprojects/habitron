@@ -160,9 +160,7 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
         if isinstance(self._module, HbtnRouter):
             await self.hbtnr.comm.async_set_group_mode(self.hbtnr.id, 0, self._mode)
         else:
-            await self._module.comm.async_set_group_mode(
-                self._module.group, self._mode
-            )
+            await self._module.comm.async_set_group_mode(self._module.group, self._mode)
 
 
 class HbtnSelectDaytimeMode(HbtnMode):
@@ -275,6 +273,8 @@ class HbtnSelectGroupMode(HbtnMode):
         )
         self._enum = group_enum
         self._value = self._mode & self._mask
+        if self._value == 0:
+            self._value = 32
         self._current_option = self._enum(self._value).name  # type: ignore  # noqa: PGH003
         if isinstance(self._module, HbtnRouter):
             self._attr_name = "Group 0 mode"
