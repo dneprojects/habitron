@@ -18,7 +18,6 @@ from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
     DataUpdateCoordinator,
 )
-import homeassistant.util.color as color_util
 
 from .const import DOMAIN
 from .interfaces import AreaDescriptor, CLedDescriptor, IfDescriptor

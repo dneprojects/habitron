@@ -98,7 +98,7 @@ class HbtnCam(Camera):
                 stream_name=self._stream_name
             )
         except Exception as e:  # noqa: BLE001
-            _LOGGER.error(
+            _LOGGER.warning(
                 "Failed to get snapshot for camera '%s': %s", self._stream_name, e
             )
             return None
