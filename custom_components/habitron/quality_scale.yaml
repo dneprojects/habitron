@@ -43,15 +43,18 @@ rules:
   test-coverage:
     status: todo
     comment: |
-      Current state: 114 tests, ~43% line coverage. Areas at or above
+      Current state: 197 tests, ~50% line coverage. Files at or above
       the Silver bar already: ``const`` 98%, ``device_trigger`` 98%,
       ``diagnostics`` 96%, ``system_health`` 94%, ``coordinator`` 90%,
-      ``services`` 90%, ``__init__`` 85%. The remaining gap is
-      concentrated in the bus / WebRTC paths (``module.py`` 12%,
-      ``ws_provider.py`` 14%, ``media_player.py`` 16%), each of which
-      needs a dedicated mocking layer to cover meaningfully. Hitting
-      the 95% Silver target is a follow-up backlog item on the scale
-      of the ``strict-typing`` migration.
+      ``services`` 90%, ``notify`` 87%, ``__init__`` 85%, ``text`` 82%.
+      Other platform files are in the 60-80% band after this round of
+      tests. The remaining gap is concentrated in the bus / WebRTC /
+      media paths (``module.py`` 12%, ``ws_provider.py`` 14%,
+      ``media_player.py`` 16%, ``update.py`` 35%, ``communicate.py``
+      34%, ``router.py`` 35%, ``assist_satellite.py`` 39%), each of
+      which needs a dedicated mocking layer to cover meaningfully.
+      Hitting the 95% Silver target is a follow-up backlog item on the
+      scale of the ``strict-typing`` migration.
 
   # Gold
   devices: done
