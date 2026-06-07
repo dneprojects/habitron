@@ -25,9 +25,8 @@ def test_cover_classes_register_device_classes() -> None:
     assert class_attr(HbtnBlind, "_attr_device_class") is CoverDeviceClass.BLIND
 
 
-@pytest.mark.parametrize("position", [0, 100])
-async def test_schedule_stop_deduplicates(position: int) -> None:
-    """Repeated ticks at an endpoint do not spawn additional stop tasks."""
+def _make_shutter() -> HbtnShutter:
+    """Build a minimal HbtnShutter stub for unit-testing the helpers."""
     cover_desc = MagicMock()
     cover_desc.nmbr = 0
     cover_desc.area = 0
@@ -40,12 +39,33 @@ async def test_schedule_stop_deduplicates(position: int) -> None:
     coord.last_update_success = True
 
     shutter = HbtnShutter(cover_desc, module, coord, 0)
-    # Patch hass for the helper.
     shutter.hass = MagicMock()
-    shutter.hass.async_create_task = MagicMock(return_value=MagicMock(done=lambda: False))
+    # ``_schedule_stop`` calls ``_stop_cover_after_delay`` which returns a
+    # coroutine. Replace it with a sync stub so the test does not leak a
+    # never-awaited coroutine warning.
+    shutter._stop_cover_after_delay = MagicMock(return_value=MagicMock())
+    shutter.hass.async_create_task = MagicMock(
+        return_value=MagicMock(done=lambda: False)
+    )
+    return shutter
+
+
+@pytest.mark.parametrize("position", [0, 100])
+async def test_schedule_stop_deduplicates(position: int) -> None:
+    """Repeated ticks at an endpoint do not spawn additional stop tasks."""
+    shutter = _make_shutter()
 
     shutter._schedule_stop(5)
     first_call_count = shutter.hass.async_create_task.call_count
-    # Second schedule with the same active task is a no-op.
     shutter._schedule_stop(5)
     assert shutter.hass.async_create_task.call_count == first_call_count
+
+
+async def test_schedule_stop_after_completed_task_runs_again() -> None:
+    """Once the previous stop task is done, a new tick schedules another."""
+    shutter = _make_shutter()
+    shutter._schedule_stop(5)
+    # Mark the previous task as done so the helper schedules a new one.
+    shutter._stop_task = MagicMock(done=lambda: True)
+    shutter._schedule_stop(5)
+    assert shutter.hass.async_create_task.call_count == 2
