@@ -368,7 +368,10 @@ async def test_async_setup_entry_emits_button_set(hass) -> None:
     counter.nmbr = 0
     counter.name = "Cnt"
 
+    from custom_components.habitron.module import SmartController  # noqa: PLC0415
+
     mod = MagicMock()
+    mod.__class__ = SmartController  # so isinstance() narrows correctly
     mod.uid = "MOD-1"
     mod.b_uid = "HUB-1"
     mod.mod_addr = 105
