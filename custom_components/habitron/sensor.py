@@ -33,6 +33,8 @@ from .coordinator import HabitronConfigEntry
 from .interfaces import TYPE_DIAG, AreaDescriptor
 from .module import SmartController
 
+PARALLEL_UPDATES = 1
+
 
 async def async_setup_entry(  # noqa: C901
     hass: HomeAssistant,

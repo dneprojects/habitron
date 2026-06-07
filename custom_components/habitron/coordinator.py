@@ -80,9 +80,11 @@ class HbtnCoordinator(DataUpdateCoordinator[None]):
         """Fetch the current Habitron status.
 
         The returned value is unused; ``async_system_update`` writes
-        directly into module/input/output objects. A timeout is converted
-        to ``UpdateFailed`` so HA surfaces it as a transient coordinator
-        error instead of an uncaught exception.
+        directly into module/input/output objects. Connection-level
+        failures (timeouts, network errors, refused connections) are
+        converted to ``UpdateFailed`` so the coordinator flips
+        ``last_update_success`` to False and every ``CoordinatorEntity``
+        is automatically marked unavailable in the frontend.
         """
         try:
             async with asyncio.timeout(20):
@@ -90,4 +92,8 @@ class HbtnCoordinator(DataUpdateCoordinator[None]):
         except TimeoutError as err:
             raise UpdateFailed(
                 "Timeout fetching system status from SmartHub"
+            ) from err
+        except (OSError, ConnectionError) as err:
+            raise UpdateFailed(
+                f"Network error fetching status from SmartHub: {err}"
             ) from err

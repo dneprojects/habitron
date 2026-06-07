@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 import voluptuous as vol
 
 from homeassistant.core import HomeAssistant, ServiceCall, callback
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import device_registry as dr
 
 from .const import (
@@ -49,12 +50,12 @@ SERVICE_SC_SYSTEM_COMMAND = "sc_system_command"
 _NO_ARGS_SCHEMA = vol.Schema({})
 _MOD_RESTART_SCHEMA = vol.Schema(
     {
-        vol.Optional(RESTART_KEY_NMBR, default=1): int,  # type: ignore  # noqa: PGH003
+        vol.Optional(RESTART_KEY_NMBR, default=1): int,
     }
 )
 _MOD_FILE_SCHEMA = vol.Schema(
     {
-        vol.Required(FILE_MOD_NMBR, default=1): int,  # type: ignore  # noqa: PGH003
+        vol.Required(FILE_MOD_NMBR, default=1): int,
     }
 )
 _UPDATE_ENTITY_SCHEMA = vol.Schema(
@@ -79,17 +80,20 @@ _SC_SYSTEM_COMMAND_SCHEMA = vol.Schema(
 )
 
 
-def _primary_hub(hass: HomeAssistant) -> SmartHub | None:
-    """Return the single loaded Habitron hub, or ``None`` on misuse.
+def _primary_hub(hass: HomeAssistant) -> SmartHub:
+    """Return the single loaded Habitron hub.
 
-    When multiple hubs are loaded the first-loaded one is returned —
-    preserving the prior closure-based behavior. A proper multi-hub
-    target selector belongs to a follow-up refactor.
+    Raises ``ServiceValidationError`` with translatable message keys
+    when no hub is loaded. When multiple hubs are loaded the first one
+    is returned and a warning is logged — a proper multi-hub target
+    selector belongs to a follow-up refactor.
     """
     entries = hass.config_entries.async_loaded_entries(DOMAIN)
     if not entries:
-        _LOGGER.error("Habitron service called but no hub is loaded")
-        return None
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="no_hub_loaded",
+        )
     if len(entries) > 1:
         _LOGGER.warning(
             "Habitron singleton service called with %d hubs configured; "
@@ -102,60 +106,51 @@ def _primary_hub(hass: HomeAssistant) -> SmartHub | None:
 
 async def _async_restart_hub(call: ServiceCall) -> None:
     """Trigger a soft restart of the active SmartHub."""
-    if hub := _primary_hub(call.hass):
-        await hub.comm.hub_restart()
+    await _primary_hub(call.hass).comm.hub_restart()
 
 
 async def _async_reboot_hub(call: ServiceCall) -> None:
     """Trigger a reboot of the active SmartHub."""
-    if hub := _primary_hub(call.hass):
-        await hub.comm.hub_reboot()
+    await _primary_hub(call.hass).comm.hub_reboot()
 
 
 async def _async_restart_module(call: ServiceCall) -> None:
     """Restart a single Habitron module."""
-    if hub := _primary_hub(call.hass):
-        mod_nmbr = call.data.get(RESTART_KEY_NMBR, RESTART_ALL)
-        await hub.comm.module_restart(100 + mod_nmbr)
+    mod_nmbr = call.data.get(RESTART_KEY_NMBR, RESTART_ALL)
+    await _primary_hub(call.hass).comm.module_restart(100 + mod_nmbr)
 
 
 async def _async_restart_router(call: ServiceCall) -> None:
     """Restart the router."""
-    if hub := _primary_hub(call.hass):
-        await hub.comm.module_restart(0)
+    await _primary_hub(call.hass).comm.module_restart(0)
 
 
 async def _async_save_module_smc(call: ServiceCall) -> None:
     """Persist a module's .smc file."""
-    if hub := _primary_hub(call.hass):
-        mod_nmbr = call.data.get(FILE_MOD_NMBR, 1)
-        await hub.comm.save_smc_file(100 + mod_nmbr)
+    mod_nmbr = call.data.get(FILE_MOD_NMBR, 1)
+    await _primary_hub(call.hass).comm.save_smc_file(100 + mod_nmbr)
 
 
 async def _async_save_module_smg(call: ServiceCall) -> None:
     """Persist a module's .smg file."""
-    if hub := _primary_hub(call.hass):
-        mod_nmbr = call.data.get(FILE_MOD_NMBR, 1)
-        await hub.comm.save_smg_file(100 + mod_nmbr)
+    mod_nmbr = call.data.get(FILE_MOD_NMBR, 1)
+    await _primary_hub(call.hass).comm.save_smg_file(100 + mod_nmbr)
 
 
 async def _async_save_router_smr(call: ServiceCall) -> None:
     """Persist the router's .smr file."""
-    if hub := _primary_hub(call.hass):
-        await hub.comm.save_smr_file()
+    await _primary_hub(call.hass).comm.save_smr_file()
 
 
 async def _async_save_module_status(call: ServiceCall) -> None:
     """Persist a module's status to disk."""
-    if hub := _primary_hub(call.hass):
-        mod_nmbr = call.data.get(FILE_MOD_NMBR, 1)
-        await hub.comm.save_module_status(100 + mod_nmbr)
+    mod_nmbr = call.data.get(FILE_MOD_NMBR, 1)
+    await _primary_hub(call.hass).comm.save_module_status(100 + mod_nmbr)
 
 
 async def _async_save_router_status(call: ServiceCall) -> None:
     """Persist the router status to disk."""
-    if hub := _primary_hub(call.hass):
-        await hub.comm.save_router_status()
+    await _primary_hub(call.hass).comm.save_router_status()
 
 
 async def _async_update_entity(call: ServiceCall) -> None:
@@ -175,7 +170,11 @@ async def _async_update_entity(call: ServiceCall) -> None:
                 hub_id, mod_id, evnt, arg1, arg2, arg3, arg4, arg5
             )
             return
-    _LOGGER.warning("update_entity: no Habitron hub matches host %s", hub_id)
+    raise ServiceValidationError(
+        translation_domain=DOMAIN,
+        translation_key="hub_not_found",
+        translation_placeholders={"hub_id": str(hub_id)},
+    )
 
 
 async def _async_dispatch_sc_command_for_device(
@@ -199,8 +198,10 @@ async def _async_dispatch_sc_command_for_device(
             if module is None or getattr(module, "typ", None) != b"\x01\x04":
                 continue
             if hub.ws_provider is None:
-                _LOGGER.error("WebSocket provider not initialized on SmartHub")
-                continue
+                raise ServiceValidationError(
+                    translation_domain=DOMAIN,
+                    translation_key="websocket_provider_missing",
+                )
             stream_id = getattr(module, "stream_name", None)
             if stream_id is None:
                 _LOGGER.warning(
@@ -223,14 +224,21 @@ async def _async_sc_system_command(call: ServiceCall) -> None:
     if isinstance(target_devices, str):
         target_devices = [target_devices]
     if not target_devices:
-        _LOGGER.warning("No target devices provided for system command")
-        return
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="no_target_devices",
+        )
 
     dev_reg = dr.async_get(call.hass)
     hubs: list[SmartHub] = [
         e.runtime_data
         for e in call.hass.config_entries.async_loaded_entries(DOMAIN)
     ]
+    if not hubs:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="no_hub_loaded",
+        )
     for device_id in target_devices:
         device = dev_reg.async_get(device_id)
         if device is None:
@@ -239,8 +247,10 @@ async def _async_sc_system_command(call: ServiceCall) -> None:
             device, hubs, command, new_ip
         )
         if not dispatched:
-            _LOGGER.warning(
-                "No valid Smart Touch module found for device %s", device_id
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="no_matching_module",
+                translation_placeholders={"device_id": device_id},
             )
 
 

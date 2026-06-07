@@ -16,9 +16,9 @@ from homeassistant.components.media_player import (
     MediaPlayerEntityFeature,
     MediaPlayerState,
     MediaType,
-    async_get_clientsession,
 )
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval, timedelta
 from homeassistant.helpers.restore_state import RestoreEntity
@@ -26,6 +26,8 @@ from homeassistant.helpers.restore_state import RestoreEntity
 from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
 from .module import SmartController
+
+PARALLEL_UPDATES = 1
 
 if TYPE_CHECKING:
     from .module import HbtnModule

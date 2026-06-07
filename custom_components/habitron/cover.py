@@ -27,6 +27,8 @@ from .interfaces import AreaDescriptor, CovDescriptor
 from .module import HbtnModule
 from .router import HbtnRouter
 
+PARALLEL_UPDATES = 1
+
 # Initialize logger for this module
 _LOGGER = logging.getLogger(__name__)
 

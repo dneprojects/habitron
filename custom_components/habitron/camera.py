@@ -18,6 +18,8 @@ from .router import HbtnRouter
 from .smart_hub import SmartHub
 from .ws_provider import HabitronWebRTCProvider
 
+PARALLEL_UPDATES = 1
+
 _LOGGER = logging.getLogger(__name__)
 
 

@@ -7,6 +7,7 @@ from habitron_client import TimeoutException
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceEntry
 
 from .const import DOMAIN
@@ -50,6 +51,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: HabitronConfigEntry) -> 
 
         entry.runtime_data = smhub
         entry.async_on_unload(entry.add_update_listener(update_listener))
+
+        _async_cleanup_stale_devices(hass, entry, smhub)
 
         # Services live on the domain, not on the entry. The helper is
         # idempotent so subsequent entries are a no-op.
@@ -111,3 +114,27 @@ async def update_listener(hass: HomeAssistant, entry: HabitronConfigEntry) -> No
     # the reload here unconditionally keeps host, interval and token in
     # sync via the normal setup path.
     await hass.config_entries.async_reload(entry.entry_id)
+
+
+def _async_cleanup_stale_devices(
+    hass: HomeAssistant,
+    entry: HabitronConfigEntry,
+    smhub: SmartHub,
+) -> None:
+    """Remove device-registry entries whose Habitron module is gone.
+
+    Run after ``smhub.async_setup`` populates ``router.modules``. The
+    hub device and the router device are kept; everything else identified
+    by ``(DOMAIN, <some uid>)`` is removed if that uid is no longer in
+    the router's current module list.
+    """
+    keep_uids: set[str] = {smhub.uid, smhub.router.uid}
+    keep_uids.update(getattr(module, "uid", "") for module in smhub.router.modules)
+    keep_uids.discard("")
+
+    dev_reg = dr.async_get(hass)
+    for device in dr.async_entries_for_config_entry(dev_reg, entry.entry_id):
+        for identifier in device.identifiers:
+            if identifier[0] == DOMAIN and identifier[1] not in keep_uids:
+                dev_reg.async_remove_device(device.id)
+                break

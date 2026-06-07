@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import device_registry as dr
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -184,28 +185,28 @@ async def test_update_entity_finds_matching_hub(
     hub.comm.update_entity.assert_awaited_once()
 
 
-async def test_primary_hub_returns_none_when_no_entries(
+async def test_primary_hub_raises_when_no_entries(
     hass: HomeAssistant,
 ) -> None:
-    """``_primary_hub`` returns None when no Habitron entry is loaded."""
-    assert _primary_hub(hass) is None
+    """``_primary_hub`` raises ServiceValidationError when no entry is loaded."""
+    with pytest.raises(ServiceValidationError) as err:
+        _primary_hub(hass)
+    assert err.value.translation_key == "no_hub_loaded"
 
 
 async def test_sc_system_command_no_device(
     hass: HomeAssistant,
     setup_integration: MockConfigEntry,
 ) -> None:
-    """An empty target list is a no-op."""
-    hub = setup_integration.runtime_data
-    hub.ws_provider = MagicMock()
-    hub.ws_provider.async_send_system_command = AsyncMock()
-    await hass.services.async_call(
-        DOMAIN,
-        SERVICE_SC_SYSTEM_COMMAND,
-        {"target_device": [], "command": "restart"},
-        blocking=True,
-    )
-    hub.ws_provider.async_send_system_command.assert_not_called()
+    """An empty target list raises ServiceValidationError."""
+    with pytest.raises(ServiceValidationError) as err:
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_SC_SYSTEM_COMMAND,
+            {"target_device": [], "command": "restart"},
+            blocking=True,
+        )
+    assert err.value.translation_key == "no_target_devices"
 
 
 async def test_sc_system_command_dispatches(

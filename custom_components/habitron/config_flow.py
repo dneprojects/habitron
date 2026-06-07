@@ -351,6 +351,61 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.ConfigFlowResult:
+        """Re-configure an existing Habitron entry.
+
+        Lets the user change the SmartHub host (e.g. after a hardware
+        swap or static-IP migration) without removing the entry — the
+        ``unique_id`` and device-registry mappings stay intact, the
+        platforms reload after the update.
+        """
+        errors: dict[str, str] = {}
+        existing = self._get_reconfigure_entry()
+
+        if user_input is not None:
+            try:
+                await validate_input(self.hass, user_input)
+            except CannotConnect:
+                errors["base"] = "cannot_connect"
+            except HostNotFound:
+                errors["base"] = "host_not_found"
+            except InvalidHost:
+                errors["base"] = "host_not_found"
+            except InvalidInterval:
+                errors["base"] = "invalid_interval"
+            except IntervalTooShort:
+                errors["base"] = "interval_too_short"
+            except IntervalTooLong:
+                errors["base"] = "interval_too_long"
+            except Exception:  # pylint: disable=broad-except
+                _LOGGER.exception("Unexpected reconfigure error")
+                errors["base"] = "unknown"
+            else:
+                return self.async_update_reload_and_abort(
+                    existing, data_updates=user_input
+                )
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        KEY_HOST, default=existing.data.get(KEY_HOST)
+                    ): str,
+                    vol.Required(
+                        KEY_INTERVAL,
+                        default=existing.data.get(KEY_INTERVAL, CONF_DEFAULT_INTERVAL),
+                    ): int,
+                    vol.Optional(
+                        KEY_TOKEN, default=existing.data.get(KEY_TOKEN, "")
+                    ): str,
+                }
+            ),
+            errors=errors,
+        )
+
 
 class MyOptionsFlowHandler(config_entries.OptionsFlow):
     """Allow to change options of integration while running."""

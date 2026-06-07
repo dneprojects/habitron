@@ -23,6 +23,8 @@ from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
 from .interfaces import TYPE_DIAG, AreaDescriptor, IfDescriptor, StateDescriptor
 
+PARALLEL_UPDATES = 1
+
 if TYPE_CHECKING:
     from .module import HbtnModule
     from .router import HbtnRouter
