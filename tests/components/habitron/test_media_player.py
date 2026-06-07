@@ -197,6 +197,27 @@ async def test_async_play_media_replace_mode_clears_queue_and_plays() -> None:
     assert player._track_mode == "single"
 
 
+async def test_async_play_media_replace_mode_moves_current_to_history() -> None:
+    """REPLACE with a current item pushes it to history before playback."""
+    from homeassistant.components.media_player import (  # noqa: PLC0415
+        MediaPlayerEnqueue,
+        MediaPlayerState,
+    )
+
+    player = _make_player()
+    _enable_play_media(player)
+    player._attr_state = MediaPlayerState.PLAYING
+    existing = QueueItem("old", "music", "u-old", {})
+    player._current_item = existing
+    await player.async_play_media(
+        "music", "media-source://library/song", enqueue=MediaPlayerEnqueue.REPLACE
+    )
+    # The previous current was moved to history and the new item is now playing.
+    assert any(it is existing for it in player._history)
+    assert player._current_item is not existing
+    player._send_item_to_client.assert_awaited()
+
+
 async def test_async_play_media_add_mode_appends_to_queue() -> None:
     """ADD appends to the queue without forcing playback."""
     from homeassistant.components.media_player import (  # noqa: PLC0415

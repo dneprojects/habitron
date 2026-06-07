@@ -110,3 +110,33 @@ async def test_attach_trigger_ignores_non_matching_event(
     await hass.async_block_till_done()
     assert action.await_count == 0
     unsub()
+
+
+async def test_attach_trigger_ignores_entity_removal(
+    hass: HomeAssistant,
+) -> None:
+    """An entity-removed state change (``new_state is None``) is dropped."""
+    action = AsyncMock()
+    config = {
+        "platform": "device",
+        "domain": "habitron",
+        "device_id": "dev-1",
+        "entity_id": "event.test3",
+        "type": "single_press",
+    }
+    unsub = await async_attach_trigger(hass, config, action, {})
+
+    # Seed an entity and immediately remove it. The removal fires a
+    # state_changed event with new_state == None — the trigger must
+    # silently bail out.
+    hass.states.async_set(
+        "event.test3",
+        "single_press",
+        attributes={"event_type": "single_press"},
+    )
+    await hass.async_block_till_done()
+    action.reset_mock()
+    hass.states.async_remove("event.test3")
+    await hass.async_block_till_done()
+    assert action.await_count == 0
+    unsub()

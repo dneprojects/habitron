@@ -170,6 +170,22 @@ async def test_setup_entry_oserror_marks_retry(
     assert mock_config_entry.state is ConfigEntryState.SETUP_RETRY
 
 
+async def test_unload_entry_returns_false_when_platform_unload_fails(
+    hass: HomeAssistant,
+    setup_integration: MockConfigEntry,
+) -> None:
+    """A failing platform-unload propagates as False without touching state."""
+    from custom_components.habitron import async_unload_entry  # noqa: PLC0415
+
+    with patch.object(
+        hass.config_entries,
+        "async_unload_platforms",
+        return_value=False,
+    ):
+        ok = await async_unload_entry(hass, setup_integration)
+    assert ok is False
+
+
 async def test_setup_entry_removes_stale_device(
     hass: HomeAssistant,
     setup_homeassistant: None,

@@ -290,6 +290,92 @@ async def test_get_descriptions_alarm_branch_is_silent() -> None:
 # ---------- get_definitions parser ----------
 
 
+async def test_get_definitions_with_modules_records_max_mod_no_and_groups() -> None:
+    """A SMR with non-zero channel counts walks the module_grp + max_mod_no path."""
+    rt = _make_router()
+    smr = bytearray(b"\x00" * 256)
+    # Channel 0: count=2, addrs [5, 6] → max_mod_no = 6
+    smr[1] = 2
+    smr[2] = 5
+    smr[3] = 6
+    # Channel 1..3: count=0
+    # ptr advances: 1 + (1+2) + (1+0)*3 = 7
+    # ptr += 2 → 9; grp_cnt at smr[8] = 2; groups at 9..10 = [3, 4]
+    smr[8] = 2  # grp_cnt
+    smr[9] = 3
+    smr[10] = 4
+    # For 6 modules (max_mod_no=6), grp_no walked from ptr=9..14
+    smr[11] = 1
+    smr[12] = 2
+    smr[13] = 1
+    smr[14] = 2
+    # ptr += 2*2 + 1 = 5 → 14; router name at smr[14]
+    # Wait — production code: ptr += 2 * grp_cnt + 1 = 5, after that ptr=14
+    # Actually need to recompute. After ptr=9 and after the for-mod_i loop,
+    # ptr += 2*grp_cnt + 1 → ptr = 9 + 5 = 14
+    # smr[14] = router name length
+    smr[14] = 4
+    smr[15:19] = b"R-Hb"
+    # ptr after name = 19; user1 length
+    smr[19] = 3
+    smr[20:23] = b"Bob"
+    # ptr after user1 = 23
+    smr[23] = 3
+    smr[24:27] = b"Sue"
+    # ptr after user2 = 27
+    smr[27] = 5
+    smr[28:33] = b"S/N-1"
+    smr[-22:] = b"v1.0                  "
+
+    rt.comm.async_get_router_status = AsyncMock(return_value=b"\x00" * 50)
+    rt.comm.get_smr = AsyncMock(return_value=bytes(smr))
+    await rt.get_definitions()
+    # 6 modules walked → 6 group entries
+    assert len(rt.module_grp) == 6
+    assert rt.name == "R-Hb"
+
+
+async def test_get_descriptions_breaks_on_overlong_header() -> None:
+    """A header that claims more lines than the body delivers stops at empty resp."""
+    rt = _make_router()
+    # no_lines=2 but only one line follows
+    header = bytes([2, 0, 0, 0])
+    lines = [_build_desc_line(767, 1, b"flag-1")]
+    payload = header + b"".join(lines)
+    rt.comm.get_global_descriptions = AsyncMock(return_value=payload)
+    await rt.get_descriptions()  # no exception — the for-loop hits break
+
+
+async def test_update_system_status_writes_flag_values() -> None:
+    """When the router has flags, the FLAG_GLOB byte drives flag.value updates."""
+    from custom_components.habitron.interfaces import StateDescriptor  # noqa: PLC0415
+
+    rt = _make_router()
+    rt.flags = [StateDescriptor("flg", 0, 1, 1, False)]
+    rt_status = bytearray(b"\x00" * 60)
+    rt_status[RoutIdx.FLAG_GLOB] = 0x01
+    rt_status[RoutIdx.ERR_SYSTEM] = FALSE_VAL
+    rt_status[RoutIdx.MIRROR_STARTED] = TRUE_VAL
+    rt.comm.async_get_router_status = AsyncMock(return_value=bytes(rt_status))
+
+    with (
+        patch("custom_components.habitron.router.ir.async_create_issue"),
+        patch("custom_components.habitron.router.ir.async_delete_issue"),
+    ):
+        await rt.update_system_status(b"")
+    assert rt.flags[0].value == 1
+
+
+async def test_get_comm_errors_concatenates_error_pairs() -> None:
+    """A response with err_cnt > 0 yields the concatenated 2-byte error pairs."""
+    rt = _make_router()
+    # err_cnt=2, error pairs (0xAA,0xBB) and (0xCC,0xDD)
+    payload = bytes([2, 0xAA, 0xBB, 0xCC, 0xDD])
+    rt.comm.async_get_error_status = AsyncMock(return_value=payload)
+    out = await rt.get_comm_errors()
+    assert out == b"\xaa\xbb\xcc\xdd"
+
+
 async def test_get_definitions_parses_smr_payload() -> None:
     """get_definitions walks the channel/group/name layout into attributes."""
     rt = _make_router()
