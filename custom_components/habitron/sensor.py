@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
+    SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     LIGHT_LUX,
     PERCENTAGE,
@@ -27,19 +29,20 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
+from .coordinator import HabitronConfigEntry
 from .interfaces import TYPE_DIAG, AreaDescriptor
 from .module import SmartController
 
 
 async def async_setup_entry(  # noqa: C901
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: HabitronConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Add sensors for passed config_entry in HA."""
-    hbtn_rt = hass.data[DOMAIN][entry.entry_id].router
+    hbtn_rt = entry.runtime_data.router
     hbtn_cord = hbtn_rt.coord
-    smhub = hass.data[DOMAIN][entry.entry_id]
+    smhub = entry.runtime_data
 
     new_devices = []
     for smhub_sensor in smhub.sensors:
@@ -148,22 +151,42 @@ async def async_setup_entry(  # noqa: C901
                 )
             elif mod_sensor.name == "Humidity":
                 new_devices.append(
-                    HumiditySensor(hbt_module, mod_sensor, hbtn_cord, len(new_devices))
+                    HbtnDescribedSensor(
+                        hbt_module,
+                        mod_sensor,
+                        hbtn_cord,
+                        len(new_devices),
+                        HUMIDITY_DESCRIPTION,
+                    )
                 )
             elif mod_sensor.name == "Illuminance":
                 new_devices.append(
-                    IlluminanceSensor(
-                        hbt_module, mod_sensor, hbtn_cord, len(new_devices)
+                    HbtnDescribedSensor(
+                        hbt_module,
+                        mod_sensor,
+                        hbtn_cord,
+                        len(new_devices),
+                        ILLUMINANCE_DESCRIPTION,
                     )
                 )
             elif mod_sensor.name in ("Wind", "Windpeak"):
                 new_devices.append(
-                    WindSensor(hbt_module, mod_sensor, hbtn_cord, len(new_devices))
+                    HbtnDescribedSensor(
+                        hbt_module,
+                        mod_sensor,
+                        hbtn_cord,
+                        len(new_devices),
+                        WIND_DESCRIPTION,
+                    )
                 )
             elif mod_sensor.name == "Airquality":
                 new_devices.append(
-                    AirqualitySensor(
-                        hbt_module, mod_sensor, hbtn_cord, len(new_devices)
+                    HbtnDescribedSensor(
+                        hbt_module,
+                        mod_sensor,
+                        hbtn_cord,
+                        len(new_devices),
+                        AIRQUALITY_DESCRIPTION,
                     )
                 )
             elif mod_sensor.name == "Identifier":
@@ -192,16 +215,24 @@ async def async_setup_entry(  # noqa: C901
                 )
     for time_out in hbtn_rt.chan_timeouts:
         new_devices.append(
-            TimeOutSensor(hbtn_rt, time_out, hbtn_cord, len(new_devices))
+            HbtnDescribedSensor(
+                hbtn_rt, time_out, hbtn_cord, len(new_devices), TIMEOUT_DESCRIPTION
+            )
         )
     for ch_curr in hbtn_rt.chan_currents:
-        new_devices.append(CurrSensor(hbtn_rt, ch_curr, hbtn_cord, len(new_devices)))
+        new_devices.append(
+            HbtnDescribedSensor(
+                hbtn_rt, ch_curr, hbtn_cord, len(new_devices), CURRENT_DESCRIPTION
+            )
+        )
     for rt_vtg in hbtn_rt.voltages:
-        new_devices.append(VoltSensor(hbtn_rt, rt_vtg, hbtn_cord, len(new_devices)))
+        new_devices.append(
+            HbtnDescribedSensor(
+                hbtn_rt, rt_vtg, hbtn_cord, len(new_devices), VOLTAGE_DESCRIPTION
+            )
+        )
 
     if new_devices:
-        await hbtn_cord.async_config_entry_first_refresh()
-        hbtn_cord.data = new_devices
         async_add_entities(new_devices)
 
     # --- Area Registry Handling ---
@@ -235,7 +266,6 @@ class HbtnSensor(CoordinatorEntity, SensorEntity):
 
     _attr_has_entity_name = True
     _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_should_poll = True  # for push updates
 
     def __init__(self, module, sensor, coord, idx) -> None:
         """Initialize a Habitron sensor, pass coordinator to CoordinatorEntity."""
@@ -267,16 +297,110 @@ class HbtnSensor(CoordinatorEntity, SensorEntity):
         self.async_write_ha_state()
 
 
+@dataclass(frozen=True, kw_only=True)
+class HbtnSensorEntityDescription(SensorEntityDescription):
+    """Habitron-specific sensor description.
+
+    ``value_fn`` lets each description point at its own module attribute
+    (``module.sensors``, ``module.chan_currents``, ``module.voltages``, …)
+    so all variants share a single entity class.
+
+    ``diag_check`` enables the common pattern of falling back to a hidden
+    diagnostic entity when the underlying descriptor's ``type`` field is
+    flagged as diagnostic.
+    """
+
+    value_fn: Callable[[Any, int], Any]
+    diag_check: bool = False
+
+
+class HbtnDescribedSensor(HbtnSensor):
+    """Generic Habitron sensor driven by a ``HbtnSensorEntityDescription``."""
+
+    entity_description: HbtnSensorEntityDescription
+
+    def __init__(
+        self,
+        module: Any,
+        sensor: Any,
+        coord: Any,
+        idx: int,
+        description: HbtnSensorEntityDescription,
+    ) -> None:
+        """Initialize the described sensor."""
+        super().__init__(module, sensor, coord, idx)
+        self.entity_description = description
+        if description.diag_check and abs(sensor.type) == TYPE_DIAG:
+            self._attr_entity_category = EntityCategory.DIAGNOSTIC
+            self._attr_entity_registry_enabled_default = False
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator via the description."""
+        self._attr_native_value = self.entity_description.value_fn(
+            self._module, self._sensor_idx
+        )
+        self.async_write_ha_state()
+
+
+HUMIDITY_DESCRIPTION = HbtnSensorEntityDescription(
+    key="humidity",
+    device_class=SensorDeviceClass.HUMIDITY,
+    native_unit_of_measurement=PERCENTAGE,
+    value_fn=lambda module, idx: module.sensors[idx].value,
+)
+ILLUMINANCE_DESCRIPTION = HbtnSensorEntityDescription(
+    key="illuminance",
+    device_class=SensorDeviceClass.ILLUMINANCE,
+    native_unit_of_measurement=LIGHT_LUX,
+    value_fn=lambda module, idx: module.sensors[idx].value,
+)
+WIND_DESCRIPTION = HbtnSensorEntityDescription(
+    key="wind",
+    translation_key="wind",
+    device_class=SensorDeviceClass.WIND_SPEED,
+    native_unit_of_measurement=UnitOfSpeed.METERS_PER_SECOND,
+    suggested_display_precision=1,
+    value_fn=lambda module, idx: module.sensors[idx].value,
+)
+AIRQUALITY_DESCRIPTION = HbtnSensorEntityDescription(
+    key="airquality",
+    device_class=SensorDeviceClass.AQI,
+    native_unit_of_measurement=PERCENTAGE,
+    value_fn=lambda module, idx: module.sensors[idx].value,
+)
+CURRENT_DESCRIPTION = HbtnSensorEntityDescription(
+    key="current",
+    device_class=SensorDeviceClass.CURRENT,
+    native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+    value_fn=lambda module, idx: module.chan_currents[idx].value,
+    diag_check=True,
+)
+VOLTAGE_DESCRIPTION = HbtnSensorEntityDescription(
+    key="voltage",
+    device_class=SensorDeviceClass.VOLTAGE,
+    native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+    value_fn=lambda module, idx: module.voltages[idx].value,
+    diag_check=True,
+)
+TIMEOUT_DESCRIPTION = HbtnSensorEntityDescription(
+    key="timeout",
+    translation_key="time_out",
+    native_unit_of_measurement="",
+    value_fn=lambda module, idx: module.chan_timeouts[idx].value,
+    diag_check=True,
+)
+
+
 class AnalogSensor(HbtnSensor):
     """Representation of a Sensor."""
 
-    _attr_should_poll = True  # for push updates
     _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_translation_key = "analog_sensor"
 
     def __init__(self, module, sensor, coord, idx) -> None:
         """Initialize the sensor."""
         super().__init__(module, sensor, coord, idx)
-        self._attr_icon = "mdi:chart-bell-curve-cumulative"
         self._attr_unique_id = f"Mod_{self._module.uid}_adin{sensor.nmbr}"
         self._attr_name = self._attr_name
         self.sensor = sensor
@@ -319,24 +443,10 @@ class TemperatureSensor(HbtnSensor):
             )
 
 
-class HumiditySensor(HbtnSensor):
-    """Representation of a Sensor."""
-
-    _attr_device_class = SensorDeviceClass.HUMIDITY
-    _attr_native_unit_of_measurement = PERCENTAGE
-
-
-class IlluminanceSensor(HbtnSensor):
-    """Representation of an illuminance sensor."""
-
-    _attr_device_class = SensorDeviceClass.ILLUMINANCE
-    _attr_native_unit_of_measurement = LIGHT_LUX
-
-
 class EKeySensorId(HbtnSensor):
     """Representation of an ekey identifier sensor."""
 
-    _attr_should_poll = True  # for push updates
+    _attr_translation_key = "ekey_id"
 
     def __init__(self, module, sensor, coord, idx) -> None:
         """Initialize the sensor."""
@@ -344,7 +454,6 @@ class EKeySensorId(HbtnSensor):
         self.sensor = sensor
         self._attr_unique_id = f"Mod_{self._module.uid}_ekey_ident"
         self._attr_name = "Identifier Value"
-        self._attr_icon = "mdi:fingerprint"
 
     async def async_added_to_hass(self) -> None:
         """Run when this Entity has been added to HA."""
@@ -366,7 +475,7 @@ class EKeySensorId(HbtnSensor):
 class EKeySensorFngr(HbtnSensor):
     """Representation of an ekey finger sensor."""
 
-    _attr_should_poll = True  # for push updates
+    _attr_translation_key = "ekey_finger"
 
     def __init__(self, module, sensor, coord, idx) -> None:
         """Initialize the sensor."""
@@ -374,7 +483,6 @@ class EKeySensorFngr(HbtnSensor):
         self.sensor = sensor
         self._attr_unique_id = f"Mod_{self._module.uid}_ekey_fngr"
         self._attr_name = "Finger Value"
-        self._attr_icon = "mdi:fingerprint"
 
     async def async_added_to_hass(self) -> None:
         """Run when this Entity has been added to HA."""
@@ -391,26 +499,6 @@ class EKeySensorFngr(HbtnSensor):
         """Entity being removed from hass."""
         # The opposite of async_added_to_hass. Remove any registered call backs here.
         self.sensor.remove_callback(self._handle_coordinator_update)
-
-
-class WindSensor(HbtnSensor):
-    """Representation of a wind sensor."""
-
-    _attr_device_class = SensorDeviceClass.WIND_SPEED
-    _attr_native_unit_of_measurement = UnitOfSpeed.METERS_PER_SECOND
-    _attr_suggested_display_precision = 1
-
-    def __init__(self, module, sensor, coord, idx) -> None:
-        """Initialize the sensor."""
-        super().__init__(module, sensor, coord, idx)
-        self._attr_icon = "mdi:weather-windy-variant"
-
-
-class AirqualitySensor(HbtnSensor):
-    """Representation of a airquality sensor."""
-
-    _attr_device_class = SensorDeviceClass.AQI
-    _attr_native_unit_of_measurement = PERCENTAGE
 
 
 class HbtnDiagSensor(CoordinatorEntity, SensorEntity):
@@ -482,7 +570,7 @@ class LogicSensor(HbtnSensor):
     """Representation of a logic state sensor."""
 
     _attr_native_unit_of_measurement = ""
-    _attr_should_poll = True  # for push updates
+    _attr_translation_key = "logic_state"
 
     def __init__(self, module, logic, coord, idx) -> None:
         """Initialize the sensor."""
@@ -491,7 +579,6 @@ class LogicSensor(HbtnSensor):
         self.logic = logic
         self._attr_unique_id = f"Mod_{self._module.uid}_logic{logic.nmbr}"
         self._attr_name = f"Cnt{logic.nmbr + 1}: {logic.name}"
-        self._attr_icon = "mdi:counter"
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -520,70 +607,6 @@ class LogicSensorPush(LogicSensor):
         self.logic.remove_callback(self._handle_coordinator_update)
 
 
-class CurrSensor(HbtnSensor):
-    """Representation of a current sensor."""
-
-    _attr_device_class = SensorDeviceClass.CURRENT
-    _attr_native_unit_of_measurement = UnitOfElectricCurrent.AMPERE
-
-    def __init__(self, module, sensor, coord, idx) -> None:
-        """Initialize the sensor."""
-        super().__init__(module, sensor, coord, idx)
-        if abs(sensor.type) == TYPE_DIAG:
-            self._attr_entity_category = EntityCategory.DIAGNOSTIC
-            self._attr_entity_registry_enabled_default = (
-                False  # Entity will initally be disabled
-            )
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self._attr_native_value = self._module.chan_currents[self._sensor_idx].value
-        self.async_write_ha_state()
-
-
-class VoltSensor(HbtnSensor):
-    """Representation of a voltage sensor."""
-
-    _attr_device_class = SensorDeviceClass.VOLTAGE
-    _attr_native_unit_of_measurement = UnitOfElectricPotential.VOLT
-
-    def __init__(self, module, sensor, coord, idx) -> None:
-        """Initialize the sensor."""
-        super().__init__(module, sensor, coord, idx)
-        if abs(sensor.type) == TYPE_DIAG:
-            self._attr_entity_category = EntityCategory.DIAGNOSTIC
-            self._attr_entity_registry_enabled_default = (
-                False  # Entity will initally be disabled
-            )
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self._attr_native_value = self._module.voltages[self._sensor_idx].value
-        self.async_write_ha_state()
-
-
-class TimeOutSensor(HbtnSensor):
-    """Representation of a timeout count sensor."""
-
-    _attr_native_unit_of_measurement = ""
-
-    def __init__(self, module, timeout, coord, idx) -> None:
-        """Initialize the sensor."""
-        super().__init__(module, timeout, coord, idx)
-        self._attr_icon = "mdi:timer-alert-outline"
-        if abs(timeout.type) == TYPE_DIAG:
-            self._attr_entity_category = EntityCategory.DIAGNOSTIC
-            self._attr_entity_registry_enabled_default = (
-                False  # Entity will initally be disabled
-            )
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self._attr_native_value = self._module.chan_timeouts[self._sensor_idx].value
-        self.async_write_ha_state()
 
 
 class PercSensor(HbtnSensor):

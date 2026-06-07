@@ -8,11 +8,11 @@ from typing import Any
 from webrtc_models import RTCIceCandidateInit
 
 from homeassistant.components.camera import Camera, CameraEntityFeature
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
+from .coordinator import HabitronConfigEntry
 from .module import HbtnModule
 from .router import HbtnRouter
 from .smart_hub import SmartHub
@@ -23,11 +23,11 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: HabitronConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Habitron cameras from a config entry."""
-    smhub: SmartHub = hass.data[DOMAIN][entry.entry_id]
+    smhub: SmartHub = entry.runtime_data
     hbtn_rt: HbtnRouter = smhub.router
     if smhub.ws_provider is None:
         _LOGGER.error("WebRTC provider not available on SmartHub instance")

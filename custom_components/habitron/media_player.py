@@ -18,13 +18,13 @@ from homeassistant.components.media_player import (
     MediaType,
     async_get_clientsession,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval, timedelta
 from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import DOMAIN
+from .coordinator import HabitronConfigEntry
 from .module import SmartController
 
 if TYPE_CHECKING:
@@ -55,11 +55,11 @@ class QueueItem:
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: HabitronConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Habitron media player entities."""
-    smhub: SmartHub = hass.data[DOMAIN][entry.entry_id]
+    smhub: SmartHub = entry.runtime_data
     provider = smhub.ws_provider
     new_devices = []
 
@@ -86,6 +86,7 @@ class HbtnMediaPlayer(MediaPlayerEntity, RestoreEntity):
     """Representation of a Habitron client as a media player."""
 
     _attr_should_poll = False
+    _attr_translation_key = "habitron_speaker"
 
     def __init__(
         self,
@@ -109,7 +110,6 @@ class HbtnMediaPlayer(MediaPlayerEntity, RestoreEntity):
         self._history: list[QueueItem] = []
         self._current_item: QueueItem | None = None
         self._play_request_lock = asyncio.Lock()
-        self._attr_icon = "mdi:speaker"
         self._attr_volume_level: float = 0.3
         self._attr_is_volume_muted = False
         self._pre_mute_volume: float = 0.3

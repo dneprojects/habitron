@@ -1,7 +1,6 @@
 """Platform for sensor integration."""
 
 from homeassistant.components.sensor import SensorEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -11,17 +10,18 @@ from homeassistant.helpers.update_coordinator import (
 )
 
 from .const import DOMAIN
+from .coordinator import HabitronConfigEntry
 from .module import HbtnModule
 from .router import HbtnRouter
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: HabitronConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Add sensors for passed config_entry in HA."""
-    hbtn_rt: HbtnRouter = hass.data[DOMAIN][entry.entry_id].router
+    hbtn_rt: HbtnRouter = entry.runtime_data.router
     hbtn_cord: DataUpdateCoordinator = hbtn_rt.coord
 
     new_devices = []
@@ -40,8 +40,6 @@ async def async_setup_entry(
                     )
                 )
     if new_devices:
-        await hbtn_cord.async_config_entry_first_refresh()
-        hbtn_cord.data = new_devices  # type: ignore  # noqa: PGH003
         async_add_entities(new_devices)
 
 
@@ -49,7 +47,7 @@ class EKeySensorUsr(CoordinatorEntity, SensorEntity):
     """Representation of a Habitron ekey finger print sensor."""
 
     _attr_has_entity_name = True
-    _attr_should_poll = True  # for pull updates
+    _attr_translation_key = "ekey_user"
 
     def __init__(
         self,
@@ -65,7 +63,6 @@ class EKeySensorUsr(CoordinatorEntity, SensorEntity):
         self._nmbr = nmbr
         self._attr_unique_id = f"Mod_{self._module.uid}_ekey_ident"
         self._attr_name = "Identifier Name"
-        self._attr_icon = "mdi:fingerprint"
         self._attr_native_value = "None"
 
     async def async_added_to_hass(self) -> None:
@@ -123,7 +120,7 @@ class EKeySensorFngr(CoordinatorEntity, SensorEntity):
     """Representation of a Habitron ekey finger print sensor."""
 
     _attr_has_entity_name = True
-    _attr_should_poll = True  # for pull updates
+    _attr_translation_key = "ekey_finger"
 
     def __init__(
         self,
@@ -139,7 +136,6 @@ class EKeySensorFngr(CoordinatorEntity, SensorEntity):
         self._nmbr = nmbr
         self._attr_unique_id = f"Mod_{self._module.uid}_ekey_fngr_ident"
         self._attr_name = "Finger Name"
-        self._attr_icon = "mdi:fingerprint"
         self._attr_native_value = "None"
         self.finger_names = [
             "Kleiner Finger links",

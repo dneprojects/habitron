@@ -2,6 +2,7 @@
 
 import asyncio
 import base64
+from collections.abc import Callable
 import logging
 import os
 import re
@@ -74,8 +75,38 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
         self.assist_satellites: dict[str, HbtnAssistSat] = {}
         self.voice_pipelines: dict[str, dict[str, Any]] = {}
 
-        # Register this instance as the WebRTC provider
-        async_register_webrtc_provider(self.hass, self)
+        # Register this instance as the WebRTC provider and keep the
+        # cleanup callback so we can detach on entry unload.
+        self._remove_provider: Callable[[], None] | None = (
+            async_register_webrtc_provider(self.hass, self)
+        )
+
+    @callback
+    def async_close(self) -> None:
+        """Detach the provider and release per-entry state.
+
+        Called from ``async_unload_entry``. Cancels in-flight voice
+        pipeline tasks, clears all session/future maps and unregisters
+        the WebRTC provider so a subsequent reload does not duplicate it.
+        """
+        if self._remove_provider is not None:
+            self._remove_provider()
+            self._remove_provider = None
+
+        for pipeline in self.voice_pipelines.values():
+            task = pipeline.get("task")
+            if task is not None and not task.done():
+                task.cancel()
+
+        self.voice_pipelines.clear()
+        self.webrtc_futures.clear()
+        self.webrtc_send_message_callbacks.clear()
+        self.session_to_stream_map.clear()
+        self.pending_candidates.clear()
+        self.snapshot_futures.clear()
+        self.active_ws_connections.clear()
+        self.media_players.clear()
+        self.assist_satellites.clear()
 
     @property
     def domain(self) -> str:
@@ -109,7 +140,10 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
 
     async def async_broadcast_message(self, msg: dict) -> None:
         """Broadcast a structured JSON message to all connected clients."""
-        for stream_name, ws_connection in self.active_ws_connections.items():
+        # Snapshot the dict before iterating: ``send_message`` may
+        # synchronously trigger a disconnect callback that mutates
+        # ``active_ws_connections``.
+        for stream_name, ws_connection in list(self.active_ws_connections.items()):
             _LOGGER.debug(
                 "Broadcasting message to stream '%s': %s",
                 stream_name,
@@ -118,7 +152,7 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
             ws_connection.send_message(msg)
 
     async def async_send_system_command(
-        self, stream_id: str, command: str, new_ip: str = None
+        self, stream_id: str, command: str, new_ip: str | None = None
     ) -> None:
         """Send a system command like 'restart' to a specific Habitron client."""
         ws_connection = self.active_ws_connections.get(stream_id)
@@ -302,20 +336,23 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
             device_id: str | None,
             satellite_id: str | None,
             tts_voice: str | None,
+            audio_queue: asyncio.Queue[bytes | None],
+            playback_finished_event: asyncio.Event,
         ) -> None:
-            """Start and manage the Assist pipeline for incoming audio."""
+            """Start and manage the Assist pipeline for incoming audio.
+
+            ``audio_queue``, ``playback_finished_event`` and the task
+            handle are created by the caller *before* this coroutine is
+            scheduled and inserted into ``voice_pipelines`` atomically.
+            That avoids losing the task handle if the coroutine raises
+            before reaching this point, and gives ``handle_voice_audio_chunk``
+            a queue to drop into even on the very first chunk.
+            """
             _LOGGER.info(
                 "Starting manual voice pipeline for stream '%s' with pipeline_id: %s",
                 stream_name,
                 pipeline_id,
             )
-            audio_queue: asyncio.Queue[bytes | None] = asyncio.Queue()
-            playback_finished_event = asyncio.Event()
-            self.voice_pipelines[stream_name] = {
-                "queue": audio_queue,
-                "task": asyncio.current_task(),  # Store reference to this task
-                "playback_event": playback_finished_event,
-            }
 
             # Set satellite state to LISTENING immediately
             satellite = self.assist_satellites.get(stream_name)
@@ -621,10 +658,14 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
                     stream_name,
                 )
 
-            # Get the context from the WebSocket message
+            # Prepare per-pipeline state and start the task atomically:
+            # we want voice_pipelines[stream_name] to be visible to the
+            # first ``handle_voice_audio_chunk`` call, even if it arrives
+            # before the task body runs.
             context = connection.context(msg)
-            # Create a new task to run the pipeline
-            asyncio.create_task(  # Use create_task to run concurrently  # noqa: RUF006
+            audio_queue: asyncio.Queue[bytes | None] = asyncio.Queue()
+            playback_finished_event = asyncio.Event()
+            task = self.hass.async_create_background_task(
                 _run_voice_pipeline(
                     connection,
                     stream_name,
@@ -633,8 +674,16 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
                     device_id,
                     satellite_id,
                     tts_voice,
-                )
+                    audio_queue,
+                    playback_finished_event,
+                ),
+                name=f"habitron_voice_pipeline_{stream_name}",
             )
+            self.voice_pipelines[stream_name] = {
+                "queue": audio_queue,
+                "task": task,
+                "playback_event": playback_finished_event,
+            }
             # Send result back to client immediately to confirm start request received
             connection.send_result(msg["id"])
 

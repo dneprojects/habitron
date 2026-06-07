@@ -5,7 +5,6 @@ from __future__ import annotations
 from enum import Enum
 
 from homeassistant.components.select import SelectEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -16,6 +15,7 @@ from homeassistant.helpers.update_coordinator import (
 )
 
 from .const import DOMAIN
+from .coordinator import HabitronConfigEntry
 from .module import HbtnModule
 from .router import AlarmMode, DaytimeMode, HbtnRouter
 from .smart_hub import LoggingLevels
@@ -23,13 +23,13 @@ from .smart_hub import LoggingLevels
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: HabitronConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Add input_select for passed config_entry in HA."""
-    hbtn_rt: HbtnRouter = hass.data[DOMAIN][entry.entry_id].router
+    hbtn_rt: HbtnRouter = entry.runtime_data.router
     hbtn_cord: DataUpdateCoordinator = hbtn_rt.coord
-    smhub = hass.data[DOMAIN][entry.entry_id]
+    smhub = entry.runtime_data
 
     new_devices = []
     for hbt_module in hbtn_rt.modules:
@@ -68,7 +68,6 @@ async def async_setup_entry(
     # If you do not want to retry setup on failure, use
     # coordinator.async_refresh() instead
     if new_devices:
-        await hbtn_cord.async_config_entry_first_refresh()
         async_add_entities(new_devices)
 
 
@@ -76,7 +75,6 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
     """Representation of a input select for Habitron modes."""
 
     _attr_has_entity_name = True
-    _attr_should_poll = True  # for poll updates
 
     def __init__(
         self,
@@ -296,8 +294,6 @@ class HbtnSelectGroupMode(HbtnMode):
 class HbtnSelectDaytimeModePush(HbtnSelectDaytimeMode):
     """Push version of group mode object."""
 
-    _attr_should_poll = False  # for push updates
-
     async def async_added_to_hass(self) -> None:
         """Run when this Entity has been added to HA."""
         await super().async_added_to_hass()
@@ -320,8 +316,6 @@ class HbtnSelectDaytimeModePush(HbtnSelectDaytimeMode):
 class HbtnSelectAlarmModePush(HbtnSelectAlarmMode):
     """Push version of group mode object."""
 
-    _attr_should_poll = False  # for push updates
-
     async def async_added_to_hass(self) -> None:
         """Run when this Entity has been added to HA."""
         await super().async_added_to_hass()
@@ -343,8 +337,6 @@ class HbtnSelectAlarmModePush(HbtnSelectAlarmMode):
 
 class HbtnSelectGroupModePush(HbtnSelectGroupMode):
     """Push version of group mode object."""
-
-    _attr_should_poll = False  # for push updates
 
     async def async_added_to_hass(self) -> None:
         """Run when this Entity has been added to HA."""
@@ -369,7 +361,6 @@ class HbtnSelectLoggingLevel(CoordinatorEntity, SelectEntity):
     """Logging level object."""
 
     _attr_has_entity_name = True
-    _attr_should_poll = True  # for push updates
 
     def __init__(self, smhub, level, coord, idx) -> None:
         """Initialize a Habitron mode, pass coordinator to CoordinatorEntity."""

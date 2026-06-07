@@ -3,23 +3,24 @@
 from __future__ import annotations
 
 from homeassistant.components.button import ButtonEntity
-from homeassistant.config_entries import _LOGGER, ConfigEntry
+from homeassistant.config_entries import _LOGGER
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
+from .coordinator import HabitronConfigEntry
 from .router import HbtnRouter
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: HabitronConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Add button for passed config_entry in HA."""
-    hbtn_rt: HbtnRouter = hass.data[DOMAIN][entry.entry_id].router
+    hbtn_rt: HbtnRouter = entry.runtime_data.router
 
     new_devices = []
 
@@ -143,6 +144,7 @@ class RestartButton(ButtonEntity):
     """Representation of a button to trigger a router restart command."""
 
     _attr_has_entity_name = True
+    _attr_translation_key = "module_reset"
 
     def __init__(self, module) -> None:
         """Initialize an restart button."""
@@ -151,7 +153,6 @@ class RestartButton(ButtonEntity):
         self._attr_unique_id = f"Mod_{self._module.uid}_{self._name}"
         self._attr_name = "Reset"
         self._attr_entity_category = EntityCategory.CONFIG
-        self._attr_icon = "mdi:restart"
 
     # To link this entity to its device, this property must return an
     # identifiers value matching that used in the module
@@ -169,6 +170,7 @@ class RestartFwdTableButton(ButtonEntity):
     """Representation of a button to trigger a router forward table restart command."""
 
     _attr_has_entity_name = True
+    _attr_translation_key = "restart_fwd_table"
 
     def __init__(self, module) -> None:
         """Initialize an restart button."""
@@ -177,7 +179,6 @@ class RestartFwdTableButton(ButtonEntity):
         self._attr_unique_id = f"Mod_{self._module.uid}_{self._name}"
         self._attr_name = "Restart Forward Table"
         self._attr_entity_category = EntityCategory.CONFIG
-        self._attr_icon = "mdi:restore"
 
     # To link this entity to its device, this property must return an
     # identifiers value matching that used in the module
@@ -195,6 +196,7 @@ class RestartAllButton(ButtonEntity):
     """Representation of a button to trigger a all modules restart command."""
 
     _attr_has_entity_name = True
+    _attr_translation_key = "router_reset_all"
 
     def __init__(self, router) -> None:
         """Initialize restart all button."""
@@ -203,7 +205,6 @@ class RestartAllButton(ButtonEntity):
         self._attr_unique_id = f"Rt_{self._router.uid}_{self._name}"
         self._attr_name = "Reset all modules"
         self._attr_entity_category = EntityCategory.CONFIG
-        self._attr_icon = "mdi:restart"
 
     # To link this entity to its device, this property must return an
     # identifiers value matching that used in the router
@@ -221,6 +222,7 @@ class RestartHubButton(ButtonEntity):
     """Representation of a button to trigger a hub restart."""
 
     _attr_has_entity_name = True
+    _attr_translation_key = "hub_restart"
 
     def __init__(self, router) -> None:
         """Initialize an hub restart button."""
@@ -229,7 +231,6 @@ class RestartHubButton(ButtonEntity):
         self._attr_unique_id = f"Hub_{self._router.b_uid}_{self._name}"
         self._attr_name = "Restart Hub"
         self._attr_entity_category = EntityCategory.CONFIG
-        self._attr_icon = "mdi:restart"
 
     # To link this entity to its device, this property must return an
     # identifiers value matching that used in the module
@@ -247,6 +248,7 @@ class RebootHubButton(ButtonEntity):
     """Representation of a button to trigger a hub reboot."""
 
     _attr_has_entity_name = True
+    _attr_translation_key = "hub_reboot"
 
     def __init__(self, router) -> None:
         """Initialize an hub reboot button."""
@@ -255,7 +257,6 @@ class RebootHubButton(ButtonEntity):
         self._attr_unique_id = f"Hub_{self._router.b_uid}_{self._name}"
         self._attr_name = "Reboot Hub"
         self._attr_entity_category = EntityCategory.CONFIG
-        self._attr_icon = "mdi:restart-alert"
 
     # To link this entity to its device, this property must return an
     # identifiers value matching that used in the module
@@ -273,6 +274,7 @@ class CountUpButton(ButtonEntity):
     """Representation of a button to trigger a counter increment command."""
 
     _attr_has_entity_name = True
+    _attr_translation_key = "count_up"
 
     def __init__(self, counter, module) -> None:
         """Initialize an Count button."""
@@ -280,7 +282,6 @@ class CountUpButton(ButtonEntity):
         self._nmbr = counter.nmbr + 1
         self._attr_name = f"Count up {self._nmbr}: {counter.name}"
         self._attr_unique_id = f"Mod_{module.uid}_cntup{self._nmbr}"
-        self._attr_icon = "mdi:chevron-up-box-outline"
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -303,6 +304,7 @@ class CountDownButton(ButtonEntity):
     """Representation of a button to trigger a counter increment command."""
 
     _attr_has_entity_name = True
+    _attr_translation_key = "count_down"
 
     def __init__(self, counter, module) -> None:
         """Initialize an Count button."""
@@ -310,7 +312,6 @@ class CountDownButton(ButtonEntity):
         self._nmbr = counter.nmbr + 1
         self._attr_name = f"Count down {self._nmbr}: {counter.name}"
         self._attr_unique_id = f"Mod_{module.uid}_cntdown{self._nmbr}"
-        self._attr_icon = "mdi:chevron-down-box-outline"
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -333,6 +334,7 @@ class ResetChannelPowerButton(ButtonEntity):
     """Representation of a button to trigger a power cycle on a router channel."""
 
     _attr_has_entity_name = True
+    _attr_translation_key = "power_cycle"
 
     def __init__(self, router, channel) -> None:
         """Initialize an Power Cycle button."""
@@ -340,7 +342,6 @@ class ResetChannelPowerButton(ButtonEntity):
         self._chan = channel
         self._attr_name = f"Power cycle router channel {self._chan}"
         self._attr_unique_id = f"Rt_{router.uid}_powcyc{self._chan}"
-        self._attr_icon = "mdi:backup-restore"
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -361,6 +362,7 @@ class SpeechButton(ButtonEntity):
     """Representation of a button to trigger a speech command."""
 
     _attr_has_entity_name = True
+    _attr_translation_key = "voice_input"
 
     def __init__(self, module) -> None:
         """Initialize a speech button."""
@@ -371,7 +373,6 @@ class SpeechButton(ButtonEntity):
         self._active_ws_connections = self._provider.active_ws_connections
         self._attr_unique_id = f"Mod_{self._module.uid}_{self._name}"
         self._attr_name = "Activate voice input"
-        self._attr_icon = "mdi:account-voice"
 
     # To link this entity to its device, this property must return an
     # identifiers value matching that used in the module

@@ -4,21 +4,21 @@ from __future__ import annotations
 
 # Import the device class from the component that you want to support
 from homeassistant.components.notify import NotifyEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
+from .coordinator import HabitronConfigEntry
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: HabitronConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Add event entities for Habitron system."""
-    hbtn_rt = hass.data[DOMAIN][entry.entry_id].router
+    hbtn_rt = entry.runtime_data.router
     new_devices = []
     for hbt_module in hbtn_rt.modules:
         if hbt_module.typ in [b"\x01\x02", b"\x01\x03", b"\x32\x01"]:

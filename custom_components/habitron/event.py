@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from homeassistant.components.event import EventDeviceClass, EventEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
+from .coordinator import HabitronConfigEntry
 
 # Import the device class from the component that you want to support
 from .interfaces import AreaDescriptor
@@ -17,11 +17,11 @@ from .interfaces import AreaDescriptor
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: HabitronConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Add event entities for Habitron system."""
-    hbtn_rt = hass.data[DOMAIN][entry.entry_id].router
+    hbtn_rt = entry.runtime_data.router
     hbtn_cord = hbtn_rt.coord
 
     new_devices = []
@@ -56,8 +56,6 @@ async def async_setup_entry(
                 )
 
     if new_devices:
-        await hbtn_cord.async_config_entry_first_refresh()
-        hbtn_cord.data = new_devices
         async_add_entities(new_devices)
 
     registry: er.EntityRegistry = er.async_get(hass)
@@ -114,6 +112,7 @@ class HbtnEvent(EventEntity):
 
     async def async_added_to_hass(self) -> None:
         """Register callbacks for input update."""
+        await super().async_added_to_hass()
         self._if.register_callback(self._async_handle_event)
 
     async def async_will_remove_from_hass(self) -> None:

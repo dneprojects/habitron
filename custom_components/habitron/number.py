@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from homeassistant.components.number import NumberDeviceClass, NumberEntity
 from homeassistant.components.number.const import NumberMode
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -15,6 +14,7 @@ from homeassistant.helpers.update_coordinator import (
 )
 
 from .const import DOMAIN
+from .coordinator import HabitronConfigEntry
 from .interfaces import AreaDescriptor, IfDescriptor
 from .module import HbtnModule
 from .router import HbtnRouter
@@ -22,11 +22,11 @@ from .router import HbtnRouter
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: HabitronConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Add input_number for passed config_entry in HA."""
-    hbtn_rt: HbtnRouter = hass.data[DOMAIN][entry.entry_id].router
+    hbtn_rt: HbtnRouter = entry.runtime_data.router
     hbtn_cord = hbtn_rt.coord
 
     new_devices = []
@@ -44,7 +44,6 @@ async def async_setup_entry(
                 )
 
     if new_devices:
-        await hbtn_cord.async_config_entry_first_refresh()
         async_add_entities(new_devices)
 
     registry: er.EntityRegistry = er.async_get(hass)
@@ -125,6 +124,7 @@ class HbtnAnalogOutput(CoordinatorEntity, NumberEntity):
     _attr_device_class = NumberDeviceClass.VOLTAGE
     _attr_native_max_value = 100.0
     _attr_native_min_value = 0.0
+    _attr_translation_key = "analog_output"
     _attr_native_step = 1
     _attr_mode = NumberMode.BOX
 
@@ -162,11 +162,6 @@ class HbtnAnalogOutput(CoordinatorEntity, NumberEntity):
     def name(self) -> str | None:
         """Return the display name of this number."""
         return self._attr_name
-
-    @property
-    def icon(self) -> str:
-        """Icon of the analog out."""
-        return "mdi:sine-wave"
 
     @callback
     def _handle_coordinator_update(self) -> None:
