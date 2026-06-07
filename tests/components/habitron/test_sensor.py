@@ -198,3 +198,216 @@ async def test_sensor_platform_setup(
     # The router fixture starts with no modules so no entities are
     # added — but the setup must still complete without exception.
     assert setup_integration.runtime_data is not None
+
+
+# ---------- Additional tests for non-described sensor classes ----------
+
+
+from custom_components.habitron.sensor import (  # noqa: E402
+    AnalogSensor,
+    EKeySensorFngr,
+    EKeySensorId,
+    FrequencySensor,
+    HbtnDiagSensor,
+    HbtnSensor,
+    LogicSensor,
+    PercSensor,
+    StatusSensor,
+    TemperatureDSensor,
+    TemperatureSensor,
+)
+
+
+def _make_hbtnsensor_module() -> MagicMock:
+    """Build a fuller stub module with all sensor source lists populated."""
+    mod = _make_module()
+    mod.sensors[0] = _make_value(23.5)
+    mod.analogins[0] = _make_value(75)
+    mod.logic = {0: _make_value(42)}
+    mod.diags = {0: _make_value(99.9)}
+    return mod
+
+
+def test_hbtnsensor_base_init_and_update() -> None:
+    """Base HbtnSensor stores module, unique_id, name and reads from sensors."""
+    mod = _make_hbtnsensor_module()
+    desc = _make_sensor_descriptor(name="Temperature", type_=1)
+    coord = MagicMock(spec=DataUpdateCoordinator)
+    entity = HbtnSensor(mod, desc, coord, 5)
+    entity.async_write_ha_state = MagicMock()
+    assert entity.unique_id == "Mod_MOD-1_snsr0"
+    assert entity.name == "Temperature"
+    assert entity._attr_state_class is SensorStateClass.MEASUREMENT
+    entity._handle_coordinator_update()
+    assert entity._attr_native_value == 23.5
+
+
+def test_temperature_sensor_disables_temperature_ext() -> None:
+    """A ``Temperature ext.`` sensor is disabled by default."""
+    mod = _make_hbtnsensor_module()
+    desc = _make_sensor_descriptor(name="Temperature ext.")
+    coord = MagicMock(spec=DataUpdateCoordinator)
+    entity = TemperatureSensor(mod, desc, coord, 0)
+    assert entity._attr_entity_registry_enabled_default is False
+    assert entity._attr_device_class is SensorDeviceClass.TEMPERATURE
+
+
+def test_temperature_sensor_normal_stays_enabled() -> None:
+    """A regular temperature sensor stays enabled by default."""
+    mod = _make_hbtnsensor_module()
+    desc = _make_sensor_descriptor(name="Temperature")
+    coord = MagicMock(spec=DataUpdateCoordinator)
+    entity = TemperatureSensor(mod, desc, coord, 0)
+    assert getattr(entity, "_attr_entity_registry_enabled_default", True) is not False
+
+
+def test_analog_sensor_unique_id_and_value() -> None:
+    """AnalogSensor uses an adin-prefixed unique id and reads analogins."""
+    mod = _make_hbtnsensor_module()
+    desc = _make_sensor_descriptor(name="Analog 1")
+    coord = MagicMock(spec=DataUpdateCoordinator)
+    entity = AnalogSensor(mod, desc, coord, 0)
+    entity.async_write_ha_state = MagicMock()
+    assert entity.unique_id == "Mod_MOD-1_adin0"
+    entity._handle_coordinator_update()
+    assert entity._attr_native_value == 75
+
+
+def test_ekey_sensor_id_unique_id_and_passthrough() -> None:
+    """EKeySensorId is a simple sensor exposing the raw identifier value."""
+    mod = _make_hbtnsensor_module()
+    desc = _make_sensor_descriptor(name="Identifier")
+    coord = MagicMock(spec=DataUpdateCoordinator)
+    entity = EKeySensorId(mod, desc, coord, 0)
+    entity.async_write_ha_state = MagicMock()
+    assert entity.unique_id == "Mod_MOD-1_ekey_ident"
+    assert entity._attr_name == "Identifier Value"
+    entity._handle_coordinator_update()
+    assert entity._attr_native_value == 23.5
+
+
+def test_ekey_sensor_fngr_unique_id_and_passthrough() -> None:
+    """EKeySensorFngr exposes the raw finger value via the base updater."""
+    mod = _make_hbtnsensor_module()
+    desc = _make_sensor_descriptor(name="Finger")
+    coord = MagicMock(spec=DataUpdateCoordinator)
+    entity = EKeySensorFngr(mod, desc, coord, 0)
+    entity.async_write_ha_state = MagicMock()
+    assert entity.unique_id == "Mod_MOD-1_ekey_fngr"
+    assert entity._attr_name == "Finger Value"
+    entity._handle_coordinator_update()
+    assert entity._attr_native_value == 23.5
+
+
+def test_hbtn_diag_sensor_disabled_by_default() -> None:
+    """HbtnDiagSensor entities are diagnostic and disabled by default."""
+    mod = _make_hbtnsensor_module()
+    diag = _make_sensor_descriptor(name="CPU")
+    coord = MagicMock(spec=DataUpdateCoordinator)
+    entity = HbtnDiagSensor(mod, diag, coord, 0)
+    entity.async_write_ha_state = MagicMock()
+    assert entity._attr_entity_registry_enabled_default is False
+    entity._handle_coordinator_update()
+    assert entity._attr_native_value == 99.9
+
+
+def test_temperature_d_sensor_attributes() -> None:
+    """TemperatureDSensor is a Celsius diagnostic temperature."""
+    mod = _make_hbtnsensor_module()
+    diag = _make_sensor_descriptor(name="PowerTemp")
+    coord = MagicMock(spec=DataUpdateCoordinator)
+    entity = TemperatureDSensor(mod, diag, coord, 0)
+    assert entity._attr_device_class is SensorDeviceClass.TEMPERATURE
+    assert entity.unique_id == "Mod_MOD-1_PowerTemp"
+
+
+def test_status_sensor_icon_flips_on_value() -> None:
+    """StatusSensor toggles its icon based on the value."""
+    mod = _make_hbtnsensor_module()
+    diag = _make_sensor_descriptor(name="Status")
+    coord = MagicMock(spec=DataUpdateCoordinator)
+    entity = StatusSensor(mod, diag, coord, 0)
+    entity.async_write_ha_state = MagicMock()
+    # value > 0 → disconnect icon
+    mod.diags[0].value = 1
+    entity._handle_coordinator_update()
+    assert entity._attr_icon == "mdi:lan-disconnect"
+    # value 0 → check icon
+    mod.diags[0].value = 0
+    entity._handle_coordinator_update()
+    assert entity._attr_icon == "mdi:lan-check"
+
+
+def test_logic_sensor_unique_id_and_update() -> None:
+    """LogicSensor reads from module.logic and unique-ids itself."""
+    mod = _make_hbtnsensor_module()
+    logic_desc = MagicMock()
+    logic_desc.nmbr = 0
+    logic_desc.idx = 0
+    logic_desc.name = "Counter"
+    logic_desc.type = 5
+    coord = MagicMock(spec=DataUpdateCoordinator)
+    entity = LogicSensor(mod, logic_desc, coord, 0)
+    entity.async_write_ha_state = MagicMock()
+    assert entity.unique_id == "Mod_MOD-1_logic0"
+    assert entity._attr_name == "Cnt1: Counter"
+    entity._handle_coordinator_update()
+    assert entity._attr_native_value == 42
+
+
+@pytest.mark.parametrize(
+    ("name", "expected_icon"),
+    [
+        ("memory usage", "mdi:memory"),
+        ("disk usage", "mdi:harddisk"),
+        ("cpu load", "mdi:timer-alert-outline"),
+        ("some other", "mdi:percent-circle-outline"),
+    ],
+)
+def test_perc_sensor_icon_by_name(name: str, expected_icon: str) -> None:
+    """PercSensor picks an icon based on its name prefix."""
+    mod = _make_hbtnsensor_module()
+    desc = _make_sensor_descriptor(name=name, type_=1)
+    coord = MagicMock(spec=DataUpdateCoordinator)
+    entity = PercSensor(mod, desc, coord, 0)
+    assert entity._attr_icon == expected_icon
+
+
+def test_perc_sensor_diag_branch() -> None:
+    """A diagnostic PercSensor reads from diags rather than sensors."""
+    mod = _make_hbtnsensor_module()
+    desc = _make_sensor_descriptor(name="cpu load", type_=TYPE_DIAG)
+    coord = MagicMock(spec=DataUpdateCoordinator)
+    entity = PercSensor(mod, desc, coord, 0)
+    entity.async_write_ha_state = MagicMock()
+    assert entity._attr_entity_category is not None
+    entity._handle_coordinator_update()
+    assert entity._attr_native_value == 99.9
+
+
+@pytest.mark.parametrize(
+    ("name", "expected_icon"),
+    [
+        ("cpu frequency", "mdi:clock-fast"),
+        ("zigbee", "mdi:sine-wave"),
+    ],
+)
+def test_frequency_sensor_icon_by_name(name: str, expected_icon: str) -> None:
+    """FrequencySensor picks an icon based on its name."""
+    mod = _make_hbtnsensor_module()
+    desc = _make_sensor_descriptor(name=name, type_=1)
+    coord = MagicMock(spec=DataUpdateCoordinator)
+    entity = FrequencySensor(mod, desc, coord, 0)
+    assert entity._attr_icon == expected_icon
+    assert entity._attr_device_class is SensorDeviceClass.FREQUENCY
+
+
+def test_frequency_sensor_diag_branch() -> None:
+    """A diagnostic FrequencySensor reads from diags rather than sensors."""
+    mod = _make_hbtnsensor_module()
+    desc = _make_sensor_descriptor(name="cpu frequency", type_=TYPE_DIAG)
+    coord = MagicMock(spec=DataUpdateCoordinator)
+    entity = FrequencySensor(mod, desc, coord, 0)
+    entity.async_write_ha_state = MagicMock()
+    entity._handle_coordinator_update()
+    assert entity._attr_native_value == 99.9
