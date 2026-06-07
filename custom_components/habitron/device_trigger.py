@@ -1,11 +1,18 @@
 """Provide device triggers for Habitron integration."""
 
+from __future__ import annotations
+
+from typing import Any
+
 import voluptuous as vol
 
 from homeassistant.components.device_automation import DEVICE_TRIGGER_BASE_SCHEMA
-from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
+from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
 from homeassistant.helpers import config_validation as cv, entity_registry as er
-from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.helpers.event import (
+    EventStateChangedData,
+    async_track_state_change_event,
+)
 from homeassistant.helpers.trigger import TriggerActionType, TriggerInfo
 from homeassistant.helpers.typing import ConfigType
 
@@ -27,7 +34,7 @@ async def async_get_triggers(
     entity_registry = er.async_get(hass)
     device_entries = er.async_entries_for_device(entity_registry, device_id)
 
-    triggers = []
+    triggers: list[dict[str, str]] = []
 
     for entry in device_entries:
         if entry.domain != "event":
@@ -67,7 +74,9 @@ async def async_attach_trigger(
 
     # Use native state event listener to catch all fast changes
     @callback
-    async def filter_event_type_action(event):
+    async def filter_event_type_action(
+        event: Event[EventStateChangedData],
+    ) -> None:
         """Filter the state change by event_type attribute."""
         new_state = event.data.get("new_state")
         old_state = event.data.get("old_state")
@@ -82,25 +91,23 @@ async def async_attach_trigger(
         # Only execute if the event_type matches our selected UI trigger
         if new_event_type == trigger_type and new_event_type != old_event_type:
             # Build variables payload for automation execution
-            variables = {
-                "trigger": {
-                    "platform": "device",
-                    "domain": DOMAIN,
-                    "device_id": config["device_id"],
-                    "entity_id": entity_id,
-                    "type": trigger_type,
-                    "description": f"habitron event {trigger_type}",
-                }
+            trigger_payload: dict[str, Any] = {
+                "platform": "device",
+                "domain": DOMAIN,
+                "device_id": config["device_id"],
+                "entity_id": entity_id,
+                "type": trigger_type,
+                "description": f"habitron event {trigger_type}",
             }
 
-            # Map optional trigger info properties
-            if "id" in trigger_info:
-                variables["trigger"]["id"] = trigger_info["id"]
-            if "idx" in trigger_info:
-                variables["trigger"]["idx"] = trigger_info["idx"]
-            if "alias" in trigger_info:
-                variables["trigger"]["alias"] = trigger_info["alias"]
+            # Forward the upstream trigger-data identifiers if present.
+            trigger_data = trigger_info["trigger_data"]
+            trigger_payload["id"] = trigger_data["id"]
+            trigger_payload["idx"] = trigger_data["idx"]
+            if trigger_data["alias"] is not None:
+                trigger_payload["alias"] = trigger_data["alias"]
 
+            variables = {"trigger": trigger_payload}
             await action(variables, context=event.context)
 
     # Attach the state trigger using our filter callback directly on the event bus

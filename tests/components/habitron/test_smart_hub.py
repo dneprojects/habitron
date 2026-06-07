@@ -234,9 +234,9 @@ async def test_get_version_returns_zero_default_when_marker_missing(
 
 
 async def test_restart_forwards_to_comm(smart_hub_stub: SmartHub) -> None:
-    """restart(rt_id) forwards the call to ``comm.hub_restart``."""
+    """``restart`` accepts a router id (forward-compat) but forwards a no-arg call."""
     await smart_hub_stub.restart(7)
-    smart_hub_stub.comm.hub_restart.assert_awaited_with(7)
+    smart_hub_stub.comm.hub_restart.assert_awaited_with()
 
 
 async def test_reboot_forwards_to_comm(smart_hub_stub: SmartHub) -> None:
