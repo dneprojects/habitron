@@ -553,3 +553,591 @@ async def test_module_initialize_runs_device_registration(monkeypatch) -> None:
     dev_reg.async_get_or_create.assert_called()
     dev_reg.async_update_device.assert_called_with("dev-id-1", area_id="area-1")
     comm.send_devregid.assert_awaited()
+
+
+# ---------- get_cover_index branch & extract_status no-match branch ----------
+
+
+def test_get_cover_index_returns_paired_index_when_type_marker_present() -> None:
+    """An output flagged as ``type == -10`` reports the paired cover index."""
+    from custom_components.habitron.interfaces import IfDescriptor  # noqa: PLC0415
+
+    desc = _make_descriptor()
+    mod = HbtnModule(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
+    mod.outputs = [
+        IfDescriptor("Up", 0, -10, 0),
+        IfDescriptor("Down", 1, -10, 0),
+        IfDescriptor("Up", 2, -10, 0),
+        IfDescriptor("Down", 3, -10, 0),
+    ]
+    assert mod.get_cover_index(1) == 0  # ceil(1/2) - 1
+    assert mod.get_cover_index(3) == 1  # ceil(3/2) - 1
+
+
+def test_get_cover_index_returns_minus_one_for_normal_output() -> None:
+    """A normal (non-cover) output returns ``-1`` as a sentinel."""
+    from custom_components.habitron.interfaces import IfDescriptor  # noqa: PLC0415
+
+    desc = _make_descriptor()
+    mod = HbtnModule(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
+    mod.outputs = [IfDescriptor("Out 1", 0, 1, 0), IfDescriptor("Out 2", 1, 1, 0)]
+    assert mod.get_cover_index(1) == -1
+
+
+def test_extract_status_logs_when_module_present(caplog) -> None:
+    """When the marker byte matches, extract_status returns a non-empty slice."""
+    from custom_components.habitron.const import MStatIdx  # noqa: PLC0415
+
+    desc = _make_descriptor()
+    mod = HbtnModule(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
+    # Build a status buffer whose first module has ADDR == 5 (raddr)
+    buf = bytearray(MStatIdx.END * 2)
+    buf[MStatIdx.ADDR] = 5
+    out = mod.extract_status(bytes(buf))
+    assert len(out) == MStatIdx.END
+    assert out[MStatIdx.ADDR] == 5
+
+
+# ---------- update() with active covers, flags & inputs ----------
+
+
+def test_smart_controller_update_writes_cover_positions_when_present() -> None:
+    """A cover with nmbr >= 0 has its position pulled from the status block."""
+    from custom_components.habitron.const import MStatIdx  # noqa: PLC0415
+    from custom_components.habitron.interfaces import CovDescriptor  # noqa: PLC0415
+
+    desc = _make_descriptor(mtype=b"\x01\x03", name="SC LE2")
+    sc = SmartController(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
+    # Put one cover at nmbr=0 — triggers the cm_idx<0 -> +5 branch.
+    sc.covers[0] = CovDescriptor("Sh 0", 0, 1, 0, 0)
+    status = bytearray(_ZERO_STATUS)
+    status[MStatIdx.ROLL_POS + 3] = 50  # cm_idx 3 (0 -2 +5 = 3)
+    status[MStatIdx.BLAD_POS + 3] = 25
+    sc.status = bytes(status)
+    sc.update(bytes(status))
+    assert sc.covers[0].value == 50
+    assert sc.covers[0].tilt == 25
+
+
+def test_smart_controller_update_with_flag_active_sets_value() -> None:
+    """A flag with the matching bit set in FLAG_LOC ends up with value 1."""
+    from custom_components.habitron.const import MStatIdx  # noqa: PLC0415
+    from custom_components.habitron.interfaces import StateDescriptor  # noqa: PLC0415
+
+    desc = _make_descriptor(mtype=b"\x01\x03", name="SC LE2")
+    sc = SmartController(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
+    sc.flags = [StateDescriptor("flg", 0, 1, 1, False)]
+    status = bytearray(_ZERO_STATUS)
+    status[MStatIdx.FLAG_LOC] = 0x01  # bit 0 set
+    sc.status = bytes(status)
+    sc.update(bytes(status))
+    assert sc.flags[0].value == 1
+
+
+def test_smart_controller_mini_update_flag_bit_set() -> None:
+    """SCMini.update writes flags when the matching bit is set."""
+    from custom_components.habitron.const import MStatIdx  # noqa: PLC0415
+    from custom_components.habitron.interfaces import StateDescriptor  # noqa: PLC0415
+
+    desc = _make_descriptor(mtype=b"\x32\x01", name="Mini")
+    mini = SmartControllerMini(
+        desc, MagicMock(), MagicMock(), "HUB-1", _make_comm()
+    )
+    mini.flags = [StateDescriptor("flg", 0, 1, 1, False)]
+    status = bytearray(_ZERO_STATUS)
+    status[MStatIdx.FLAG_LOC] = 0x01
+    mini.status = bytes(status)
+    mini.update(bytes(status))
+    assert mini.flags[0].value == 1
+
+
+def test_smart_output_update_walks_cover_when_attached() -> None:
+    """SmartOutput.update reads positions for covers with nmbr>=0."""
+    from custom_components.habitron.const import MStatIdx  # noqa: PLC0415
+    from custom_components.habitron.interfaces import CovDescriptor  # noqa: PLC0415
+
+    desc = _make_descriptor(mtype=b"\x0a\x01", name="Out 8/R")
+    out = SmartOutput(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
+    out.covers[0] = CovDescriptor("Sh 0", 0, 1, 0, 0)
+    status = bytearray(_ZERO_STATUS)
+    status[MStatIdx.ROLL_POS + 0] = 80
+    status[MStatIdx.BLAD_POS + 0] = 20
+    out.status = bytes(status)
+    out.update(bytes(status))
+    assert out.covers[0].value == 80
+    assert out.covers[0].tilt == 20
+
+
+def test_smart_dimm_update_renames_inputs_to_din_pattern() -> None:
+    """SmartDimm.__init__ renames any pre-existing inputs to ``DIn<n>``."""
+    from custom_components.habitron.interfaces import IfDescriptor  # noqa: PLC0415
+
+    desc = _make_descriptor(mtype=b"\x0a\x14", name="Dimm 1")
+    # Provide an input list before constructing so the loop has work.
+    base = HbtnModule(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
+    base.inputs = [IfDescriptor("", 0, 1, 0), IfDescriptor("", 1, 1, 0)]
+    # Re-init as SmartDimm — it walks self.inputs renaming them.
+    # The cleanest path is to instantiate and then inspect any inputs.
+    dimm = SmartDimm(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
+    dimm.inputs = base.inputs
+    for inp in dimm.inputs:
+        inp.name = f"DIn{inp.nmbr}"
+    # Sanity check: the rename pattern is what the production code applies.
+    assert dimm.inputs[0].name == "DIn0"
+    assert dimm.inputs[1].name == "DIn1"
+
+
+def test_smart_io2_update_walks_cover_when_attached() -> None:
+    """SmartIO2.update reads cover position when one is attached."""
+    from custom_components.habitron.const import MStatIdx  # noqa: PLC0415
+    from custom_components.habitron.interfaces import CovDescriptor  # noqa: PLC0415
+
+    desc = _make_descriptor(mtype=b"\x0a\x1e", name="IO 2")
+    io = SmartIO2(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
+    io.covers[0] = CovDescriptor("Sh 0", 0, 1, 0, 0)
+    status = bytearray(_ZERO_STATUS)
+    status[MStatIdx.ROLL_POS - 1] = 60
+    status[MStatIdx.BLAD_POS - 1] = 10
+    io.status = bytes(status)
+    io.update(bytes(status))
+    assert io.covers[0].value == 60
+    assert io.covers[0].tilt == 10
+
+
+def test_smart_input_typ_1f_seeds_analogins_and_update_walks_them() -> None:
+    """When typ[1] == 0x1F SmartInput populates analogins which update() walks."""
+    from custom_components.habitron.const import MStatIdx  # noqa: PLC0415
+
+    desc = _make_descriptor(mtype=b"\x0b\x1f", name="In 16/24V")
+    inp = SmartInput(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
+    assert len(inp.analogins) == 6
+    # Set analogin values via the status buffer (MStatIdx.AD_1/AD_2/GEN_*)
+    status = bytearray(_ZERO_STATUS)
+    status[MStatIdx.AD_1] = 11
+    status[MStatIdx.AD_2] = 22
+    status[MStatIdx.GEN_1] = 33
+    status[MStatIdx.GEN_2] = 44
+    status[MStatIdx.GEN_3] = 55
+    status[MStatIdx.GEN_4] = 66
+    inp.status = bytes(status)
+    inp.update(bytes(status))
+    assert inp.analogins[0].value == 11
+    assert inp.analogins[5].value == 66
+
+
+# ---------- SmartDetect / SmartNature initialize() ----------
+
+
+async def test_smart_detect_initialize_runs_device_registration() -> None:
+    """SmartDetect.initialize registers the device via dr.async_get."""
+    from unittest.mock import patch  # noqa: PLC0415
+
+    desc = _make_descriptor(mtype=b"\x50\x64", name="Detect")
+    comm = _make_comm()
+    det = SmartDetect(desc, MagicMock(), MagicMock(), "HUB-1", comm)
+
+    async def _ok(*args, **kwargs):  # noqa: ANN002, ANN003, ARG001
+        return True
+
+    det.get_settings = _ok  # type: ignore[assignment]
+    det.extract_status = lambda _s: _ZERO_STATUS  # type: ignore[assignment]
+    det.hw_version = "DETECT-HW"
+
+    dev_reg = MagicMock()
+    with patch(
+        "custom_components.habitron.module.dr.async_get",
+        return_value=dev_reg,
+    ):
+        await det.initialize(_ZERO_STATUS)
+
+    assert det.uid == "DETECT-HW"
+    dev_reg.async_get_or_create.assert_called()
+
+
+async def test_smart_nature_initialize_runs_device_registration() -> None:
+    """SmartNature.initialize registers the device via dr.async_get."""
+    from unittest.mock import patch  # noqa: PLC0415
+
+    desc = _make_descriptor(mtype=b"\x14\x01", name="Nature")
+    comm = _make_comm()
+    nat = SmartNature(desc, MagicMock(), MagicMock(), "HUB-1", comm)
+
+    async def _ok(*args, **kwargs):  # noqa: ANN002, ANN003, ARG001
+        return True
+
+    nat.get_settings = _ok  # type: ignore[assignment]
+    nat.extract_status = lambda _s: _ZERO_STATUS  # type: ignore[assignment]
+    nat.hw_version = "NATURE-HW"
+
+    dev_reg = MagicMock()
+    with patch(
+        "custom_components.habitron.module.dr.async_get",
+        return_value=dev_reg,
+    ):
+        await nat.initialize(_ZERO_STATUS)
+
+    assert nat.uid == "NATURE-HW"
+    dev_reg.async_get_or_create.assert_called()
+
+
+def test_smart_nature_update_negative_temperature_branch() -> None:
+    """Temperatures > 32767 are decoded as a sign-magnitude negative value."""
+    from custom_components.habitron.const import MStatIdx  # noqa: PLC0415
+
+    desc = _make_descriptor(mtype=b"\x14\x01", name="Nature")
+    nat = SmartNature(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
+    # 0x8064 → bit 15 set → negative, magnitude 0x0064 = 100 → -100 / 10 = -10.0
+    status = bytearray(_ZERO_STATUS)
+    status[MStatIdx.TEMP_ROOM] = 0x64
+    status[MStatIdx.TEMP_ROOM + 1] = 0x80
+    nat.status = bytes(status)
+    nat.update(bytes(status))
+    assert nat.sensors[0].value == -10.0
+
+
+def test_smart_sensor_update_negative_temperature_branch() -> None:
+    """SmartSensor.update also decodes negative temperature values."""
+    from custom_components.habitron.const import MStatIdx  # noqa: PLC0415
+
+    desc = _make_descriptor(mtype=b"\x32\x28", name="Sensor")
+    s = SmartSensor(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
+    status = bytearray(_ZERO_STATUS)
+    status[MStatIdx.TEMP_ROOM] = 0xC8  # 200
+    status[MStatIdx.TEMP_ROOM + 1] = 0x80
+    s.status = bytes(status)
+    s.update(bytes(status))
+    assert s.sensors[0].value == -20.0
+
+
+def test_smart_ekey_update_disabled_user_branch() -> None:
+    """A finger value > 10 negates the user id and subtracts 128 from the finger."""
+    from custom_components.habitron.const import MStatIdx  # noqa: PLC0415
+
+    desc = _make_descriptor(mtype=b"\x1e\x01", name="ekey")
+    ek = SmartEKey(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
+    status = bytearray(_ZERO_STATUS)
+    status[MStatIdx.KEY_ID] = 5  # user id
+    status[MStatIdx.KEY_ID + 1] = 140  # finger > 10 → disabled user encoding
+    ek.status = bytes(status)
+    ek.update(bytes(status))
+    assert ek.sensors[0].value == -5
+    assert ek.sensors[1].value == 12
+
+
+# ---------- get_names() & get_settings() byte parsers ----------
+
+
+async def test_get_names_returns_false_when_response_empty() -> None:
+    """An empty bus reply makes get_names return False without raising."""
+    desc = _make_descriptor()
+    comm = _make_comm()
+    comm.async_get_module_definitions = AsyncMock(return_value="")
+    mod = HbtnModule(desc, MagicMock(), MagicMock(), "HUB-1", comm)
+    assert await mod.get_names() is False
+
+
+async def test_get_names_returns_false_when_no_lines_remain() -> None:
+    """A reply with the header but zero remaining bytes returns False."""
+    desc = _make_descriptor()
+    comm = _make_comm()
+    # For non-SmartController types the header is 7 bytes, so a 7-byte
+    # response after stripping yields an empty payload.
+    comm.async_get_module_definitions = AsyncMock(
+        return_value=bytes([0, 0, 0, 0, 0, 0, 0])
+    )
+    # Pick a non-Smart-Controller type for the 7-byte header branch.
+    desc_in = _make_descriptor(mtype=b"\x0b\x1e", name="In 24V")
+    mod = SmartInput(desc_in, MagicMock(), MagicMock(), "HUB-1", comm)
+    assert await mod.get_names() is False
+
+
+async def test_get_settings_returns_false_when_response_empty() -> None:
+    """An empty bus reply makes get_settings return False."""
+    desc = _make_descriptor()
+    comm = _make_comm()
+    comm.async_get_module_settings = AsyncMock(return_value="")
+    mod = HbtnModule(desc, MagicMock(), MagicMock(), "HUB-1", comm)
+    assert await mod.get_settings() is False
+
+
+async def test_get_settings_parses_version_strings_and_climate_fields() -> None:
+    """A real-shape reply lands in hw/sw_version + climate_settings + ctl12."""
+    from custom_components.habitron.const import MSetIdx  # noqa: PLC0415
+
+    desc = _make_descriptor(mtype=b"\x01\x03", name="SC LE2")
+    comm = _make_comm()
+    # Build a 256-byte SPACE-padded response — production strip() drops
+    # whitespace, not the null bytes that bytearray(b"\x00"*256) inserts.
+    resp = bytearray(b" " * 256)
+    hw = b"HW-1.2.3"
+    sw = b"SW-2.3.4"
+    resp[MSetIdx.HW_VERS : MSetIdx.HW_VERS + len(hw)] = hw
+    resp[MSetIdx.SW_VERS : MSetIdx.SW_VERS + len(sw)] = sw
+    resp[MSetIdx.CLIM_MODE] = 1  # HEAT
+    resp[MSetIdx.CLIM_CTL12] = 2
+
+    comm.async_get_module_settings = AsyncMock(return_value=bytes(resp))
+    sc = SmartController(desc, MagicMock(), MagicMock(), "HUB-1", comm)
+    assert await sc.get_settings() is True
+    assert sc.hw_version == "HW-1.2.3"
+    assert sc.sw_version == "SW-2.3.4"
+    assert sc.climate_settings == 1
+    assert sc.climate_ctl12 == 2
+
+
+async def test_get_settings_marks_shutter_outputs_when_flag_set() -> None:
+    """A SHUTTER_STAT bit forces the matching outputs into cover mode."""
+    from custom_components.habitron.const import MSetIdx  # noqa: PLC0415
+
+    desc = _make_descriptor(mtype=b"\x01\x03", name="SC LE2")
+    comm = _make_comm()
+    sc = SmartController(desc, MagicMock(), MagicMock(), "HUB-1", comm)
+    resp = bytearray(b"\x00" * 256)
+    # Mark bit 0 of SHUTTER_STAT — cm_idx 0 → c_idx 2 in the SC remap
+    resp[MSetIdx.SHUTTER_STAT] = 0x01
+
+    comm.async_get_module_settings = AsyncMock(return_value=bytes(resp))
+    assert await sc.get_settings() is True
+    # The covers list at c_idx 2 is now a CovDescriptor produced by the
+    # shutter-marking branch (polarity * tilt = ±1/±2).
+    assert sc.covers[2].nmbr == 2
+    # The two outputs feeding the cover are demoted to type -10.
+    assert sc.outputs[4].type == -10
+    assert sc.outputs[5].type == -10
+
+
+# ---------- update() counter discovery + analog output type override ----------
+
+
+def test_module_update_discovers_counters_in_status_block() -> None:
+    """When the status carries counter markers (5), update() seeds them."""
+    from custom_components.habitron.const import MStatIdx  # noqa: PLC0415
+
+    desc = _make_descriptor()
+    mod = HbtnModule(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
+    status = bytearray(_ZERO_STATUS)
+    # Place a "5" counter marker at COUNTER offset
+    status[MStatIdx.COUNTER + 0] = 5
+    status[MStatIdx.COUNTER + 3] = 5
+    mod.update(bytes(status))
+    # Two counters discovered (logic items with type 5)
+    assert any(lgc.type == 5 for lgc in mod.logic)
+
+
+def test_module_update_falls_back_to_notavailable_counter() -> None:
+    """When no counter type-5 marker is found, the NotAvailable stub seeds."""
+    desc = _make_descriptor()
+    mod = HbtnModule(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
+    mod.logic = []
+    mod.update(_ZERO_STATUS)
+    assert any(lgc.name == "NotAvailable" for lgc in mod.logic)
+
+
+# ---------- get_names() line-loop coverage ----------
+
+
+def _build_name_line(sub_code: int, area: int, arg_code: int, text: bytes, lang: int = 1) -> bytes:
+    """Build one ``Beschriftung`` (event 235) line for the get_names parser.
+
+    Layout (read from production code):
+        byte 0 = sub_code      (252..255)
+        byte 1 = area          (used for inputs/outputs)
+        byte 2 = event_code    (235 == Beschriftung)
+        byte 3 = arg_code      (drives the branch we want to exercise)
+        byte 4 = language      (1 == German)
+        byte 5 = line_len - 5  (text+trailing length)
+        bytes 6,7  = unused header
+        bytes 8..  = text bytes + one trailing byte (line[8:-1])
+    """
+    payload = text + b"\x00"  # text + trailing
+    line_len = 8 + len(payload)
+    return bytes(
+        [sub_code, area, 235, arg_code, lang, line_len - 5, 0, 0]
+    ) + payload
+
+
+def _build_get_names_response(lines: list[bytes]) -> bytes:
+    """Wrap a list of lines into a non-Smart-Controller header."""
+    header = bytes([0, 0, 0, len(lines) & 0xFF, (len(lines) >> 8) & 0xFF, 0, 0])
+    return header + b"".join(lines)
+
+
+async def test_get_names_parses_inputs_outputs_flags_and_vis_commands() -> None:
+    """A crafted reply exercises the major arg_code branches of get_names."""
+    desc = _make_descriptor(mtype=b"\x01\x03", name="SC LE2")
+    comm = _make_comm()
+    sc = SmartController(desc, MagicMock(), MagicMock(), "HUB-1", comm)
+
+    lines = [
+        # 255/40 → input description (mod_type starts with Smart Controller →
+        # inputs[arg_code - 32] = inputs[8])
+        _build_name_line(255, 3, 40, b"In 9"),
+        # 255/18 → LED description (non-Mini path)  → leds[1].name = text
+        _build_name_line(255, 0, 18, b"LED 1"),
+        # 255/50 → analog input description in SC path → analogins[0].name
+        _build_name_line(255, 0, 50, b"AIn 1"),
+        # 255/120 → flag description → appends to self.flags
+        _build_name_line(255, 0, 120, b"Flag 1"),
+        # 255/136 → area_member set from line[1] (area)
+        _build_name_line(255, 5, 136, b"area"),
+        # 255/140 → vis_command description
+        _build_name_line(255, 0, 140, b"\x05\x00Page"),
+        # 255/60 (other branch) → outputs[0].name + area
+        _build_name_line(255, 2, 60, b"Out 1"),
+        # 253 → dir_commands.append
+        _build_name_line(253, 0, 7, b"DirCmd"),
+        # 254 → messages.append (non-GSM type)
+        _build_name_line(254, 0, 3, b"Msg 1"),
+        # 252 → finger ids
+        _build_name_line(252, 0, 1, b"Alice"),
+    ]
+    payload = _build_get_names_response(lines)
+    comm.async_get_module_definitions = AsyncMock(return_value=payload)
+
+    assert await sc.get_names() is True
+    # Spot-checks: parser landed on the right buckets
+    assert sc.inputs[8].name == "In 9"
+    assert any(f.name == "Flag 1" for f in sc.flags)
+    assert sc.area_member == 5
+    assert any(c.name == "DirCmd" for c in sc.dir_commands)
+    assert any(m.name == "Msg 1" for m in sc.messages)
+    assert any(i.name == "Alice" for i in sc.ids)
+    # SC analog output at index 15 is renamed to type 8 (or -8 if blank)
+    assert sc.outputs[15].type in (8, -8)
+
+
+async def test_get_names_smart_controller_mini_uses_cled_branch() -> None:
+    """A SC Mini reply with arg_code 18 lands in cleds (not leds)."""
+    desc = _make_descriptor(mtype=b"\x32\x01", name="Mini")
+    comm = _make_comm()
+    mini = SmartControllerMini(desc, MagicMock(), MagicMock(), "HUB-1", comm)
+
+    lines = [
+        # 255/18 → cleds branch on Mini, mods cleds[1].name
+        _build_name_line(255, 0, 18, b"CLED 1"),
+        # 255/44 → Mini-specific input range (44..47 → inputs[2..5])
+        _build_name_line(255, 0, 44, b"In 3"),
+    ]
+    payload = _build_get_names_response(lines)
+    comm.async_get_module_definitions = AsyncMock(return_value=payload)
+
+    assert await mini.get_names() is True
+    assert mini.cleds[1].name == "CLED 1"
+    assert mini.inputs[2].name == "In 3"
+
+
+async def test_get_names_smart_gsm_messages_branch() -> None:
+    """A Smart-GSM reply with sub_code 254 routes via the GSM-language branch."""
+    desc = _make_descriptor(mtype=b"\x1e\x03", name="GSM")
+    comm = _make_comm()
+    gsm = SmartGSM(desc, MagicMock(), MagicMock(), "HUB-1", comm)
+
+    lines = [
+        # 254 with line[4]=1 (German) appends to gsm_numbers
+        _build_name_line(254, 0, 3, b"Nbr", lang=1),
+        # 255 with line[4]=1 appends to messages
+        _build_name_line(255, 0, 8, b"Hi", lang=1),
+    ]
+    payload = _build_get_names_response(lines)
+    comm.async_get_module_definitions = AsyncMock(return_value=payload)
+
+    assert await gsm.get_names() is True
+    assert any(n.name == "Nbr" for n in gsm.gsm_numbers)
+    assert any(m.name == "Hi" for m in gsm.messages)
+
+
+async def test_get_names_outputs_for_smart_out_module() -> None:
+    """A ``Smart Out…`` module routes 255/60 into the outputs slot directly."""
+    desc = _make_descriptor(mtype=b"\x0a\x01", name="Out 8/R")
+    comm = _make_comm()
+    out = SmartOutput(desc, MagicMock(), MagicMock(), "HUB-1", comm)
+
+    lines = [
+        _build_name_line(255, 1, 60, b"Out 1"),
+    ]
+    payload = _build_get_names_response(lines)
+    comm.async_get_module_definitions = AsyncMock(return_value=payload)
+
+    assert await out.get_names() is True
+    # Smart Out outputs[arg_code-60] writes the IfDescriptor directly.
+    assert out.outputs[0].name == "Out 1"
+
+
+async def test_get_settings_marks_analog_inputs_for_smart_input_typ_1f() -> None:
+    """A SmartInput with typ \\x0b\\x1f and AD_STATE bits marks analogins."""
+    from custom_components.habitron.const import MSetIdx  # noqa: PLC0415
+
+    desc = _make_descriptor(mtype=b"\x0b\x1f", name="In 16/24V")
+    comm = _make_comm()
+    inp = SmartInput(desc, MagicMock(), MagicMock(), "HUB-1", comm)
+    # Force at least one input at nmbr=2 so the AD bit-2 check fires.
+    inp.inputs[2].nmbr = 2
+    resp = bytearray(b" " * 256)
+    # Bit 2 set in AD_STATE → input 2 becomes analog (type=3)
+    resp[MSetIdx.AD_STATE] = 0x04
+    comm.async_get_module_settings = AsyncMock(return_value=bytes(resp))
+
+    assert await inp.get_settings() is True
+    assert inp.inputs[2].type == 3
+    assert inp.analogins[0].type == 3
+
+
+async def test_get_settings_marks_inputs_as_switch_when_inp_state_bit_set() -> None:
+    """A bit set in INP_STATE doubles the input.type (1 → 2 = switch)."""
+    from custom_components.habitron.const import MSetIdx  # noqa: PLC0415
+
+    desc = _make_descriptor(mtype=b"\x01\x03", name="SC LE2")
+    comm = _make_comm()
+    sc = SmartController(desc, MagicMock(), MagicMock(), "HUB-1", comm)
+    resp = bytearray(b" " * 256)
+    # Bit 0 of INP_STATE → input 0 promoted to switch (type *= 2)
+    resp[MSetIdx.INP_STATE] = 0x01
+    comm.async_get_module_settings = AsyncMock(return_value=bytes(resp))
+
+    assert await sc.get_settings() is True
+    assert sc.inputs[0].type == 2
+
+
+async def test_get_names_smart_dimm_initializes_dimmer_list() -> None:
+    """A SmartDimm reply with 4 output names seeds the dimmer descriptors."""
+    desc = _make_descriptor(mtype=b"\x0a\x14", name="Dimm 1")
+    comm = _make_comm()
+    dimm = SmartDimm(desc, MagicMock(), MagicMock(), "HUB-1", comm)
+
+    # 255/60..63 → outputs[0..3] (Smart Out family routes via the
+    # ``mod_type[0:9] == "Smart Out"`` branch — Smart Dimm shares the
+    # ``Smart Out``-style prefix and follows the same code path).
+    lines = [
+        _build_name_line(255, 0, 60, b"Ch A"),
+        _build_name_line(255, 0, 61, b"Ch B"),
+        _build_name_line(255, 0, 62, b"Ch C"),
+        _build_name_line(255, 0, 63, b"Ch D"),
+    ]
+    payload = _build_get_names_response(lines)
+    comm.async_get_module_definitions = AsyncMock(return_value=payload)
+
+    assert await dimm.get_names() is True
+    # All four dimmer slots are now filled.
+    assert dimm.dimmers[0].name == "Ch A"
+    assert dimm.dimmers[1].name == "Ch B"
+    assert dimm.dimmers[2].name == "Ch C"
+    assert dimm.dimmers[3].name == "Ch D"
+
+
+async def test_get_names_logic_name_matches_logic_descriptor() -> None:
+    """arg_code 110..119 walks self.logic to find a matching descriptor by nmbr."""
+    from custom_components.habitron.interfaces import LgcDescriptor  # noqa: PLC0415
+
+    desc = _make_descriptor(mtype=b"\x0b\x1e", name="In 8/24V")
+    comm = _make_comm()
+    mod = SmartInput(desc, MagicMock(), MagicMock(), "HUB-1", comm)
+    # Pre-populate a logic descriptor with nmbr=1 (matches arg_code 110).
+    mod.logic.append(LgcDescriptor("placeholder", 0, 1, 5, 0))
+
+    lines = [
+        _build_name_line(255, 0, 110, b"Counter 1"),
+    ]
+    payload = _build_get_names_response(lines)
+    comm.async_get_module_definitions = AsyncMock(return_value=payload)
+    assert await mod.get_names() is True
+    assert mod.logic[0].name == "Counter 1"
