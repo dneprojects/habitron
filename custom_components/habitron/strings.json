@@ -1,7 +1,8 @@
 {
   "config": {
     "abort": {
-      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
+      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]",
+      "reconfigure_successful": "[%key:common::config_flow::abort::reconfigure_successful%]"
     },
     "error": {
       "cannot_connect": "Cannot connect to SmartHub",
@@ -19,6 +20,14 @@
           "websock_token": "Token for websocket authentication"
         },
         "title": "Setup communication"
+      },
+      "reconfigure": {
+        "data": {
+          "habitron_host": "[%key:component::habitron::config::step::user::data::habitron_host%]",
+          "update_interval": "[%key:component::habitron::config::step::user::data::update_interval%]",
+          "websock_token": "[%key:component::habitron::config::step::user::data::websock_token%]"
+        },
+        "title": "Reconfigure SmartHub connection"
       }
     }
   },
@@ -47,6 +56,106 @@
     }
   },
   "entity": {
+    "binary_sensor": {
+      "input_switch": {
+        "name": "Input switch"
+      },
+      "motion": {
+        "name": "Motion"
+      },
+      "rain": {
+        "name": "Rain"
+      },
+      "hub_state": {
+        "name": "Hub state"
+      },
+      "listening_status": {
+        "name": "Listening status"
+      }
+    },
+    "button": {
+      "module_reset": {
+        "name": "Module reset"
+      },
+      "restart_fwd_table": {
+        "name": "Restart forwarding table"
+      },
+      "router_reset_all": {
+        "name": "Reset all modules"
+      },
+      "hub_restart": {
+        "name": "Hub restart"
+      },
+      "hub_reboot": {
+        "name": "Hub reboot"
+      },
+      "count_up": {
+        "name": "Count up"
+      },
+      "count_down": {
+        "name": "Count down"
+      },
+      "power_cycle": {
+        "name": "Power cycle"
+      },
+      "voice_input": {
+        "name": "Voice input"
+      }
+    },
+    "light": {
+      "dimmed_output": {
+        "name": "Dimmed output"
+      }
+    },
+    "media_player": {
+      "habitron_speaker": {
+        "name": "Speaker"
+      }
+    },
+    "number": {
+      "analog_output": {
+        "name": "Analog output"
+      }
+    },
+    "sensor": {
+      "analog_sensor": {
+        "name": "Analog"
+      },
+      "ekey_id": {
+        "name": "Identifier value"
+      },
+      "ekey_finger": {
+        "name": "Finger value"
+      },
+      "wind": {
+        "name": "Wind"
+      },
+      "logic_state": {
+        "name": "Counter"
+      },
+      "time_out": {
+        "name": "Timeout"
+      }
+    },
+    "switch": {
+      "habitron_flag": {
+        "name": "Flag"
+      },
+      "microphone": {
+        "name": "Microphone"
+      },
+      "climate_ctl": {
+        "name": "Climate controller"
+      }
+    },
+    "text": {
+      "ekey_user": {
+        "name": "Identifier name"
+      },
+      "ekey_finger": {
+        "name": "Finger name"
+      }
+    },
     "select": {
       "habitron_mode": {
         "state": {
@@ -222,16 +331,19 @@
   },
   "exceptions": {
     "no_hub_loaded": {
-      "message": "Habitron service called but no hub is loaded."
+      "message": "Habitron service called but no SmartHub is loaded."
     },
     "hub_not_found": {
-      "message": "No Habitron hub matches host {hub_id}."
+      "message": "No Habitron SmartHub matches host {hub_id}."
     },
     "websocket_provider_missing": {
       "message": "WebSocket provider not initialized on SmartHub."
     },
+    "no_target_devices": {
+      "message": "No target devices were provided for the system command."
+    },
     "no_matching_module": {
-      "message": "No valid Smart Touch module found for device {device_id}."
+      "message": "No valid Smart Touch module was found for device {device_id}."
     }
   },
   "system_health": {

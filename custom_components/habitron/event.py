@@ -14,6 +14,8 @@ from .coordinator import HabitronConfigEntry
 # Import the device class from the component that you want to support
 from .interfaces import AreaDescriptor
 
+PARALLEL_UPDATES = 1
+
 
 async def async_setup_entry(
     hass: HomeAssistant,

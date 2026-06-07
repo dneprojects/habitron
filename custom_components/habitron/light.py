@@ -24,6 +24,8 @@ from .interfaces import AreaDescriptor, CLedDescriptor, IfDescriptor
 from .module import HbtnModule
 from .router import HbtnRouter
 
+PARALLEL_UPDATES = 1
+
 
 async def async_setup_entry(
     hass: HomeAssistant,

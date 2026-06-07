@@ -20,6 +20,8 @@ from .module import HbtnModule
 from .router import AlarmMode, DaytimeMode, HbtnRouter
 from .smart_hub import LoggingLevels
 
+PARALLEL_UPDATES = 1
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -273,7 +275,7 @@ class HbtnSelectGroupMode(HbtnMode):
         self._value = self._mode & self._mask
         if self._value == 0:
             self._value = 32
-        self._current_option = self._enum(self._value).name  # type: ignore  # noqa: PGH003
+        self._current_option = self._enum(self._value).name
         if isinstance(self._module, HbtnRouter):
             self._attr_name = "Group 0 mode"
             self._attr_unique_id = f"Rt_{self.hbtnr.uid}_group_0_mode"
@@ -283,7 +285,7 @@ class HbtnSelectGroupMode(HbtnMode):
 
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
-        set_val = self._enum[option].value  # type: ignore  # noqa: PGH003
+        set_val = self._enum[option].value
         if isinstance(self._module, HbtnRouter):
             # router
             await self.hbtnr.comm.async_set_group_mode(self.hbtnr.id, 0, set_val)

@@ -25,6 +25,8 @@ from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
 from .router import HbtnModule, HbtnRouter
 
+PARALLEL_UPDATES = 1
+
 _LOGGER = logging.getLogger(__name__)
 
 
