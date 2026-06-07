@@ -12,15 +12,16 @@ from __future__ import annotations
 import asyncio
 import base64
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
 
 from homeassistant.components import websocket_api
-from homeassistant.components.camera import (
+from homeassistant.components.camera import (  # type: ignore[attr-defined]
     RTCIceCandidateInit,
     WebRTCCandidate,
 )
+from homeassistant.components.websocket_api import ActiveConnection  # type: ignore[attr-defined]
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 
@@ -73,14 +74,14 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
             provider.pending_candidates.pop(session_id, None)
 
     # --- WebSocket Command Handlers ---
-    @websocket_api.websocket_command(
+    @websocket_api.websocket_command(  # type: ignore[attr-defined]
         {
             vol.Required("type"): "habitron/voice_pipeline_status",
             vol.Required("disabled"): bool,  # Expects an empty dict for now
         }
     )
-    @websocket_api.async_response
-    async def handle_voice_pipeline_status(hass: HomeAssistant, connection, msg):
+    @websocket_api.async_response  # type: ignore[attr-defined]
+    async def handle_voice_pipeline_status(hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]) -> None:
         """Handle request from client to start the voice pipeline."""
         stream_name = provider._get_stream_or_send_error(connection, msg)
         if not stream_name:
@@ -113,14 +114,14 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
             )
         connection.send_result(msg["id"])
 
-    @websocket_api.websocket_command(
+    @websocket_api.websocket_command(  # type: ignore[attr-defined]
         {
             vol.Required("type"): "habitron/voice_pipeline_start",
             vol.Required("payload"): dict,  # Expects an empty dict for now
         }
     )
-    @websocket_api.async_response
-    async def handle_voice_pipeline_start(hass: HomeAssistant, connection, msg):
+    @websocket_api.async_response  # type: ignore[attr-defined]
+    async def handle_voice_pipeline_start(hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]) -> None:
         """Handle request from client to start the voice pipeline."""
         stream_name = provider._get_stream_or_send_error(connection, msg)
         if not stream_name:
@@ -204,14 +205,14 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
         # Send result back to client immediately to confirm start request received
         connection.send_result(msg["id"])
 
-    @websocket_api.websocket_command(
+    @websocket_api.websocket_command(  # type: ignore[attr-defined]
         {
             vol.Required("type"): "habitron/voice_audio_chunk",
             vol.Required("payload"): str,  # base64 encoded string
         }
     )
-    @websocket_api.async_response  # Use async_response for commands that don't need a result
-    async def handle_voice_audio_chunk(hass: HomeAssistant, connection, msg):
+    @websocket_api.async_response  # type: ignore[attr-defined]  # Use async_response for commands that don't need a result
+    async def handle_voice_audio_chunk(hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]) -> None:
         """Handle incoming audio chunks from the client."""
         stream_name = provider._get_stream_or_send_error(connection, msg)
         if not stream_name:
@@ -237,11 +238,11 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
                 )
         # No result message is sent back for chunks to minimize overhead
 
-    @websocket_api.websocket_command(
+    @websocket_api.websocket_command(  # type: ignore[attr-defined]
         {vol.Required("type"): "habitron/voice_pipeline_abort"}
     )
-    @websocket_api.async_response
-    async def handle_voice_pipeline_abort(hass: HomeAssistant, connection, msg):
+    @websocket_api.async_response  # type: ignore[attr-defined]
+    async def handle_voice_pipeline_abort(hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]) -> None:
         """Handle explicit abort from client on timeout."""
         stream_name = provider._get_stream_or_send_error(connection, msg)
         if not stream_name:
@@ -259,11 +260,13 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
 
         connection.send_result(msg["id"])
 
-    @websocket_api.websocket_command(
+    @websocket_api.websocket_command(  # type: ignore[attr-defined]
         {vol.Required("type"): "habitron/voice_pipeline_end"}
     )
-    @websocket_api.async_response
-    async def handle_voice_pipeline_end(_, connection, msg):
+    @websocket_api.async_response  # type: ignore[attr-defined]
+    async def handle_voice_pipeline_end(
+        _: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
+    ) -> None:
         """Handle signal from client that audio streaming is finished."""
         stream_name = provider._get_stream_or_send_error(connection, msg)
         if not stream_name:
@@ -286,12 +289,12 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
             await queue.put(None)
         connection.send_result(msg["id"])  # Acknowledge command
 
-    @websocket_api.websocket_command(
+    @websocket_api.websocket_command(  # type: ignore[attr-defined]
         {vol.Required("type"): "habitron/tts_playback_finished"}
     )
-    @websocket_api.async_response
+    @websocket_api.async_response  # type: ignore[attr-defined]
     async def handle_tts_playback_finished(
-        hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+        hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
     ) -> None:
         """Handle signal from client that TTS playback has finished."""
         stream_name = provider._get_stream_or_send_error(connection, msg)
@@ -316,17 +319,17 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
 
         connection.send_result(msg["id"])  # Acknowledge command
 
-    @websocket_api.websocket_command(
+    @websocket_api.websocket_command(  # type: ignore[attr-defined]
         {
             vol.Required("type"): "habitron/register_stream",
             vol.Required("stream_name"): str,
             vol.Required("version"): str,
         }
     )
-    @websocket_api.async_response
+    @websocket_api.async_response  # type: ignore[attr-defined]
     async def handle_register_stream(
-        hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
-    ):
+        hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
+    ) -> None:
         """Handle client registering its stream name."""
         stream_name = msg["stream_name"]
         client_version = msg.get("version", "unknown")
@@ -347,7 +350,7 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
         connection.send_result(msg["id"])  # Acknowledge registration
         _LOGGER.info("Client registered stream '%s'", stream_name)
 
-    @websocket_api.websocket_command(
+    @websocket_api.websocket_command(  # type: ignore[attr-defined]
         {
             vol.Required("type"): "habitron/webrtc_answer",
             vol.Required("session_id"): str,
@@ -355,10 +358,10 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
             vol.Required("stream_name"): vol.Any(str, None),
         }
     )
-    @websocket_api.async_response
+    @websocket_api.async_response  # type: ignore[attr-defined]
     async def handle_webrtc_answer(
-        hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
-    ):
+        hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
+    ) -> None:
         """Handle the WebRTC answer SDP from the client."""
         stream_name = provider._get_stream_or_send_error(connection, msg)
         if not stream_name:
@@ -376,7 +379,7 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
             )
         connection.send_result(msg["id"])  # Acknowledge
 
-    @websocket_api.websocket_command(
+    @websocket_api.websocket_command(  # type: ignore[attr-defined]
         {
             vol.Required("type"): "habitron/webrtc_candidate",
             vol.Required("session_id"): str,
@@ -385,10 +388,10 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
             vol.Optional("sdp_m_line_index"): vol.Any(int, None),
         }
     )
-    @websocket_api.async_response
+    @websocket_api.async_response  # type: ignore[attr-defined]
     async def handle_webrtc_candidate(
-        hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
-    ):
+        hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
+    ) -> None:
         """Handle an ICE candidate received from the client."""
         stream_name = provider._get_stream_or_send_error(connection, msg)
         if not stream_name:
@@ -415,7 +418,7 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
             provider.pending_candidates.setdefault(session_id, []).append(candidate)
         connection.send_result(msg["id"])  # Acknowledge
 
-    @websocket_api.websocket_command(
+    @websocket_api.websocket_command(  # type: ignore[attr-defined]
         {
             vol.Required("type"): "habitron/snapshot_result",
             vol.Required("request_id"): str,
@@ -423,10 +426,10 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
             vol.Optional("error"): str,  # Error message if snapshot failed
         }
     )
-    @websocket_api.async_response
+    @websocket_api.async_response  # type: ignore[attr-defined]
     async def handle_snapshot_result(
-        hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
-    ):
+        hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
+    ) -> None:
         """Handle the snapshot result (image data or error) from the client."""
         stream_name = provider._get_stream_or_send_error(connection, msg)
         if not stream_name:
@@ -482,16 +485,16 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
             )
         connection.send_result(msg["id"])  # Acknowledge
 
-    @websocket_api.websocket_command(
+    @websocket_api.websocket_command(  # type: ignore[attr-defined]
         {
             vol.Required("type"): "habitron/call_announcement",
             vol.Required("message"): str,  # message to announce
         }
     )
-    @websocket_api.async_response
+    @websocket_api.async_response  # type: ignore[attr-defined]
     async def handle_call_announcement(
-        hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
-    ):
+        hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
+    ) -> None:
         """Announce message from client."""
         stream_name = provider._get_stream_or_send_error(connection, msg)
         if not stream_name:
@@ -543,17 +546,17 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
             )
             connection.send_result(msg["id"], {"success": False, "error": str(e)})
 
-    @websocket_api.websocket_command(
+    @websocket_api.websocket_command(  # type: ignore[attr-defined]
         {
             vol.Required("type"): "habitron/update_media_state",
             vol.Required("state"): str,  # e.g., "playing", "paused", "idle"
             vol.Optional("attributes"): dict,  # e.g., {"volume_level": 0.5}
         }
     )
-    @websocket_api.async_response
+    @websocket_api.async_response  # type: ignore[attr-defined]
     async def handle_update_media_state(
-        hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
-    ):
+        hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
+    ) -> None:
         """Handle media player state updates pushed from the client."""
         stream_name = provider._get_stream_or_send_error(connection, msg)
         if not stream_name:
@@ -575,12 +578,12 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
                 msg["id"], {"success": False, "error": "Player not registered"}
             )
 
-    @websocket_api.websocket_command(
+    @websocket_api.websocket_command(  # type: ignore[attr-defined]
         {vol.Required("type"): "habitron/media_next_track"}
     )
-    @websocket_api.async_response
+    @websocket_api.async_response  # type: ignore[attr-defined]
     async def handle_media_next_track(
-        hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+        hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
     ) -> None:
         """Handle skip to next track command triggered from the client UI."""
         stream_name = provider._get_stream_or_send_error(connection, msg)
@@ -600,12 +603,12 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
 
         connection.send_result(msg["id"], {"success": success})
 
-    @websocket_api.websocket_command(
+    @websocket_api.websocket_command(  # type: ignore[attr-defined]
         {vol.Required("type"): "habitron/media_previous_track"}
     )
-    @websocket_api.async_response
+    @websocket_api.async_response  # type: ignore[attr-defined]
     async def handle_media_previous_track(
-        hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+        hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
     ) -> None:
         """Handle skip to previous track command triggered from the client UI."""
         stream_name = provider._get_stream_or_send_error(connection, msg)
@@ -627,15 +630,15 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
 
         connection.send_result(msg["id"], {"success": success})
 
-    @websocket_api.websocket_command(
+    @websocket_api.websocket_command(  # type: ignore[attr-defined]
         {
             vol.Required("type"): "habitron/report_state",
             vol.Required("payload"): dict,
         }
     )
-    @websocket_api.async_response
+    @websocket_api.async_response  # type: ignore[attr-defined]
     async def handle_report_state(
-        hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+        hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
     ) -> None:
         """Handle device state reports (battery, temp, etc.) from client."""
         stream_name = provider._get_stream_or_send_error(connection, msg)

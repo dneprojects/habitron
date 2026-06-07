@@ -13,11 +13,11 @@ import asyncio
 from collections.abc import Callable
 import logging
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 import uuid
 
 from homeassistant.components import websocket_api
-from homeassistant.components.camera import (
+from homeassistant.components.camera import (  # type: ignore[attr-defined]
     Camera,
     CameraWebRTCProvider,
     RTCIceCandidateInit,
@@ -27,6 +27,7 @@ from homeassistant.components.camera import (
     WebRTCSendMessage,
     async_register_webrtc_provider,
 )
+from homeassistant.components.websocket_api import ActiveConnection  # type: ignore[attr-defined]
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 
@@ -34,8 +35,6 @@ from ..const import DOMAIN
 from ..router import HbtnRouter
 
 if TYPE_CHECKING:
-    from typing import Any
-
     from ..assist_satellite import HbtnAssistSat
     from ..media_player import HbtnMediaPlayer
 
@@ -57,12 +56,12 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
         self.rtr = hbtn_rt
 
         # State is managed within the class instance.
-        self.active_ws_connections: dict[str, websocket_api.ActiveConnection] = {}
-        self.webrtc_futures: dict[str, asyncio.Future] = {}
+        self.active_ws_connections: dict[str, ActiveConnection] = {}
+        self.webrtc_futures: dict[str, asyncio.Future[Any]] = {}
         self.webrtc_send_message_callbacks: dict[str, WebRTCSendMessage] = {}
         self.session_to_stream_map: dict[str, str] = {}
         self.pending_candidates: dict[str, list[WebRTCCandidate]] = {}
-        self.snapshot_futures: dict[str, dict] = {}
+        self.snapshot_futures: dict[str, dict[str, Any]] = {}
         self.media_players: dict[str, HbtnMediaPlayer] = {}
         self.assist_satellites: dict[str, HbtnAssistSat] = {}
         self.voice_pipelines: dict[str, dict[str, Any]] = {}
@@ -119,7 +118,9 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
             "Assist satellite registered for stream: %s", satellite.stream_name
         )
 
-    async def async_send_json_message(self, stream_name: str, msg: dict) -> None:
+    async def async_send_json_message(
+        self, stream_name: str, msg: dict[str, Any]
+    ) -> None:
         """Send a structured JSON message to a specific connected client."""
         if not (ws_connection := self.active_ws_connections.get(stream_name)):
             _LOGGER.warning(
@@ -130,7 +131,7 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
             return
         ws_connection.send_message(msg)
 
-    async def async_broadcast_message(self, msg: dict) -> None:
+    async def async_broadcast_message(self, msg: dict[str, Any]) -> None:
         """Broadcast a structured JSON message to all connected clients."""
         # Snapshot the dict before iterating: ``send_message`` may
         # synchronously trigger a disconnect callback that mutates
@@ -206,7 +207,7 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
             )
 
             # Prepare to wait for the client's answer
-            fut: asyncio.Future = asyncio.Future()
+            fut: asyncio.Future[Any] = asyncio.Future()
             self.webrtc_futures[session_id] = fut
             _LOGGER.info("Waiting for answer from client for session: %s", session_id)
 
@@ -254,7 +255,7 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
             raise HomeAssistantError(f"No active client for stream '{stream_name}'")
 
         request_id = uuid.uuid4().hex
-        fut: asyncio.Future = asyncio.Future()
+        fut: asyncio.Future[Any] = asyncio.Future()
         self.snapshot_futures[request_id] = {"future": fut}
 
         # Send request to client
@@ -286,7 +287,7 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
         register_handlers(self)
 
     def _get_stream_or_send_error(
-        self, connection: websocket_api.ActiveConnection, msg: dict
+        self, connection: ActiveConnection, msg: dict[str, Any]
     ) -> str | None:
         """Look up the stream name for a connection or send an error to it."""
         stream_name = next(
