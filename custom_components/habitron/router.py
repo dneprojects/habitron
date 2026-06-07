@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from enum import Enum
 import logging
+from typing import TYPE_CHECKING
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -32,6 +33,9 @@ from .module import (
     SmartOutput as hbtoutm,
     SmartSensor as hbtsens,
 )
+
+if TYPE_CHECKING:
+    from .smart_hub import SmartHub
 
 
 class DaytimeMode(Enum):
@@ -67,7 +71,9 @@ class HbtnRouter:
 
     manufacturer = "Habitron GmbH"
 
-    def __init__(self, hass: HomeAssistant, config: ConfigEntry, smhub) -> None:
+    def __init__(
+        self, hass: HomeAssistant, config: ConfigEntry, smhub: SmartHub
+    ) -> None:
         """Init habitron router."""
         self.id = 100  # to be adapted for more routers
         self.b_uid = smhub.uid
@@ -82,13 +88,13 @@ class HbtnRouter:
         self.devreg_id = ""
         self.version = ""
         self.serial = ""
-        self.status = ""
-        self.smr = ""
-        self.chan_list = []
-        self.module_grp = []
+        self.status: bytes = b""
+        self.smr: bytes = b""
+        self.chan_list: list[list[int]] = []
+        self.module_grp: list[int] = []
         self.max_group = 0
         self.cover_autostop_del = 5
-        self.modules_desc = []
+        self.modules_desc: list[ModuleDescriptor] = []
         self.modules: list[HbtnModule] = []
         self.areas: dict[int, AreaDescriptor] = {}
         self.coll_commands: list[CmdDescriptor] = []
@@ -110,9 +116,9 @@ class HbtnRouter:
         self.states[1].name = "Mirror started"
         self.user1_name = "user1"
         self.user2_name = "user2"
-        self.sys_status = ""
+        self.sys_status: bytes = b""
         self.mode = IfDescriptor("Mode", 0, 1, 0x11)
-        self.mod_reg = {}
+        self.mod_reg: dict[int, int] = {}
         self._sys_ok = True
         self._mirror_started = True
 
@@ -157,7 +163,7 @@ class HbtnRouter:
 
         # 4. Create module instances
         for mod_desc in self.modules_desc:
-            module_instance = None
+            module_instance: HbtnModule | None = None
             m0, m1 = mod_desc.mtype[0], mod_desc.mtype[1]
 
             if m0 == 10 and m1 in [1, 2, 50, 51]:
@@ -253,21 +259,21 @@ class HbtnRouter:
         str_len = self.smr[ptr]
         self.version = self.smr[-22:].decode("iso8859-1").strip()
 
-    def get_module(self, mod_addr) -> HbtnModule | None:
+    def get_module(self, mod_addr: int) -> HbtnModule | None:
         """Return module based on id."""
         for module in self.modules:
             if module.raddr == mod_addr:
                 return module
         return None
 
-    def get_module_by_uid(self, mod_uid) -> HbtnModule | None:
+    def get_module_by_uid(self, mod_uid: str) -> HbtnModule | None:
         """Return module based on uid."""
         for module in self.modules:
             if module.uid == mod_uid:
                 return module
         return None
 
-    def get_module_by_stream(self, stream_name) -> HbtnModule | None:
+    def get_module_by_stream(self, stream_name: str) -> HbtnModule | None:
         """Return module based on stream name."""
         for module in self.modules:
             if module.type == "Smart Controller Touch":
@@ -275,10 +281,10 @@ class HbtnRouter:
                     return module
         return None
 
-    async def get_modules(self, mod_groups) -> list[ModuleDescriptor]:
+    async def get_modules(self, mod_groups: list[int]) -> list[ModuleDescriptor]:
         """Get summary of all Habitron modules."""
         desc: list[ModuleDescriptor] = []
-        addr_dict = {}
+        addr_dict: dict[int, int] = {}
         resp = await self.comm.async_get_router_modules()
         mod_string = resp.decode("iso8859-1")
         while len(resp) > 0:
@@ -297,7 +303,7 @@ class HbtnRouter:
         self.mod_reg = addr_dict
         return desc
 
-    async def get_descriptions(self) -> str | None:
+    async def get_descriptions(self) -> None:
         """Get descriptions of commands, etc."""
         resp = await self.comm.get_global_descriptions()
 
@@ -373,7 +379,7 @@ class HbtnRouter:
             sys_status[i * blk_len : (i + 1) * blk_len] + pad for i in range(no_mods)
         )
 
-    async def update_system_status(self, sys_status) -> None:
+    async def update_system_status(self, sys_status: bytes) -> None:
         """Update system status and distribute to modules."""
         self.sys_status = self._pad_sys_status(sys_status)
 

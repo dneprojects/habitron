@@ -44,7 +44,7 @@ class HbtnModule:
         hass: HomeAssistant,
         config: ConfigEntry,
         b_uid: str,
-        comm,
+        comm: HbtnComm,
     ) -> None:
         """Init Habitron module."""
         self._hass: HomeAssistant = hass
@@ -64,7 +64,7 @@ class HbtnModule:
         self.smc: str = ""
         self.status: bytes = b""
         self.mstatus = ""
-        self.shutter_state = []
+        self.shutter_state: list[int] = []
         self.climate_settings: int = 0
         self.climate_ctl12: int = 1
         self.id: str = f"Mod_{mod_descriptor.uid}_{self.b_uid}"
@@ -129,7 +129,7 @@ class HbtnModule:
             return self.comm.router.areas[self.area_member].name
         return "House"
 
-    async def initialize(self, sys_status) -> None:
+    async def initialize(self, sys_status: bytes) -> None:
         """Initialize module instance."""
         await self.get_names()
         await self.get_settings()
@@ -170,7 +170,7 @@ class HbtnModule:
     async def get_names(self) -> bool:  # noqa: C901
         """Get summary of Habitron module."""
         resp = await self.comm.async_get_module_definitions(self._addr)
-        if resp == "":
+        if resp == b"":
             return False
 
         # No production module type is the bare string ``Smart Controller``
@@ -187,9 +187,7 @@ class HbtnModule:
             line = resp[0:line_len]
             event_code = int(line[2])
             if event_code == 235:  # Beschriftung
-                text = line[8:-1]
-                text = text.decode("iso8859-1")
-                text = text.strip()
+                text = line[8:-1].decode("iso8859-1").strip()
                 arg_code = int(line[3])
                 if int(line[0]) == 252:
                     # Finger ids
@@ -341,7 +339,7 @@ class HbtnModule:
     async def get_settings(self) -> bool:
         """Get settings of Habitron module."""
         resp = await self.comm.async_get_module_settings(self._addr)
-        if resp == "":
+        if resp == b"":
             self.logger.warning(
                 "get_settings: No settings received for module %s", self.raddr
             )
@@ -416,7 +414,7 @@ class HbtnModule:
                 self.outputs[2 * c_idx + 1].type = -10
         return True
 
-    def update(self, mod_status):
+    def update(self, mod_status: bytes) -> None:
         """General update for Habitron modules."""
         self.status = mod_status
         self.mode.value = self.status[MStatIdx.MODE]
@@ -437,7 +435,7 @@ class HbtnModule:
         for lgc in self.logic:
             lgc.value = self.status[MStatIdx.COUNTER_VAL + 3 * lgc.nmbr]
 
-    def extract_status(self, sys_status) -> bytes:
+    def extract_status(self, sys_status: bytes) -> bytes:
         """Extract status of Habitron module from system status."""
         stat_len = MStatIdx.END
         no_mods = len(sys_status) // stat_len
@@ -458,7 +456,9 @@ class HbtnModule:
             return b""
         return sys_status[m_idx * stat_len : (m_idx + 1) * stat_len]
 
-    def set_default_names(self, mod_entities, def_name: str) -> None:
+    def set_default_names(
+        self, mod_entities: list[IfDescriptor], def_name: str
+    ) -> None:
         """Set default names for entities."""
         e_idx = 0
         # pylint: disable-next=consider-using-enumerate
@@ -472,8 +472,7 @@ class HbtnModule:
 
     async def async_reset(self) -> None:
         """Call reset command for self."""
-        rt_nmbr = self._addr - self.raddr
-        await self.comm.module_restart(rt_nmbr, self.raddr)
+        await self.comm.module_restart(self.raddr)
 
 
 class SmartController(HbtnModule):
@@ -485,7 +484,7 @@ class SmartController(HbtnModule):
         hass: HomeAssistant,
         config: ConfigEntry,
         b_uid: str,
-        comm,
+        comm: HbtnComm,
     ) -> None:
         """Init Habitron SmartController module."""
         super().__init__(mod_descriptor, hass, config, b_uid, comm)
@@ -517,11 +516,11 @@ class SmartController(HbtnModule):
         self.sensors.append(IfDescriptor("Airquality", 5, 2, 0))
         self.diags.append(IfDescriptor("PowerTemp", 1, 1, 0))
 
-    def set_assist_entity(self, entity_id: str):
+    def set_assist_entity(self, entity_id: str) -> None:
         """Store assist satellite entity id in module properties."""
         self.assist_entity_id = entity_id
 
-    def update(self, mod_status) -> None:
+    def update(self, mod_status: bytes) -> None:
         """Update with module specific method. Reads and parses status."""
         super().update(mod_status)
         self.sensors[0].value = int(self.status[MStatIdx.MOV])  # movement?
@@ -628,7 +627,7 @@ class SmartControllerMini(HbtnModule):
         hass: HomeAssistant,
         config: ConfigEntry,
         b_uid: str,
-        comm,
+        comm: HbtnComm,
     ) -> None:
         """Init Habitron SmartController Mini module."""
         super().__init__(mod_descriptor, hass, config, b_uid, comm)
@@ -652,7 +651,7 @@ class SmartControllerMini(HbtnModule):
         self.sensors.append(IfDescriptor("Illuminance", 2, 2, 0))
         self.sensors.append(IfDescriptor("Airquality", 3, 2, 0))
 
-    def update(self, mod_status) -> None:
+    def update(self, mod_status: bytes) -> None:
         """Update with module specific method. Reads and parses status."""
         super().update(mod_status)
         self.sensors[0].value = int(self.status[MStatIdx.MOV])  # movement?
@@ -724,7 +723,7 @@ class SmartOutput(HbtnModule):
         hass: HomeAssistant,
         config: ConfigEntry,
         b_uid: str,
-        comm,
+        comm: HbtnComm,
     ) -> None:
         """Init Habitron SmartOutput module."""
         super().__init__(mod_descriptor, hass, config, b_uid, comm)
@@ -732,7 +731,7 @@ class SmartOutput(HbtnModule):
         self.outputs = [IfDescriptor("", i, 1, 0) for i in range(8)]
         self.covers = [CovDescriptor("", -1, 0, 0, 0) for i in range(4)]
 
-    def update(self, mod_status) -> None:
+    def update(self, mod_status: bytes) -> None:
         """Update with module specific method. Reads and parses status."""
         super().update(mod_status)
         out_state = int(self.status[MStatIdx.OUT_1_8])
@@ -757,7 +756,7 @@ class SmartDimm(HbtnModule):
         hass: HomeAssistant,
         config: ConfigEntry,
         b_uid: str,
-        comm,
+        comm: HbtnComm,
     ) -> None:
         """Init Habitron SmartDimm module."""
         super().__init__(mod_descriptor, hass, config, b_uid, comm)
@@ -766,7 +765,7 @@ class SmartDimm(HbtnModule):
         self.dimmers = [IfDescriptor("", i, 2, 0) for i in range(4)]
         self.diags.append(IfDescriptor("PowerTemp", 1, 1, 0))
 
-    def update(self, mod_status) -> None:
+    def update(self, mod_status: bytes) -> None:
         """Update with module specific method. Reads and parses status."""
         super().update(mod_status)
 
@@ -803,7 +802,7 @@ class SmartIO2(HbtnModule):
         hass: HomeAssistant,
         config: ConfigEntry,
         b_uid: str,
-        comm,
+        comm: HbtnComm,
     ) -> None:
         """Init Habitron SmartOutput module."""
         super().__init__(mod_descriptor, hass, config, b_uid, comm)
@@ -813,7 +812,7 @@ class SmartIO2(HbtnModule):
         self.diags = [IfDescriptor("", i, 0, 0) for i in range(1)]
         self.covers = [CovDescriptor("", -1, 0, 0, 0)]
 
-    def update(self, mod_status) -> None:
+    def update(self, mod_status: bytes) -> None:
         """Update with module specific method. Reads and parses status."""
         super().update(mod_status)
 
@@ -843,7 +842,7 @@ class SmartInput(HbtnModule):
         hass: HomeAssistant,
         config: ConfigEntry,
         b_uid: str,
-        comm,
+        comm: HbtnComm,
     ) -> None:
         """Init Habitron SmartInput module."""
         super().__init__(mod_descriptor, hass, config, b_uid, comm)
@@ -852,7 +851,7 @@ class SmartInput(HbtnModule):
         if self.typ[1] == 0x1F:
             self.analogins = [IfDescriptor("", i, -3, 0) for i in range(6)]
 
-    def update(self, mod_status) -> None:
+    def update(self, mod_status: bytes) -> None:
         """Update with module specific method. Reads and parses status."""
         ad_val_map = {
             0: MStatIdx.AD_1,
@@ -882,7 +881,7 @@ class SmartDetect(HbtnModule):
         hass: HomeAssistant,
         config: ConfigEntry,
         b_uid: str,
-        comm,
+        comm: HbtnComm,
     ) -> None:
         """Init Habitron SmartDetect module."""
         super().__init__(mod_descriptor, hass, config, b_uid, comm)
@@ -890,7 +889,7 @@ class SmartDetect(HbtnModule):
         self.sensors.append(IfDescriptor("Movement", 0, 2, 0))
         self.sensors.append(IfDescriptor("Illuminance", 1, 2, 0))
 
-    async def initialize(self, sys_status) -> None:
+    async def initialize(self, sys_status: bytes) -> None:
         """Initialize SmartDetect."""
         # No name and settings initialization needed
         device_registry = dr.async_get(self._hass)
@@ -910,7 +909,7 @@ class SmartDetect(HbtnModule):
         )
         self.update(self.status)
 
-    def update(self, mod_status) -> None:
+    def update(self, mod_status: bytes) -> None:
         """Update with module specific method. Reads and parses status."""
         super().update(mod_status)
         self.sensors[0].value = int(self.status[MStatIdx.MOV])  # movement
@@ -927,7 +926,7 @@ class SmartEKey(HbtnModule):
         hass: HomeAssistant,
         config: ConfigEntry,
         b_uid: str,
-        comm,
+        comm: HbtnComm,
     ) -> None:
         """Init Habitron eKey module."""
         super().__init__(mod_descriptor, hass, config, b_uid, comm)
@@ -936,7 +935,7 @@ class SmartEKey(HbtnModule):
         self.sensors.append(IfDescriptor("Finger", 1, 2, 0))
         self.fingers.append(IfDescriptor("Finger", 0, 2, 0))
 
-    def update(self, mod_status) -> None:
+    def update(self, mod_status: bytes) -> None:
         """Update with module specific method. Reads and parses status."""
         super().update(mod_status)
         self.sensors[0].value = int(self.status[MStatIdx.KEY_ID])  # last id
@@ -956,7 +955,7 @@ class SmartGSM(HbtnModule):
         hass: HomeAssistant,
         config: ConfigEntry,
         b_uid: str,
-        comm,
+        comm: HbtnComm,
     ) -> None:
         """Init Habitron GSM module."""
         super().__init__(mod_descriptor, hass, config, b_uid, comm)
@@ -972,7 +971,7 @@ class SmartNature(HbtnModule):
         hass: HomeAssistant,
         config: ConfigEntry,
         b_uid: str,
-        comm,
+        comm: HbtnComm,
     ) -> None:
         """Init Habitron SmartNature module."""
         super().__init__(mod_descriptor, hass, config, b_uid, comm)
@@ -984,7 +983,7 @@ class SmartNature(HbtnModule):
         self.sensors.append(IfDescriptor("Rain", 4, 0, 0))
         self.sensors.append(IfDescriptor("Windpeak", 5, 2, 0))
 
-    async def initialize(self, sys_status) -> None:
+    async def initialize(self, sys_status: bytes) -> None:
         """Initialize SmartNature."""
         # No name and settings initialization needed
         device_registry = dr.async_get(self._hass)
@@ -1004,7 +1003,7 @@ class SmartNature(HbtnModule):
         )
         self.update(self.status)
 
-    def update(self, mod_status) -> None:
+    def update(self, mod_status: bytes) -> None:
         """Update with module specific method. Reads and parses status."""
         super().update(mod_status)
         _temp_value = int.from_bytes(
@@ -1038,7 +1037,7 @@ class SmartSensor(HbtnModule):
         hass: HomeAssistant,
         config: ConfigEntry,
         b_uid: str,
-        comm,
+        comm: HbtnComm,
     ) -> None:
         """Init Habitron SmartSensor module."""
         super().__init__(mod_descriptor, hass, config, b_uid, comm)
@@ -1046,7 +1045,7 @@ class SmartSensor(HbtnModule):
         # self.sensors.append(IfDescriptor("Humidity", 1, 2, 0))
         self.setvalues = [IfDescriptor("Set temperature", 0, 2, 20.0)]
 
-    def update(self, mod_status) -> None:
+    def update(self, mod_status: bytes) -> None:
         """Update with module specific method. Reads and parses status."""
         super().update(mod_status)
         _temp_value: int = int.from_bytes(
