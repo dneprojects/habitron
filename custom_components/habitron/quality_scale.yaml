@@ -40,7 +40,18 @@ rules:
       credentials. A WebSocket access token can be supplied but is
       optional; there is no upstream authentication state that can
       transition into a "needs re-authentication" failure.
-  test-coverage: todo
+  test-coverage:
+    status: todo
+    comment: |
+      Current state: 114 tests, ~43% line coverage. Areas at or above
+      the Silver bar already: ``const`` 98%, ``device_trigger`` 98%,
+      ``diagnostics`` 96%, ``system_health`` 94%, ``coordinator`` 90%,
+      ``services`` 90%, ``__init__`` 85%. The remaining gap is
+      concentrated in the bus / WebRTC paths (``module.py`` 12%,
+      ``ws_provider.py`` 14%, ``media_player.py`` 16%), each of which
+      needs a dedicated mocking layer to cover meaningfully. Hitting
+      the 95% Silver target is a follow-up backlog item on the scale
+      of the ``strict-typing`` migration.
 
   # Gold
   devices: done
