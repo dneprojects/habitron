@@ -155,12 +155,11 @@ class HbtnModule:
         if resp == "":
             return False
 
-        if self.type == "Smart Controller":
-            no_lines = int.from_bytes(resp[0:2], "little")
-            resp = resp[4 : len(resp)]  # Strip 4 header bytes
-        else:
-            no_lines = int.from_bytes(resp[3:5], "little")
-            resp = resp[7 : len(resp)]  # Strip 7 header bytes
+        # No production module type is the bare string ``Smart Controller``
+        # (all map to "Smart Controller XL-…" / "Smart Controller Touch" / …),
+        # so we always strip the 7-byte universal header.
+        no_lines = int.from_bytes(resp[3:5], "little")
+        resp = resp[7 : len(resp)]
         if len(resp) == 0:
             return False
         for _ in range(no_lines):
@@ -268,8 +267,6 @@ class HbtnModule:
         self.set_default_names(self.outputs, "Out")
         if self.mod_type == "Smart Controller Mini":
             self.cleds[0].name = "Ambient"
-            for led in self.leds:
-                led.type = 4
             return True
         if self.mod_type[:16] == "Smart Controller":
             self.dimmers[0] = IfDescriptor(
@@ -749,9 +746,6 @@ class SmartDimm(HbtnModule):
 
         self.outputs = [IfDescriptor("", i, 2, 0) for i in range(4)]
         self.dimmers = [IfDescriptor("", i, 2, 0) for i in range(4)]
-        # self.inputs = [IfDescriptor("", i, 1, 0) for i in range(4)]
-        for mod_inp in self.inputs:
-            mod_inp.name = f"DIn{mod_inp.nmbr}"
         self.diags.append(IfDescriptor("PowerTemp", 1, 1, 0))
 
     def update(self, mod_status) -> None:
