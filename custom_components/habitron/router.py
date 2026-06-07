@@ -341,12 +341,14 @@ class HbtnRouter:
         return 0
 
     async def get_comm_errors(self) -> bytes:
-        """Get current communication errors."""
+        """Get current communication errors as concatenated 2-byte tuples."""
         resp = await self.comm.async_get_error_status()
         err_cnt = resp[0]
         ret_bytes = b""
         for e_idx in range(err_cnt):
-            ret_bytes += resp[2 * e_idx + 1] + resp[2 * e_idx + 2]
+            # Slice to keep this as bytes — indexing single bytes would yield
+            # ints which cannot be concatenated to ``ret_bytes``.
+            ret_bytes += resp[2 * e_idx + 1 : 2 * e_idx + 3]
         return ret_bytes
 
     @staticmethod

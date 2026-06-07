@@ -338,29 +338,20 @@ class ColorLed(CoordinatorEntity, LightEntity):
                 min(round((b_dimmed / max_channel) * 255), 255),
             )
         else:
-            # Fallback if the light is completely off (all channels are 0)
-            # We keep the last known color or default to white, but brightness is 0
+            # All channels off — keep the last-known colour, drop brightness to 0.
             self._brightness = 0
-            if not hasattr(self, "_rgb_color") or self._rgb_color is None:
-                self._rgb_color = (255, 255, 255)
         self.async_write_ha_state()
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Instruct the light to turn on."""
 
-        # Update the un-dimmed base color if provided by the color picker
+        # __init__ seeds both ``_rgb_color`` and ``_brightness`` so we can read
+        # them directly when the user didn't supply new values via the
+        # frontend's color picker / brightness slider.
         if ATTR_RGB_COLOR in kwargs:
             self._rgb_color = kwargs[ATTR_RGB_COLOR]
-        elif not hasattr(self, "_rgb_color") or self._rgb_color is None:
-            # Fallback to white if no color was ever set
-            self._rgb_color = (255, 255, 255)
-
-        # Update brightness if provided by the brightness slider
         if ATTR_BRIGHTNESS in kwargs:
             self._brightness = kwargs[ATTR_BRIGHTNESS]
-        elif not hasattr(self, "_brightness") or self._brightness is None:
-            # Fallback to full brightness if not set yet
-            self._brightness = 255
 
         # Calculate the dimmed color for your hardware based on current brightness
         # We use a float factor to avoid early truncation during calculation
