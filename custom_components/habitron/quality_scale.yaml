@@ -43,21 +43,22 @@ rules:
   test-coverage:
     status: todo
     comment: |
-      Current state: 406 tests, ~63% line coverage. Files at or above
-      the Silver bar already: ``binary_sensor`` 100%, ``climate`` 100%,
-      ``const`` 100%, ``select`` 100%, ``switch`` 100%, ``cover`` 99%,
-      ``event`` 99%, ``device_trigger`` 98%, ``diagnostics`` 96%,
-      ``system_health`` 94%, ``coordinator`` 90%, ``services`` 90%,
-      ``notify`` 87%, ``__init__`` 85%, ``text`` 82%, ``number`` 79%,
-      ``button`` 76%, ``light`` 72%, ``sensor`` 71%, ``interfaces`` 70%,
+      Current state: 485 tests, ~67% line coverage. Every Habitron
+      entity platform is now at or above the Silver bar:
+      ``binary_sensor`` 100%, ``button`` 100%, ``climate`` 100%,
+      ``notify`` 100%, ``number`` 100%, ``select`` 100%, ``sensor``
+      100%, ``switch`` 100%, ``text`` 100%, ``cover`` 99%, ``event``
+      99%, ``light`` 98%; plus ``const`` 100%, ``device_trigger`` 98%,
+      ``diagnostics`` 96%, ``system_health`` 94%, ``coordinator`` 90%,
+      ``services`` 90%, ``__init__`` 85%, ``interfaces`` 70%,
       ``module`` 66%. The remaining gap is concentrated in the
-      bus / WebRTC / media paths (``ws_provider.py`` 14%,
+      WebRTC / media / bus paths (``ws_provider.py`` 14%,
       ``media_player.py`` 16%, ``update.py`` 35%, ``communicate.py``
       34%, ``router.py`` 35%, ``assist_satellite.py`` 39%,
       ``camera.py`` 47%, ``smart_hub.py`` 50%), each of which needs a
       dedicated mocking layer to cover meaningfully. Hitting the 95%
-      Silver target on these files is a follow-up backlog item on the
-      scale of the ``strict-typing`` migration.
+      Silver target on these support files is a follow-up backlog item
+      on the scale of the ``strict-typing`` migration.
 
   # Gold
   devices: done

@@ -2,17 +2,18 @@
 
 from __future__ import annotations
 
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.components.light import ColorMode
-
-from unittest.mock import AsyncMock, MagicMock
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.light import (
     ColorLed,
     DimmedOutput,
     DimmedOutputPush,
     SwitchedLight,
+    SwitchedLightPush,
+    async_setup_entry,
 )
 
 from .conftest import class_attr
@@ -205,3 +206,292 @@ def test_color_led_off_keeps_color_brightness_zero() -> None:
     led._handle_coordinator_update()
     assert led._attr_is_on is False
     assert led.brightness == 0
+
+
+def test_switched_light_empty_name_disabled_by_default() -> None:
+    """An empty output name marks the entity disabled by default."""
+    out = _make_output(name="  ", nmbr=2)
+    mod = _make_module()
+    coord = MagicMock()
+    light = SwitchedLight(out, mod, coord, 0)
+    assert light._attr_entity_registry_enabled_default is False
+    assert light._attr_name == "Out 3"
+
+
+def test_switched_light_is_on_property() -> None:
+    """is_on returns True iff output.value == 1."""
+    out = _make_output()
+    out.value = 1
+    mod = _make_module()
+    coord = MagicMock()
+    light = SwitchedLight(out, mod, coord, 0)
+    assert light.is_on is True
+
+
+async def test_switched_light_push_register_callback() -> None:
+    """SwitchedLightPush.async_added_to_hass registers the callback."""
+    out = _make_output()
+    out.register_callback = MagicMock()
+    mod = _make_module()
+    coord = MagicMock()
+    light = SwitchedLightPush(out, mod, coord, 0)
+    with patch(
+        "homeassistant.helpers.update_coordinator."
+        "CoordinatorEntity.async_added_to_hass",
+        new=AsyncMock(),
+    ):
+        await light.async_added_to_hass()
+    out.register_callback.assert_called()
+
+
+async def test_switched_light_push_remove_callback() -> None:
+    """SwitchedLightPush.async_will_remove_from_hass removes the callback."""
+    out = _make_output()
+    out.remove_callback = MagicMock()
+    mod = _make_module()
+    coord = MagicMock()
+    light = SwitchedLightPush(out, mod, coord, 0)
+    await light.async_will_remove_from_hass()
+    out.remove_callback.assert_called()
+
+
+def test_dimmed_output_brightness_property() -> None:
+    """brightness returns the cached _brightness value."""
+    out = _make_output(nmbr=10)
+    mod = _make_dimmer_module()
+    coord = MagicMock()
+    light = DimmedOutput(out, mod, coord, 0)
+    assert light.brightness == 255
+
+
+def test_dimmed_output_push_brightness_property() -> None:
+    """DimmedOutputPush.brightness returns the cached value."""
+    out = _make_output(nmbr=10)
+    mod = _make_dimmer_module()
+    coord = MagicMock()
+    light = DimmedOutputPush(out, mod, coord, 0)
+    assert light.brightness == 255
+
+
+def test_dimmed_output_push_handle_coordinator_update_reads_dimmer() -> None:
+    """DimmedOutputPush._handle_coordinator_update reads brightness via round()."""
+    out = _make_output(nmbr=10)
+    mod = _make_dimmer_module()
+    mod.dimmers[0].value = 100
+    coord = MagicMock()
+    light = DimmedOutputPush(out, mod, coord, 0)
+    light.async_write_ha_state = MagicMock()
+    light._handle_coordinator_update()
+    # round(100*2.55) == 255
+    assert light._brightness == 255
+
+
+async def test_dimmed_output_push_turn_on_uses_round() -> None:
+    """DimmedOutputPush.async_turn_on uses round() before sending."""
+    out = _make_output(nmbr=10)
+    mod = _make_dimmer_module()
+    coord = MagicMock()
+    light = DimmedOutputPush(out, mod, coord, 0)
+    await light.async_turn_on(brightness=128)
+    mod.comm.async_set_dimmval.assert_awaited()
+    args = mod.comm.async_set_dimmval.await_args
+    # round(128*100/255) == 50
+    assert args.args[2] == 50
+
+
+def test_color_led_empty_name_falls_back_to_default() -> None:
+    """An empty CLED name yields a generated name."""
+    cled = _make_cled_descriptor(nmbr=3)
+    cled.name = " "
+    mod = _make_module()
+    coord = MagicMock()
+    led = ColorLed(cled, mod, coord, 0)
+    assert led._attr_name == "CLED 3"
+
+
+def test_color_led_negative_type_disabled_by_default() -> None:
+    """A negative CLED type marks the entity disabled by default."""
+    cled = _make_cled_descriptor()
+    cled.type = -1
+    mod = _make_module()
+    coord = MagicMock()
+    led = ColorLed(cled, mod, coord, 0)
+    assert led._attr_entity_registry_enabled_default is False
+
+
+def test_color_led_icons_for_corner_numbers() -> None:
+    """Each LED number gets its corner-specific MDI icon."""
+    for nmbr, expected in [
+        (0, "mdi:square-outline"),
+        (1, "mdi:arrow-top-left-bold-box-outline"),
+        (2, "mdi:arrow-top-right-bold-box-outline"),
+        (3, "mdi:arrow-bottom-left-bold-box-outline"),
+        (4, "mdi:arrow-bottom-right-bold-box-outline"),
+    ]:
+        cled = _make_cled_descriptor(nmbr=nmbr)
+        mod = _make_module()
+        coord = MagicMock()
+        led = ColorLed(cled, mod, coord, 0)
+        assert led._attr_icon == expected
+
+
+def test_color_led_is_on_property() -> None:
+    """is_on returns True iff led.value[0] == 1."""
+    cled = _make_cled_descriptor()
+    cled.value = [1, 0, 0, 0]
+    mod = _make_module()
+    coord = MagicMock()
+    led = ColorLed(cled, mod, coord, 0)
+    assert led.is_on is True
+
+
+def test_color_led_handle_coordinator_update_partial_channels() -> None:
+    """Partial RGB values are normalised back to a 100% reference colour."""
+    cled = _make_cled_descriptor()
+    cled.value = [1, 128, 64, 0]  # half-red, quarter-green, no blue
+    mod = _make_module()
+    coord = MagicMock()
+    led = ColorLed(cled, mod, coord, 0)
+    led.async_write_ha_state = MagicMock()
+    led._handle_coordinator_update()
+    # max_channel = 128 → brightness = 128
+    assert led._brightness == 128
+    # rgb_color normalised: 255, round(64/128*255)=128, 0
+    assert led._rgb_color == (255, 128, 0)
+
+
+async def test_color_led_async_added_to_hass_registers() -> None:
+    """ColorLed.async_added_to_hass registers the LED callback."""
+    cled = _make_cled_descriptor()
+    cled.register_callback = MagicMock()
+    mod = _make_module()
+    coord = MagicMock()
+    led = ColorLed(cled, mod, coord, 0)
+    with patch(
+        "homeassistant.helpers.update_coordinator."
+        "CoordinatorEntity.async_added_to_hass",
+        new=AsyncMock(),
+    ):
+        await led.async_added_to_hass()
+    cled.register_callback.assert_called()
+
+
+async def test_color_led_async_will_remove_unregisters() -> None:
+    """ColorLed.async_will_remove_from_hass removes the LED callback."""
+    cled = _make_cled_descriptor()
+    cled.remove_callback = MagicMock()
+    mod = _make_module()
+    coord = MagicMock()
+    led = ColorLed(cled, mod, coord, 0)
+    await led.async_will_remove_from_hass()
+    cled.remove_callback.assert_called()
+
+
+async def test_color_led_turn_on_without_kwargs_uses_defaults() -> None:
+    """Without rgb_color/brightness kwargs, ColorLed.turn_on uses cached values."""
+    cled = _make_cled_descriptor()
+    mod = _make_module()
+    coord = MagicMock()
+    led = ColorLed(cled, mod, coord, 0)
+    led._rgb_color = (200, 100, 0)
+    led._brightness = 255
+    await led.async_turn_on()
+    mod.comm.async_set_rgbval.assert_awaited()
+
+
+async def test_async_setup_entry_emits_dimmed_output_and_color_led(hass) -> None:
+    """async_setup_entry creates DimmedOutputPush + ColorLed for relevant modules."""
+    dim_out = _make_output(type_=2, nmbr=10)
+    dim_out.area = 0
+    mod = MagicMock()
+    mod.uid = "MOD-1"
+    mod.mod_addr = 105
+    mod.typ = b"\x01\x04"  # RGB-capable
+    mod.area_member = 0
+    mod.outputs = [dim_out]
+    mod.dimmers = [MagicMock(value=50)]
+    cled = _make_cled_descriptor()
+    cled.name = "Color"
+    cled.set_name = MagicMock()
+    cled_alt = _make_cled_descriptor(nmbr=1)
+    cled_alt.name = ""
+    cled_alt.set_name = MagicMock()
+    mod.cleds = [cled, cled_alt]
+
+    router = MagicMock()
+    router.modules = [mod]
+    router.coord = MagicMock()
+    router.areas = {0: MagicMock()}
+
+    entry = MagicMock()
+    entry.runtime_data.router = router
+
+    added: list = []
+    with patch("custom_components.habitron.light.er.async_get") as mock_get:
+        registry = MagicMock()
+        registry.async_get_entity_id = MagicMock(return_value="light.fake")
+        mock_get.return_value = registry
+        await async_setup_entry(hass, entry, lambda es: added.extend(es))
+
+    assert any(isinstance(e, DimmedOutputPush) for e in added)
+    assert any(isinstance(e, ColorLed) for e in added)
+
+
+async def test_async_setup_entry_assigns_external_area(hass) -> None:
+    """When dimmer area > module area_member the area_id is set."""
+    dim_out = _make_output(type_=2, nmbr=10)
+    dim_out.area = 5
+    mod = MagicMock()
+    mod.uid = "MOD-A"
+    mod.mod_addr = 105
+    mod.typ = b"\x01\x03"
+    mod.area_member = 0
+    mod.outputs = [dim_out]
+    mod.dimmers = [MagicMock(value=50)]
+
+    router = MagicMock()
+    router.modules = [mod]
+    router.coord = MagicMock()
+    area = MagicMock()
+    area.get_name_id = MagicMock(return_value="area_5_id")
+    router.areas = {i: area for i in range(6)}
+
+    entry = MagicMock()
+    entry.runtime_data.router = router
+
+    with patch("custom_components.habitron.light.er.async_get") as mock_get:
+        registry = MagicMock()
+        registry.async_get_entity_id = MagicMock(return_value="light.fake")
+        mock_get.return_value = registry
+        await async_setup_entry(hass, entry, lambda es: None)
+
+    registry.async_update_entity.assert_called_with("light.fake", area_id="area_5_id")
+
+
+async def test_async_setup_entry_area_overflow_falls_back_to_zero(hass) -> None:
+    """An out-of-range dimmer area is clamped to zero."""
+    dim_out = _make_output(type_=2, nmbr=10)
+    dim_out.area = 99
+    mod = MagicMock()
+    mod.uid = "MOD-OV"
+    mod.mod_addr = 105
+    mod.typ = b"\x01\x03"
+    mod.area_member = 0
+    mod.outputs = [dim_out]
+    mod.dimmers = [MagicMock(value=50)]
+
+    router = MagicMock()
+    router.modules = [mod]
+    router.coord = MagicMock()
+    router.areas = {0: MagicMock()}
+
+    entry = MagicMock()
+    entry.runtime_data.router = router
+
+    with patch("custom_components.habitron.light.er.async_get") as mock_get:
+        registry = MagicMock()
+        registry.async_get_entity_id = MagicMock(return_value="light.fake")
+        mock_get.return_value = registry
+        await async_setup_entry(hass, entry, lambda es: None)
+
+    registry.async_update_entity.assert_called_with("light.fake", area_id=None)

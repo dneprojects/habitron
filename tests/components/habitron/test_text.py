@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from unittest.mock import MagicMock
-
-from custom_components.habitron.text import EKeySensorFngr, EKeySensorUsr
+from custom_components.habitron.text import (
+    EKeySensorFngr,
+    EKeySensorUsr,
+    async_setup_entry,
+)
 
 from .conftest import class_attr
 
@@ -158,3 +162,113 @@ def test_ekey_fngr_unknown_for_out_of_range() -> None:
     mod.sensors[0].value = 99
     entity._handle_coordinator_update()
     assert entity._attr_native_value == "Unknown"
+
+
+def test_ekey_user_device_info_and_name_property() -> None:
+    """EKeySensorUsr exposes device_info and the cached name."""
+    mod = _make_text_module()
+    coord = MagicMock()
+    entity = EKeySensorUsr(mod, 0, coord, 0)
+    assert ("habitron", "MOD-1") in entity.device_info["identifiers"]
+    assert entity.name == "Identifier Name"
+
+
+def test_ekey_fngr_device_info_and_name_property() -> None:
+    """EKeySensorFngr exposes device_info and the cached name."""
+    mod = _make_text_module()
+    coord = MagicMock()
+    entity = EKeySensorFngr(mod, 0, coord, 0)
+    assert ("habitron", "MOD-1") in entity.device_info["identifiers"]
+    assert entity.name == "Finger Name"
+
+
+async def test_ekey_user_async_added_to_hass_registers() -> None:
+    """EKeySensorUsr registers its callback on the sensor."""
+    mod = _make_text_module()
+    mod.sensors[0].register_callback = MagicMock()
+    coord = MagicMock()
+    entity = EKeySensorUsr(mod, 0, coord, 0)
+    with patch(
+        "homeassistant.helpers.update_coordinator."
+        "CoordinatorEntity.async_added_to_hass",
+        new=AsyncMock(),
+    ):
+        await entity.async_added_to_hass()
+    mod.sensors[0].register_callback.assert_called()
+
+
+async def test_ekey_user_async_will_remove_unregisters() -> None:
+    """EKeySensorUsr unregisters its callback on remove."""
+    mod = _make_text_module()
+    mod.sensors[0].remove_callback = MagicMock()
+    coord = MagicMock()
+    entity = EKeySensorUsr(mod, 0, coord, 0)
+    await entity.async_will_remove_from_hass()
+    mod.sensors[0].remove_callback.assert_called()
+
+
+async def test_ekey_fngr_async_added_to_hass_registers() -> None:
+    """EKeySensorFngr registers its callback on the sensor."""
+    mod = _make_text_module()
+    mod.sensors[0].register_callback = MagicMock()
+    coord = MagicMock()
+    entity = EKeySensorFngr(mod, 0, coord, 0)
+    with patch(
+        "homeassistant.helpers.update_coordinator."
+        "CoordinatorEntity.async_added_to_hass",
+        new=AsyncMock(),
+    ):
+        await entity.async_added_to_hass()
+    mod.sensors[0].register_callback.assert_called()
+
+
+async def test_ekey_fngr_async_will_remove_unregisters() -> None:
+    """EKeySensorFngr unregisters its callback on remove."""
+    mod = _make_text_module()
+    mod.sensors[0].remove_callback = MagicMock()
+    coord = MagicMock()
+    entity = EKeySensorFngr(mod, 0, coord, 0)
+    await entity.async_will_remove_from_hass()
+    mod.sensors[0].remove_callback.assert_called()
+
+
+async def test_async_setup_entry_emits_ekey_user_and_finger(hass) -> None:
+    """async_setup_entry emits one EKeySensorUsr + one EKeySensorFngr."""
+    ident = MagicMock()
+    ident.name = "Identifier"
+    ident.nmbr = 0
+    finger = MagicMock()
+    finger.name = "Finger"
+    finger.nmbr = 1
+    mod = MagicMock()
+    mod.uid = "MOD-1"
+    mod.sensors = [ident, finger]
+
+    router = MagicMock()
+    router.modules = [mod]
+    router.coord = MagicMock()
+    entry = MagicMock()
+    entry.runtime_data.router = router
+
+    added: list = []
+    await async_setup_entry(hass, entry, lambda es: added.extend(es))
+    assert any(isinstance(e, EKeySensorUsr) for e in added)
+    assert any(isinstance(e, EKeySensorFngr) for e in added)
+
+
+async def test_async_setup_entry_skips_other_sensors(hass) -> None:
+    """A non-eKey sensor does not produce any entity."""
+    sensor = MagicMock()
+    sensor.name = "Temperature"
+    mod = MagicMock()
+    mod.uid = "MOD-X"
+    mod.sensors = [sensor]
+    router = MagicMock()
+    router.modules = [mod]
+    router.coord = MagicMock()
+    entry = MagicMock()
+    entry.runtime_data.router = router
+
+    added: list = []
+    await async_setup_entry(hass, entry, lambda es: added.extend(es))
+    assert added == []
