@@ -6,7 +6,6 @@ import logging
 from typing import Any
 
 from homeassistant.components.switch import SwitchDeviceClass, SwitchEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
@@ -18,6 +17,7 @@ from homeassistant.helpers.update_coordinator import (
 )
 
 from .const import DOMAIN
+from .coordinator import HabitronConfigEntry
 from .interfaces import AreaDescriptor, IfDescriptor, StateDescriptor
 from .module import HbtnModule
 from .router import HbtnRouter
@@ -25,11 +25,11 @@ from .router import HbtnRouter
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: HabitronConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Add switches for passed config_entry in HA."""
-    hbtn_rt: HbtnRouter = hass.data[DOMAIN][entry.entry_id].router
+    hbtn_rt: HbtnRouter = entry.runtime_data.router
     hbtn_cord = hbtn_rt.coord
 
     new_devices: list[SwitchEntity] = []
@@ -76,7 +76,6 @@ async def async_setup_entry(
         flg_idx += 1
 
     if new_devices:
-        await hbtn_cord.async_config_entry_first_refresh()
         async_add_entities(new_devices)
 
     registry: er.EntityRegistry = er.async_get(hass)
@@ -131,7 +130,6 @@ class SwitchedOutput(CoordinatorEntity, SwitchEntity):
     """Representation of habitron outout as switch entities."""
 
     _attr_has_entity_name = True
-    _attr_should_poll = True  # for push updates
 
     def __init__(
         self,
@@ -202,7 +200,6 @@ class SwitchedOutputPush(SwitchedOutput):
 class SwitchedLed(CoordinatorEntity, SwitchEntity):
     """Module switch background LEDs."""
 
-    _attr_should_poll = False  # for push updates
     _attr_device_class = SwitchDeviceClass.SWITCH
     _attr_has_entity_name = True
 
@@ -278,6 +275,7 @@ class HbtnFlag(CoordinatorEntity, SwitchEntity):
 
     _attr_device_class = SwitchDeviceClass.SWITCH
     _attr_has_entity_name = True
+    _attr_translation_key = "habitron_flag"
 
     def __init__(
         self,
@@ -302,12 +300,6 @@ class HbtnFlag(CoordinatorEntity, SwitchEntity):
         """Return status of output."""
         return self._state
 
-    @property
-    def icon(self) -> str:
-        """Icon of the led, based on number and state."""
-        if self.is_on:
-            return "mdi:bookmark-check"
-        return "mdi:bookmark-outline"
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -337,8 +329,6 @@ class HbtnFlag(CoordinatorEntity, SwitchEntity):
 class HbtnFlagPush(HbtnFlag):
     """Representation of habitron flag entities for push update."""
 
-    _attr_should_poll = False  # for push updates
-
     async def async_added_to_hass(self) -> None:
         """Run when this Entity has been added to HA."""
         # Importantly for a push integration, the module that will be getting updates
@@ -360,6 +350,7 @@ class MicrophoneSwitch(SwitchEntity):
     """Representation of a button to trigger a speech command."""
 
     _attr_has_entity_name = True
+    _attr_translation_key = "microphone"
 
     def __init__(self, module) -> None:
         """Initialize a switch for the microphone."""
@@ -370,7 +361,6 @@ class MicrophoneSwitch(SwitchEntity):
         self._active_ws_connections = self._provider.active_ws_connections
         self._attr_unique_id = f"Mod_{self._module.uid}_{self._name}"
         self._attr_name = "Microphone Mode"
-        self._attr_icon = "mdi:microphone"
         self._state = False
 
     # To link this entity to its device, this property must return an
@@ -384,13 +374,6 @@ class MicrophoneSwitch(SwitchEntity):
     def is_on(self) -> bool:
         """Return status of output."""
         return self._state
-
-    @property
-    def icon(self) -> str:
-        """Icon of the switch, based on state."""
-        if self.is_on:
-            return "mdi:webcam"
-        return "mdi:microphone-message"
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Instruct the flag to turn on."""
@@ -416,6 +399,7 @@ class ClimateCtlSwitch(SwitchEntity):
 
     _attr_has_entity_name = True
     _attr_should_poll = True
+    _attr_translation_key = "climate_ctl"
 
     def __init__(self, module) -> None:
         """Initialize a switch for the microphone."""
@@ -423,7 +407,6 @@ class ClimateCtlSwitch(SwitchEntity):
         self._module = module
         self._attr_unique_id = f"Mod_{self._module.uid}_{self._name}"
         self._attr_name = self._name
-        self._attr_icon = "mdi:heat-pump-outline"  # "mdi:home-climate-outline"
         self._attr_entity_category = EntityCategory.CONFIG
         self._attr_entity_registry_enabled_default = (
             False  # Entity will initally be disabled
@@ -446,13 +429,6 @@ class ClimateCtlSwitch(SwitchEntity):
         """Return status of output."""
         self._state = self._module.climate_ctl12 == 2
         return self._state
-
-    @property
-    def icon(self) -> str:
-        """Icon of the switch, based on state."""
-        if self.is_on:
-            return "mdi:heat-pump"  # "mdi:home-climate"
-        return "mdi:heat-pump-outline"  # "mdi:home-climate-outline"
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Instruct the flag to turn on."""

@@ -1,281 +1,59 @@
 """The Habitron integration."""
 
-# remoteHA Token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJmMWI4NWUzZDg3ODg0MGNiOTIzNDE2OWE4ZDMxZDZhOCIsImlhdCI6MTc2MjA3OTMxMCwiZXhwIjoyMDc3NDM5MzEwfQ.NnEjgKTM_gbkBoRsf_pHVLzskY88SPR7gqlgReMWxKU
-
 from __future__ import annotations
 
-import logging
-
 from habitron_client import TimeoutException
-import voluptuous as vol
 
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.const import Platform
+from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceEntry
 
-from .const import (
-    DOMAIN,
-    EVNT_ARG1,
-    EVNT_ARG2,
-    EVNT_ARG3,
-    EVNT_ARG4,
-    EVNT_ARG5,
-    EVNT_TYPE,
-    FILE_MOD_NMBR,
-    HUB_UID,
-    MOD_NMBR,
-    RESTART_ALL,
-    RESTART_KEY_NMBR,
-    ROUTER_NMBR,
-)
+from .const import DOMAIN
+from .coordinator import HabitronConfigEntry
+from .services import async_remove_services, async_setup_services
 from .smart_hub import SmartHub
 from .system_health import system_health_info  # noqa: F401
 from .ws_provider import HabitronWebRTCProvider
 
-PLATFORMS: list[str] = [
-    "assist_satellite",
-    "binary_sensor",
-    "button",
-    "camera",
-    "climate",
-    "cover",
-    "event",
-    "light",
-    "media_player",
-    "notify",
-    "number",
-    "select",
-    "sensor",
-    "switch",
-    "text",
-    "update",
+PLATFORMS: list[Platform] = [
+    Platform.ASSIST_SATELLITE,
+    Platform.BINARY_SENSOR,
+    Platform.BUTTON,
+    Platform.CAMERA,
+    Platform.CLIMATE,
+    Platform.COVER,
+    Platform.EVENT,
+    Platform.LIGHT,
+    Platform.MEDIA_PLAYER,
+    Platform.NOTIFY,
+    Platform.NUMBER,
+    Platform.SELECT,
+    Platform.SENSOR,
+    Platform.SWITCH,
+    Platform.TEXT,
+    Platform.UPDATE,
 ]
-SERVICE_HUB_RESTART_SCHEMA = vol.Schema({})
-SERVICE_HUB_REBOOT_SCHEMA = vol.Schema({})
-SERVICE_MOD_RESTART_SCHEMA = vol.Schema(
-    {
-        vol.Optional(RESTART_KEY_NMBR, default=1): int,  # type: ignore  # noqa: PGH003
-    }
-)
-SERVICE_MOD_FILE_SCHEMA = vol.Schema(
-    {
-        vol.Required(FILE_MOD_NMBR, default=1): int,  # type: ignore  # noqa: PGH003
-    }
-)
-SERVICE_RTR_FILE_SCHEMA = vol.Schema({})
-SERVICE_RTR_RESTART_SCHEMA = vol.Schema({})
-SERVICE_UPDATE_ENTITY_SCHEMA = vol.Schema(
-    {
-        vol.Required(HUB_UID): str,
-        vol.Required(ROUTER_NMBR, default=1): int,
-        vol.Required(MOD_NMBR): int,
-        vol.Required(EVNT_TYPE): int,
-        vol.Required(EVNT_ARG1): int,
-        vol.Required(EVNT_ARG2): int,
-        vol.Optional(EVNT_ARG3): int,
-        vol.Optional(EVNT_ARG4): int,
-        vol.Optional(EVNT_ARG5): int,
-    }
-)
-
-SERVICE_SC_SYSTEM_COMMAND_SCHEMA = vol.Schema(
-    {
-        vol.Required("target_device"): vol.Any(str, list),
-        vol.Optional("command", default="restart"): str,
-        vol.Optional("new_ip"): str,
-    }
-)
-
-_LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:  # noqa: C901
+async def async_setup_entry(hass: HomeAssistant, entry: HabitronConfigEntry) -> bool:
     """Set up Habitron from a config entry."""
-
     try:
-        # 1. Create the main SmartHub instance.
         smhub = SmartHub(hass, entry)
-
-        # 2. Run the setup which initializes router, etc.
         await smhub.async_setup()
+        # Central first refresh — done once here instead of per platform.
+        await smhub.router.coord.async_config_entry_first_refresh()
 
-        # 3. Create the provider, passing it the router from the SmartHub.
         provider = HabitronWebRTCProvider(hass, smhub.router)
         smhub.ws_provider = provider
-
-        # 4. Store ONLY the smhub object. Other platforms will access .router and .ws_provider from it.
-        hass.data.setdefault(DOMAIN, {})[entry.entry_id] = smhub
-
-        # 5. Register websocket handlers from the provider instance.
         provider.async_register_websocket_handlers()
 
+        entry.runtime_data = smhub
         entry.async_on_unload(entry.add_update_listener(update_listener))
 
-        # --- Service Registration ---
-        async def restart_hub(_call: ServiceCall):
-            """Handle the service call."""
-            await smhub.comm.hub_restart()
-
-        async def reboot_hub(_call: ServiceCall):
-            """Handle the service call."""
-            await smhub.comm.hub_reboot()
-
-        async def restart_module(call: ServiceCall):
-            """Handle the service call."""
-            mod_nmbr = call.data.get(RESTART_KEY_NMBR, RESTART_ALL)
-            await smhub.comm.module_restart(100 + mod_nmbr)
-
-        async def restart_router(_call: ServiceCall):
-            """Handle the service call."""
-            await smhub.comm.module_restart(0)
-
-        async def save_module_smc(call: ServiceCall):
-            """Handle the service call."""
-            mod_nmbr = call.data.get(FILE_MOD_NMBR, 1)
-            await smhub.comm.save_smc_file(100 + mod_nmbr)
-
-        async def save_module_smg(call: ServiceCall):
-            """Handle the service call."""
-            mod_nmbr = call.data.get(FILE_MOD_NMBR, 1)
-            await smhub.comm.save_smg_file(100 + mod_nmbr)
-
-        async def save_router_smr(_call: ServiceCall):
-            """Handle the service call."""
-            await smhub.comm.save_smr_file()
-
-        async def save_module_status(call: ServiceCall):
-            """Handle the service call."""
-            mod_nmbr = call.data.get(FILE_MOD_NMBR, 1)
-            await smhub.comm.save_module_status(100 + mod_nmbr)
-
-        async def save_router_status(_call: ServiceCall):
-            """Handle the service call."""
-            await smhub.comm.save_router_status()
-
-        async def update_entity(call: ServiceCall):
-            """Handle the update service call."""
-            hub_id = call.data.get(HUB_UID)
-            _rt_id = call.data.get(ROUTER_NMBR)
-            mod_id = call.data.get(MOD_NMBR)
-            evnt = call.data.get(EVNT_TYPE)
-            arg1 = call.data.get(EVNT_ARG1)
-            arg2 = call.data.get(EVNT_ARG2)
-            arg3 = call.data.get(EVNT_ARG3, 0)  # optional, Default 0
-            arg4 = call.data.get(EVNT_ARG4, 0)  # optional, Default 0
-            arg5 = call.data.get(EVNT_ARG5, 0)  # optional, Default 0
-            for hub_instance in hass.data.get(DOMAIN, {}).values():
-                if hub_instance.host == hub_id:
-                    await hub_instance.comm.update_entity(
-                        hub_id, mod_id, evnt, arg1, arg2, arg3, arg4, arg5
-                    )
-                    break
-
-        async def sc_system_command(call: ServiceCall):
-            """Handle the system command service call by accessing module properties."""
-            target_devices = call.data.get("target_device", [])
-            command = call.data.get("command", "restart")
-            new_ip = call.data.get("new_ip")
-
-            if not hasattr(smhub, "ws_provider") or not smhub.ws_provider:
-                _LOGGER.error("WebSocket provider not initialized on SmartHub")
-                return
-
-            if isinstance(target_devices, str):
-                target_devices = [target_devices]
-
-            if not target_devices:
-                _LOGGER.warning("No target devices provided for system command")
-                return
-
-            # Access the device registry instead of the entity registry
-            dev_reg = dr.async_get(hass)
-
-            for device_id in target_devices:
-                device = dev_reg.async_get(device_id)
-                if not device:
-                    continue
-
-                module_found = False
-
-                # Iterate through identifiers to find the Habitron mapping
-                for identifier in device.identifiers:
-                    if identifier[0] == DOMAIN:
-                        try:
-                            mod_uid = str(identifier[1])
-
-                            # Get the module instance directly from the router
-                            module = smhub.router.get_module_by_uid(mod_uid)
-
-                            # Check if it's a Smart Controller
-                            if module and getattr(module, "typ", None) == b"\x01\x04":
-                                # Directly access the stream_name property
-                                stream_id = getattr(module, "stream_name", None)
-
-                                if stream_id:
-                                    await smhub.ws_provider.async_send_system_command(
-                                        stream_id, command, new_ip
-                                    )
-                                    module_found = True
-                                    break
-                                _LOGGER.warning(
-                                    "Module %s is missing the stream_name property",
-                                    module.name,
-                                )
-                        except ValueError, IndexError:
-                            pass
-
-                if not module_found:
-                    _LOGGER.warning(
-                        "No valid Smart Touch module found for device %s", device_id
-                    )
-
-        hass.services.async_register(
-            DOMAIN, "hub_restart", restart_hub, schema=SERVICE_HUB_RESTART_SCHEMA
-        )
-        hass.services.async_register(
-            DOMAIN, "hub_reboot", reboot_hub, schema=SERVICE_HUB_REBOOT_SCHEMA
-        )
-        hass.services.async_register(
-            DOMAIN, "mod_restart", restart_module, schema=SERVICE_MOD_RESTART_SCHEMA
-        )
-        hass.services.async_register(
-            DOMAIN, "rtr_restart", restart_router, schema=SERVICE_RTR_RESTART_SCHEMA
-        )
-        hass.services.async_register(
-            DOMAIN, "save_module_smc", save_module_smc, schema=SERVICE_MOD_FILE_SCHEMA
-        )
-        hass.services.async_register(
-            DOMAIN, "save_module_smg", save_module_smg, schema=SERVICE_MOD_FILE_SCHEMA
-        )
-        hass.services.async_register(
-            DOMAIN, "save_router_smr", save_router_smr, schema=SERVICE_RTR_FILE_SCHEMA
-        )
-        hass.services.async_register(
-            DOMAIN,
-            "save_module_status",
-            save_module_status,
-            schema=SERVICE_MOD_FILE_SCHEMA,
-        )
-        hass.services.async_register(
-            DOMAIN,
-            "save_router_status",
-            save_router_status,
-            schema=SERVICE_RTR_FILE_SCHEMA,
-        )
-        hass.services.async_register(
-            DOMAIN,
-            "update_entity",
-            update_entity,
-            schema=SERVICE_UPDATE_ENTITY_SCHEMA,
-        )
-        hass.services.async_register(
-            DOMAIN,
-            "sc_system_command",
-            sc_system_command,
-            schema=SERVICE_SC_SYSTEM_COMMAND_SCHEMA,
-        )
+        # Services live on the domain, not on the entry. The helper is
+        # idempotent so subsequent entries are a no-op.
+        async_setup_services(hass)
 
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
         return True  # noqa: TRY300
@@ -284,15 +62,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:  #
         raise ConfigEntryNotReady("Timeout while connecting to SmartHub") from ex
     except ConnectionRefusedError as ex:
         raise ConfigEntryNotReady(f"Connection refused to SmartHub: {ex}") from ex
-    except Exception as ex:
+    except (OSError, ConnectionError) as ex:
+        # Network-level failures (DNS, socket errors, ...) are transient
+        # and should let HA retry the entry. Programming errors such as
+        # AttributeError/KeyError must propagate so they show up in the
+        # logs instead of being masked as a retry loop.
         raise ConfigEntryNotReady(f"Error connecting to SmartHub: {ex}") from ex
 
 
 async def async_remove_config_entry_device(
-    hass: HomeAssistant, config_entry: ConfigEntry, device_entry: DeviceEntry
+    hass: HomeAssistant,
+    config_entry: HabitronConfigEntry,
+    device_entry: DeviceEntry,
 ) -> bool:
     """Remove a config entry from a device."""
-    smhub: SmartHub = hass.data[DOMAIN][config_entry.entry_id]
+    smhub = config_entry.runtime_data
     return not any(
         identifier
         for identifier in device_entry.identifiers
@@ -300,22 +84,30 @@ async def async_remove_config_entry_device(
     )
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: HabitronConfigEntry) -> bool:
     """Unload a config entry."""
-    # This is called when an entry/configured device is to be removed. The class
-    # needs to unload itself, and remove callbacks. See the classes for further
-    # details
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    if unload_ok:
-        hass.data[DOMAIN].pop(entry.entry_id)
-    return unload_ok
+    if not unload_ok:
+        return False
+
+    smhub = entry.runtime_data
+    if smhub.ws_provider is not None:
+        smhub.ws_provider.async_close()
+
+    # Services are registered globally on DOMAIN, not per entry. Only
+    # tear them down once the last loaded hub is gone, otherwise a
+    # remaining hub would lose its services. ``async_loaded_entries``
+    # excludes the entry currently being unloaded.
+    if not hass.config_entries.async_loaded_entries(DOMAIN):
+        async_remove_services(hass)
+
+    return True
 
 
-async def update_listener(hass: HomeAssistant, entry: ConfigEntry):
-    """Handle options update."""
-    smhub: SmartHub = hass.data[DOMAIN][entry.entry_id]
-    await smhub.router.comm.set_host(entry.options["habitron_host"])
-    smhub.router.coord.set_update_interval(
-        entry.options["update_interval"], entry.options["updates_enabled"]
-    )
-    await smhub.router.comm.send_network_info(entry.options["websock_token"])
+async def update_listener(hass: HomeAssistant, entry: HabitronConfigEntry) -> None:
+    """Handle options update by reloading the config entry."""
+    # ``set_host`` triggered a reload itself, which left the rest of this
+    # listener acting on a hub instance that was being torn down. Doing
+    # the reload here unconditionally keeps host, interval and token in
+    # sync via the normal setup path.
+    await hass.config_entries.async_reload(entry.entry_id)

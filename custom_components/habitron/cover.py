@@ -13,7 +13,6 @@ from homeassistant.components.cover import (
     CoverEntity,
     CoverEntityFeature,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -23,6 +22,7 @@ from homeassistant.helpers.update_coordinator import (
 )
 
 from .const import DOMAIN
+from .coordinator import HabitronConfigEntry
 from .interfaces import AreaDescriptor, CovDescriptor
 from .module import HbtnModule
 from .router import HbtnRouter
@@ -33,11 +33,11 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: HabitronConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Add covers for passed config_entry in HA."""
-    hbtn_rt: HbtnRouter = hass.data[DOMAIN][entry.entry_id].router
+    hbtn_rt: HbtnRouter = entry.runtime_data.router
     hbtn_cord: DataUpdateCoordinator = hbtn_rt.coord
 
     new_devices = []
@@ -54,8 +54,6 @@ async def async_setup_entry(
                     )
 
     if new_devices:
-        await hbtn_cord.async_config_entry_first_refresh()
-        hbtn_cord.data = new_devices  # type: ignore  # noqa: PGH003
         async_add_entities(new_devices)
 
     registry: er.EntityRegistry = er.async_get(hass)
@@ -89,7 +87,6 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
 
     _attr_has_entity_name = True
     _attr_device_class = CoverDeviceClass.SHUTTER
-    _attr_should_poll = True  # for push updates
 
     _attr_supported_features = (
         CoverEntityFeature.SET_POSITION
@@ -128,6 +125,7 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
         self._position: int = 0
         self._moving: int = 0
         self.stop_delay: int = module.comm.router.cover_autostop_del
+        self._stop_task: asyncio.Task | None = None
         self._attr_unique_id: str | None = f"Mod_{self._module.uid}_cover{cover.nmbr}"
         self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
 
@@ -146,6 +144,24 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
         """Entity being removed from hass."""
         # The opposite of async_added_to_hass. Remove any registered call backs here.
         self._cover.remove_callback(self._handle_coordinator_update)
+        if self._stop_task is not None and not self._stop_task.done():
+            self._stop_task.cancel()
+
+    @callback
+    def _schedule_stop(self, delay: int) -> None:
+        """Schedule a single delayed cover-stop, deduplicated across ticks.
+
+        Without this, every coordinator tick that still sees the cover
+        running at an endpoint would spawn an additional stop task,
+        which would each fire a redundant ``async_set_output`` after
+        ``delay`` seconds.
+        """
+        if self._stop_task is not None and not self._stop_task.done():
+            return
+        self._stop_task = self.hass.async_create_task(
+            self._stop_cover_after_delay(delay),
+            name=f"habitron_cover_stop_{self._attr_unique_id}",
+        )
 
     @property
     def current_cover_position(self) -> int | None:
@@ -186,10 +202,10 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
             self._moving = 0
         if self._moving == 1:
             if (self._position == 100) and (self.stop_delay >= 0):
-                self.hass.create_task(self._stop_cover_after_delay(self.stop_delay))
+                self._schedule_stop(self.stop_delay)
         elif self._moving == -1:
             if (self._position == 0) and (self.stop_delay >= 0):
-                self.hass.create_task(self._stop_cover_after_delay(self.stop_delay))
+                self._schedule_stop(self.stop_delay)
         self.async_write_ha_state()
 
     async def _stop_cover_after_delay(self, delay_time: int) -> None:
@@ -308,10 +324,10 @@ class HbtnBlind(HbtnShutter):
         self._position = 100 - int(self._cover.value)
         if self._moving == 1:
             if (self._position == 100) and (self.stop_delay >= 0):
-                self.hass.create_task(self._stop_cover_after_delay(self.stop_delay))
+                self._schedule_stop(self.stop_delay)
         elif self._moving == -1:
             if (self._position == 0) and (self.stop_delay >= 0):
-                self.hass.create_task(self._stop_cover_after_delay(self.stop_delay))
+                self._schedule_stop(self.stop_delay)
         self.async_write_ha_state()
 
     async def async_set_cover_tilt_position(self, **kwargs: Any) -> None:

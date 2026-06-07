@@ -16,22 +16,21 @@ def async_register(
     register.async_register_info(system_health_info)
 
 
-def get_router_status(hass: HomeAssistant) -> str:
-    """Get the router status."""
-    hbtn = hass.data[DOMAIN][list(hass.data[DOMAIN].keys())[0]]
-    if hbtn.comm.router._sys_ok:  # noqa: SLF001
+def _aggregate_router_status(hubs: list) -> str:
+    """Return aggregate router health across all configured SmartHubs."""
+    if not hubs:
+        return "no hubs"
+    if all(hub.comm.router._sys_ok for hub in hubs):  # noqa: SLF001
         return "ok"
     return "errors"
 
 
 async def system_health_info(hass: HomeAssistant) -> dict[str, Any]:
     """Get info for the info page."""
-
-    hbtn_health: dict[str, Any] = {}
-    hbtn_health["hbtn_version"] = hass.data["integrations"]["habitron"].manifest[
-        "version"
-    ]
-    hbtn = hass.data[DOMAIN][list(hass.data[DOMAIN].keys())[0]]
-    hbtn_health["router_status"] = get_router_status(hass)
-    hbtn_health["module_count"] = len(hbtn.router.modules)
-    return hbtn_health
+    hubs = list(hass.data.get(DOMAIN, {}).values())
+    return {
+        "hbtn_version": hass.data["integrations"]["habitron"].manifest["version"],
+        "hub_count": len(hubs),
+        "router_status": _aggregate_router_status(hubs),
+        "module_count": sum(len(hub.router.modules) for hub in hubs),
+    }

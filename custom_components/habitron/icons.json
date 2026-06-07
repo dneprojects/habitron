@@ -1,0 +1,128 @@
+{
+  "entity": {
+    "binary_sensor": {
+      "input_switch": {
+        "default": "mdi:toggle-switch-variant-off",
+        "state": {
+          "on": "mdi:toggle-switch-variant"
+        }
+      },
+      "motion": {
+        "default": "mdi:motion-sensor-off",
+        "state": {
+          "on": "mdi:motion-sensor"
+        }
+      },
+      "rain": {
+        "default": "mdi:weather-partly-cloudy",
+        "state": {
+          "on": "mdi:weather-rainy"
+        }
+      },
+      "hub_state": {
+        "default": "mdi:alert-circle-outline",
+        "state": {
+          "on": "mdi:checkbox-marked-circle-outline"
+        }
+      },
+      "listening_status": {
+        "default": "mdi:microphone-message-off",
+        "state": {
+          "on": "mdi:microphone-message"
+        }
+      }
+    },
+    "button": {
+      "module_reset": {
+        "default": "mdi:restart"
+      },
+      "restart_fwd_table": {
+        "default": "mdi:restore"
+      },
+      "router_reset_all": {
+        "default": "mdi:restart"
+      },
+      "hub_restart": {
+        "default": "mdi:restart"
+      },
+      "hub_reboot": {
+        "default": "mdi:restart-alert"
+      },
+      "count_up": {
+        "default": "mdi:chevron-up-box-outline"
+      },
+      "count_down": {
+        "default": "mdi:chevron-down-box-outline"
+      },
+      "power_cycle": {
+        "default": "mdi:backup-restore"
+      },
+      "voice_input": {
+        "default": "mdi:account-voice"
+      }
+    },
+    "light": {
+      "dimmed_output": {
+        "default": "mdi:lightbulb-on-60"
+      }
+    },
+    "media_player": {
+      "habitron_speaker": {
+        "default": "mdi:speaker"
+      }
+    },
+    "number": {
+      "analog_output": {
+        "default": "mdi:sine-wave"
+      }
+    },
+    "sensor": {
+      "analog_sensor": {
+        "default": "mdi:chart-bell-curve-cumulative"
+      },
+      "ekey_id": {
+        "default": "mdi:fingerprint"
+      },
+      "ekey_finger": {
+        "default": "mdi:fingerprint"
+      },
+      "wind": {
+        "default": "mdi:weather-windy-variant"
+      },
+      "logic_state": {
+        "default": "mdi:counter"
+      },
+      "time_out": {
+        "default": "mdi:timer-alert-outline"
+      }
+    },
+    "switch": {
+      "habitron_flag": {
+        "default": "mdi:bookmark-outline",
+        "state": {
+          "on": "mdi:bookmark-check"
+        }
+      },
+      "microphone": {
+        "default": "mdi:microphone-message",
+        "state": {
+          "on": "mdi:webcam"
+        }
+      },
+      "climate_ctl": {
+        "default": "mdi:heat-pump-outline",
+        "state": {
+          "on": "mdi:heat-pump"
+        }
+      }
+    },
+    "text": {
+      "ekey_user": {
+        "default": "mdi:fingerprint"
+      },
+      "ekey_finger": {
+        "default": "mdi:fingerprint"
+      }
+    }
+  }
+}

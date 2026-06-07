@@ -29,10 +29,13 @@ if TYPE_CHECKING:
     from .router import HbtnRouter
     from .smart_hub import SmartHub
 
-BASE_PATH_COMPONENT = "./homeassistant/components"
-BASE_PATH_CUSTOM_COMPONENT = "./custom_components"
 DATA_FILES_ADDON_DIR = "/addon_configs/"
 DEF_TOKEN_FILE = "def_token.set"
+
+# Directory in which saved configuration / status files are placed.
+# Lives next to this module so it survives independent of the cwd
+# Home Assistant happened to start from.
+_DATA_DIR = Path(__file__).parent / "data"
 
 
 class HbtnComm:
@@ -49,12 +52,17 @@ class HbtnComm:
 
         if self.is_valid_ipv4(self._host_conf):
             self._host = self._host_conf
-        elif self._host_conf == "local":
-            self._host = get_own_ip()
         else:
-            self._host: str = get_host_ip(self._host_conf)
+            # Hostname/"local" resolution happens in ``async_setup`` to keep
+            # blocking DNS off the event loop. Provisional empty host until
+            # ``self.client.host`` is updated there.
+            self._host = ""
 
-        self.logger.info("Initializing hub, got own ip: %s", self._host)
+        self.logger.info(
+            "Initializing hub, host conf: %s, initial ip: %s",
+            self._host_conf,
+            self._host,
+        )
         self._port: int = 7777
 
         # Initialize client instance
@@ -70,8 +78,6 @@ class HbtnComm:
         self._network_ip: str = ""
 
         self.logger.info("Got network ip: %s", self._network_ip)
-
-        self._loop = asyncio.get_event_loop()
 
         # Lock to ensure sequential access to the socket even when running in executor threads
         self._api_lock = asyncio.Lock()
@@ -130,7 +136,15 @@ class HbtnComm:
         return self._hostname
 
     async def async_setup(self) -> None:
-        """Async post-init: resolve own network IP via HA helper."""
+        """Async post-init: resolve hub host via executor, then own network IP."""
+        if not self._host:
+            if self._host_conf == "local":
+                self._host = await self._hass.async_add_executor_job(get_own_ip)
+            else:
+                self._host = await self._hass.async_add_executor_job(
+                    get_host_ip, self._host_conf
+                )
+            self.client.host = self._host
         self._network_ip = await network.async_get_source_ip(
             self._hass, target_ip=self._host
         )
@@ -162,7 +176,9 @@ class HbtnComm:
         if self._host_conf == host:
             return
         self._host_conf = host
-        self._host = get_host_ip(self._host_conf)
+        self._host = await self._hass.async_add_executor_job(
+            get_host_ip, self._host_conf
+        )
         self.client.host = self._host
         await self._hass.config_entries.async_reload(self._config.entry_id)
 
@@ -460,13 +476,8 @@ class HbtnComm:
 
     async def save_config_data(self, file_name: str, str_data: str) -> None:
         """Save config info to text file."""
-        if Path(BASE_PATH_COMPONENT).is_dir():
-            data_path = f"{BASE_PATH_COMPONENT}/{DOMAIN}/data/"
-        else:
-            data_path = f"{BASE_PATH_CUSTOM_COMPONENT}/{DOMAIN}/data/"
-        if not Path(data_path).is_dir():
-            Path(data_path).mkdir()
-        file_path = data_path + file_name
+        await self._hass.async_add_executor_job(_DATA_DIR.mkdir, 0o755, True, True)
+        file_path = _DATA_DIR / file_name
         async with await anyio.open_file(
             file_path, "w", encoding="ascii", errors="surrogateescape"
         ) as hbtn_file:

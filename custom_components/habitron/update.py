@@ -15,7 +15,6 @@ from homeassistant.components.update import (
     UpdateEntity,
     UpdateEntityFeature,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -23,6 +22,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
+from .coordinator import HabitronConfigEntry
 from .router import HbtnModule, HbtnRouter
 
 _LOGGER = logging.getLogger(__name__)
@@ -30,11 +30,11 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: HabitronConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Add update entities for Habitron system."""
-    hbtn_rt: HbtnRouter = hass.data[DOMAIN][entry.entry_id].router
+    hbtn_rt: HbtnRouter = entry.runtime_data.router
     hbtn_cord = hbtn_rt.coord
 
     new_devices = []
@@ -51,7 +51,6 @@ async def async_setup_entry(
             new_devices.append(SCTouchAppUpdate(hbt_module, hbtn_rt))
 
     if new_devices:
-        await hbtn_cord.async_config_entry_first_refresh()
         async_add_entities(new_devices)
 
 
@@ -250,6 +249,10 @@ class HbtnModuleUpdate(CoordinatorEntity, UpdateEntity):
     _attr_supported_features = (
         UpdateEntityFeature.INSTALL | UpdateEntityFeature.PROGRESS
     )
+    # CoordinatorEntity normally turns off polling, but this entity does
+    # not consume coordinator.data — it queries firmware versions via its
+    # own ``async_update`` against the bus. Keep periodic polling so a
+    # firmware bumped on the device shows up without an HA reload.
     _attr_should_poll = True
 
     def __init__(self, module, coord, idx) -> None:

@@ -9,7 +9,6 @@ from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
@@ -21,6 +20,7 @@ from homeassistant.helpers.update_coordinator import (
 )
 
 from .const import DOMAIN
+from .coordinator import HabitronConfigEntry
 from .interfaces import TYPE_DIAG, AreaDescriptor, IfDescriptor, StateDescriptor
 
 if TYPE_CHECKING:
@@ -30,11 +30,11 @@ if TYPE_CHECKING:
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: HabitronConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Add binary sensors for Habitron inputs."""
-    hbtn_rt: HbtnRouter = hass.data[DOMAIN][entry.entry_id].router
+    hbtn_rt: HbtnRouter = entry.runtime_data.router
     hbtn_cord = hbtn_rt.coord
 
     new_devices = []
@@ -63,8 +63,6 @@ async def async_setup_entry(
         new_devices.append(HbtnState(rt_stat, hbtn_rt, hbtn_cord, len(new_devices)))
 
     if new_devices:
-        await hbtn_cord.async_config_entry_first_refresh()
-        hbtn_cord.data = new_devices  # type: ignore  # noqa: PGH003
         async_add_entities(new_devices)
 
     registry: er.EntityRegistry = er.async_get(hass)
@@ -90,7 +88,6 @@ class HbtnBinSensor(CoordinatorEntity, BinarySensorEntity):
     """Representation of habitron switch input entities."""
 
     _attr_has_entity_name = True
-    _attr_should_poll = True
 
     def __init__(
         self,
@@ -133,6 +130,7 @@ class InputSwitch(HbtnBinSensor):
     """Representation of habitron switch input entities."""
 
     _attr_has_entity_name = True
+    _attr_translation_key = "input_switch"
 
     def __init__(
         self,
@@ -145,13 +143,6 @@ class InputSwitch(HbtnBinSensor):
         super().__init__(inpt, module, coord, idx)
         self._attr_unique_id: str = f"Mod_{self._module.uid}_in{self._nmbr}"
 
-    @property
-    def icon(self) -> str:
-        """Icon of the led, based on number and state."""
-        if self.is_on:
-            return "mdi:toggle-switch-variant"
-        return "mdi:toggle-switch-variant-off"
-
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
@@ -161,8 +152,6 @@ class InputSwitch(HbtnBinSensor):
 
 class InputSwitchPush(InputSwitch):
     """Representation of habitron switch input entities for push update."""
-
-    _attr_should_poll = True  # for push updates, poll anyway
 
     async def async_added_to_hass(self) -> None:
         """Run when this Entity has been added to HA."""
@@ -185,6 +174,7 @@ class MotionSensor(HbtnBinSensor):
     """Representation of habitron button switch input."""
 
     _attr_device_class = BinarySensorDeviceClass.MOTION
+    _attr_translation_key = "motion"
 
     def __init__(
         self,
@@ -198,13 +188,6 @@ class MotionSensor(HbtnBinSensor):
         self._attr_unique_id = f"Mod_{self._module.uid}_motion"
         self._attr_name = "Motion"
 
-    @property
-    def icon(self) -> str:
-        """Icon of the led, based on number and state."""
-        if self.is_on:
-            return "mdi:motion-sensor"
-        return "mdi:motion-sensor-off"
-
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
@@ -214,8 +197,6 @@ class MotionSensor(HbtnBinSensor):
 
 class MotionSensorPush(MotionSensor):
     """Representation of habitron button switch input for push update."""
-
-    _attr_should_poll = False  # for push updates
 
     async def async_added_to_hass(self) -> None:
         """Run when this Entity has been added to HA."""
@@ -238,6 +219,7 @@ class RainSensor(HbtnBinSensor):
     """Representation of habitron button switch input."""
 
     _attr_device_class = BinarySensorDeviceClass.MOISTURE
+    _attr_translation_key = "rain"
 
     def __init__(
         self,
@@ -250,14 +232,6 @@ class RainSensor(HbtnBinSensor):
         super().__init__(sensor, module, coord, idx)
         self._attr_unique_id: str = f"Mod_{self._module.uid}_rain"
         self._attr_name: str = "Rain"
-        self._attr_icon: str = "mdi:weather-rainy"
-
-    @property
-    def icon(self) -> str:
-        """Icon of the led, based on number and state."""
-        if self.is_on:
-            return "mdi:weather-rainy"
-        return "mdi:weather-partly-cloudy"
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -270,7 +244,7 @@ class HbtnState(CoordinatorEntity, BinarySensorEntity):
     """Representation of habitron state entities."""
 
     _attr_has_entity_name = True
-    _attr_should_poll = True
+    _attr_translation_key = "hub_state"
 
     def __init__(
         self,
@@ -314,13 +288,6 @@ class HbtnState(CoordinatorEntity, BinarySensorEntity):
         """Return status of output."""
         return self._on_state
 
-    @property
-    def icon(self) -> str:
-        """Icon of the led, based on number and state."""
-        if self.is_on:
-            return "mdi:checkbox-marked-circle-outline"
-        return "mdi:alert-circle-outline"
-
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
@@ -335,6 +302,7 @@ class ListeningStatusSensor(BinarySensorEntity):
     _attr_should_poll = True
     _attr_name: str = "Listening Status"
     _attr_device_class = BinarySensorDeviceClass.SOUND
+    _attr_translation_key = "listening_status"
 
     def __init__(
         self,
@@ -351,11 +319,6 @@ class ListeningStatusSensor(BinarySensorEntity):
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
         return {"identifiers": {(DOMAIN, self._module.uid)}}
-
-    @property
-    def icon(self) -> str:
-        """Icon of the sensor, based on state."""
-        return "mdi:microphone-message" if self.is_on else "mdi:microphone-message-off"
 
     # This method allows us to update the state from outside
     def set_listening_state(self, is_listening: bool) -> None:

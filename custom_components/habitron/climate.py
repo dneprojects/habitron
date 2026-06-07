@@ -11,7 +11,6 @@ from homeassistant.components.climate import (
     HVACAction,
     HVACMode,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
@@ -23,6 +22,7 @@ from homeassistant.helpers.update_coordinator import (
 )
 
 from .const import DOMAIN
+from .coordinator import HabitronConfigEntry
 from .module import HbtnModule
 from .router import HbtnRouter
 
@@ -31,11 +31,11 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: HabitronConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Add climate units for passed config_entry in HA."""
-    hbtn_rt: HbtnRouter = hass.data[DOMAIN][entry.entry_id].router
+    hbtn_rt: HbtnRouter = entry.runtime_data.router
     hbtn_cord: DataUpdateCoordinator = hbtn_rt.coord
 
     new_devices = []
@@ -83,7 +83,6 @@ async def async_setup_entry(
                 entry.async_on_unload(hbtn_cord.async_add_listener(clean_enable_logic))
 
     if new_devices:
-        await hbtn_cord.async_config_entry_first_refresh()
         async_add_entities(new_devices)
 
 

@@ -10,7 +10,6 @@ from homeassistant.components.light import (
     ColorMode,
     LightEntity,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -20,6 +19,7 @@ from homeassistant.helpers.update_coordinator import (
 )
 
 from .const import DOMAIN
+from .coordinator import HabitronConfigEntry
 from .interfaces import AreaDescriptor, CLedDescriptor, IfDescriptor
 from .module import HbtnModule
 from .router import HbtnRouter
@@ -27,11 +27,11 @@ from .router import HbtnRouter
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: HabitronConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Add lights for passed config_entry in HA."""
-    hbtn_rt: HbtnRouter = hass.data[DOMAIN][entry.entry_id].router
+    hbtn_rt: HbtnRouter = entry.runtime_data.router
     hbtn_cord = hbtn_rt.coord
 
     new_devices: list[LightEntity] = []
@@ -61,7 +61,6 @@ async def async_setup_entry(
                     ColorLed(cled, hbt_module, hbtn_cord, len(new_devices))
                 )
     if new_devices:
-        await hbtn_cord.async_config_entry_first_refresh()
         async_add_entities(new_devices)
 
     registry: er.EntityRegistry = er.async_get(hass)
@@ -92,7 +91,7 @@ class SwitchedLight(CoordinatorEntity, LightEntity):
 
     _attr_has_entity_name = True
     _attr_color_mode = ColorMode.ONOFF
-    _attr_should_poll = True  # for push updates
+    _attr_supported_color_modes = {ColorMode.ONOFF}
 
     def __init__(
         self,
@@ -117,13 +116,6 @@ class SwitchedLight(CoordinatorEntity, LightEntity):
         self._out_offs = 0  # Dimm 1 = Out 1 + offs
         self._attr_unique_id: str | None = f"Mod_{self._module.uid}_out{output.nmbr}"
         self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
-
-    @property
-    def supported_color_modes(self) -> set[ColorMode] | set[str] | None:
-        """Flag supported color modes."""
-        color_modes: set[ColorMode | str] = set()
-        color_modes.add(ColorMode.ONOFF)
-        return color_modes
 
     @property
     def is_on(self) -> bool:
@@ -153,30 +145,20 @@ class DimmedOutput(SwitchedLight):
     """Representation of habitron light entities, dimmable."""
 
     _attr_brightness = True
+    _attr_color_mode = ColorMode.BRIGHTNESS
+    _attr_supported_color_modes = {ColorMode.BRIGHTNESS}
+    _attr_translation_key = "dimmed_output"
 
     def __init__(self, output, module, coord, idx) -> None:
         """Initialize a dimmable Habitron Light."""
         super().__init__(output, module, coord, idx)
         if module.typ[0] == 1:
             self._out_offs = 10  # Dimm 1 = Out 11
-        self._attr_icon = "mdi:lightbulb-on-60"
 
     @property
     def brightness(self) -> int | None:
         """Return the brightness of the light."""
         return self._brightness
-
-    @property
-    def color_mode(self) -> ColorMode | str | None:
-        """Return colormode."""
-        return ColorMode.BRIGHTNESS
-
-    @property
-    def supported_color_modes(self) -> set[ColorMode] | set[str]:
-        """Flag supported color modes."""
-        color_modes: set[ColorMode | str] = set()
-        color_modes.add(ColorMode.BRIGHTNESS)
-        return color_modes
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -224,6 +206,8 @@ class DimmedOutputPush(SwitchedLightPush):
     """Representation of habitron light entities, dimmable."""
 
     _attr_brightness = True
+    _attr_color_mode = ColorMode.BRIGHTNESS
+    _attr_supported_color_modes = {ColorMode.BRIGHTNESS}
 
     def __init__(self, output, module, coord, idx) -> None:
         """Initialize a dimmable Habitron Light."""
@@ -235,18 +219,6 @@ class DimmedOutputPush(SwitchedLightPush):
     def brightness(self) -> int | None:
         """Return the brightness of the light."""
         return self._brightness
-
-    @property
-    def color_mode(self) -> ColorMode:
-        """Return colormode."""
-        return ColorMode.BRIGHTNESS
-
-    @property
-    def supported_color_modes(self) -> set[ColorMode] | set[str]:
-        """Flag supported color modes."""
-        color_modes: set[ColorMode | str] = set()
-        color_modes.add(ColorMode.BRIGHTNESS)
-        return color_modes
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -275,7 +247,7 @@ class ColorLed(CoordinatorEntity, LightEntity):
 
     _attr_has_entity_name = True
     _attr_color_mode = ColorMode.RGB
-    _attr_should_poll = True  # for push updates
+    _attr_supported_color_modes = {ColorMode.RGB}
 
     def __init__(
         self,
@@ -335,13 +307,6 @@ class ColorLed(CoordinatorEntity, LightEntity):
     def is_on(self) -> bool | None:
         """Return status of output."""
         return self._led.value[0] == 1
-
-    @property
-    def supported_color_modes(self) -> set[ColorMode] | set[str]:
-        """Flag supported color modes."""
-        color_modes: set[ColorMode | str] = set()
-        color_modes.add(ColorMode.RGB)
-        return color_modes
 
     @property
     def rgb_color(self) -> tuple[int, int, int] | None:

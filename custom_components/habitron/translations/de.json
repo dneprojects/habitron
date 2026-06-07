@@ -1,135 +1,206 @@
 {
-    "config": {
-        "step": {
-            "user": {
-                "title": "Einstellungen zur Kommunikation",
-                "data": {
-                    "habitron_host": "Host-Name oder IP des SmartHub",
-                    "update_interval": "Update Intervall [s]",
-                    "websock_token": "Token zur Websocket Authentifizierung"
-                }
-            }
-        },
-        "error": {
-            "cannot_connect": "Keine Verbindung zum SmartHub",
-            "host_not_found": "Hostname nicht gefunden, evtl. IP eingeben",
-            "invalid_interval": "Intervall Eingabe ungültig",
-            "interval_too_short": "Intervall zu kurz, mind. 2 s",
-            "interval_too_long": "Intervall zu lang, max. 10 s",
-            "unknown": "Unbekannter Fehler"
-        },
-        "abort": {
-            "already_configured": "Habitron Integration bereits installiert"
-        }
+  "config": {
+    "abort": {
+      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
     },
-    "options": {
-        "step": {
-            "init": {
-                "title": "Einstellungen zur Kommunikation",
-                "data": {
-                    "habitron_host": "Host-Name oder IP des SmartHub",
-                    "update_interval": "Update Intervall [s]",
-                    "updates_enabled": "Zyklische Updates ausführen",
-                    "websock_token": "Token zur Websocket Authentifizierung"
-                }
-            }
-        },
-        "error": {
-            "cannot_connect": "Keine Verbindung zum SmartHub",
-            "host_not_found": "Hostname nicht gefunden, evtl. IP eingeben",
-            "invalid_interval": "Intervall Eingabe ungültig",
-            "interval_too_short": "Intervall zu kurz, mind. 4 s",
-            "interval_too_long": "Intervall zu lang, max. 60 s",
-            "unknown": "Unbekannter Fehler"
-        },
-        "abort": {
-            "already_configured": "Habitron Integration bereits installiert"
-        }
+    "error": {
+      "cannot_connect": "Keine Verbindung zum SmartHub",
+      "host_not_found": "Hostname nicht gefunden, evtl. IP eingeben",
+      "interval_too_long": "Intervall zu lang, max. 10 s",
+      "interval_too_short": "Intervall zu kurz, mind. 2 s",
+      "invalid_interval": "Intervall-Eingabe ungültig",
+      "unknown": "[%key:common::config_flow::error::unknown%]"
     },
-    "entity": {
-      "select": {
-        "habitron_mode": {
-            "state": {
-                "on": "Aktiv",
-                "off": "Aus",
-                "day": "Tag",
-                "update": "Update",
-                "config": "Konfiguration",
-                "night": "Nacht",
-                "absent": "Abwesend",
-                "present": "Anwesend",
-                "sleeping": "Schlafen",
-                "vacation": "Urlaub"
-            }
+    "step": {
+      "user": {
+        "data": {
+          "habitron_host": "Host-Name oder IP des SmartHub",
+          "update_interval": "Update-Intervall [s]",
+          "websock_token": "Token zur Websocket-Authentifizierung"
         },
-        "habitron_loglevel": {
-          "state": {
-            "notset": "Not Set",
-            "debug": "Debug",
-            "info": "Info",
-            "warning": "Warning",
-            "error": "Error",
-            "critical": "Critical"
-          }
-        }
-      },
-        "event": {
-            "hbtn_event": {
-                "state_attributes": {
-                    "event_type": {
-                        "state": {
-                          "inactive": "Inaktiv",
-                          "single_press": "kurz gedrückt",
-                          "long_press": "lange gedrückt",
-                          "long_press_end": "langer Tastendruck beendet",
-                          "left_pinky": "Kleiner Finger links",
-                          "left_ring": "Ringfinger links",
-                          "left_middle": "Mittelfinger links",
-                          "left_index": "Zeigefinger links",
-                          "left_thumb": "Daumen links",
-                          "right_thumb": "Daumen rechts",
-                          "right_index": "Zeigefinger rechts",
-                          "right_middle": "Mittelfinger rechts",
-                          "right_ring": "Ringfinger rechts",
-                          "right_pinky": "Kleiner Finger rechts"
-                        }
-                    }
-                }
-            }
-        }
-    },
-    "system_health": {
-    "info": {
-      "hbtn_version": "Version",
-      "router_status": "Router status",
-      "module_count": "Modulanzahl"
+        "title": "Einstellungen zur Kommunikation"
+      }
     }
   },
-  "issues": {
-      "router_system_error": {
-        "title": "Router Systemfehler",
-        "description": "Der Habitron-Router hat einen Fehler festgestellt, z. B. einen Kommunikationsfehler mit einem Modul."
+  "options": {
+    "abort": {
+      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
+    },
+    "error": {
+      "cannot_connect": "Keine Verbindung zum SmartHub",
+      "host_not_found": "Hostname nicht gefunden, evtl. IP eingeben",
+      "interval_too_long": "Intervall zu lang, max. 60 s",
+      "interval_too_short": "Intervall zu kurz, mind. 4 s",
+      "invalid_interval": "Intervall-Eingabe ungültig",
+      "unknown": "[%key:common::config_flow::error::unknown%]"
+    },
+    "step": {
+      "init": {
+        "data": {
+          "habitron_host": "Host-Name oder IP des SmartHub",
+          "update_interval": "Update-Intervall [s]",
+          "updates_enabled": "Zyklische Updates ausführen",
+          "websock_token": "Token zur Websocket-Authentifizierung"
+        },
+        "title": "Einstellungen zur Kommunikation"
+      }
+    }
+  },
+  "entity": {
+    "select": {
+      "habitron_mode": {
+        "state": {
+          "on": "Aktiv",
+          "off": "Aus",
+          "day": "Tag",
+          "update": "Update",
+          "config": "Konfiguration",
+          "night": "Nacht",
+          "absent": "Abwesend",
+          "present": "Anwesend",
+          "sleeping": "Schlafen",
+          "vacation": "Urlaub"
+        }
+      },
+      "habitron_loglevel": {
+        "state": {
+          "notset": "Nicht gesetzt",
+          "debug": "Debug",
+          "info": "Info",
+          "warning": "Warnung",
+          "error": "Fehler",
+          "critical": "Kritisch"
+        }
       }
     },
-  "device_automation": {
-    "trigger_type": {
-      "single_press": "{entity_name} kurz gedrückt",
-      "long_press": "{entity_name} lange gedrückt",
-      "long_press_end": "{entity_name} langer Tastendruck beendet",
-      "finger": "{entity_name} (Allgemein): Beliebiger Finger",
-      "left_pinky": "User {entity_name}: Kleiner Finger links",
-      "left_ring": "User {entity_name}: Ringfinger links",
-      "left_middle": "User {entity_name}: Mittelfinger links",
-      "left_index": "User {entity_name}: Zeigefinger links",
-      "left_thumb": "User {entity_name}: Daumen links",
-      "right_thumb": "User {entity_name}: Daumen rechts",
-      "right_index": "User {entity_name}: Zeigefinger rechts",
-      "right_middle": "User {entity_name}: Mittelfinger rechts",
-      "right_ring": "User {entity_name}: Ringfinger rechts",
-      "right_pinky": "User {entity_name}: Kleiner Finger rechts"
+    "event": {
+      "hbtn_event": {
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "inactive": "Inaktiv",
+              "single_press": "kurz gedrückt",
+              "long_press": "lange gedrückt",
+              "long_press_end": "langer Tastendruck beendet",
+              "left_pinky": "Kleiner Finger links",
+              "left_ring": "Ringfinger links",
+              "left_middle": "Mittelfinger links",
+              "left_index": "Zeigefinger links",
+              "left_thumb": "Daumen links",
+              "right_thumb": "Daumen rechts",
+              "right_index": "Zeigefinger rechts",
+              "right_middle": "Mittelfinger rechts",
+              "right_ring": "Ringfinger rechts",
+              "right_pinky": "Kleiner Finger rechts"
+            }
+          }
+        }
+      }
     }
   },
   "services": {
+    "hub_restart": {
+      "name": "Hub Neustart",
+      "description": "Startet den SmartHub-Dienst weich neu."
+    },
+    "hub_reboot": {
+      "name": "Hub Reboot",
+      "description": "Startet den SmartHub-Host neu."
+    },
+    "mod_restart": {
+      "name": "Modul Neustart",
+      "description": "Startet ein oder alle Habitron-Module neu.",
+      "fields": {
+        "mod_nmbr": {
+          "name": "Modul-Nummer",
+          "description": "Habitron Modul-Adresse, Standard 0xFF für alle."
+        }
+      }
+    },
+    "rtr_restart": {
+      "name": "Router Neustart",
+      "description": "Startet den Habitron-Router neu."
+    },
+    "save_module_smc": {
+      "name": "Modul .smc-Datei speichern",
+      "description": "Liest Modul-Regeln und Namen aus und speichert sie als .smc-Textdatei.",
+      "fields": {
+        "mod_nmbr": {
+          "name": "Modul-Nummer",
+          "description": "Habitron Modul-Adresse."
+        }
+      }
+    },
+    "save_module_smg": {
+      "name": "Modul .smg-Datei speichern",
+      "description": "Liest Modul-Einstellungen aus und speichert sie als .smg-Textdatei.",
+      "fields": {
+        "mod_nmbr": {
+          "name": "Modul-Nummer",
+          "description": "Habitron Modul-Adresse."
+        }
+      }
+    },
+    "save_router_smr": {
+      "name": "Router .smr-Datei speichern",
+      "description": "Liest Router-Einstellungen aus und speichert sie als .smr-Textdatei."
+    },
+    "save_module_status": {
+      "name": "Modulstatus speichern",
+      "description": "Liest den Modulstatus aus und speichert ihn als .mstat-Textdatei.",
+      "fields": {
+        "mod_nmbr": {
+          "name": "Modul-Nummer",
+          "description": "Habitron Modul-Adresse."
+        }
+      }
+    },
+    "save_router_status": {
+      "name": "Routerstatus speichern",
+      "description": "Liest den Routerstatus aus und speichert ihn als .rstat-Textdatei."
+    },
+    "update_entity": {
+      "name": "Update-Event an Hub weiterleiten",
+      "description": "Interner Hook, mit dem Automatisierungen Statusänderungen an einen Hub injizieren können.",
+      "fields": {
+        "hub_uid": {
+          "name": "Hub-UID",
+          "description": "Hostname oder IP des Ziel-SmartHubs."
+        },
+        "rtr_nmbr": {
+          "name": "Router-Nummer",
+          "description": "Router-Adresse. Standard 1."
+        },
+        "mod_nmbr": {
+          "name": "Modul-Nummer",
+          "description": "Habitron Modul-Adresse."
+        },
+        "evnt_type": {
+          "name": "Event-Typ",
+          "description": "Habitron-Event-Typ-Code."
+        },
+        "evnt_arg1": {
+          "name": "Event-Arg 1",
+          "description": "Erstes Event-Argument."
+        },
+        "evnt_arg2": {
+          "name": "Event-Arg 2",
+          "description": "Zweites Event-Argument."
+        },
+        "evnt_arg3": {
+          "name": "Event-Arg 3",
+          "description": "Drittes Event-Argument (optional)."
+        },
+        "evnt_arg4": {
+          "name": "Event-Arg 4",
+          "description": "Viertes Event-Argument (optional)."
+        },
+        "evnt_arg5": {
+          "name": "Event-Arg 5",
+          "description": "Fünftes Event-Argument (optional)."
+        }
+      }
+    },
     "sc_system_command": {
       "name": "Smart Touch Systembefehl",
       "description": "Führt einen Neustart oder Factory Reset der App eines spezifischen Smart Touch Moduls aus.",
@@ -147,16 +218,52 @@
           "description": "(Optional) Ändert die gespeicherte IP/Route in der App VOR einem Neustart."
         }
       }
+    }
+  },
+  "exceptions": {
+    "no_hub_loaded": {
+      "message": "Habitron-Service aufgerufen, aber kein Hub geladen."
     },
-    "mod_restart": {
-      "name": "Modul Neustart",
-      "description": "Startet ein oder alle Habitron Module neu.",
-      "fields": {
-        "mod_nmbr": {
-          "name": "Modul Nummer",
-          "description": "Habitron Modul-Adresse, Standard 0xFF für alle"
-        }
-      }
+    "hub_not_found": {
+      "message": "Kein Habitron-Hub passt zum Host {hub_id}."
+    },
+    "websocket_provider_missing": {
+      "message": "WebSocket-Provider auf dem SmartHub nicht initialisiert."
+    },
+    "no_matching_module": {
+      "message": "Kein gültiges Smart-Touch-Modul für Gerät {device_id} gefunden."
+    }
+  },
+  "system_health": {
+    "info": {
+      "hbtn_version": "Version",
+      "hub_count": "Anzahl Hubs",
+      "router_status": "Routerstatus",
+      "module_count": "Modulanzahl"
+    }
+  },
+  "issues": {
+    "router_system_error": {
+      "title": "Router-Systemfehler",
+      "description": "Der Habitron-Router hat einen Fehler festgestellt, z. B. einen Kommunikationsfehler mit einem Modul."
+    }
+  },
+  "device_automation": {
+    "trigger_type": {
+      "single_press": "{entity_name} kurz gedrückt",
+      "long_press": "{entity_name} lange gedrückt",
+      "long_press_end": "{entity_name} langer Tastendruck beendet",
+      "finger": "{entity_name} (Allgemein): Beliebiger Finger",
+      "left_pinky": "User {entity_name}: Kleiner Finger links",
+      "left_ring": "User {entity_name}: Ringfinger links",
+      "left_middle": "User {entity_name}: Mittelfinger links",
+      "left_index": "User {entity_name}: Zeigefinger links",
+      "left_thumb": "User {entity_name}: Daumen links",
+      "right_thumb": "User {entity_name}: Daumen rechts",
+      "right_index": "User {entity_name}: Zeigefinger rechts",
+      "right_middle": "User {entity_name}: Mittelfinger rechts",
+      "right_ring": "User {entity_name}: Ringfinger rechts",
+      "right_pinky": "User {entity_name}: Kleiner Finger rechts"
     }
   }
 }

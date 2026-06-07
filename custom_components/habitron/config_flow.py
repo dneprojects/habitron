@@ -16,7 +16,11 @@ import voluptuous as vol
 from homeassistant import config_entries, exceptions
 from homeassistant.components import network
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.service_info.ssdp import SsdpServiceInfo
+from homeassistant.helpers.service_info.ssdp import (
+    ATTR_UPNP_SERIAL,
+    ATTR_UPNP_UDN,
+    SsdpServiceInfo,
+)
 
 from .const import (
     CONF_DEFAULT_HOST,
@@ -140,7 +144,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for habitron."""
 
     VERSION = 1
-    CONNECTION_CLASS = config_entries.CONN_CLASS_LOCAL_POLL
 
     def __init__(self) -> None:
         """Initialize the config flow."""
@@ -188,33 +191,51 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self, discovery_info: SsdpServiceInfo
     ) -> config_entries.ConfigFlowResult:
         """Handle SSDP discovery."""
-        # Extract host from SSDP location URL
-        host = urlparse(discovery_info.ssdp_location).hostname
+        host = (
+            urlparse(discovery_info.ssdp_location).hostname
+            if discovery_info.ssdp_location
+            else None
+        )
         if not host:
             return self.async_abort(reason="no_host_in_ssdp")
-
         host_str = str(host)
 
-        # 1. Fast check: Is this IP already configured?
-        # If so, abort immediately to prevent "new device" notification
-        if self._is_device_already_configured(str(host)):
-            return self.async_abort(reason="already_configured")
+        # Prefer stable identifiers from the UPnP description; fall back
+        # to a UDP probe (which may return a serial), and only use the
+        # host as last resort. A host-based id changes on DHCP-lease
+        # renewals and would otherwise look like a new device.
+        upnp = discovery_info.upnp or {}
+        unique_id: str | None = upnp.get(ATTR_UPNP_UDN) or upnp.get(ATTR_UPNP_SERIAL)
+        target_device: dict[str, Any] | None = None
 
-        # Verify via UDP to get full details (Serial, MAC)
-        devices = await self._discover_habitron()
-        target_device = next((d for d in devices if d.get("ip") == host_str), None)
+        if unique_id is None:
+            devices = await self._discover_habitron()
+            target_device = next(
+                (d for d in devices if d.get("ip") == host_str), None
+            )
+            if target_device:
+                unique_id = target_device.get("serial")
 
-        if target_device:
-            # Use serial if available
-            unique_id = target_device.get("serial", f"habitron_{host_str}")
-            self._discovered_device = target_device
-        else:
-            # Fallback if UDP fails but SSDP worked
-            _LOGGER.debug("SSDP found %s but UDP probe failed", host_str)
+        self._discovered_device = target_device or {"host": host_str, "ip": host_str}
+
+        if not unique_id:
+            _LOGGER.warning(
+                "Habitron at %s exposed no UDN/serial; using host as fallback id",
+                host_str,
+            )
             unique_id = f"habitron_{host_str}"
-            self._discovered_device = {"host": host_str, "ip": host_str}
 
-        # 2. Check if Unique ID matches (standard check)
+        # Migrate any pre-existing host-based entry to the new stable id
+        # so SSDP rediscovery does not create a duplicate side-by-side.
+        legacy_id = f"habitron_{host_str}"
+        if unique_id != legacy_id:
+            for entry in self.hass.config_entries.async_entries(DOMAIN):
+                if entry.unique_id == legacy_id:
+                    self.hass.config_entries.async_update_entry(
+                        entry, unique_id=unique_id
+                    )
+                    break
+
         await self.async_set_unique_id(unique_id)
         self._abort_if_unique_id_configured(updates={KEY_HOST: host_str})
 
@@ -274,9 +295,24 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 default_host = device.get("host", device.get("ip", CONF_DEFAULT_HOST))
 
         if user_input is not None:
-            # Use host as unique ID for manual entry if serial unknown
-            # Best practice: Try to fetch serial in validate_input if possible
-            unique_id = f"habitron_{user_input[KEY_HOST]}"
+            # Try a UDP probe to obtain a stable serial-based unique_id;
+            # fall back to the host string when no probe response arrives.
+            host_input = user_input[KEY_HOST]
+            unique_id: str | None = None
+            devices = await self._discover_habitron()
+            target = next(
+                (
+                    d
+                    for d in devices
+                    if d.get("ip") == host_input or d.get("host") == host_input
+                ),
+                None,
+            )
+            if target:
+                unique_id = target.get("serial")
+            if unique_id is None:
+                unique_id = f"habitron_{host_input}"
+
             await self.async_set_unique_id(unique_id)
             self._abort_if_unique_id_configured()
 

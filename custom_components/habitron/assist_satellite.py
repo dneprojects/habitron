@@ -16,11 +16,11 @@ from homeassistant.components.assist_satellite import (
     AssistSatelliteWakeWord,
 )
 from homeassistant.components.assist_satellite.entity import AssistSatelliteState
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
+from .coordinator import HabitronConfigEntry
 from .module import SmartController
 from .smart_hub import SmartHub
 from .ws_provider import HabitronWebRTCProvider
@@ -30,11 +30,11 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: HabitronConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Habitron assist satellite entities."""
-    smhub: SmartHub = hass.data[DOMAIN][entry.entry_id]
+    smhub: SmartHub = entry.runtime_data
     hbtn_rt = smhub.router
 
     if not smhub.ws_provider:
