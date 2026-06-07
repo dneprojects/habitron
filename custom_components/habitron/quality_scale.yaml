@@ -43,23 +43,19 @@ rules:
   test-coverage:
     status: done
     comment: |
-      Current state: 940 tests, ~97% line coverage. Every file in the
-      integration except the ``update`` platform clears the 95% Silver
-      bar: ``binary_sensor`` 100%, ``button`` 100%, ``camera`` 100%,
-      ``climate`` 100%, ``communicate`` 100%, ``const`` 100%,
-      ``coordinator`` 100%, ``interfaces`` 100%, ``notify`` 100%,
-      ``number`` 100%, ``select`` 100%, ``sensor`` 100%, ``smart_hub``
-      100%, ``switch`` 100%, ``text`` 100%,
-      ``ws_provider/handlers`` 100%, ``ws_provider/provider`` 100%,
-      ``ws_provider/voice_pipeline`` 100%, ``assist_satellite`` 100%,
-      ``config_flow`` 99%, ``cover`` 99%, ``event`` 99%,
+      Current state: 974 tests, ~99% line coverage. Every file in the
+      integration clears the 95% Silver bar, and most clear 100%:
+      ``assist_satellite`` 100%, ``binary_sensor`` 100%, ``button``
+      100%, ``camera`` 100%, ``climate`` 100%, ``communicate`` 100%,
+      ``const`` 100%, ``coordinator`` 100%, ``interfaces`` 100%,
+      ``notify`` 100%, ``number`` 100%, ``select`` 100%, ``sensor``
+      100%, ``smart_hub`` 100%, ``switch`` 100%, ``text`` 100%,
+      ``update`` 100%, ``ws_provider/handlers`` 100%,
+      ``ws_provider/provider`` 100%, ``ws_provider/voice_pipeline``
+      100%, ``config_flow`` 99%, ``cover`` 99%, ``event`` 99%,
       ``media_player`` 99%, ``__init__`` 98%, ``device_trigger`` 98%,
       ``light`` 98%, ``router`` 98%, ``services`` 98%, ``module`` 97%,
-      ``diagnostics`` 96%, ``system_health`` 94%. ``update`` 35% is
-      the lone outlier: it drives a firmware-upload state machine
-      whose interesting paths involve real socket / file I/O against
-      the bus, and bringing it past 95% would couple the test suite
-      to that protocol shape. Tracked separately.
+      ``diagnostics`` 96%, ``system_health`` 94%.
 
   # Gold
   devices: done
