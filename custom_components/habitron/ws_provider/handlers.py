@@ -661,10 +661,6 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
         connection.send_result(msg["id"])
 
     # --- REGISTRATION OF ALL HANDLERS ---
-    # NOTE: ``handle_voice_pipeline_abort`` is defined above but is not
-    # registered here. This matches the pre-split behavior — the abort
-    # command currently never reaches the handler. Likely a missed
-    # registration; left as-is by the refactor to keep semantics stable.
     websocket_api.async_register_command(provider.hass, handle_register_stream)
     websocket_api.async_register_command(provider.hass, handle_webrtc_answer)
     websocket_api.async_register_command(provider.hass, handle_webrtc_candidate)
@@ -674,6 +670,7 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
     websocket_api.async_register_command(provider.hass, handle_voice_pipeline_status)
     websocket_api.async_register_command(provider.hass, handle_voice_pipeline_start)
     websocket_api.async_register_command(provider.hass, handle_voice_audio_chunk)
+    websocket_api.async_register_command(provider.hass, handle_voice_pipeline_abort)
     websocket_api.async_register_command(provider.hass, handle_voice_pipeline_end)
     websocket_api.async_register_command(provider.hass, handle_media_next_track)
     websocket_api.async_register_command(provider.hass, handle_media_previous_track)
