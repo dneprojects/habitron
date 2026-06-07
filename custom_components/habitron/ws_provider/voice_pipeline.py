@@ -12,9 +12,11 @@ import asyncio
 import base64
 import logging
 import struct
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+from collections.abc import AsyncIterator
 
 from homeassistant.components import tts, websocket_api
+from homeassistant.components.websocket_api import ActiveConnection  # type: ignore[attr-defined]
 from homeassistant.components.assist_pipeline import (
     PipelineEvent,
     PipelineEventType,
@@ -39,7 +41,7 @@ _LOGGER = logging.getLogger(__name__)
 
 async def run_voice_pipeline(
     provider: HabitronWebRTCProvider,
-    connection: websocket_api.ActiveConnection,
+    connection: ActiveConnection,
     stream_name: str,
     context: Context,
     pipeline_id: str | None,
@@ -82,7 +84,7 @@ async def run_voice_pipeline(
     try:
         last_err = ""
 
-        async def audio_stream():
+        async def audio_stream() -> AsyncIterator[bytes]:
             """Yield audio chunks for the pipeline, starting with a WAV header."""
             # Create a 44-byte WAV header for 16-bit 16kHz mono PCM
             channels = 1
@@ -113,11 +115,11 @@ async def run_voice_pipeline(
                     break
                 yield chunk
 
-        tts_task: asyncio.Task | None = None  # Task for streaming TTS audio back
+        tts_task: asyncio.Task[None] | None = None  # Task for streaming TTS audio back
         tts_was_streamed = False
 
         @callback
-        def event_callback(event: PipelineEvent):
+        def event_callback(event: PipelineEvent) -> None:
             """Handle pipeline events FOR TTS STREAMING ONLY."""
             # This callback is executed synchronously by the pipeline.
             nonlocal tts_task
@@ -144,7 +146,7 @@ async def run_voice_pipeline(
                 and (token := tts_output.get("token"))
             ):
 
-                async def _stream_tts_to_client():
+                async def _stream_tts_to_client() -> None:
                     """Fetch TTS audio stream and send chunks to the client."""
                     _LOGGER.debug(
                         "Starting TTS stream to client for token %s", token
