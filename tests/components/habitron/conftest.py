@@ -140,7 +140,7 @@ def mock_ws_provider() -> Generator[MagicMock]:
     """
     with (
         patch(
-            "custom_components.habitron.ws_provider.async_register_webrtc_provider",
+            "custom_components.habitron.ws_provider.provider.async_register_webrtc_provider",
             return_value=MagicMock(),
         ) as mock_register,
         patch(
