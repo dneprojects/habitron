@@ -8,7 +8,7 @@ import ipaddress
 import logging
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import anyio
 from habitron_client import (
@@ -26,6 +26,7 @@ from homeassistant.core import HomeAssistant
 from .const import DOMAIN, HaEvents
 
 if TYPE_CHECKING:
+    from .module import HbtnModule
     from .router import HbtnRouter
     from .smart_hub import SmartHub
 
@@ -88,7 +89,7 @@ class HbtnComm:
         self.is_addon: bool = True  # will be set in get_smhub_info()
         self.slugname: str = ""
         self.info: dict[str, str] = {}
-        self.grp_modes: dict = {}
+        self.grp_modes: dict[int, int] = {}
         self._hbtn_version: str = self._hass.data["integrations"]["habitron"].manifest[
             "version"
         ]
@@ -163,12 +164,12 @@ class HbtnComm:
         """Helper to calculate module address."""
         return int(mod_id - 100)
 
-    async def _async_exec(self, func: Callable, *args: Any) -> Any:
+    async def _async_exec(self, func: Callable[..., Any], *args: Any) -> Any:
         """Execute a blocking client call in the Home Assistant executor."""
         async with self._api_lock:
             return await self._hass.async_add_executor_job(func, *args)
 
-    async def set_host(self, host: str):
+    async def set_host(self, host: str) -> None:
         """Update host information for integration re-configuration."""
         self._hass.config_entries.async_update_entry(
             self._config, data=self._config.options
@@ -182,7 +183,7 @@ class HbtnComm:
         self.client.host = self._host
         await self._hass.config_entries.async_reload(self._config.entry_id)
 
-    async def send_network_info(self, tok: str):
+    async def send_network_info(self, tok: str) -> None:
         """Send home assistant ipv4."""
         await self._async_exec(
             self.client.send_network_info,
@@ -198,24 +199,24 @@ class HbtnComm:
             tok,
         )
 
-    async def reinit_hub(self, mode: int):
+    async def reinit_hub(self, mode: int) -> Any:
         """Restart event server on hub."""
         resp = await self._async_exec(self.client.reinit_hub, mode)
         self.logger.info("Re-initialized hub with mode %s", mode)
         return resp
 
-    def set_router(self, rtr) -> None:
+    def set_router(self, rtr: HbtnRouter) -> None:
         """Register the router instance."""
         self._rtr = rtr
 
     async def get_smhub_version(self) -> bytes:
         """Query of SmartHub firmware."""
-        return await self._async_exec(self.client.get_smhub_version)
+        return cast(bytes, await self._async_exec(self.client.get_smhub_version))
 
-    def get_smhub_info(self) -> dict[str, str]:
+    def get_smhub_info(self) -> dict[str, Any]:
         """Get basic infos of SmartHub (blocking, run in executor)."""
         try:
-            info = self.client.get_smhub_info()
+            info: dict[str, Any] = self.client.get_smhub_info()
             self.info = info
             self._version = info["software"]["version"]
             self._hwtype = info["hardware"]["platform"]["type"]
@@ -240,7 +241,7 @@ class HbtnComm:
 
     async def get_smr(self) -> bytes:
         """Get router SMR information."""
-        return await self._async_exec(self.client.get_smr)
+        return cast(bytes, await self._async_exec(self.client.get_smr))
 
     async def send_devreg_ids(self) -> None:
         """Send device registry ids to all modules."""
@@ -251,19 +252,19 @@ class HbtnComm:
 
     async def async_get_router_status(self) -> bytes:
         """Get router status."""
-        return await self._async_exec(self.client.get_router_status)
+        return cast(bytes, await self._async_exec(self.client.get_router_status))
 
     async def async_get_router_modules(self) -> bytes:
         """Get summary of all Habitron modules of a router."""
-        return await self._async_exec(self.client.get_router_modules)
+        return cast(bytes, await self._async_exec(self.client.get_router_modules))
 
     async def get_global_descriptions(self) -> bytes:
         """Get descriptions of commands, etc."""
-        return await self._async_exec(self.client.get_global_descriptions)
+        return cast(bytes, await self._async_exec(self.client.get_global_descriptions))
 
     async def async_get_error_status(self) -> bytes:
         """Get error byte for each module."""
-        return await self._async_exec(self.client.get_error_status)
+        return cast(bytes, await self._async_exec(self.client.get_error_status))
 
     async def async_start_mirror(self) -> None:
         """Start mirror on specified router."""
@@ -321,6 +322,9 @@ class HbtnComm:
     async def async_set_led_outp(self, mod_id: int, nmbr: int, val: bool) -> None:
         """Translate led nmbr to output nmbr and send on/off command."""
         mod = self.router.get_module(self._convert_mod_id(mod_id))
+        if mod is None:
+            self.logger.warning("async_set_led_outp: unknown mod_id %s", mod_id)
+            return
         await self.async_set_output(mod_id, nmbr + len(mod.outputs), val)
 
     async def async_set_dimmval(self, mod_id: int, nmbr: int, val: int) -> None:
@@ -335,7 +339,7 @@ class HbtnComm:
             self.client.set_rgb_output, self._convert_mod_id(mod_id), nmbr, val
         )
 
-    async def async_set_rgbval(self, mod_id: int, nmbr: int, val: list) -> None:
+    async def async_set_rgbval(self, mod_id: int, nmbr: int, val: list[int]) -> None:
         """Send value to dimm output."""
         await self._async_exec(
             self.client.set_rgbval, self._convert_mod_id(mod_id), nmbr, val
@@ -403,7 +407,7 @@ class HbtnComm:
         if crc == self.crc:
             return b""
         self.crc = crc
-        return resp_bytes
+        return cast(bytes, resp_bytes)
 
     async def get_module_status(self, mod_id: int) -> bytes:
         """Get compact status for all modules, if changed crc."""
@@ -413,18 +417,24 @@ class HbtnComm:
         if crc == self.crc:
             return b""
         self.crc = crc
-        return resp_bytes
+        return cast(bytes, resp_bytes)
 
     async def async_get_module_definitions(self, mod_id: int) -> bytes:
         """Get summary of Habitron module: names, commands, etc."""
-        return await self._async_exec(
-            self.client.get_module_definitions, self._convert_mod_id(mod_id)
+        return cast(
+            bytes,
+            await self._async_exec(
+                self.client.get_module_definitions, self._convert_mod_id(mod_id)
+            ),
         )
 
     async def async_get_module_settings(self, mod_id: int) -> bytes:
         """Get settings of Habitron module."""
-        return await self._async_exec(
-            self.client.get_module_settings, self._convert_mod_id(mod_id)
+        return cast(
+            bytes,
+            await self._async_exec(
+                self.client.get_module_settings, self._convert_mod_id(mod_id)
+            ),
         )
 
     async def save_module_status(self, mod_id: int) -> None:
@@ -517,7 +527,7 @@ class HbtnComm:
         if crc == self.crc:
             return b""
         self.crc = crc
-        return resp_bytes
+        return cast(bytes, resp_bytes)
 
     async def update_firmware(self, mod_nmbr: int) -> bytes:
         """Start router/module firmware updates."""
@@ -525,7 +535,7 @@ class HbtnComm:
         if crc == self.crc:
             return b""
         self.crc = crc
-        return resp_bytes
+        return cast(bytes, resp_bytes)
 
     async def async_power_cycle_channel(self, channel: int) -> None:
         """Power down a router channel and set power on again."""
@@ -547,9 +557,10 @@ class HbtnComm:
         arg3: int = 0,
         arg4: int = 0,
         arg5: int = 0,
-    ):
+    ) -> None:
         """Event server handler to receive entity updates."""
         inp_event_types = ["inactive", "single_press", "long_press", "long_press_end"]
+        module: HbtnModule | None
         if self._hostip != hub_id:
             return
         if mod_id == 0:

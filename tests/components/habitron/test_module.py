@@ -831,7 +831,7 @@ async def test_get_names_returns_false_when_response_empty() -> None:
     """An empty bus reply makes get_names return False without raising."""
     desc = _make_descriptor()
     comm = _make_comm()
-    comm.async_get_module_definitions = AsyncMock(return_value="")
+    comm.async_get_module_definitions = AsyncMock(return_value=b"")
     mod = HbtnModule(desc, MagicMock(), MagicMock(), "HUB-1", comm)
     assert await mod.get_names() is False
 
@@ -855,7 +855,7 @@ async def test_get_settings_returns_false_when_response_empty() -> None:
     """An empty bus reply makes get_settings return False."""
     desc = _make_descriptor()
     comm = _make_comm()
-    comm.async_get_module_settings = AsyncMock(return_value="")
+    comm.async_get_module_settings = AsyncMock(return_value=b"")
     mod = HbtnModule(desc, MagicMock(), MagicMock(), "HUB-1", comm)
     assert await mod.get_settings() is False
 
