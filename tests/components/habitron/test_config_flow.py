@@ -789,6 +789,33 @@ async def test_reconfigure_flow_invalid_interval_via_validate_input(
     assert result["errors"] == {"base": "invalid_interval"}
 
 
+async def test_reconfigure_flow_interval_too_long_via_validate_input(
+    hass: HomeAssistant,
+    setup_homeassistant: None,
+    mock_habitron_client: MagicMock,
+) -> None:
+    """The reconfigure flow maps IntervalTooLong to ``interval_too_long``."""
+    from custom_components.habitron.config_flow import IntervalTooLong  # noqa: PLC0415
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=MOCK_NAME,
+        unique_id=MOCK_UID,
+        data=MOCK_CONFIG_DATA,
+    )
+    entry.add_to_hass(hass)
+
+    result = await entry.start_reconfigure_flow(hass)
+    with patch(
+        "custom_components.habitron.config_flow.validate_input",
+        side_effect=IntervalTooLong("too long"),
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input=MOCK_CONFIG_DATA
+        )
+    assert result["errors"] == {"base": "interval_too_long"}
+
+
 async def test_reconfigure_flow_host_not_found_via_validate_input(
     hass: HomeAssistant,
     setup_homeassistant: None,

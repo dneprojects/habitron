@@ -370,6 +370,43 @@ async def test_async_setup_entry_with_area_member_skips_area_update(hass) -> Non
     registry.async_update_entity.assert_called_with("event.fake", area_id=None)
 
 
+async def test_async_setup_entry_external_area_assigns_area_id(hass) -> None:
+    """An input whose area differs from area_member assigns the area_id."""
+    inp_pulse = _make_input(nmbr=1, name="Btn 1")
+    inp_pulse.type = 1
+    inp_pulse.area = 2  # different from area_member
+    mod_a = MagicMock()
+    mod_a.uid = "MOD-A"
+    mod_a.mod_type = "Standard"
+    mod_a.mod_addr = 100
+    mod_a.area_member = 0
+    mod_a.inputs = [inp_pulse]
+    mod_a.fingers = []
+    mod_a.ids = []
+
+    router = MagicMock()
+    router.modules = [mod_a]
+    router.coord = MagicMock()
+    area = MagicMock()
+    area.get_name_id = MagicMock(return_value="area_2_id")
+    router.areas = {0: area, 2: area}
+
+    entry = MagicMock()
+    entry.runtime_data.router = router
+
+    from unittest.mock import patch  # noqa: PLC0415
+
+    with patch(
+        "custom_components.habitron.event.er.async_get",
+    ) as mock_get:
+        registry = MagicMock()
+        registry.async_get_entity_id = MagicMock(return_value="event.fake")
+        mock_get.return_value = registry
+        await async_setup_entry(hass, entry, lambda es: None)
+
+    registry.async_update_entity.assert_called_with("event.fake", area_id="area_2_id")
+
+
 async def test_async_setup_entry_skips_missing_registry_entry(hass) -> None:
     """Missing registry entries fall through without calling async_update_entity."""
     inp_pulse = _make_input(nmbr=1, name="Btn 1")

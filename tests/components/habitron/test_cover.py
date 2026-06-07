@@ -380,6 +380,18 @@ async def test_async_set_cover_position_moving_down_branch() -> None:
     assert shutter._moving == -1
 
 
+async def test_async_set_cover_position_moving_up_branch() -> None:
+    """Position below target → moving = 1."""
+    cov = _make_cover_descriptor()
+    cov.value = 70  # position = 30
+    mod = _make_cover_module()
+    coord = MagicMock()
+    shutter = HbtnShutter(cov, mod, coord, 0)
+    shutter.async_write_ha_state = MagicMock()
+    await shutter.async_set_cover_position(position=70)
+    assert shutter._moving == 1
+
+
 async def test_async_added_to_hass_registers_callback() -> None:
     """async_added_to_hass registers the coordinator callback."""
     cov = _make_cover_descriptor()

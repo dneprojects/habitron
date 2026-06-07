@@ -43,19 +43,14 @@ rules:
   test-coverage:
     status: done
     comment: |
-      Current state: 974 tests, ~99% line coverage. Every file in the
-      integration clears the 95% Silver bar, and most clear 100%:
-      ``assist_satellite`` 100%, ``binary_sensor`` 100%, ``button``
-      100%, ``camera`` 100%, ``climate`` 100%, ``communicate`` 100%,
-      ``const`` 100%, ``coordinator`` 100%, ``interfaces`` 100%,
-      ``notify`` 100%, ``number`` 100%, ``select`` 100%, ``sensor``
-      100%, ``smart_hub`` 100%, ``switch`` 100%, ``text`` 100%,
-      ``update`` 100%, ``ws_provider/handlers`` 100%,
-      ``ws_provider/provider`` 100%, ``ws_provider/voice_pipeline``
-      100%, ``config_flow`` 99%, ``cover`` 99%, ``event`` 99%,
-      ``media_player`` 99%, ``__init__`` 98%, ``device_trigger`` 98%,
-      ``light`` 98%, ``router`` 98%, ``services`` 98%, ``module`` 97%,
-      ``diagnostics`` 96%, ``system_health`` 94%.
+      994 tests, 100% line coverage. Every file in the integration is
+      at 100%. The journey to get here surfaced a handful of true
+      dead-code branches (defensive fallbacks guarded by ``None``
+      checks for fields that ``__init__`` always seeds, a leftover
+      ``Smart Controller`` exact-match header strip that no module
+      type ever matches, an empty-list loop in SmartControllerMini)
+      and one real bug in the router's ``get_comm_errors`` byte
+      concatenation — all addressed in dedicated commits.
 
   # Gold
   devices: done

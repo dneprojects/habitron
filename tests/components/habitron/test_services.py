@@ -421,3 +421,57 @@ async def test_sc_system_command_skips_unknown_device_id(
         {"target_device": ["does-not-exist"], "command": "restart"},
         blocking=True,
     )
+
+
+async def test_sc_system_command_skips_foreign_identifiers(
+    hass: HomeAssistant,
+    setup_integration: MockConfigEntry,
+) -> None:
+    """A device with non-habitron identifiers ignores them but still dispatches."""
+    hub = setup_integration.runtime_data
+    module = MagicMock()
+    module.typ = b"\x01\x04"
+    module.name = "SC Touch"
+    module.stream_name = "sc_touch_1"
+    hub.router.get_module_by_uid = MagicMock(return_value=module)
+    hub.ws_provider = MagicMock()
+    hub.ws_provider.async_send_system_command = AsyncMock()
+
+    dev_reg = dr.async_get(hass)
+    device = dev_reg.async_get_or_create(
+        config_entry_id=setup_integration.entry_id,
+        # First identifier is from a foreign integration → trigger the
+        # ``continue`` skip; second one is ours and drives the dispatch.
+        identifiers={("zigbee2mqtt", "0xabc"), (DOMAIN, "module-uid")},
+        name="Mixed Device",
+    )
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_SC_SYSTEM_COMMAND,
+        {"target_device": [device.id], "command": "restart"},
+        blocking=True,
+    )
+    hub.ws_provider.async_send_system_command.assert_awaited()
+
+
+async def test_sc_system_command_raises_when_no_hubs_loaded(
+    hass: HomeAssistant,
+    setup_homeassistant: None,
+) -> None:
+    """Calling sc_system_command with no loaded entries surfaces ``no_hub_loaded``.
+
+    We register the services manually since there is no SmartHub entry to
+    drive ``async_setup_entry``.
+    """
+    from custom_components.habitron.services import async_setup_services  # noqa: PLC0415
+
+    async_setup_services(hass)
+    with pytest.raises(ServiceValidationError) as err:
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_SC_SYSTEM_COMMAND,
+            {"target_device": "any-device", "command": "restart"},
+            blocking=True,
+        )
+    assert err.value.translation_key == "no_hub_loaded"
