@@ -11,6 +11,8 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
+from .interfaces import CmdDescriptor, LgcDescriptor
+from .module import HbtnModule, SmartController
 from .router import HbtnRouter
 
 PARALLEL_UPDATES = 1
@@ -24,7 +26,7 @@ async def async_setup_entry(
     """Add button for passed config_entry in HA."""
     hbtn_rt: HbtnRouter = entry.runtime_data.router
 
-    new_devices = []
+    new_devices: list[ButtonEntity] = []
 
     for hbt_module in hbtn_rt.modules:
         for dir_cmd in hbt_module.dir_commands:
@@ -35,7 +37,10 @@ async def async_setup_entry(
             if mod_logic.type == 5:
                 new_devices.append(CountUpButton(mod_logic, hbt_module))
                 new_devices.append(CountDownButton(mod_logic, hbt_module))
-        if hbt_module.mod_type == "Smart Controller Touch":
+        if (
+            isinstance(hbt_module, SmartController)
+            and hbt_module.mod_type == "Smart Controller Touch"
+        ):
             new_devices.append(SpeechButton(hbt_module))
         new_devices.append(RestartButton(hbt_module))
     # Add router commands as buttons
@@ -60,7 +65,7 @@ class CollCmdButton(ButtonEntity):
 
     _attr_has_entity_name = True
 
-    def __init__(self, coll_cmd, module) -> None:
+    def __init__(self, coll_cmd: CmdDescriptor, module: HbtnRouter) -> None:
         """Initialize an CollCommand."""
         self._module = module
         self._nmbr = coll_cmd.nmbr
@@ -87,7 +92,7 @@ class DirCmdButton(ButtonEntity):
 
     _attr_has_entity_name = True
 
-    def __init__(self, dir_cmd, module) -> None:
+    def __init__(self, dir_cmd: CmdDescriptor, module: HbtnModule) -> None:
         """Initialize an DirectCommand."""
         self._module = module
         self._nmbr = dir_cmd.nmbr
@@ -116,7 +121,7 @@ class VisCmdButton(ButtonEntity):
 
     _attr_has_entity_name = True
 
-    def __init__(self, vis_cmd, module) -> None:
+    def __init__(self, vis_cmd: CmdDescriptor, module: HbtnModule) -> None:
         """Initialize an VisCommand."""
         self._module = module
         self._nmbr = vis_cmd.nmbr
@@ -148,7 +153,7 @@ class RestartButton(ButtonEntity):
     _attr_has_entity_name = True
     _attr_translation_key = "module_reset"
 
-    def __init__(self, module) -> None:
+    def __init__(self, module: HbtnModule | HbtnRouter) -> None:
         """Initialize an restart button."""
         self._name = "restart"
         self._module = module
@@ -174,7 +179,7 @@ class RestartFwdTableButton(ButtonEntity):
     _attr_has_entity_name = True
     _attr_translation_key = "restart_fwd_table"
 
-    def __init__(self, module) -> None:
+    def __init__(self, module: HbtnRouter) -> None:
         """Initialize an restart button."""
         self._name = "restartfwdtable"
         self._module = module
@@ -200,7 +205,7 @@ class RestartAllButton(ButtonEntity):
     _attr_has_entity_name = True
     _attr_translation_key = "router_reset_all"
 
-    def __init__(self, router) -> None:
+    def __init__(self, router: HbtnRouter) -> None:
         """Initialize restart all button."""
         self._name = "restart_all"
         self._router = router
@@ -226,7 +231,7 @@ class RestartHubButton(ButtonEntity):
     _attr_has_entity_name = True
     _attr_translation_key = "hub_restart"
 
-    def __init__(self, router) -> None:
+    def __init__(self, router: HbtnRouter) -> None:
         """Initialize an hub restart button."""
         self._name = "restart"
         self._router = router
@@ -252,7 +257,7 @@ class RebootHubButton(ButtonEntity):
     _attr_has_entity_name = True
     _attr_translation_key = "hub_reboot"
 
-    def __init__(self, router) -> None:
+    def __init__(self, router: HbtnRouter) -> None:
         """Initialize an hub reboot button."""
         self._name = "reboot"
         self._router = router
@@ -278,7 +283,7 @@ class CountUpButton(ButtonEntity):
     _attr_has_entity_name = True
     _attr_translation_key = "count_up"
 
-    def __init__(self, counter, module) -> None:
+    def __init__(self, counter: LgcDescriptor, module: HbtnModule) -> None:
         """Initialize an Count button."""
         self._module = module
         self._nmbr = counter.nmbr + 1
@@ -308,7 +313,7 @@ class CountDownButton(ButtonEntity):
     _attr_has_entity_name = True
     _attr_translation_key = "count_down"
 
-    def __init__(self, counter, module) -> None:
+    def __init__(self, counter: LgcDescriptor, module: HbtnModule) -> None:
         """Initialize an Count button."""
         self._module = module
         self._nmbr = counter.nmbr + 1
@@ -338,7 +343,7 @@ class ResetChannelPowerButton(ButtonEntity):
     _attr_has_entity_name = True
     _attr_translation_key = "power_cycle"
 
-    def __init__(self, router, channel) -> None:
+    def __init__(self, router: HbtnRouter, channel: int) -> None:
         """Initialize an Power Cycle button."""
         self._router = router
         self._chan = channel
@@ -366,8 +371,13 @@ class SpeechButton(ButtonEntity):
     _attr_has_entity_name = True
     _attr_translation_key = "voice_input"
 
-    def __init__(self, module) -> None:
-        """Initialize a speech button."""
+    def __init__(self, module: SmartController) -> None:
+        """Initialize a speech button.
+
+        Only ``SmartController`` (Touch) modules expose
+        ``assist_entity_id`` / ``stream_name``, which is why the type
+        narrows here.
+        """
         self._name = "Activate voice input"
         self._module = module
         self._stream_name = module.stream_name
