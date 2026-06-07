@@ -64,3 +64,22 @@ async def test_coordinator_uses_configured_interval(hass: HomeAssistant) -> None
     comm = _make_comm(hass, interval=7)
     coord = HbtnCoordinator(hass, MagicMock(), comm)
     assert coord.update_interval == timedelta(seconds=7)
+
+
+async def test_async_setup_runs_first_refresh(hass: HomeAssistant) -> None:
+    """``_async_setup`` delegates to ``_async_update_data``."""
+    comm = _make_comm(hass)
+    coord = HbtnCoordinator(hass, MagicMock(), comm)
+    await coord._async_setup()
+    comm.async_system_update.assert_awaited()
+
+
+async def test_coordinator_network_error_raises_update_failed(
+    hass: HomeAssistant,
+) -> None:
+    """An OSError in ``async_system_update`` is wrapped in ``UpdateFailed``."""
+    comm = _make_comm(hass)
+    comm.async_system_update.side_effect = OSError("dns down")
+    coord = HbtnCoordinator(hass, MagicMock(), comm)
+    with pytest.raises(UpdateFailed, match="Network error"):
+        await coord._async_update_data()
