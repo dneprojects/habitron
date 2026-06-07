@@ -27,6 +27,12 @@ if TYPE_CHECKING:
     from .media_player import HbtnMediaPlayer
 
 
+# ``HbtnMediaPlayer`` is only assigned by the Touch-specific
+# ``set_assist_entity`` flow but is queried unconditionally from
+# ``async_announce``. Annotated as Optional on the base so mypy can see
+# the attribute on every module variant.
+
+
 class HbtnModule:
     """Habitron Module class."""
 
@@ -73,6 +79,11 @@ class HbtnModule:
         self.covers: list[CovDescriptor] = []
         self.sensors: list[IfDescriptor] = []
         self.leds: list[IfDescriptor] = []
+        # ``cleds`` (colour-LEDs) only exist on SmartController + Mini
+        # variants at runtime, but downstream code paths access them
+        # through an HbtnModule reference. Default-empty here so the
+        # attribute is always present and mypy can see it.
+        self.cleds: list[CLedDescriptor] = []
         self.ids: list[IfDescriptor] = []
         self.messages: list[CmdDescriptor] = []
         self.gsm_numbers: list[CmdDescriptor] = []
@@ -85,9 +96,16 @@ class HbtnModule:
         self.diags: list[IfDescriptor] = [IfDescriptor("", 0, 0, 0)]
         self.diags.append(IfDescriptor("Status", 0, 1, 0))
         self.vce_stat: ListeningStatusSensor | None = None
-        if self.type == "Smart Controller Touch":
-            self.stream_name: str = slugify(self.name) + f"_{self.raddr}"
-            self.client_version = "unknown"
+        # Touch-only properties — declared unconditionally so external
+        # callers don't need to narrow the module's type.
+        self.stream_name: str = (
+            slugify(self.name) + f"_{self.raddr}"
+            if self.type == "Smart Controller Touch"
+            else ""
+        )
+        self.client_version: str = "unknown"
+        self.assist_entity_id: str = ""
+        self.media_player: HbtnMediaPlayer | None = None
 
     @property
     def mod_id(self) -> str:
@@ -481,15 +499,15 @@ class SmartController(HbtnModule):
         self.dimmers = [IfDescriptor("", i, -1, 0) for i in range(2)]
         self.leds = [IfDescriptor("", i, 0, 0) for i in range(9)]
         if self.typ[1] == 4:  # Smart Touch
-            self.cleds: list[CLedDescriptor] = [
+            self.cleds = [
                 CLedDescriptor("", i, 4, [0, 0, 0, 0]) for i in range(5)
             ]
         self.diags = [IfDescriptor("", i, 0, 0) for i in range(2)]
         self.setvalues = [IfDescriptor("Set temperature", 0, 2, 20.0)]
         self.setvalues.append(IfDescriptor("Set temperature 2", 1, 2, 20.0))
         self.auxheat_value = 0
-        self.assist_entity_id = ""
-        self.media_player: HbtnMediaPlayer
+        # ``assist_entity_id`` and ``media_player`` are seeded on the
+        # base class — touched here only conceptually.
 
         self.sensors.append(IfDescriptor("Movement", 0, 2, 0))
         self.sensors.append(IfDescriptor("Temperature", 1, 2, 0))
@@ -619,7 +637,7 @@ class SmartControllerMini(HbtnModule):
         self.outputs = [IfDescriptor("", i, 1, 0) for i in range(2)]
         self.covers = [CovDescriptor("", -1, 0, 0, 0) for i in range(0)]
         self.dimmers = [IfDescriptor("", i, -1, 0) for i in range(0)]
-        self.cleds: list[CLedDescriptor] = [
+        self.cleds = [
             CLedDescriptor("", i, 4, [0, 0, 0, 0]) for i in range(5)
         ]
         self.diags = [IfDescriptor("", i, 0, 0) for i in range(1)]
