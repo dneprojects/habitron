@@ -1141,3 +1141,94 @@ async def test_get_names_logic_name_matches_logic_descriptor() -> None:
     comm.async_get_module_definitions = AsyncMock(return_value=payload)
     assert await mod.get_names() is True
     assert mod.logic[0].name == "Counter 1"
+
+
+async def test_get_names_breaks_when_response_runs_out_of_lines() -> None:
+    """A header that promises more lines than the body delivers stops at empty resp."""
+    desc = _make_descriptor(mtype=b"\x0b\x1e", name="In 8/24V")
+    comm = _make_comm()
+    mod = SmartInput(desc, MagicMock(), MagicMock(), "HUB-1", comm)
+    # Header says ``2`` lines but only one is present — the second iteration
+    # of the for-loop hits ``if resp == b"": break``.
+    lines = [_build_name_line(255, 0, 40, b"In")]
+    header = bytes([0, 0, 0, 2, 0, 0, 0])  # no_lines = 2
+    payload = header + b"".join(lines)
+    comm.async_get_module_definitions = AsyncMock(return_value=payload)
+    assert await mod.get_names() is True
+
+
+async def test_get_names_arg_code_in_button_range_writes_input() -> None:
+    """arg_code in 10..17 places the text into self.inputs[arg_code - 10]."""
+    desc = _make_descriptor(mtype=b"\x0b\x1e", name="In 8/24V")
+    comm = _make_comm()
+    mod = SmartInput(desc, MagicMock(), MagicMock(), "HUB-1", comm)
+    lines = [_build_name_line(255, 0, 10, b"Btn-0")]
+    payload = _build_get_names_response(lines)
+    comm.async_get_module_definitions = AsyncMock(return_value=payload)
+    assert await mod.get_names() is True
+    assert mod.inputs[0].name == "Btn-0"
+
+
+async def test_get_names_long_press_range_is_a_silent_pass() -> None:
+    """arg_code in 101..108 (long-press buttons) is intentionally a no-op."""
+    desc = _make_descriptor(mtype=b"\x0b\x1e", name="In 8/24V")
+    comm = _make_comm()
+    mod = SmartInput(desc, MagicMock(), MagicMock(), "HUB-1", comm)
+    lines = [_build_name_line(255, 0, 101, b"long")]
+    payload = _build_get_names_response(lines)
+    comm.async_get_module_definitions = AsyncMock(return_value=payload)
+    assert await mod.get_names() is True
+
+
+async def test_get_names_logs_warning_on_processing_exception() -> None:
+    """A parser exception in the 255-branch is caught and logged via the warning."""
+    desc = _make_descriptor(mtype=b"\x0b\x1e", name="In 8/24V")
+    comm = _make_comm()
+    mod = SmartInput(desc, MagicMock(), MagicMock(), "HUB-1", comm)
+    # Clear inputs so ``inputs[arg_code - 10] = ...`` throws IndexError.
+    mod.inputs = []
+    mod.logger = MagicMock()
+    lines = [_build_name_line(255, 0, 10, b"Btn-0")]
+    payload = _build_get_names_response(lines)
+    comm.async_get_module_definitions = AsyncMock(return_value=payload)
+    await mod.get_names()
+    mod.logger.warning.assert_called()
+
+
+async def test_get_names_smart_controller_normal_type_branch() -> None:
+    """A SC reply with outputs[10] + outputs[11] named hits the ``type=2`` branch."""
+    desc = _make_descriptor(mtype=b"\x01\x03", name="SC LE2")
+    comm = _make_comm()
+    sc = SmartController(desc, MagicMock(), MagicMock(), "HUB-1", comm)
+    # Provide names for outputs[10] (arg_code 70) and outputs[11] (arg_code 71).
+    lines = [
+        _build_name_line(255, 0, 70, b"Dim A"),
+        _build_name_line(255, 0, 71, b"Dim B"),
+    ]
+    payload = _build_get_names_response(lines)
+    comm.async_get_module_definitions = AsyncMock(return_value=payload)
+    assert await sc.get_names() is True
+    # The else-branch sets outputs[10/11].type to 2.
+    assert sc.outputs[10].type == 2
+    assert sc.outputs[11].type == 2
+
+
+async def test_get_names_smart_dimm_disabled_output_branch() -> None:
+    """A SmartDimm reply WITHOUT output names triggers the disable branch.
+
+    ``get_names`` returns False on a totally empty body, so we send one
+    harmless 255/136 line (``area_member``) to keep the parser going.
+    With no names supplied for outputs[0..3], ``set_default_names``
+    flips each type to -1 and the dimm-init walks the disable branches.
+    """
+    desc = _make_descriptor(mtype=b"\x0a\x14", name="Dimm 1")
+    comm = _make_comm()
+    dimm = SmartDimm(desc, MagicMock(), MagicMock(), "HUB-1", comm)
+    lines = [_build_name_line(255, 0, 136, b"area")]
+    payload = _build_get_names_response(lines)
+    comm.async_get_module_definitions = AsyncMock(return_value=payload)
+    assert await dimm.get_names() is True
+    # Every dimmer + output should be marked as disabled (type < 0).
+    for i in range(4):
+        assert dimm.dimmers[i].type == -2
+        assert dimm.outputs[i].type == -2

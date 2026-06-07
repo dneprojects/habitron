@@ -243,3 +243,16 @@ async def test_reboot_forwards_to_comm(smart_hub_stub: SmartHub) -> None:
     """reboot() forwards the call to ``comm.hub_reboot``."""
     await smart_hub_stub.reboot()
     smart_hub_stub.comm.hub_reboot.assert_awaited()
+
+
+def test_async_register_forwards_system_health_info() -> None:
+    """``async_register`` wires ``system_health_info`` into the registration helper."""
+    from custom_components.habitron.system_health import (  # noqa: PLC0415
+        async_register,
+        system_health_info,
+    )
+
+    hass = MagicMock()
+    register = MagicMock()
+    async_register(hass, register)
+    register.async_register_info.assert_called_with(system_health_info)
