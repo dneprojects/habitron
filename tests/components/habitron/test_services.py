@@ -239,3 +239,185 @@ async def test_sc_system_command_dispatches(
     hub.ws_provider.async_send_system_command.assert_awaited_once_with(
         "sc_touch_1", "restart", None
     )
+
+
+async def test_primary_hub_logs_warning_on_multiple_hubs(
+    hass: HomeAssistant,
+    setup_integration: MockConfigEntry,
+    mock_habitron_client: MagicMock,
+    mock_smart_hub_setup: None,
+    mock_ws_provider: MagicMock,
+    mock_coordinator_refresh: AsyncMock,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """With more than one loaded hub, ``_primary_hub`` warns + returns the first."""
+    other = MockConfigEntry(
+        domain=DOMAIN,
+        title="Habitron #2",
+        unique_id="hub-2",
+        data=setup_integration.data,
+        options=setup_integration.options,
+    )
+    other.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(other.entry_id)
+    await hass.async_block_till_done()
+
+    with caplog.at_level("WARNING"):
+        hub = _primary_hub(hass)
+    assert hub is not None
+    assert any("singleton service" in rec.message for rec in caplog.records)
+
+
+async def test_update_entity_raises_when_hub_not_found(
+    hass: HomeAssistant,
+    setup_integration: MockConfigEntry,
+) -> None:
+    """``update_entity`` raises ``hub_not_found`` when no host matches."""
+    hub = setup_integration.runtime_data
+    hub.host = "192.168.1.50"
+    with pytest.raises(ServiceValidationError) as err:
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_UPDATE_ENTITY,
+            {
+                "hub_uid": "no-such-host",
+                "rtr_nmbr": 1,
+                "mod_nmbr": 10,
+                "evnt_type": 1,
+                "evnt_arg1": 0,
+                "evnt_arg2": 0,
+            },
+            blocking=True,
+        )
+    assert err.value.translation_key == "hub_not_found"
+
+
+async def test_sc_system_command_accepts_string_device(
+    hass: HomeAssistant,
+    setup_integration: MockConfigEntry,
+) -> None:
+    """A string ``target_device`` is wrapped into a single-element list."""
+    hub = setup_integration.runtime_data
+    module = MagicMock()
+    module.typ = b"\x01\x04"
+    module.name = "SC Touch 1"
+    module.stream_name = "sc_touch_1"
+    hub.router.get_module_by_uid = MagicMock(return_value=module)
+    hub.ws_provider = MagicMock()
+    hub.ws_provider.async_send_system_command = AsyncMock()
+
+    dev_reg = dr.async_get(hass)
+    device = dev_reg.async_get_or_create(
+        config_entry_id=setup_integration.entry_id,
+        identifiers={(DOMAIN, "module-uid-42")},
+        name="SC Touch Device",
+    )
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_SC_SYSTEM_COMMAND,
+        {"target_device": device.id, "command": "restart"},
+        blocking=True,
+    )
+    hub.ws_provider.async_send_system_command.assert_awaited()
+
+
+async def test_sc_system_command_raises_when_no_matching_module(
+    hass: HomeAssistant,
+    setup_integration: MockConfigEntry,
+) -> None:
+    """A device whose identifier doesn't match any module raises ``no_matching_module``."""
+    hub = setup_integration.runtime_data
+    hub.router.get_module_by_uid = MagicMock(return_value=None)
+
+    dev_reg = dr.async_get(hass)
+    device = dev_reg.async_get_or_create(
+        config_entry_id=setup_integration.entry_id,
+        identifiers={(DOMAIN, "phantom-uid")},
+        name="Mystery Device",
+    )
+
+    with pytest.raises(ServiceValidationError) as err:
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_SC_SYSTEM_COMMAND,
+            {"target_device": [device.id], "command": "restart"},
+            blocking=True,
+        )
+    assert err.value.translation_key == "no_matching_module"
+
+
+async def test_sc_system_command_raises_when_ws_provider_missing(
+    hass: HomeAssistant,
+    setup_integration: MockConfigEntry,
+) -> None:
+    """A matching module without a ws_provider raises ``websocket_provider_missing``."""
+    hub = setup_integration.runtime_data
+    module = MagicMock()
+    module.typ = b"\x01\x04"
+    module.name = "SC Touch"
+    module.stream_name = "sc_touch_1"
+    hub.router.get_module_by_uid = MagicMock(return_value=module)
+    hub.ws_provider = None
+
+    dev_reg = dr.async_get(hass)
+    device = dev_reg.async_get_or_create(
+        config_entry_id=setup_integration.entry_id,
+        identifiers={(DOMAIN, "module-uid-42")},
+        name="SC Touch Device",
+    )
+
+    with pytest.raises(ServiceValidationError) as err:
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_SC_SYSTEM_COMMAND,
+            {"target_device": [device.id], "command": "restart"},
+            blocking=True,
+        )
+    assert err.value.translation_key == "websocket_provider_missing"
+
+
+async def test_sc_system_command_skips_module_without_stream_name(
+    hass: HomeAssistant,
+    setup_integration: MockConfigEntry,
+) -> None:
+    """A module without ``stream_name`` is skipped and the dispatch reports failure."""
+    hub = setup_integration.runtime_data
+    module = MagicMock(spec=["typ", "name"])
+    module.typ = b"\x01\x04"
+    module.name = "Stale"
+    hub.router.get_module_by_uid = MagicMock(return_value=module)
+    hub.ws_provider = MagicMock()
+
+    dev_reg = dr.async_get(hass)
+    device = dev_reg.async_get_or_create(
+        config_entry_id=setup_integration.entry_id,
+        identifiers={(DOMAIN, "module-uid-stale")},
+        name="Stale Device",
+    )
+
+    with pytest.raises(ServiceValidationError) as err:
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_SC_SYSTEM_COMMAND,
+            {"target_device": [device.id], "command": "restart"},
+            blocking=True,
+        )
+    assert err.value.translation_key == "no_matching_module"
+
+
+async def test_sc_system_command_skips_unknown_device_id(
+    hass: HomeAssistant,
+    setup_integration: MockConfigEntry,
+) -> None:
+    """A device id that's not in the registry is silently skipped."""
+    hub = setup_integration.runtime_data
+    hub.router.get_module_by_uid = MagicMock(return_value=None)
+
+    # No device created with this id — registry lookup returns None.
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_SC_SYSTEM_COMMAND,
+        {"target_device": ["does-not-exist"], "command": "restart"},
+        blocking=True,
+    )

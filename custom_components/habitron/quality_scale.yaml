@@ -43,20 +43,20 @@ rules:
   test-coverage:
     status: todo
     comment: |
-      Current state: 633 tests, ~77% line coverage. Every entity
-      platform, every config-flow path, the camera, the router, the
-      ``SmartHub`` orchestrator, the descriptor helpers and the
-      module-layer parser are at or above the Silver bar:
-      ``binary_sensor`` 100%, ``button`` 100%, ``camera`` 100%,
-      ``climate`` 100%, ``const`` 100%, ``interfaces`` 100%, ``notify``
-      100%, ``number`` 100%, ``select`` 100%, ``sensor`` 100%,
-      ``smart_hub`` 100%, ``switch`` 100%, ``text`` 100%, ``config_flow``
-      99%, ``cover`` 99%, ``event`` 99%, ``device_trigger`` 98%,
-      ``light`` 98%, ``router`` 98%, ``module`` 97%, ``diagnostics``
-      96%, ``system_health`` 94%, ``coordinator`` 90%, ``services``
-      90%, ``__init__`` 85%. The remaining gap is concentrated in the
-      WebRTC / media / bus paths (``ws_provider.py`` 14%,
-      ``media_player.py`` 16%, ``communicate.py`` 34%, ``update.py``
+      Current state: 745 tests, ~82% line coverage. The bus-protocol
+      wrapper (``communicate``) joined the Silver-bar club along with
+      every entity platform, config flow, camera, router, SmartHub,
+      descriptor helpers, the module-layer parser and the integration
+      lifecycle: ``binary_sensor`` 100%, ``button`` 100%, ``camera``
+      100%, ``climate`` 100%, ``communicate`` 100%, ``const`` 100%,
+      ``coordinator`` 100%, ``interfaces`` 100%, ``notify`` 100%,
+      ``number`` 100%, ``select`` 100%, ``sensor`` 100%, ``smart_hub``
+      100%, ``switch`` 100%, ``text`` 100%, ``config_flow`` 99%,
+      ``cover`` 99%, ``event`` 99%, ``__init__`` 98%, ``device_trigger``
+      98%, ``light`` 98%, ``router`` 98%, ``services`` 98%, ``module``
+      97%, ``diagnostics`` 96%, ``system_health`` 94%. The remaining
+      gap is concentrated in the WebRTC / media paths
+      (``ws_provider.py`` 14%, ``media_player.py`` 16%, ``update.py``
       35%, ``assist_satellite.py`` 39%), each of which needs a
       dedicated mocking layer to cover meaningfully. Hitting the 95%
       Silver target on these support files is a follow-up backlog item
