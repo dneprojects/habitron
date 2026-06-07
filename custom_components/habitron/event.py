@@ -2,17 +2,21 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from homeassistant.components.event import EventDeviceClass, EventEntity
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
 
 # Import the device class from the component that you want to support
-from .interfaces import AreaDescriptor
+from .interfaces import AreaDescriptor, IfDescriptor
+from .module import HbtnModule
 
 PARALLEL_UPDATES = 1
 
@@ -26,7 +30,7 @@ async def async_setup_entry(
     hbtn_rt = entry.runtime_data.router
     hbtn_cord = hbtn_rt.coord
 
-    new_devices = []
+    new_devices: list[EventEntity] = []
     for hbt_module in hbtn_rt.modules:
         for mod_input in hbt_module.inputs:
             if abs(mod_input.type) == 1:  # pulse switch
@@ -43,7 +47,7 @@ async def async_setup_entry(
 
             # Create one entity per user, removing the German name list here
             for user_obj in hbt_module.ids:
-                u_id = user_obj.nmbr if hasattr(user_obj, "nmbr") else user_obj.id
+                u_id = user_obj.nmbr  # all IfDescriptors expose ``nmbr``
                 u_name = user_obj.name
 
                 new_devices.append(
@@ -86,7 +90,13 @@ class HbtnEvent(EventEntity):
 
     _attr_translation_key = "hbtn_event"
 
-    def __init__(self, event_if, module, coord, idx) -> None:
+    def __init__(
+        self,
+        event_if: IfDescriptor,
+        module: HbtnModule,
+        coord: DataUpdateCoordinator[None],
+        idx: int,
+    ) -> None:
         """Initialize an HbtnEvent, pass coordinator to CoordinatorEntity."""
         super().__init__()
         self.idx = idx
@@ -107,7 +117,7 @@ class HbtnEvent(EventEntity):
         return {"identifiers": {(DOMAIN, self._module.uid)}}
 
     @callback
-    def _async_handle_event(self, event: str) -> None:
+    def _async_handle_event(self, event: str, *args: Any) -> None:
         """Handle event."""
         self._trigger_event(event, {"extra_data": 123})
         self.async_write_ha_state()
@@ -131,7 +141,7 @@ class InputPressed(HbtnEvent):
     _attr_event_types = ["single_press", "long_press", "long_press_end"]
 
     @callback
-    def _async_handle_event(self, event: str) -> None:
+    def _async_handle_event(self, event: str, *args: Any) -> None:
         """Handle event."""
         # Call standard trigger for the event entity
         self._trigger_event(event, {"extra_data": 123})
@@ -146,7 +156,13 @@ class FingerDetected(HbtnEvent):
     _attr_device_class = EventDeviceClass.BUTTON
     _attr_event_types = ["finger"]
 
-    def __init__(self, event_if, module, coord, idx) -> None:
+    def __init__(
+        self,
+        event_if: IfDescriptor,
+        module: HbtnModule,
+        coord: DataUpdateCoordinator[None],
+        idx: int,
+    ) -> None:
         """Initialize FingerDetected and setup extra attributes."""
         super().__init__(event_if, module, coord, idx)
         # Initialize attributes to be visible in HA UI
@@ -179,7 +195,15 @@ class EkeyUserEvent(HbtnEvent):
     _attr_device_class = EventDeviceClass.BUTTON
     _attr_has_entity_name = True
 
-    def __init__(self, event_if, module, coord, idx, u_id, u_name) -> None:
+    def __init__(
+        self,
+        event_if: IfDescriptor,
+        module: HbtnModule,
+        coord: DataUpdateCoordinator[None],
+        idx: int,
+        u_id: int,
+        u_name: str,
+    ) -> None:
         """Initialize specific user event."""
         super().__init__(event_if, module, coord, idx)
         self._u_id = u_id

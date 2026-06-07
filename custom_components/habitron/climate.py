@@ -38,7 +38,7 @@ async def async_setup_entry(
 ) -> None:
     """Add climate units for passed config_entry in HA."""
     hbtn_rt: HbtnRouter = entry.runtime_data.router
-    hbtn_cord: DataUpdateCoordinator = hbtn_rt.coord
+    hbtn_cord: DataUpdateCoordinator[None] = hbtn_rt.coord
 
     new_devices = []
     for hbt_module in hbtn_rt.modules:
@@ -104,7 +104,7 @@ class HbtnClimate(CoordinatorEntity, ClimateEntity):
     def __init__(
         self,
         module: HbtnModule,
-        coord: DataUpdateCoordinator,
+        coord: DataUpdateCoordinator[None],
         controller_idx: int,
     ) -> None:
         """Initialize climate unit with instance index (0 or 1)."""

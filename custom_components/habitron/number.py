@@ -134,7 +134,7 @@ class HbtnAnalogOutput(CoordinatorEntity, NumberEntity):
         self,
         output: IfDescriptor,
         module: HbtnModule,
-        coord: DataUpdateCoordinator,
+        coord: DataUpdateCoordinator[None],
         idx: int,
     ) -> None:
         """Initialize a Habitron analog value, pass coordinator to CoordinatorEntity."""
