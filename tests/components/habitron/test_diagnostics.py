@@ -128,3 +128,24 @@ async def test_device_diagnostics_unknown_identifier(
     info = await async_get_device_diagnostics(hass, entry, device)
     assert info["device_identifier"] == "ghost-uid"
     assert info["target"] is None
+
+
+async def test_device_diagnostics_for_router(
+    hass: HomeAssistant,
+    setup_integration: MockConfigEntry,
+) -> None:
+    """A device whose UID matches the router reports the router summary."""
+    entry = setup_integration
+    smhub = entry.runtime_data
+    router_uid = smhub.router.uid
+
+    dev_reg = dr.async_get(hass)
+    device = dev_reg.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, router_uid)},
+        name="Router",
+    )
+
+    info = await async_get_device_diagnostics(hass, entry, device)
+    assert info["device_identifier"] == router_uid
+    assert info["target"]["kind"] == "router"
