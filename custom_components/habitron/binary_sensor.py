@@ -39,7 +39,7 @@ async def async_setup_entry(
     hbtn_rt: HbtnRouter = entry.runtime_data.router
     hbtn_cord = hbtn_rt.coord
 
-    new_devices = []
+    new_devices: list[BinarySensorEntity] = []
     for hbt_module in hbtn_rt.modules:
         for mod_input in hbt_module.inputs:
             if abs(mod_input.type) == 2:  # switch
@@ -86,7 +86,7 @@ async def async_setup_entry(
                     )
 
 
-class HbtnBinSensor(CoordinatorEntity, BinarySensorEntity):
+class HbtnBinSensor(CoordinatorEntity[DataUpdateCoordinator[None]], BinarySensorEntity):
     """Representation of habitron switch input entities."""
 
     _attr_has_entity_name = True
@@ -95,7 +95,7 @@ class HbtnBinSensor(CoordinatorEntity, BinarySensorEntity):
         self,
         sens_or_inpt: IfDescriptor,
         module: HbtnModule,
-        coord: DataUpdateCoordinator,
+        coord: DataUpdateCoordinator[None],
         idx: int,
     ) -> None:
         """Initialize an InputSwitch, pass coordinator to CoordinatorEntity."""
@@ -138,7 +138,7 @@ class InputSwitch(HbtnBinSensor):
         self,
         inpt: IfDescriptor,
         module: HbtnModule,
-        coord: DataUpdateCoordinator,
+        coord: DataUpdateCoordinator[None],
         idx: int,
     ) -> None:
         """Initialize an InputSwitch, pass coordinator to CoordinatorEntity."""
@@ -182,7 +182,7 @@ class MotionSensor(HbtnBinSensor):
         self,
         sensor: IfDescriptor,
         module: HbtnModule,
-        coord: DataUpdateCoordinator,
+        coord: DataUpdateCoordinator[None],
         idx: int,
     ) -> None:
         """Initialize motion sensor."""
@@ -227,7 +227,7 @@ class RainSensor(HbtnBinSensor):
         self,
         sensor: IfDescriptor,
         module: HbtnModule,
-        coord: DataUpdateCoordinator,
+        coord: DataUpdateCoordinator[None],
         idx: int,
     ) -> None:
         """Initialize rain sensor."""
@@ -242,7 +242,7 @@ class RainSensor(HbtnBinSensor):
         self.async_write_ha_state()
 
 
-class HbtnState(CoordinatorEntity, BinarySensorEntity):
+class HbtnState(CoordinatorEntity[DataUpdateCoordinator[None]], BinarySensorEntity):
     """Representation of habitron state entities."""
 
     _attr_has_entity_name = True
@@ -252,7 +252,7 @@ class HbtnState(CoordinatorEntity, BinarySensorEntity):
         self,
         state: StateDescriptor,
         module: HbtnModule | HbtnRouter,
-        coord: DataUpdateCoordinator,
+        coord: DataUpdateCoordinator[None],
         idx: int,
     ) -> None:
         """Initialize an Hbtnstate, pass coordinator to CoordinatorEntity."""

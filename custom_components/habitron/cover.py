@@ -40,9 +40,9 @@ async def async_setup_entry(
 ) -> None:
     """Add covers for passed config_entry in HA."""
     hbtn_rt: HbtnRouter = entry.runtime_data.router
-    hbtn_cord: DataUpdateCoordinator = hbtn_rt.coord
+    hbtn_cord: DataUpdateCoordinator[None] = hbtn_rt.coord
 
-    new_devices = []
+    new_devices: list[CoverEntity] = []
     for hbt_module in hbtn_rt.modules:
         for mod_cover in hbt_module.covers:
             if mod_cover.nmbr >= 0:  # not disabled
@@ -84,7 +84,7 @@ async def async_setup_entry(
 # This entire class could be written to extend a base class to ensure common attributes
 # are kept identical/in sync. It's broken apart here between the Cover and Sensors to
 # be explicit about what is returned, and the comments outline where the overlap is.
-class HbtnShutter(CoordinatorEntity, CoverEntity):
+class HbtnShutter(CoordinatorEntity[DataUpdateCoordinator[None]], CoverEntity):
     """Representation of a shutter cover."""
 
     _attr_has_entity_name = True
@@ -101,7 +101,7 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
         self,
         cover: CovDescriptor,
         module: HbtnModule,
-        coord: DataUpdateCoordinator,
+        coord: DataUpdateCoordinator[None],
         idx: int,
     ) -> None:
         """Initialize an HbtnShutter, pass coordinator to CoordinatorEntity."""
@@ -127,7 +127,7 @@ class HbtnShutter(CoordinatorEntity, CoverEntity):
         self._position: int = 0
         self._moving: int = 0
         self.stop_delay: int = module.comm.router.cover_autostop_del
-        self._stop_task: asyncio.Task | None = None
+        self._stop_task: asyncio.Task[None] | None = None
         self._attr_unique_id: str | None = f"Mod_{self._module.uid}_cover{cover.nmbr}"
         self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
 
@@ -301,7 +301,13 @@ class HbtnBlind(HbtnShutter):
     )
     _attr_device_class = CoverDeviceClass.BLIND
 
-    def __init__(self, cover, module, coord, idx) -> None:
+    def __init__(
+        self,
+        cover: CovDescriptor,
+        module: HbtnModule,
+        coord: DataUpdateCoordinator[None],
+        idx: int,
+    ) -> None:
         """Initialize an HbtnShutterTilt."""
         super().__init__(cover, module, coord, idx)
         self._tilt_position = 0
@@ -347,7 +353,7 @@ class HbtnBlind(HbtnShutter):
             100 - tmp_tilt_position,
         )
 
-    async def async_open_cover_tilt(self, **kwargs) -> None:
+    async def async_open_cover_tilt(self, **kwargs: Any) -> None:
         """Set the tilt angle."""
         sh_nmbr = self._nmbr + 1
         self._tilt_position = 100 - self._module.covers[self._nmbr].tilt
@@ -361,7 +367,7 @@ class HbtnBlind(HbtnShutter):
             0,
         )
 
-    async def async_close_cover_tilt(self, **kwargs) -> None:
+    async def async_close_cover_tilt(self, **kwargs: Any) -> None:
         """Set the tilt angle."""
         sh_nmbr = self._nmbr + 1
         self._tilt_position = 100 - self._module.covers[self._nmbr].tilt

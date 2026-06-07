@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from homeassistant.components.light import (
+from homeassistant.components.light import (  # type: ignore[attr-defined]
     ATTR_BRIGHTNESS,
     ATTR_RGB_COLOR,
     ColorMode,
@@ -88,7 +88,7 @@ async def async_setup_entry(
                         )
 
 
-class SwitchedLight(CoordinatorEntity, LightEntity):
+class SwitchedLight(CoordinatorEntity[DataUpdateCoordinator[None]], LightEntity):
     """Representation of habitron light entities."""
 
     _attr_has_entity_name = True
@@ -99,7 +99,7 @@ class SwitchedLight(CoordinatorEntity, LightEntity):
         self,
         output: IfDescriptor,
         module: HbtnModule,
-        coord: DataUpdateCoordinator,
+        coord: DataUpdateCoordinator[None],
         idx: int,
     ) -> None:
         """Initialize an HbtnLight, pass coordinator to CoordinatorEntity."""
@@ -122,7 +122,7 @@ class SwitchedLight(CoordinatorEntity, LightEntity):
     @property
     def is_on(self) -> bool:
         """Return status of output."""
-        return self._output.value == 1
+        return bool(self._output.value == 1)
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -151,7 +151,7 @@ class DimmedOutput(SwitchedLight):
     _attr_supported_color_modes = {ColorMode.BRIGHTNESS}
     _attr_translation_key = "dimmed_output"
 
-    def __init__(self, output, module, coord, idx) -> None:
+    def __init__(self, output: IfDescriptor, module: HbtnModule, coord: DataUpdateCoordinator[None], idx: int) -> None:
         """Initialize a dimmable Habitron Light."""
         super().__init__(output, module, coord, idx)
         if module.typ[0] == 1:
@@ -211,7 +211,7 @@ class DimmedOutputPush(SwitchedLightPush):
     _attr_color_mode = ColorMode.BRIGHTNESS
     _attr_supported_color_modes = {ColorMode.BRIGHTNESS}
 
-    def __init__(self, output, module, coord, idx) -> None:
+    def __init__(self, output: IfDescriptor, module: HbtnModule, coord: DataUpdateCoordinator[None], idx: int) -> None:
         """Initialize a dimmable Habitron Light."""
         super().__init__(output, module, coord, idx)
         if module.typ[0] == 1:
@@ -244,7 +244,7 @@ class DimmedOutputPush(SwitchedLightPush):
         )
 
 
-class ColorLed(CoordinatorEntity, LightEntity):
+class ColorLed(CoordinatorEntity[DataUpdateCoordinator[None]], LightEntity):
     """Representation of habitron light entities."""
 
     _attr_has_entity_name = True
@@ -255,7 +255,7 @@ class ColorLed(CoordinatorEntity, LightEntity):
         self,
         led: CLedDescriptor,
         module: HbtnModule,
-        coord: DataUpdateCoordinator,
+        coord: DataUpdateCoordinator[None],
         idx: int,
     ) -> None:
         """Initialize an HbtnLight, pass coordinator to CoordinatorEntity."""
@@ -373,7 +373,7 @@ class ColorLed(CoordinatorEntity, LightEntity):
         await self._module.comm.async_set_rgbval(
             self._module.mod_addr,
             self._nmbr,
-            dimmed_col,
+            list(dimmed_col),
         )
 
     async def async_turn_off(self, **kwargs: Any) -> None:

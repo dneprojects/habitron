@@ -30,7 +30,7 @@ async def async_setup_entry(
 ) -> None:
     """Add input_select for passed config_entry in HA."""
     hbtn_rt: HbtnRouter = entry.runtime_data.router
-    hbtn_cord: DataUpdateCoordinator = hbtn_rt.coord
+    hbtn_cord: DataUpdateCoordinator[None] = hbtn_rt.coord
     smhub = entry.runtime_data
 
     new_devices = []
@@ -82,7 +82,7 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
         self,
         module: int | HbtnModule,
         hbtnr: HbtnRouter,
-        coord: DataUpdateCoordinator,
+        coord: DataUpdateCoordinator[None],
         idx: int,
     ) -> None:
         """Initialize a Habitron mode, pass coordinator to CoordinatorEntity."""
@@ -170,7 +170,7 @@ class HbtnSelectDaytimeMode(HbtnMode):
         self,
         module: int | HbtnModule,
         hbtnr: HbtnRouter,
-        coord: DataUpdateCoordinator,
+        coord: DataUpdateCoordinator[None],
         idx: int,
     ) -> None:
         """Initialize daytime mode selector."""
@@ -215,7 +215,7 @@ class HbtnSelectAlarmMode(HbtnMode):
         self,
         module: int | HbtnModule,
         hbtnr: HbtnRouter,
-        coord: DataUpdateCoordinator,
+        coord: DataUpdateCoordinator[None],
         idx: int,
     ) -> None:
         """Initialize alarm mode selector."""

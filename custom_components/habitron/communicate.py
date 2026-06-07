@@ -309,17 +309,17 @@ class HbtnComm:
         """Set new logging level."""
         await self._async_exec(self.client.set_log_level, hdlr, level)
 
-    def set_output(self, mod_id: int, nmbr: int, val: bool) -> None:
+    def set_output(self, mod_id: int, nmbr: int, val: int) -> None:
         """Send turn_on/turn_off command synchronously."""
         self.client.set_output(self._convert_mod_id(mod_id), nmbr, val)
 
-    async def async_set_output(self, mod_id: int, nmbr: int, val: bool) -> None:
+    async def async_set_output(self, mod_id: int, nmbr: int, val: int) -> None:
         """Send turn_on/turn_off command."""
         await self._async_exec(
             self.client.set_output, self._convert_mod_id(mod_id), nmbr, val
         )
 
-    async def async_set_led_outp(self, mod_id: int, nmbr: int, val: bool) -> None:
+    async def async_set_led_outp(self, mod_id: int, nmbr: int, val: int) -> None:
         """Translate led nmbr to output nmbr and send on/off command."""
         mod = self.router.get_module(self._convert_mod_id(mod_id))
         if mod is None:
@@ -333,7 +333,7 @@ class HbtnComm:
             self.client.set_dimmval, self._convert_mod_id(mod_id), nmbr, val
         )
 
-    async def async_set_rgb_output(self, mod_id: int, nmbr: int, val: bool) -> None:
+    async def async_set_rgb_output(self, mod_id: int, nmbr: int, val: int) -> None:
         """Turn RGB light on/off."""
         await self._async_exec(
             self.client.set_rgb_output, self._convert_mod_id(mod_id), nmbr, val
@@ -357,7 +357,7 @@ class HbtnComm:
             self.client.set_blindtilt, self._convert_mod_id(mod_id), nmbr, val
         )
 
-    async def async_set_flag(self, mod_id: int, nmbr: int, val: bool) -> None:
+    async def async_set_flag(self, mod_id: int, nmbr: int, val: int) -> None:
         """Send flag on/flag off command."""
         await self._async_exec(
             self.client.set_flag, self._convert_mod_id(mod_id), nmbr, val

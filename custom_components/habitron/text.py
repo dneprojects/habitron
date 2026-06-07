@@ -24,7 +24,7 @@ async def async_setup_entry(
 ) -> None:
     """Add sensors for passed config_entry in HA."""
     hbtn_rt: HbtnRouter = entry.runtime_data.router
-    hbtn_cord: DataUpdateCoordinator = hbtn_rt.coord
+    hbtn_cord: DataUpdateCoordinator[None] = hbtn_rt.coord
 
     new_devices = []
     for hbt_module in hbtn_rt.modules:
@@ -55,7 +55,7 @@ class EKeySensorUsr(CoordinatorEntity, SensorEntity):
         self,
         module: HbtnModule,
         nmbr: int,
-        coord: DataUpdateCoordinator,
+        coord: DataUpdateCoordinator[None],
         idx: int,
     ) -> None:
         """Initialize a Habitron text entity, pass coordinator to CoordinatorEntity."""
@@ -128,7 +128,7 @@ class EKeySensorFngr(CoordinatorEntity, SensorEntity):
         self,
         module: HbtnModule,
         nmbr: int,
-        coord: DataUpdateCoordinator,
+        coord: DataUpdateCoordinator[None],
         idx: int,
     ) -> None:
         """Initialize a Habitron text entity, pass coordinator to CoordinatorEntity."""
