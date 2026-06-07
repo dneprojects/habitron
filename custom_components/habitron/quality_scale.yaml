@@ -43,16 +43,16 @@ rules:
   test-coverage:
     status: todo
     comment: |
-      Current state: 517 tests, ~69% line coverage. Every Habitron
-      entity platform plus the ``SmartHub`` orchestrator and the
-      descriptor helpers are at or above the Silver bar:
-      ``binary_sensor`` 100%, ``button`` 100%, ``climate`` 100%,
-      ``interfaces`` 100%, ``notify`` 100%, ``number`` 100%,
-      ``select`` 100%, ``sensor`` 100%, ``smart_hub`` 100%, ``switch``
-      100%, ``text`` 100%, ``cover`` 99%, ``event`` 99%, ``light`` 98%;
-      plus ``const`` 100%, ``device_trigger`` 98%, ``diagnostics`` 96%,
-      ``system_health`` 94%, ``coordinator`` 90%, ``services`` 90%,
-      ``__init__`` 85%, ``module`` 66%. The remaining gap is
+      Current state: 547 tests, ~72% line coverage. Every Habitron
+      entity platform, the ``SmartHub`` orchestrator, the descriptor
+      helpers and the module-layer parser are at or above the Silver
+      bar: ``binary_sensor`` 100%, ``button`` 100%, ``climate`` 100%,
+      ``const`` 100%, ``interfaces`` 100%, ``notify`` 100%, ``number``
+      100%, ``select`` 100%, ``sensor`` 100%, ``smart_hub`` 100%,
+      ``switch`` 100%, ``text`` 100%, ``cover`` 99%, ``event`` 99%,
+      ``device_trigger`` 98%, ``light`` 98%, ``module`` 97%,
+      ``diagnostics`` 96%, ``system_health`` 94%, ``coordinator``
+      90%, ``services`` 90%, ``__init__`` 85%. The remaining gap is
       concentrated in the WebRTC / media / bus paths
       (``ws_provider.py`` 14%, ``media_player.py`` 16%, ``update.py``
       35%, ``communicate.py`` 34%, ``router.py`` 35%,
