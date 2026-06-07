@@ -65,7 +65,14 @@ async def test_attach_trigger_fires_on_matching_state_change(
         "entity_id": "event.test",
         "type": "single_press",
     }
-    trigger_info = {"id": "trig-1", "idx": "0", "alias": "test-trigger"}
+    # Modern TriggerInfo nests identifiers under ``trigger_data``.
+    trigger_info = {
+        "domain": "habitron",
+        "name": "device-trigger",
+        "home_assistant_start": False,
+        "variables": {},
+        "trigger_data": {"id": "trig-1", "idx": "0", "alias": "test-trigger"},
+    }
 
     unsub = await async_attach_trigger(hass, config, action, trigger_info)
     assert callable(unsub)

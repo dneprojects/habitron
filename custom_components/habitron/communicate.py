@@ -234,9 +234,9 @@ class HbtnComm:
         else:
             return info
 
-    def get_smhub_update(self):
+    def get_smhub_update(self) -> dict[str, Any]:
         """Get current sensor and status values."""
-        return self.client.get_smhub_update(self._hbtn_version)
+        return self.client.get_smhub_update(self._hbtn_version)  # type: ignore[no-any-return]
 
     async def get_smr(self) -> bytes:
         """Get router SMR information."""

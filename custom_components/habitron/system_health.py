@@ -16,7 +16,7 @@ def async_register(
     register.async_register_info(system_health_info)
 
 
-def _aggregate_router_status(hubs: list) -> str:
+def _aggregate_router_status(hubs: list[Any]) -> str:
     """Return aggregate router health across all configured SmartHubs."""
     if not hubs:
         return "no hubs"

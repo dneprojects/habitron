@@ -83,11 +83,11 @@ class SmartHub:
         self.router.b_uid = self.uid
 
         if self.comm.is_addon:
-            self.base_url: str = (
+            self.base_url = (
                 f"http://{self.host}:8123/{self.addon_slug}/ingress?index="
             )
         else:
-            self.base_url: str = f"http://{self.host}:7780"
+            self.base_url = f"http://{self.host}:7780"
 
         conf_url = f"{self.base_url}/hub" if self.host else None
 
@@ -173,9 +173,15 @@ class SmartHub:
         ver_string = resp.decode("iso8859-1")
         return ver_string[9:] if ver_string.startswith("SmartIP") else "0.0.0"
 
-    async def restart(self, rt_id) -> None:
-        """Restart hub."""
-        await self.comm.hub_restart(rt_id)
+    async def restart(self, rt_id: int) -> None:
+        """Restart hub.
+
+        ``rt_id`` is accepted for forward compatibility with multi-router
+        setups but is unused today — the bus protocol exposes a single
+        ``hub_restart`` command without a target selector.
+        """
+        del rt_id
+        await self.comm.hub_restart()
 
     async def reboot(self) -> None:
         """Reboot hub."""
