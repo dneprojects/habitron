@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from custom_components.habitron._axml import read_apk_version_name
 
 _REAL_APK = (
@@ -15,9 +17,17 @@ _REAL_APK = (
 )
 
 
+@pytest.mark.skipif(
+    not _REAL_APK.is_file(),
+    reason=(
+        "Real APK fixture not present locally — the file is in .gitignore "
+        "(190 MB, too large to ship in the repo). Maintainer runs this "
+        "test against an APK held outside git; CI exercises the synthetic "
+        "fixtures below."
+    ),
+)
 def test_read_apk_version_name_returns_manifest_value() -> None:
     """The real bundled APK reports the versionName it advertises."""
-    assert _REAL_APK.is_file(), f"Fixture APK missing: {_REAL_APK}"
     assert read_apk_version_name(_REAL_APK) == "1.2.9"
 
 
