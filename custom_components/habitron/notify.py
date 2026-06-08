@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 # Import the device class from the component that you want to support
 from homeassistant.components.notify import NotifyEntity
 from homeassistant.core import HomeAssistant
@@ -12,6 +14,8 @@ from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
 from .interfaces import IfDescriptor
 from .module import HbtnModule
+
+_LOGGER = logging.getLogger(__name__)
 
 PARALLEL_UPDATES = 1
 
@@ -53,17 +57,26 @@ class HbtnMessage(NotifyEntity):
         return {"identifiers": {(DOMAIN, self._module.uid)}}
 
     async def async_send_message(self, message: str, title: str | None = None) -> None:
-        """Send a message."""
+        """Send a message.
 
+        The bus protocol addresses messages by their stored numeric id; free-
+        text payloads are not supported by habitron_client 1.0.0. When the
+        message text does not match a known entry, log and skip.
+        """
         msg_id = None
         for msg in self.messages:
             if message.replace(" ", "") == msg.name.replace(" ", ""):
                 msg_id = msg.nmbr
                 break
-        if msg_id is not None:
-            await self._module.comm.send_message(self._module.mod_addr, msg_id)
-        else:
-            await self._module.comm.send_message(self._module.mod_addr, message)
+        if msg_id is None:
+            _LOGGER.warning(
+                "Cannot send free-text message via HbtnMessage: %r is not a"
+                " known stored message on module %s",
+                message,
+                self._module.uid,
+            )
+            return
+        await self._module.comm.send_message(self._module.mod_addr, msg_id)
 
 
 class HbtnGSMMessage(NotifyEntity):
@@ -88,16 +101,23 @@ class HbtnGSMMessage(NotifyEntity):
         return {"identifiers": {(DOMAIN, self._module.uid)}}
 
     async def async_send_message(self, message: str, title: str | None = None) -> None:
-        """Send a message."""
+        """Send an SMS via the GSM module.
 
+        Like ``HbtnMessage`` above, free-text payloads are not supported by
+        habitron_client 1.0.0; only stored message ids reach the bus. Log
+        and skip when the text is not a known entry.
+        """
         msg_id = None
         for msg in self.messages:
             if message == msg.name:
                 msg_id = msg.nmbr
                 break
-        if msg_id is not None:
-            await self._module.comm.send_sms(self._module.mod_addr, msg_id, self.sms_id)
-        else:
-            await self._module.comm.send_sms(
-                self._module.mod_addr, message, self.sms_id
+        if msg_id is None:
+            _LOGGER.warning(
+                "Cannot send free-text SMS via HbtnGSMMessage: %r is not a"
+                " known stored message on module %s",
+                message,
+                self._module.uid,
             )
+            return
+        await self._module.comm.send_sms(self._module.mod_addr, msg_id, self.sms_id)

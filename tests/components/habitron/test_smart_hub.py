@@ -37,8 +37,9 @@ def smart_hub_stub() -> SmartHub:
         comm.is_addon = False
         comm.slugname = ""
         comm.async_setup = AsyncMock()
-        comm.get_smhub_info = MagicMock()
-        comm.get_smhub_update = MagicMock()
+        comm.async_close = AsyncMock()
+        comm.get_smhub_info = AsyncMock()
+        comm.get_smhub_update = AsyncMock()
         comm.get_smhub_version = AsyncMock()
         comm.reinit_hub = AsyncMock()
         comm.send_network_info = AsyncMock()
@@ -82,11 +83,6 @@ async def test_smhub_async_setup_populates_fields_and_diagnostics(
     smart_hub_stub: SmartHub,
 ) -> None:
     """async_setup populates uid, base_url, registers the device and diagnostics."""
-    # Make async_add_executor_job execute the function passed in.
-    async def _exec_job(func, *args):
-        return func(*args)
-
-    smart_hub_stub.hass.async_add_executor_job = AsyncMock(side_effect=_exec_job)
     smart_hub_stub.comm.get_smhub_update.return_value = None
 
     with (
@@ -112,10 +108,6 @@ async def test_smhub_async_setup_addon_branch_sets_ingress_base_url(
     smart_hub_stub: SmartHub,
 ) -> None:
     """When ``comm.is_addon`` is True, base_url points at the ingress endpoint."""
-    async def _exec_job(func, *args):
-        return func(*args)
-
-    smart_hub_stub.hass.async_add_executor_job = AsyncMock(side_effect=_exec_job)
     smart_hub_stub.comm.is_addon = True
     smart_hub_stub.comm.slugname = "habitron_smarthub"
     smart_hub_stub.comm.com_hwtype = "Other"  # skip RPi diag setup
@@ -140,10 +132,6 @@ async def test_smhub_async_setup_swallows_static_path_install_error(
     smart_hub_stub: SmartHub,
 ) -> None:
     """If the static-path registration raises, async_setup keeps going."""
-    async def _exec_job(func, *args):
-        return func(*args)
-
-    smart_hub_stub.hass.async_add_executor_job = AsyncMock(side_effect=_exec_job)
     smart_hub_stub.hass.http.async_register_static_paths = AsyncMock(
         side_effect=RuntimeError("already installed")
     )
@@ -160,22 +148,24 @@ async def test_smhub_async_setup_swallows_static_path_install_error(
         await smart_hub_stub.async_setup()
 
 
-def test_update_short_circuits_when_no_info(smart_hub_stub: SmartHub) -> None:
+async def test_update_short_circuits_when_no_info(smart_hub_stub: SmartHub) -> None:
     """update() returns early when get_smhub_update yields no data."""
     smart_hub_stub.comm.get_smhub_update.return_value = None
     smart_hub_stub.diags = []
-    smart_hub_stub.update()  # no exception
-    smart_hub_stub.comm.get_smhub_update.assert_called_once()
+    await smart_hub_stub.update()
+    smart_hub_stub.comm.get_smhub_update.assert_awaited_once()
 
 
-def test_update_short_circuits_when_no_diags(smart_hub_stub: SmartHub) -> None:
+async def test_update_short_circuits_when_no_diags(smart_hub_stub: SmartHub) -> None:
     """update() returns early when self.diags is still empty."""
     smart_hub_stub.comm.get_smhub_update.return_value = {"hardware": {}}
     smart_hub_stub.diags = []
-    smart_hub_stub.update()  # no exception, just early return
+    await smart_hub_stub.update()  # no exception, just early return
 
 
-def test_update_writes_diag_sensor_and_log_levels(smart_hub_stub: SmartHub) -> None:
+async def test_update_writes_diag_sensor_and_log_levels(
+    smart_hub_stub: SmartHub,
+) -> None:
     """A fully-populated info dict is parsed into the descriptor lists."""
     smart_hub_stub.comm.get_smhub_update.return_value = {
         "hardware": {
@@ -193,7 +183,7 @@ def test_update_writes_diag_sensor_and_log_levels(smart_hub_stub: SmartHub) -> N
     smart_hub_stub.sensors = [MagicMock(), MagicMock()]
     smart_hub_stub.loglvl = [MagicMock(), MagicMock()]
 
-    smart_hub_stub.update()
+    await smart_hub_stub.update()
 
     assert smart_hub_stub.diags[0].value == 1500.0
     assert smart_hub_stub.diags[1].value == 12.0
@@ -204,13 +194,22 @@ def test_update_writes_diag_sensor_and_log_levels(smart_hub_stub: SmartHub) -> N
     assert smart_hub_stub.loglvl[1].value == 4
 
 
-async def test_async_update_dispatches_to_executor(
+async def test_async_update_delegates_to_update(
     smart_hub_stub: SmartHub,
 ) -> None:
-    """async_update offloads the blocking update() call to the executor."""
-    smart_hub_stub.hass.async_add_executor_job = AsyncMock()
+    """async_update is now a thin awaiter around update() directly."""
+    smart_hub_stub.comm.get_smhub_update.return_value = None
+    smart_hub_stub.diags = []
     await smart_hub_stub.async_update()
-    smart_hub_stub.hass.async_add_executor_job.assert_awaited()
+    smart_hub_stub.comm.get_smhub_update.assert_awaited()
+
+
+async def test_async_close_delegates_to_comm(
+    smart_hub_stub: SmartHub,
+) -> None:
+    """async_close hands off to comm.async_close to tear down the persistent client."""
+    await smart_hub_stub.async_close()
+    smart_hub_stub.comm.async_close.assert_awaited()
 
 
 async def test_get_version_strips_smartip_prefix(

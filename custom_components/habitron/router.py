@@ -383,8 +383,8 @@ class HbtnRouter:
         """Update system status and distribute to modules."""
         self.sys_status = self._pad_sys_status(sys_status)
 
-        # 1. Update SmHub (Move blocking call to executor)
-        self.smhub.update()
+        # 1. Update SmHub
+        await self.smhub.update()
 
         # 2. Get Router status
         self.status = await self.comm.async_get_router_status()

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
 import ipaddress
 import logging
 import os
@@ -55,8 +54,8 @@ class HbtnComm:
             self._host = self._host_conf
         else:
             # Hostname/"local" resolution happens in ``async_setup`` to keep
-            # blocking DNS off the event loop. Provisional empty host until
-            # ``self.client.host`` is updated there.
+            # blocking DNS off the event loop. The client is constructed
+            # there once the resolved host is known.
             self._host = ""
 
         self.logger.info(
@@ -66,8 +65,11 @@ class HbtnComm:
         )
         self._port: int = 7777
 
-        # Initialize client instance
-        self.client = HabitronClient(self._host, self._port)
+        # Persistent client. Constructed + connected in ``async_setup`` so the
+        # blocking DNS lookup that may be needed for the host stays off the
+        # event loop. Replaced wholesale on ``set_host`` (the lib's host is
+        # read-only).
+        self._client: HabitronClient | None = None
 
         self._hass: HomeAssistant = hass
         self._config: ConfigEntry = config
@@ -80,9 +82,6 @@ class HbtnComm:
 
         self.logger.info("Got network ip: %s", self._network_ip)
 
-        # Lock to ensure sequential access to the socket even when running in executor threads
-        self._api_lock = asyncio.Lock()
-
         self.crc: int = 0
         self._rtr: HbtnRouter
         self.update_suspended: bool = False
@@ -93,6 +92,19 @@ class HbtnComm:
         self._hbtn_version: str = self._hass.data["integrations"]["habitron"].manifest[
             "version"
         ]
+
+    @property
+    def client(self) -> HabitronClient:
+        """Return the connected HabitronClient instance.
+
+        ``async_setup`` constructs and connects the client; calling any wire
+        method before then is a programming error.
+        """
+        if self._client is None:
+            raise RuntimeError(
+                "HabitronClient is not connected; call async_setup() first"
+            )
+        return self._client
 
     @property
     def router(self) -> HbtnRouter:
@@ -137,7 +149,7 @@ class HbtnComm:
         return self._hostname
 
     async def async_setup(self) -> None:
-        """Async post-init: resolve hub host via executor, then own network IP."""
+        """Resolve hub host, open the persistent client connection."""
         if not self._host:
             if self._host_conf == "local":
                 self._host = await self._hass.async_add_executor_job(get_own_ip)
@@ -145,11 +157,18 @@ class HbtnComm:
                 self._host = await self._hass.async_add_executor_job(
                     get_host_ip, self._host_conf
                 )
-            self.client.host = self._host
         self._network_ip = await network.async_get_source_ip(
             self._hass, target_ip=self._host
         )
         self.logger.info("Resolved network ip: %s", self._network_ip)
+        self._client = HabitronClient(self._host, self._port)
+        await self._client.connect()
+
+    async def async_close(self) -> None:
+        """Close the persistent client connection during entry unload."""
+        if self._client is not None:
+            await self._client.close()
+            self._client = None
 
     def is_valid_ipv4(self, ip_string: str) -> bool:
         """Check if a string is a valid IPv4 address."""
@@ -164,11 +183,6 @@ class HbtnComm:
         """Helper to calculate module address."""
         return int(mod_id - 100)
 
-    async def _async_exec(self, func: Callable[..., Any], *args: Any) -> Any:
-        """Execute a blocking client call in the Home Assistant executor."""
-        async with self._api_lock:
-            return await self._hass.async_add_executor_job(func, *args)
-
     async def set_host(self, host: str) -> None:
         """Update host information for integration re-configuration."""
         self._hass.config_entries.async_update_entry(
@@ -180,18 +194,20 @@ class HbtnComm:
         self._host = await self._hass.async_add_executor_job(
             get_host_ip, self._host_conf
         )
-        self.client.host = self._host
+        # The lib's HabitronClient.host is read-only — replace the instance.
+        await self.async_close()
+        self._client = HabitronClient(self._host, self._port)
+        await self._client.connect()
         await self._hass.config_entries.async_reload(self._config.entry_id)
 
     async def send_network_info(self, tok: str) -> None:
         """Send home assistant ipv4."""
-        await self._async_exec(
-            self.client.send_network_info,
+        await self.client.send_network_info(
             self._network_ip,
-            tok,
-            self._mac,
-            self.is_addon,
-            self._hbtn_version,
+            tok.encode("utf-8"),
+            bytes.fromhex(self._mac.replace(":", "").replace("-", "")),
+            is_addon=self.is_addon,
+            version=self._hbtn_version,
         )
         self.logger.warning(
             "Sent network info to hub (ip and token) - ip: %s - token: %s",
@@ -199,9 +215,9 @@ class HbtnComm:
             tok,
         )
 
-    async def reinit_hub(self, mode: int) -> Any:
+    async def reinit_hub(self, mode: int) -> bytes:
         """Restart event server on hub."""
-        resp = await self._async_exec(self.client.reinit_hub, mode)
+        resp = await self.client.reinit_hub(mode)
         self.logger.info("Re-initialized hub with mode %s", mode)
         return resp
 
@@ -211,37 +227,43 @@ class HbtnComm:
 
     async def get_smhub_version(self) -> bytes:
         """Query of SmartHub firmware."""
-        return cast(bytes, await self._async_exec(self.client.get_smhub_version))
+        return await self.client.get_smhub_version()
 
-    def get_smhub_info(self) -> dict[str, Any]:
-        """Get basic infos of SmartHub (blocking, run in executor)."""
+    async def get_smhub_info(self) -> dict[str, Any]:
+        """Get basic infos of SmartHub."""
         try:
-            info: dict[str, Any] = self.client.get_smhub_info()
-            self.info = info
+            info = await self.client.get_smhub_info()
+            self.info = cast("dict[str, Any]", info)
             self._version = info["software"]["version"]
             self._hwtype = info["hardware"]["platform"]["type"]
             self._hostip = info["hardware"]["network"]["ip"]
             self._hostname = info["hardware"]["network"]["host"]
             self._mac = info["hardware"]["network"]["lan mac"]
             self.is_addon = os.getenv("SUPERVISOR_TOKEN") is not None
-            self.slugname = info["software"].get("slug", "") if self.is_addon else ""
+            software = cast("dict[str, Any]", info["software"])
+            self.slugname = software.get("slug", "") if self.is_addon else ""
             self.logger.debug("SmartHub slugname: %s", self.slugname)
         except HabitronTimeoutError as exc:
             self.logger.error("Timeout connecting to SmartHub at %s", self._host)
-            raise HabitronTimeoutError(f"Hub at {self._host} not responding") from exc
+            raise HabitronTimeoutError(
+                f"Hub at {self._host} not responding"
+            ) from exc
         except Exception as exc:
             self.logger.error("Error during SmartHub info fetch: %s", exc)
             raise
         else:
-            return info
+            return cast("dict[str, Any]", info)
 
-    def get_smhub_update(self) -> dict[str, Any]:
+    async def get_smhub_update(self) -> dict[str, Any]:
         """Get current sensor and status values."""
-        return self.client.get_smhub_update(self._hbtn_version)  # type: ignore[no-any-return]
+        return cast(
+            "dict[str, Any]",
+            await self.client.get_smhub_update(self._hbtn_version),
+        )
 
     async def get_smr(self) -> bytes:
         """Get router SMR information."""
-        return cast(bytes, await self._async_exec(self.client.get_smr))
+        return await self.client.get_smr()
 
     async def send_devreg_ids(self) -> None:
         """Send device registry ids to all modules."""
@@ -252,27 +274,27 @@ class HbtnComm:
 
     async def async_get_router_status(self) -> bytes:
         """Get router status."""
-        return cast(bytes, await self._async_exec(self.client.get_router_status))
+        return await self.client.get_router_status()
 
     async def async_get_router_modules(self) -> bytes:
         """Get summary of all Habitron modules of a router."""
-        return cast(bytes, await self._async_exec(self.client.get_router_modules))
+        return await self.client.get_router_modules()
 
     async def get_global_descriptions(self) -> bytes:
         """Get descriptions of commands, etc."""
-        return cast(bytes, await self._async_exec(self.client.get_global_descriptions))
+        return await self.client.get_global_descriptions()
 
     async def async_get_error_status(self) -> bytes:
         """Get error byte for each module."""
-        return cast(bytes, await self._async_exec(self.client.get_error_status))
+        return await self.client.get_error_status()
 
     async def async_start_mirror(self) -> None:
         """Start mirror on specified router."""
-        await self._async_exec(self.client.start_mirror)
+        await self.client.start_mirror()
 
     async def async_stop_mirror(self) -> None:
         """Start mirror on specified router."""
-        await self._async_exec(self.client.stop_mirror)
+        await self.client.stop_mirror()
 
     async def async_system_update(self) -> None:
         """Trigger update of Habitron states, must poll all routers."""
@@ -291,33 +313,27 @@ class HbtnComm:
 
     async def async_set_group_mode(self, grp_no: int, new_mode: int) -> None:
         """Set mode for given group."""
-        await self._async_exec(self.client.set_group_mode, grp_no, new_mode)
+        await self.client.set_group_mode(grp_no, new_mode)
 
     async def async_set_daytime_mode(self, grp_no: int, new_mode: int) -> None:
         """Set mode for given group."""
         mode = 0x42 if new_mode == 1 else 0x43 if new_mode == 2 else None
         if not mode:
             return
-        await self._async_exec(self.client.set_group_mode, grp_no, mode)
+        await self.client.set_group_mode(grp_no, mode)
 
     async def async_set_alarm_mode(self, grp_no: int, alarm_mode: bool) -> None:
         """Set mode for given group."""
         mode = 0x40 if alarm_mode else 0x41
-        await self._async_exec(self.client.set_group_mode, grp_no, mode)
+        await self.client.set_group_mode(grp_no, mode)
 
     async def async_set_log_level(self, hdlr: int, level: int) -> None:
         """Set new logging level."""
-        await self._async_exec(self.client.set_log_level, hdlr, level)
-
-    def set_output(self, mod_id: int, nmbr: int, val: int) -> None:
-        """Send turn_on/turn_off command synchronously."""
-        self.client.set_output(self._convert_mod_id(mod_id), nmbr, val)
+        await self.client.set_log_level(hdlr, level)
 
     async def async_set_output(self, mod_id: int, nmbr: int, val: int) -> None:
         """Send turn_on/turn_off command."""
-        await self._async_exec(
-            self.client.set_output, self._convert_mod_id(mod_id), nmbr, val
-        )
+        await self.client.set_output(self._convert_mod_id(mod_id), nmbr, bool(val))
 
     async def async_set_led_outp(self, mod_id: int, nmbr: int, val: int) -> None:
         """Translate led nmbr to output nmbr and send on/off command."""
@@ -329,51 +345,37 @@ class HbtnComm:
 
     async def async_set_dimmval(self, mod_id: int, nmbr: int, val: int) -> None:
         """Send value to dimm output."""
-        await self._async_exec(
-            self.client.set_dimmval, self._convert_mod_id(mod_id), nmbr, val
-        )
+        await self.client.set_dimmval(self._convert_mod_id(mod_id), nmbr, val)
 
     async def async_set_rgb_output(self, mod_id: int, nmbr: int, val: int) -> None:
         """Turn RGB light on/off."""
-        await self._async_exec(
-            self.client.set_rgb_output, self._convert_mod_id(mod_id), nmbr, val
+        await self.client.set_rgb_output(
+            self._convert_mod_id(mod_id), nmbr, bool(val)
         )
 
     async def async_set_rgbval(self, mod_id: int, nmbr: int, val: list[int]) -> None:
         """Send value to dimm output."""
-        await self._async_exec(
-            self.client.set_rgbval, self._convert_mod_id(mod_id), nmbr, val
-        )
+        await self.client.set_rgbval(self._convert_mod_id(mod_id), nmbr, val)
 
     async def async_set_shutterpos(self, mod_id: int, nmbr: int, val: int) -> None:
         """Send value to dimm output."""
-        await self._async_exec(
-            self.client.set_shutterpos, self._convert_mod_id(mod_id), nmbr, val
-        )
+        await self.client.set_shutterpos(self._convert_mod_id(mod_id), nmbr, val)
 
     async def async_set_blindtilt(self, mod_id: int, nmbr: int, val: int) -> None:
         """Send value to dimm output."""
-        await self._async_exec(
-            self.client.set_blindtilt, self._convert_mod_id(mod_id), nmbr, val
-        )
+        await self.client.set_blindtilt(self._convert_mod_id(mod_id), nmbr, val)
 
     async def async_set_flag(self, mod_id: int, nmbr: int, val: int) -> None:
         """Send flag on/flag off command."""
-        await self._async_exec(
-            self.client.set_flag, self._convert_mod_id(mod_id), nmbr, val
-        )
+        await self.client.set_flag(self._convert_mod_id(mod_id), nmbr, bool(val))
 
     async def async_inc_dec_counter(self, mod_id: int, nmbr: int, val: int) -> None:
         """Send flag on/flag off command."""
-        await self._async_exec(
-            self.client.inc_dec_counter, self._convert_mod_id(mod_id), nmbr, val
-        )
+        await self.client.inc_dec_counter(self._convert_mod_id(mod_id), nmbr, val)
 
     async def async_set_setpoint(self, mod_id: int, nmbr: int, val: int) -> None:
         """Send two byte value for setpoint definition."""
-        await self._async_exec(
-            self.client.set_setpoint, self._convert_mod_id(mod_id), nmbr, val
-        )
+        await self.client.set_setpoint(self._convert_mod_id(mod_id), nmbr, val)
 
     async def async_set_analog_val(self, mod_id: int, nmbr: int, val: int) -> None:
         """Send byte value for analog output definition."""
@@ -381,61 +383,45 @@ class HbtnComm:
 
     async def async_set_climate_mode(self, mod_id: int, cmode: int, ctl12: int) -> None:
         """Set climate mode for given module."""
-        await self._async_exec(
-            self.client.set_climate_mode, self._convert_mod_id(mod_id), cmode, ctl12
-        )
+        await self.client.set_climate_mode(self._convert_mod_id(mod_id), cmode, ctl12)
 
     async def async_call_dir_command(self, mod_id: int, nmbr: int) -> None:
         """Call of direct command of nmbr."""
-        await self._async_exec(
-            self.client.call_dir_command, self._convert_mod_id(mod_id), nmbr
-        )
+        await self.client.call_dir_command(self._convert_mod_id(mod_id), nmbr)
 
     async def async_call_vis_command(self, mod_id: int, nmbr: int) -> None:
         """Call of visualization command of nmbr."""
-        await self._async_exec(
-            self.client.call_vis_command, self._convert_mod_id(mod_id), nmbr
-        )
+        await self.client.call_vis_command(self._convert_mod_id(mod_id), nmbr)
 
     async def async_call_coll_command(self, nmbr: int) -> None:
         """Call collective command of nmbr."""
-        await self._async_exec(self.client.call_coll_command, nmbr)
+        await self.client.call_coll_command(nmbr)
 
     async def get_compact_status(self) -> bytes:
         """Get compact status for all modules, if changed crc."""
-        resp_bytes, crc = await self._async_exec(self.client.get_compact_status)
+        resp_bytes, crc = await self.client.get_compact_status()
         if crc == self.crc:
             return b""
         self.crc = crc
-        return cast(bytes, resp_bytes)
+        return resp_bytes
 
     async def get_module_status(self, mod_id: int) -> bytes:
         """Get compact status for all modules, if changed crc."""
-        resp_bytes, crc = await self._async_exec(
-            self.client.get_module_status, self._convert_mod_id(mod_id)
+        resp_bytes, crc = await self.client.get_module_status(
+            self._convert_mod_id(mod_id)
         )
         if crc == self.crc:
             return b""
         self.crc = crc
-        return cast(bytes, resp_bytes)
+        return resp_bytes
 
     async def async_get_module_definitions(self, mod_id: int) -> bytes:
         """Get summary of Habitron module: names, commands, etc."""
-        return cast(
-            bytes,
-            await self._async_exec(
-                self.client.get_module_definitions, self._convert_mod_id(mod_id)
-            ),
-        )
+        return await self.client.get_module_definitions(self._convert_mod_id(mod_id))
 
     async def async_get_module_settings(self, mod_id: int) -> bytes:
         """Get settings of Habitron module."""
-        return cast(
-            bytes,
-            await self._async_exec(
-                self.client.get_module_settings, self._convert_mod_id(mod_id)
-            ),
-        )
+        return await self.client.get_module_settings(self._convert_mod_id(mod_id))
 
     async def save_module_status(self, mod_id: int) -> None:
         """Get module module status and saves it to file."""
@@ -493,59 +479,55 @@ class HbtnComm:
         ) as hbtn_file:
             await hbtn_file.write(str_data)
 
-    async def send_message(self, mod_id: int, msg_id: int | str) -> None:
+    async def send_message(self, mod_id: int, msg_id: int) -> None:
         """Send message to module."""
-        await self._async_exec(
-            self.client.send_message, self._convert_mod_id(mod_id), msg_id
-        )
+        await self.client.send_message(self._convert_mod_id(mod_id), msg_id)
 
-    async def send_sms(self, mod_id: int, msg_id: int | str, ct_id: int) -> None:
+    async def send_sms(self, mod_id: int, msg_id: int, ct_id: int) -> None:
         """Send sms message to module."""
-        await self._async_exec(
-            self.client.send_sms, self._convert_mod_id(mod_id), msg_id, ct_id
-        )
+        await self.client.send_sms(self._convert_mod_id(mod_id), msg_id, ct_id)
 
     async def hub_restart(self) -> None:
         """Restart hub."""
-        await self._async_exec(self.client.hub_restart)
+        await self.client.hub_restart()
 
     async def hub_reboot(self) -> None:
         """Reboot hub."""
-        await self._async_exec(self.client.hub_reboot)
+        await self.client.hub_reboot()
 
     async def module_restart(self, mod_nmbr: int) -> None:
         """Restart a single module or all with arg 0xFF or router if arg 0."""
-        await self._async_exec(self.client.module_restart, mod_nmbr)
+        await self.client.module_restart(mod_nmbr)
 
     async def restart_fwd_tbl(self) -> None:
         """Restart forwarding table of router."""
-        await self._async_exec(self.client.restart_fwd_tbl)
+        await self.client.restart_fwd_tbl()
 
     async def handle_firmware(self, mod_nmbr: int) -> bytes:
         """Handle router/module firmware update file status."""
-        resp_bytes, crc = await self._async_exec(self.client.handle_firmware, mod_nmbr)
+        resp_bytes, crc = await self.client.handle_firmware(mod_nmbr)
         if crc == self.crc:
             return b""
         self.crc = crc
-        return cast(bytes, resp_bytes)
+        return resp_bytes
 
     async def update_firmware(self, mod_nmbr: int) -> bytes:
         """Start router/module firmware updates."""
-        resp_bytes, crc = await self._async_exec(self.client.update_firmware, mod_nmbr)
+        resp_bytes, crc = await self.client.update_firmware(mod_nmbr)
         if crc == self.crc:
             return b""
         self.crc = crc
-        return cast(bytes, resp_bytes)
+        return resp_bytes
 
     async def async_power_cycle_channel(self, channel: int) -> None:
         """Power down a router channel and set power on again."""
-        await self._async_exec(self.client.power_cycle_channel_down, channel)
+        await self.client.power_cycle_channel_down(channel)
         await asyncio.sleep(2)
-        await self._async_exec(self.client.power_cycle_channel_up, channel)
+        await self.client.power_cycle_channel_up(channel)
 
     async def send_devregid(self, mod_nmbr: int, devreg_id: str) -> None:
         """Send device registry id to module."""
-        await self._async_exec(self.client.send_devregid, mod_nmbr, devreg_id)
+        await self.client.send_devregid(mod_nmbr, devreg_id)
 
     async def update_entity(  # noqa: C901
         self,

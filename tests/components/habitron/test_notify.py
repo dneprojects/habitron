@@ -48,12 +48,12 @@ async def test_message_send_known_message_uses_message_number() -> None:
     mod.comm.send_message.assert_awaited_with(105, 42)
 
 
-async def test_message_send_unknown_message_passes_text_through() -> None:
-    """An unknown message gets passed through verbatim."""
+async def test_message_send_unknown_message_logs_and_skips() -> None:
+    """An unknown message no longer sends — the lib only accepts stored ids."""
     mod = _make_message_module()
     entity = HbtnMessage(mod, 0)
     await entity.async_send_message(message="freeform text")
-    mod.comm.send_message.assert_awaited_with(105, "freeform text")
+    mod.comm.send_message.assert_not_awaited()
 
 
 def _make_gsm_module() -> MagicMock:
@@ -84,15 +84,15 @@ async def test_gsm_send_known_message_routes_to_send_sms() -> None:
     mod.comm.send_sms.assert_awaited_with(105, 42, 3)
 
 
-async def test_gsm_send_unknown_message_passes_text_through() -> None:
-    """An unknown SMS message goes out as raw text."""
+async def test_gsm_send_unknown_message_logs_and_skips() -> None:
+    """An unknown SMS message no longer sends — only stored ids are accepted."""
     mod = _make_gsm_module()
     sms = MagicMock()
     sms.name = "+49-170-1234567"
     sms.nmbr = 3
     entity = HbtnGSMMessage(mod, sms, 0)
     await entity.async_send_message(message="hello")
-    mod.comm.send_sms.assert_awaited_with(105, "hello", 3)
+    mod.comm.send_sms.assert_not_awaited()
 
 
 def test_message_device_info_links_module() -> None:

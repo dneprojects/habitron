@@ -10,7 +10,14 @@ from custom_components.habitron.const import HaEvents
 
 
 def _make_comm(host: str = "192.168.1.50") -> object:
-    """Build an HbtnComm with all heavyweight dependencies stubbed out."""
+    """Build an HbtnComm with all heavyweight dependencies stubbed out.
+
+    The underlying ``HabitronClient`` is replaced by an ``AsyncMock`` so
+    individual tests can ``await`` bus-method calls without opening a real
+    socket. ``async_setup`` is bypassed: ``_client`` is wired up directly.
+    """
+    from habitron_client import HabitronClient  # noqa: PLC0415
+
     from custom_components.habitron.communicate import HbtnComm  # noqa: PLC0415
 
     hass = MagicMock()
@@ -19,8 +26,8 @@ def _make_comm(host: str = "192.168.1.50") -> object:
     config = MagicMock()
     config.data = {"habitron_host": host, "update_interval": 5}
     smhub = MagicMock()
-    with patch("custom_components.habitron.communicate.HabitronClient"):
-        comm = HbtnComm(hass, config, smhub)
+    comm = HbtnComm(hass, config, smhub)
+    comm._client = AsyncMock(spec=HabitronClient)
     return comm
 
 
@@ -80,16 +87,6 @@ def test_router_property_falls_back_to_smhub_router() -> None:
     assert comm.router is other
 
 
-async def test_async_exec_runs_inside_api_lock() -> None:
-    """_async_exec offloads the call to hass.async_add_executor_job."""
-    comm = _make_comm()
-    fn = MagicMock(return_value="ok")
-    comm._hass.async_add_executor_job = AsyncMock(return_value="ok")
-    result = await comm._async_exec(fn, 1, 2)
-    assert result == "ok"
-    comm._hass.async_add_executor_job.assert_awaited_with(fn, 1, 2)
-
-
 # ---------- async_setup() host resolution ----------
 
 
@@ -97,23 +94,36 @@ async def test_async_setup_resolves_local_via_own_ip() -> None:
     """When host_conf is "local", async_setup uses get_own_ip()."""
     comm = _make_comm("local")
     comm._hass.async_add_executor_job = AsyncMock(return_value="192.0.2.1")
-    with patch(
-        "custom_components.habitron.communicate.network.async_get_source_ip",
-        new=AsyncMock(return_value="192.0.2.42"),
+    fake_client = AsyncMock()
+    with (
+        patch(
+            "custom_components.habitron.communicate.network.async_get_source_ip",
+            new=AsyncMock(return_value="192.0.2.42"),
+        ),
+        patch(
+            "custom_components.habitron.communicate.HabitronClient",
+            return_value=fake_client,
+        ),
     ):
         await comm.async_setup()
     assert comm._host == "192.0.2.1"
-    assert comm.client.host == "192.0.2.1"
     assert comm._network_ip == "192.0.2.42"
+    fake_client.connect.assert_awaited()
 
 
 async def test_async_setup_resolves_hostname_via_get_host_ip() -> None:
     """A hostname is resolved to an IP via get_host_ip()."""
     comm = _make_comm("hub.local")
     comm._hass.async_add_executor_job = AsyncMock(return_value="10.0.0.99")
-    with patch(
-        "custom_components.habitron.communicate.network.async_get_source_ip",
-        new=AsyncMock(return_value="10.0.0.42"),
+    with (
+        patch(
+            "custom_components.habitron.communicate.network.async_get_source_ip",
+            new=AsyncMock(return_value="10.0.0.42"),
+        ),
+        patch(
+            "custom_components.habitron.communicate.HabitronClient",
+            return_value=AsyncMock(),
+        ),
     ):
         await comm.async_setup()
     assert comm._host == "10.0.0.99"
@@ -123,9 +133,15 @@ async def test_async_setup_skips_dns_when_host_already_set() -> None:
     """If the IP is already set, async_setup only resolves the network IP."""
     comm = _make_comm("10.0.0.1")  # IPv4 → _host already set
     comm._hass.async_add_executor_job = AsyncMock()
-    with patch(
-        "custom_components.habitron.communicate.network.async_get_source_ip",
-        new=AsyncMock(return_value="10.0.0.42"),
+    with (
+        patch(
+            "custom_components.habitron.communicate.network.async_get_source_ip",
+            new=AsyncMock(return_value="10.0.0.42"),
+        ),
+        patch(
+            "custom_components.habitron.communicate.HabitronClient",
+            return_value=AsyncMock(),
+        ),
     ):
         await comm.async_setup()
     # async_add_executor_job is NOT called for host resolution
@@ -146,21 +162,29 @@ async def test_set_host_no_op_when_host_unchanged() -> None:
 
 
 async def test_set_host_with_new_host_triggers_reload() -> None:
-    """A different host string triggers a reload of the config entry."""
+    """A different host string closes the old client, opens a new one, reloads."""
     comm = _make_comm("192.168.1.50")
     comm._hass.config_entries.async_update_entry = MagicMock()
     comm._hass.config_entries.async_reload = AsyncMock()
     comm._hass.async_add_executor_job = AsyncMock(return_value="10.0.0.99")
-    await comm.set_host("new-host")
+    old_client = comm._client
+    new_client = AsyncMock()
+    with patch(
+        "custom_components.habitron.communicate.HabitronClient",
+        return_value=new_client,
+    ):
+        await comm.set_host("new-host")
     assert comm._host_conf == "new-host"
     assert comm._host == "10.0.0.99"
+    old_client.close.assert_awaited()
+    new_client.connect.assert_awaited()
     comm._hass.config_entries.async_reload.assert_awaited()
 
 
 # ---------- get_smhub_info success + error paths ----------
 
 
-def test_get_smhub_info_populates_fields_from_client_payload() -> None:
+async def test_get_smhub_info_populates_fields_from_client_payload() -> None:
     """get_smhub_info maps the client response into the comm's cached fields."""
     comm = _make_comm()
     payload = {
@@ -174,9 +198,9 @@ def test_get_smhub_info_populates_fields_from_client_payload() -> None:
             },
         },
     }
-    comm.client.get_smhub_info = MagicMock(return_value=payload)
+    comm._client.get_smhub_info = AsyncMock(return_value=payload)
     with patch.dict("os.environ", {"SUPERVISOR_TOKEN": "tok"}):
-        out = comm.get_smhub_info()
+        out = await comm.get_smhub_info()
     assert out is payload
     assert comm._version == "1.0.0"
     assert comm._hwtype == "Raspberry Pi"
@@ -187,7 +211,7 @@ def test_get_smhub_info_populates_fields_from_client_payload() -> None:
     assert comm.slugname == "habitron_addon"
 
 
-def test_get_smhub_info_non_addon_clears_slugname() -> None:
+async def test_get_smhub_info_non_addon_clears_slugname() -> None:
     """Without SUPERVISOR_TOKEN, ``is_addon`` is False and slugname is blank."""
     import os  # noqa: PLC0415
 
@@ -199,142 +223,152 @@ def test_get_smhub_info_non_addon_clears_slugname() -> None:
             "network": {"ip": "1.1.1.1", "host": "h", "lan mac": "ff"},
         },
     }
-    comm.client.get_smhub_info = MagicMock(return_value=payload)
+    comm._client.get_smhub_info = AsyncMock(return_value=payload)
     os.environ.pop("SUPERVISOR_TOKEN", None)
-    comm.get_smhub_info()
+    await comm.get_smhub_info()
     assert comm.is_addon is False
     assert comm.slugname == ""
 
 
-def test_get_smhub_info_timeout_reraises() -> None:
+async def test_get_smhub_info_timeout_reraises() -> None:
     """A HabitronTimeoutError is re-raised so the caller knows the hub is silent."""
     from habitron_client import HabitronTimeoutError  # noqa: PLC0415
 
     comm = _make_comm()
-    comm.client.get_smhub_info = MagicMock(side_effect=HabitronTimeoutError("silent"))
+    comm._client.get_smhub_info = AsyncMock(
+        side_effect=HabitronTimeoutError("silent")
+    )
     with pytest.raises(HabitronTimeoutError):
-        comm.get_smhub_info()
+        await comm.get_smhub_info()
 
 
-def test_get_smhub_info_generic_exception_reraises() -> None:
+async def test_get_smhub_info_generic_exception_reraises() -> None:
     """A non-timeout exception also propagates after being logged."""
     comm = _make_comm()
-    comm.client.get_smhub_info = MagicMock(side_effect=RuntimeError("boom"))
+    comm._client.get_smhub_info = AsyncMock(side_effect=RuntimeError("boom"))
     with pytest.raises(RuntimeError):
-        comm.get_smhub_info()
+        await comm.get_smhub_info()
 
 
-def test_get_smhub_update_forwards_to_client() -> None:
+async def test_get_smhub_update_forwards_to_client() -> None:
     """get_smhub_update delegates to the client."""
     comm = _make_comm()
-    comm.client.get_smhub_update = MagicMock(return_value={"ok": True})
-    out = comm.get_smhub_update()
+    comm._client.get_smhub_update = AsyncMock(return_value={"ok": True})
+    out = await comm.get_smhub_update()
     assert out == {"ok": True}
-    comm.client.get_smhub_update.assert_called_with(comm._hbtn_version)
+    comm._client.get_smhub_update.assert_awaited_with(comm._hbtn_version)
 
 
-# ---------- async_setup-suite of bus wrappers (delegate to _async_exec) ----------
+# ---------- bus-wrapper suite — each method awaits the corresponding client call ----------
 
 
-@pytest.fixture
-def comm_with_mock_exec() -> object:
-    """An HbtnComm with ``_async_exec`` patched to a recording AsyncMock."""
-    comm = _make_comm("10.0.0.1")
-    comm._async_exec = AsyncMock(return_value=b"resp")
-    return comm
+# (HbtnComm-method, client-method, args-passed-to-HbtnComm, expected client-args)
+# When HbtnComm strips rtr_id*100+mod to raw mod_addr or maps int→bool, the
+# expected tuple captures the translated form the wire actually sees.
+_BUS_WRAPPER_CASES = [
+    ("get_smhub_version", "get_smhub_version", (), ()),
+    ("get_smr", "get_smr", (), ()),
+    ("async_get_router_status", "get_router_status", (), ()),
+    ("async_get_router_modules", "get_router_modules", (), ()),
+    ("get_global_descriptions", "get_global_descriptions", (), ()),
+    ("async_get_error_status", "get_error_status", (), ()),
+    ("async_start_mirror", "start_mirror", (), ()),
+    ("async_stop_mirror", "stop_mirror", (), ()),
+    ("async_set_group_mode", "set_group_mode", (1, 7), (1, 7)),
+    ("async_set_alarm_mode", "set_group_mode", (1, True), (1, 0x40)),
+    ("async_set_log_level", "set_log_level", (0, 3), (0, 3)),
+    ("async_set_output", "set_output", (105, 2, 1), (5, 2, True)),
+    ("async_set_dimmval", "set_dimmval", (105, 1, 80), (5, 1, 80)),
+    ("async_set_rgb_output", "set_rgb_output", (105, 0, 0), (5, 0, False)),
+    ("async_set_rgbval", "set_rgbval", (105, 0, [255, 0, 0]), (5, 0, [255, 0, 0])),
+    ("async_set_shutterpos", "set_shutterpos", (105, 1, 50), (5, 1, 50)),
+    ("async_set_blindtilt", "set_blindtilt", (105, 1, 30), (5, 1, 30)),
+    ("async_set_flag", "set_flag", (105, 0, 1), (5, 0, True)),
+    ("async_inc_dec_counter", "inc_dec_counter", (105, 1, 1), (5, 1, 1)),
+    ("async_set_setpoint", "set_setpoint", (105, 1, 220), (5, 1, 220)),
+    ("async_set_climate_mode", "set_climate_mode", (105, 1, 1), (5, 1, 1)),
+    ("async_call_dir_command", "call_dir_command", (105, 1), (5, 1)),
+    ("async_call_vis_command", "call_vis_command", (105, 1), (5, 1)),
+    ("async_call_coll_command", "call_coll_command", (1,), (1,)),
+    ("async_get_module_definitions", "get_module_definitions", (105,), (5,)),
+    ("async_get_module_settings", "get_module_settings", (105,), (5,)),
+    ("send_message", "send_message", (105, 1), (5, 1)),
+    ("send_sms", "send_sms", (105, 1, 1), (5, 1, 1)),
+    ("hub_restart", "hub_restart", (), ()),
+    ("hub_reboot", "hub_reboot", (), ()),
+    ("module_restart", "module_restart", (5,), (5,)),
+    ("restart_fwd_tbl", "restart_fwd_tbl", (), ()),
+    ("send_devregid", "send_devregid", (5, "dev-1"), (5, "dev-1")),
+    ("reinit_hub", "reinit_hub", (0,), (0,)),
+]
 
 
 @pytest.mark.parametrize(
-    ("method", "args"),
-    [
-        ("get_smhub_version", ()),
-        ("get_smr", ()),
-        ("async_get_router_status", ()),
-        ("async_get_router_modules", ()),
-        ("get_global_descriptions", ()),
-        ("async_get_error_status", ()),
-        ("async_start_mirror", ()),
-        ("async_stop_mirror", ()),
-        ("async_set_group_mode", (1, 7)),
-        ("async_set_alarm_mode", (1, True)),
-        ("async_set_log_level", (0, 3)),
-        ("async_set_output", (105, 2, True)),
-        ("async_set_dimmval", (105, 1, 80)),
-        ("async_set_rgb_output", (105, 0, False)),
-        ("async_set_rgbval", (105, 0, [255, 0, 0])),
-        ("async_set_shutterpos", (105, 1, 50)),
-        ("async_set_blindtilt", (105, 1, 30)),
-        ("async_set_flag", (105, 0, True)),
-        ("async_inc_dec_counter", (105, 1, 1)),
-        ("async_set_setpoint", (105, 1, 220)),
-        ("async_set_climate_mode", (105, 1, 1)),
-        ("async_call_dir_command", (105, 1)),
-        ("async_call_vis_command", (105, 1)),
-        ("async_call_coll_command", (1,)),
-        ("async_get_module_definitions", (105,)),
-        ("async_get_module_settings", (105,)),
-        ("send_message", (105, 1)),
-        ("send_sms", (105, 1, 1)),
-        ("hub_restart", ()),
-        ("hub_reboot", ()),
-        ("module_restart", (5,)),
-        ("restart_fwd_tbl", ()),
-        ("send_devregid", (5, "dev-1")),
-        ("async_set_analog_val", (105, 1, 50)),
-        ("send_network_info", ("tok",)),
-        ("reinit_hub", (0,)),
-    ],
+    ("comm_method", "client_method", "args", "expected_client_args"),
+    _BUS_WRAPPER_CASES,
 )
-async def test_comm_bus_wrappers_delegate_to_async_exec(
-    comm_with_mock_exec: object,
-    method: str,
-    args: tuple,
+async def test_comm_bus_wrappers_delegate_to_client(
+    comm_method: str, client_method: str, args: tuple, expected_client_args: tuple
 ) -> None:
-    """Each bus-wrapper method delegates the call to ``_async_exec``."""
-    await getattr(comm_with_mock_exec, method)(*args)
-    comm_with_mock_exec._async_exec.assert_awaited()
-
-
-async def test_async_set_daytime_mode_day_path(comm_with_mock_exec) -> None:
-    """mode 1 maps to 0x42 and dispatches via _async_exec."""
-    await comm_with_mock_exec.async_set_daytime_mode(1, 1)
-    args, _ = comm_with_mock_exec._async_exec.call_args
-    assert args[1] == 1
-    assert args[2] == 0x42
-
-
-async def test_async_set_daytime_mode_night_path(comm_with_mock_exec) -> None:
-    """mode 2 maps to 0x43."""
-    await comm_with_mock_exec.async_set_daytime_mode(1, 2)
-    args, _ = comm_with_mock_exec._async_exec.call_args
-    assert args[2] == 0x43
-
-
-async def test_async_set_daytime_mode_unknown_is_noop(comm_with_mock_exec) -> None:
-    """An undefined daytime mode short-circuits without dispatching."""
-    await comm_with_mock_exec.async_set_daytime_mode(1, 99)
-    comm_with_mock_exec._async_exec.assert_not_awaited()
-
-
-def test_set_output_delegates_synchronously() -> None:
-    """The synchronous ``set_output`` calls into the client directly."""
+    """Each bus-wrapper awaits the corresponding HabitronClient coroutine."""
     comm = _make_comm("10.0.0.1")
-    comm.client.set_output = MagicMock()
-    comm.set_output(105, 1, True)
-    comm.client.set_output.assert_called_with(5, 1, True)
+    await getattr(comm, comm_method)(*args)
+    getattr(comm._client, client_method).assert_awaited_with(*expected_client_args)
 
 
-async def test_async_set_led_outp_translates_to_output(
-    comm_with_mock_exec,
-) -> None:
+async def test_async_set_analog_val_dispatches_via_set_dimmval() -> None:
+    """async_set_analog_val is a thin alias over set_dimmval channel 3."""
+    comm = _make_comm("10.0.0.1")
+    await comm.async_set_analog_val(105, 1, 50)
+    comm._client.set_dimmval.assert_awaited_with(5, 3, 50)
+
+
+async def test_send_network_info_encodes_token_and_mac() -> None:
+    """send_network_info encodes the token to utf-8 bytes and the MAC to 6 bytes."""
+    comm = _make_comm("10.0.0.1")
+    comm._mac = "AA:BB:CC:DD:EE:FF"
+    comm._network_ip = "192.0.2.10"
+    comm.is_addon = False
+    await comm.send_network_info("my-token")
+    comm._client.send_network_info.assert_awaited_with(
+        "192.0.2.10",
+        b"my-token",
+        b"\xaa\xbb\xcc\xdd\xee\xff",
+        is_addon=False,
+        version="9.9.9",
+    )
+
+
+async def test_async_set_daytime_mode_day_path() -> None:
+    """mode 1 maps to 0x42 and dispatches set_group_mode."""
+    comm = _make_comm("10.0.0.1")
+    await comm.async_set_daytime_mode(1, 1)
+    comm._client.set_group_mode.assert_awaited_with(1, 0x42)
+
+
+async def test_async_set_daytime_mode_night_path() -> None:
+    """mode 2 maps to 0x43."""
+    comm = _make_comm("10.0.0.1")
+    await comm.async_set_daytime_mode(1, 2)
+    comm._client.set_group_mode.assert_awaited_with(1, 0x43)
+
+
+async def test_async_set_daytime_mode_unknown_is_noop() -> None:
+    """An undefined daytime mode short-circuits without dispatching."""
+    comm = _make_comm("10.0.0.1")
+    await comm.async_set_daytime_mode(1, 99)
+    comm._client.set_group_mode.assert_not_awaited()
+
+
+async def test_async_set_led_outp_translates_to_output() -> None:
     """async_set_led_outp shifts the index by len(module.outputs)."""
+    comm = _make_comm("10.0.0.1")
     module = MagicMock()
     module.outputs = [MagicMock() for _ in range(8)]
-    comm_with_mock_exec.smhub.router.get_module = MagicMock(return_value=module)
-    await comm_with_mock_exec.async_set_led_outp(105, 1, True)
-    # async_set_led_outp → async_set_output → _async_exec
-    args, _ = comm_with_mock_exec._async_exec.call_args
-    assert args[2] == 1 + 8  # nmbr + len(outputs)
+    comm.smhub.router.get_module = MagicMock(return_value=module)
+    await comm.async_set_led_outp(105, 1, 1)
+    # async_set_led_outp → async_set_output → client.set_output(mod, nmbr+8, bool)
+    comm._client.set_output.assert_awaited_with(5, 1 + 8, True)
 
 
 # ---------- send_devreg_ids walking the router modules ----------
@@ -403,7 +437,7 @@ async def test_async_system_update_distributes_normal_status() -> None:
 async def test_get_compact_status_returns_empty_on_unchanged_crc() -> None:
     """A response whose crc matches the cached value yields an empty byte string."""
     comm = _make_comm()
-    comm._async_exec = AsyncMock(return_value=(b"payload", 42))
+    comm._client.get_compact_status = AsyncMock(return_value=(b"payload", 42))
     comm.crc = 42
     out = await comm.get_compact_status()
     assert out == b""
@@ -412,7 +446,7 @@ async def test_get_compact_status_returns_empty_on_unchanged_crc() -> None:
 async def test_get_compact_status_caches_new_crc_and_returns_bytes() -> None:
     """A new crc updates the cached value and returns the payload."""
     comm = _make_comm()
-    comm._async_exec = AsyncMock(return_value=(b"payload", 7))
+    comm._client.get_compact_status = AsyncMock(return_value=(b"payload", 7))
     comm.crc = 0
     out = await comm.get_compact_status()
     assert out == b"payload"
@@ -422,7 +456,7 @@ async def test_get_compact_status_caches_new_crc_and_returns_bytes() -> None:
 async def test_get_module_status_caches_new_crc_and_returns_bytes() -> None:
     """get_module_status follows the same crc-dedupe contract as compact status."""
     comm = _make_comm()
-    comm._async_exec = AsyncMock(return_value=(b"mod-payload", 9))
+    comm._client.get_module_status = AsyncMock(return_value=(b"mod-payload", 9))
     comm.crc = 0
     out = await comm.get_module_status(105)
     assert out == b"mod-payload"
@@ -432,7 +466,7 @@ async def test_get_module_status_caches_new_crc_and_returns_bytes() -> None:
 async def test_get_module_status_returns_empty_on_unchanged_crc() -> None:
     """A matching crc yields an empty bytes."""
     comm = _make_comm()
-    comm._async_exec = AsyncMock(return_value=(b"mod-payload", 9))
+    comm._client.get_module_status = AsyncMock(return_value=(b"mod-payload", 9))
     comm.crc = 9
     out = await comm.get_module_status(105)
     assert out == b""
@@ -441,7 +475,7 @@ async def test_get_module_status_returns_empty_on_unchanged_crc() -> None:
 async def test_handle_firmware_crc_dedupe() -> None:
     """handle_firmware shares the same crc-dedupe contract."""
     comm = _make_comm()
-    comm._async_exec = AsyncMock(return_value=(b"fw", 5))
+    comm._client.handle_firmware = AsyncMock(return_value=(b"fw", 5))
     comm.crc = 0
     out = await comm.handle_firmware(105)
     assert out == b"fw"
@@ -453,7 +487,7 @@ async def test_handle_firmware_crc_dedupe() -> None:
 async def test_update_firmware_crc_dedupe() -> None:
     """update_firmware shares the crc-dedupe contract."""
     comm = _make_comm()
-    comm._async_exec = AsyncMock(return_value=(b"fw", 11))
+    comm._client.update_firmware = AsyncMock(return_value=(b"fw", 11))
     comm.crc = 0
     out = await comm.update_firmware(105)
     assert out == b"fw"
@@ -465,10 +499,10 @@ async def test_update_firmware_crc_dedupe() -> None:
 async def test_async_power_cycle_channel_down_and_up_with_sleep() -> None:
     """power_cycle_channel runs the down + sleep + up sequence."""
     comm = _make_comm()
-    comm._async_exec = AsyncMock()
     with patch("custom_components.habitron.communicate.asyncio.sleep", new=AsyncMock()):
         await comm.async_power_cycle_channel(2)
-    assert comm._async_exec.await_count == 2
+    comm._client.power_cycle_channel_down.assert_awaited_with(2)
+    comm._client.power_cycle_channel_up.assert_awaited_with(2)
 
 
 # ---------- save_* file persisters ----------
