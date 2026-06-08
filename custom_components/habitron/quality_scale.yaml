@@ -82,24 +82,14 @@ rules:
   stale-devices: done
 
   # Platinum
-  async-dependency:
-    status: exempt
-    comment: |
-      The upstream ``habitron_client`` library exposes a synchronous
-      API. Every call from the integration is routed through
-      ``HbtnComm._async_exec`` which offloads to
-      ``hass.async_add_executor_job`` under a per-hub asyncio lock, so
-      the event loop is never blocked. A full async rewrite would be an
-      upstream project.
+  async-dependency: done
   inject-websession: done
   strict-typing:
     status: done
     comment: |
       ``mypy --strict custom_components/habitron`` reports zero errors
-      across all 34 source files (down from an initial 420). ``mypy.ini``
-      sets ``strict = True`` with an ``ignore_missing_imports`` override
-      for the upstream ``habitron_client`` library, which does not yet
-      ship a ``py.typed`` marker. APK manifest parsing for firmware
-      version detection lives in a small in-tree helper (``_axml.py``)
-      so the integration has no untyped third-party runtime
-      dependencies beyond ``habitron_client`` itself.
+      across all 34 source files (down from an initial 420). The only
+      third-party runtime dependency is ``habitron_client`` 1.0.0,
+      which ships ``py.typed`` and a fully async + strict-typed API
+      (PEP 561 compliant). APK manifest parsing for firmware version
+      detection lives in a small in-tree helper (``_axml.py``).

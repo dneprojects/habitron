@@ -581,7 +581,7 @@ class HbtnMediaPlayer(MediaPlayerEntity, RestoreEntity):
             ):
                 _LOGGER.debug("Found MA proxy player: %s", state.entity_id)
                 return state.entity_id
-        _LOGGER.warning("Could not find MA proxy player for %s", self.entity_id)
+        _LOGGER.debug("No Music Assistant proxy player for %s", self.entity_id)
         return None
 
     async def async_media_next_track(self, **kwargs: Any) -> None:
