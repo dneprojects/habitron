@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any, cast
 import anyio
 from habitron_client import (
     HabitronClient,
-    TimeoutException,
+    HabitronTimeoutError,
     format_block_output,
     get_host_ip,
     get_own_ip,
@@ -226,9 +226,9 @@ class HbtnComm:
             self.is_addon = os.getenv("SUPERVISOR_TOKEN") is not None
             self.slugname = info["software"].get("slug", "") if self.is_addon else ""
             self.logger.debug("SmartHub slugname: %s", self.slugname)
-        except TimeoutException as exc:
+        except HabitronTimeoutError as exc:
             self.logger.error("Timeout connecting to SmartHub at %s", self._host)
-            raise TimeoutException(f"Hub at {self._host} not responding") from exc
+            raise HabitronTimeoutError(f"Hub at {self._host} not responding") from exc
         except Exception as exc:
             self.logger.error("Error during SmartHub info fetch: %s", exc)
             raise
