@@ -69,7 +69,7 @@ def mock_habitron_client() -> Generator[MagicMock]:
     with (
         patch(
             "custom_components.habitron.config_flow.test_connection",
-            return_value=(True, MOCK_NAME),
+            new=AsyncMock(return_value=(True, MOCK_NAME)),
         ) as mock_test,
         patch(
             "custom_components.habitron.config_flow._get_local_ip",

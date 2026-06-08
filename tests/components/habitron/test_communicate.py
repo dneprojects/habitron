@@ -207,12 +207,12 @@ def test_get_smhub_info_non_addon_clears_slugname() -> None:
 
 
 def test_get_smhub_info_timeout_reraises() -> None:
-    """A TimeoutException is re-raised so the caller knows the hub is silent."""
-    from habitron_client import TimeoutException  # noqa: PLC0415
+    """A HabitronTimeoutError is re-raised so the caller knows the hub is silent."""
+    from habitron_client import HabitronTimeoutError  # noqa: PLC0415
 
     comm = _make_comm()
-    comm.client.get_smhub_info = MagicMock(side_effect=TimeoutException("silent"))
-    with pytest.raises(TimeoutException):
+    comm.client.get_smhub_info = MagicMock(side_effect=HabitronTimeoutError("silent"))
+    with pytest.raises(HabitronTimeoutError):
         comm.get_smhub_info()
 
 

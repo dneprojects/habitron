@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from habitron_client import TimeoutException
+from habitron_client import HabitronTimeoutError
 import pytest
 
 from homeassistant import config_entries
@@ -242,7 +242,7 @@ async def test_ssdp_no_host(
 @pytest.mark.parametrize(
     ("exception", "expected"),
     [
-        (TimeoutException("timeout"), "cannot_connect"),
+        (HabitronTimeoutError("timeout"), "cannot_connect"),
         (ConnectionRefusedError("refused"), "cannot_connect"),
     ],
 )

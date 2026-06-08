@@ -83,10 +83,8 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
 
     # 3. Connection Test
     try:
-        # test_connection läuft im Executor (synchron)
-        result, host_name = await hass.async_add_executor_job(
-            test_connection, host_to_test
-        )
+        # test_connection ist seit habitron_client 1.0.0 async.
+        result, host_name = await test_connection(host_to_test)
     except socket.gaierror as exc:
         raise HostNotFound from exc
     except ConnectionRefusedError as exc:
