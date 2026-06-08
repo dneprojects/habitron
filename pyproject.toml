@@ -7,7 +7,7 @@ name = "habitron"
 version = "2.7.0"
 description = "Habitron custom integration for Home Assistant"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -36,7 +36,7 @@ exclude_lines = [
 
 [tool.ruff]
 line-length = 88
-target-version = "py313"
+target-version = "py314"
 extend-exclude = ["custom_components/habitron/data"]
 
 [tool.ruff.lint]
