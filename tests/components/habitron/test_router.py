@@ -30,7 +30,7 @@ def _make_router(uid: str = "ROUTER-1") -> HbtnRouter:
     smhub = MagicMock()
     smhub.uid = uid
     smhub.base_url = "http://10.0.0.1:7780"
-    smhub.update = MagicMock()
+    smhub.update = AsyncMock()
     smhub.comm = MagicMock()
     smhub.comm.send_devregid = AsyncMock()
     smhub.comm.set_router = MagicMock()
@@ -447,7 +447,7 @@ async def test_update_system_status_short_router_status_returns_early() -> None:
     rt.logger = MagicMock()
     await rt.update_system_status(b"")
     rt.logger.warning.assert_called()
-    rt.smhub.update.assert_called()
+    rt.smhub.update.assert_awaited()
 
 
 async def test_update_system_status_writes_router_values() -> None:

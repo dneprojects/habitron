@@ -96,6 +96,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: HabitronConfigEntry) ->
     smhub = entry.runtime_data
     if smhub.ws_provider is not None:
         smhub.ws_provider.async_close()
+    await smhub.async_close()
 
     # Services are registered globally on DOMAIN, not per entry. Only
     # tear them down once the last loaded hub is gone, otherwise a

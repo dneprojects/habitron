@@ -68,10 +68,11 @@ class SmartHub:
     async def async_setup(self) -> None:
         """Initialize SmartHub instance and register device."""
 
-        # 1. Fetch info from Hub (Offload blocking socket to executor)
-        # This populates self.comm.info
+        # 1. Fetch info from Hub. ``comm.async_setup`` resolves the host and
+        # opens the persistent client connection; ``get_smhub_info`` then
+        # populates ``self.comm.info`` and the mac/version/host fields.
         await self.comm.async_setup()
-        await self.hass.async_add_executor_job(self.comm.get_smhub_info)
+        await self.comm.get_smhub_info()
 
         # 2. Update local variables with real data
         self._mac = self.comm.com_mac
@@ -139,11 +140,11 @@ class SmartHub:
         await self.comm.reinit_hub(1)
 
         # 6. First data update
-        await self.hass.async_add_executor_job(self.update)
+        await self.update()
 
-    def update(self) -> None:
+    async def update(self) -> None:
         """Update in a module specific method. Reads and parses status."""
-        info = self.comm.get_smhub_update()
+        info = await self.comm.get_smhub_update()
         if not info or not self.diags:
             return
         self.diags[0].value = float(
@@ -163,9 +164,12 @@ class SmartHub:
         self.loglvl[1].value = int(info["software"]["loglevel"]["file"])
 
     async def async_update(self) -> None:
-        """Async wrapper for the update method."""
-        # This offloads the blocking 'update' call to a thread pool
-        await self.hass.async_add_executor_job(self.update)
+        """Async wrapper retained for callers expecting the old API."""
+        await self.update()
+
+    async def async_close(self) -> None:
+        """Close the underlying client connection on entry unload."""
+        await self.comm.async_close()
 
     async def get_version(self) -> str:
         """Test connectivity to SmartHub is OK."""
