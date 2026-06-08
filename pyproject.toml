@@ -36,7 +36,7 @@ exclude_lines = [
 
 [tool.ruff]
 line-length = 88
-target-version = "py313"
+target-version = "py314"
 extend-exclude = ["custom_components/habitron/data"]
 
 [tool.ruff.lint]

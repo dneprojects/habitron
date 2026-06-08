@@ -33,12 +33,12 @@ def read_apk_version_name(apk_path: Path) -> str | None:
     try:
         with zipfile.ZipFile(apk_path) as zf, zf.open("AndroidManifest.xml") as f:
             manifest = f.read()
-    except (zipfile.BadZipFile, KeyError, OSError):
+    except zipfile.BadZipFile, KeyError, OSError:
         return None
 
     try:
         return _extract_version_name(manifest)
-    except (struct.error, UnicodeDecodeError, IndexError, ValueError):
+    except struct.error, UnicodeDecodeError, IndexError, ValueError:
         return None
 
 
