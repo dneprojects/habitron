@@ -38,6 +38,8 @@ mutagen==1.47.0
 ha-ffmpeg==3.2.2
 hassil==3.5.0
 home-assistant-intents==2026.6.1
+pymicro-vad==1.0.1
+pyspeex-noise==1.0.2
 
 # Lint + type-check tooling. Pinned only loosely; CI uses whatever
 # the resolver lands on for the current Python version.
