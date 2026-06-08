@@ -235,7 +235,7 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:
             try:
                 audio_data = base64.b64decode(msg["payload"])
                 await queue.put(audio_data)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 _LOGGER.error("Failed to decode base64 audio chunk for %s", stream_name)
             except asyncio.QueueFull:
                 _LOGGER.warning("Audio queue full for %s, dropping chunk", stream_name)
