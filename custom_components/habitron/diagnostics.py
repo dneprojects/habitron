@@ -24,7 +24,9 @@ def _module_summary(module: Any) -> dict[str, Any]:
         "uid": getattr(module, "uid", None),
         "name": getattr(module, "name", None),
         "type": (
-            module.typ.hex() if isinstance(getattr(module, "typ", None), bytes) else None
+            module.typ.hex()
+            if isinstance(getattr(module, "typ", None), bytes)
+            else None
         ),
         "mod_type": getattr(module, "mod_type", None),
         "mod_addr": getattr(module, "mod_addr", None),
@@ -54,7 +56,7 @@ async def async_get_config_entry_diagnostics(
         "hub": {
             "uid": smhub.uid,
             "version": smhub.smhub_version,
-            "type": smhub._type,  # noqa: SLF001
+            "type": smhub._type,
             "host": smhub.host,
             "addon_slug": smhub.addon_slug,
             "online": smhub.online,
@@ -64,7 +66,7 @@ async def async_get_config_entry_diagnostics(
             "id": router.id,
             "name": router.name,
             "version": router.version,
-            "sys_ok": router._sys_ok,  # noqa: SLF001
+            "sys_ok": router._sys_ok,
             "module_count": len(router.modules),
             "area_count": len(router.areas),
             "max_group": router.max_group,
@@ -93,13 +95,17 @@ async def async_get_device_diagnostics(
 
     # Map the device's domain identifier back to a Habitron uid.
     target_uid: str | None = next(
-        (identifier[1] for identifier in device.identifiers if identifier[0] == "habitron"),
+        (
+            identifier[1]
+            for identifier in device.identifiers
+            if identifier[0] == "habitron"
+        ),
         None,
     )
 
     target: dict[str, Any] | None = None
     if target_uid == smhub.uid:
-        target = {"kind": "hub", "summary": {"uid": smhub.uid, "name": smhub._name}}  # noqa: SLF001
+        target = {"kind": "hub", "summary": {"uid": smhub.uid, "name": smhub._name}}
     elif target_uid == router.uid:
         target = {"kind": "router", "summary": {"uid": router.uid, "name": router.name}}
     else:

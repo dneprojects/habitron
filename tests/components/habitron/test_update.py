@@ -127,7 +127,9 @@ async def test_async_setup_entry_skips_apk_for_non_touch(hass) -> None:
 # ---------- SCTouchAppUpdate ----------
 
 
-def _make_app(rt: MagicMock | None = None, mod: MagicMock | None = None) -> SCTouchAppUpdate:
+def _make_app(
+    rt: MagicMock | None = None, mod: MagicMock | None = None
+) -> SCTouchAppUpdate:
     """Build an SCTouchAppUpdate with stubbed router + module."""
     rt = rt if rt is not None else _make_router_with_smhub()
     mod = mod if mod is not None else _make_module(typ=b"\x01\x04")
@@ -168,13 +170,16 @@ async def test_sc_touch_async_added_to_hass_triggers_update() -> None:
     """async_added_to_hass fires an immediate update so the entity has fresh data."""
     app = _make_app()
     app.async_update = AsyncMock()
-    with patch(
-        "homeassistant.helpers.update_coordinator."
-        "CoordinatorEntity.async_added_to_hass",
-        new=AsyncMock(),
-    ), patch(
-        "homeassistant.components.update.UpdateEntity.async_added_to_hass",
-        new=AsyncMock(),
+    with (
+        patch(
+            "homeassistant.helpers.update_coordinator."
+            "CoordinatorEntity.async_added_to_hass",
+            new=AsyncMock(),
+        ),
+        patch(
+            "homeassistant.components.update.UpdateEntity.async_added_to_hass",
+            new=AsyncMock(),
+        ),
     ):
         await app.async_added_to_hass()
     app.async_update.assert_awaited()
@@ -446,9 +451,7 @@ async def test_hbtn_module_update_install_for_module() -> None:
     entity = _make_module_update()
     entity.async_write_ha_state = MagicMock()
     entity.async_update = AsyncMock()
-    with patch(
-        "custom_components.habitron.update.sleep", new=AsyncMock()
-    ):
+    with patch("custom_components.habitron.update.sleep", new=AsyncMock()):
         await entity.async_install(version="9.9.9", backup=False)
     entity._module.comm.update_firmware.assert_awaited_with(105)
     assert entity._module.sw_version == "9.9.9"
@@ -461,9 +464,7 @@ async def test_hbtn_module_update_install_for_router() -> None:
     entity = _make_module_update(mod=rt)
     entity.async_write_ha_state = MagicMock()
     entity.async_update = AsyncMock()
-    with patch(
-        "custom_components.habitron.update.sleep", new=AsyncMock()
-    ):
+    with patch("custom_components.habitron.update.sleep", new=AsyncMock()):
         await entity.async_install(version="9.9.9", backup=False)
     rt.comm.update_firmware.assert_awaited_with(rt.id)
     assert rt.version == "9.9.9"
@@ -491,7 +492,9 @@ async def test_hbtn_module_update_async_update_parses_versions() -> None:
     assert entity._attr_latest_version == "2.0.0"
 
 
-async def test_hbtn_module_update_async_update_router_branch_calls_get_definitions() -> None:
+async def test_hbtn_module_update_async_update_router_branch_calls_get_definitions() -> (
+    None
+):
     """For a router target, async_update first reloads its definitions."""
     rt = _make_router_module()
     entity = _make_module_update(mod=rt)

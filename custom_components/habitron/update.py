@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-from asyncio import sleep
 import hashlib
 import logging
-from pathlib import Path
 import shutil
+from asyncio import sleep
+from pathlib import Path
 from typing import Any
-
-from packaging.version import parse as parse_version
 
 from homeassistant.components.update import (
     UpdateDeviceClass,
@@ -24,6 +22,7 @@ from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
     DataUpdateCoordinator,
 )
+from packaging.version import parse as parse_version
 
 from ._axml import read_apk_version_name
 from .const import DOMAIN
@@ -75,7 +74,7 @@ class SCTouchAppUpdate(UpdateEntity):
         self._module = module
         self._router = router
         self._hass = router.hass
-        self.firmware_dir = Path("")  # noqa: PTH201
+        self.firmware_dir = Path("")
 
         self._attr_unique_id = f"mod_{self._module.uid}_app_update"
         self._attr_device_info = {"identifiers": {(DOMAIN, module.uid)}}
@@ -114,8 +113,7 @@ class SCTouchAppUpdate(UpdateEntity):
         try:
             for file_path in self.firmware_dir.iterdir():
                 if not (
-                    file_path.name.startswith("sctouch_")
-                    and file_path.suffix == ".apk"
+                    file_path.name.startswith("sctouch_") and file_path.suffix == ".apk"
                 ):
                     continue
                 version_name = read_apk_version_name(file_path)
@@ -330,7 +328,7 @@ class HbtnModuleUpdate(CoordinatorEntity[DataUpdateCoordinator[None]], UpdateEnt
                         self._attr_latest_version,
                     )
                 self.async_write_ha_state()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             _LOGGER.error(
                 "Error checking firmware version for module %s: %s",
                 self._module.name,

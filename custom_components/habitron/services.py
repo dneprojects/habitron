@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Coroutine
 import logging
+from collections.abc import Callable, Coroutine
 from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
-
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import device_registry as dr
@@ -209,9 +208,7 @@ async def _async_dispatch_sc_command_for_device(
                     "Module %s is missing the stream_name property", module.name
                 )
                 continue
-            await hub.ws_provider.async_send_system_command(
-                stream_id, command, new_ip
-            )
+            await hub.ws_provider.async_send_system_command(stream_id, command, new_ip)
             return True
     return False
 
@@ -232,8 +229,7 @@ async def _async_sc_system_command(call: ServiceCall) -> None:
 
     dev_reg = dr.async_get(call.hass)
     hubs: list[SmartHub] = [
-        e.runtime_data
-        for e in call.hass.config_entries.async_loaded_entries(DOMAIN)
+        e.runtime_data for e in call.hass.config_entries.async_loaded_entries(DOMAIN)
     ]
     if not hubs:
         raise ServiceValidationError(

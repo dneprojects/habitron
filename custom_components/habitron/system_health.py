@@ -20,7 +20,7 @@ def _aggregate_router_status(hubs: list[Any]) -> str:
     """Return aggregate router health across all configured SmartHubs."""
     if not hubs:
         return "no hubs"
-    if all(hub.comm.router._sys_ok for hub in hubs):  # noqa: SLF001
+    if all(hub.comm.router._sys_ok for hub in hubs):
         return "ok"
     return "errors"
 
@@ -28,8 +28,7 @@ def _aggregate_router_status(hubs: list[Any]) -> str:
 async def system_health_info(hass: HomeAssistant) -> dict[str, Any]:
     """Get info for the info page."""
     hubs = [
-        entry.runtime_data
-        for entry in hass.config_entries.async_loaded_entries(DOMAIN)
+        entry.runtime_data for entry in hass.config_entries.async_loaded_entries(DOMAIN)
     ]
     return {
         "hbtn_version": hass.data["integrations"]["habitron"].manifest["version"],

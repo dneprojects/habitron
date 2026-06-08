@@ -17,12 +17,11 @@ from habitron_client import (
     get_host_ip,
     get_own_ip,
 )
-
 from homeassistant.components import network
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN, HaEvents
+from .const import HaEvents
 
 if TYPE_CHECKING:
     from .module import HbtnModule
@@ -245,9 +244,7 @@ class HbtnComm:
             self.logger.debug("SmartHub slugname: %s", self.slugname)
         except HabitronTimeoutError as exc:
             self.logger.error("Timeout connecting to SmartHub at %s", self._host)
-            raise HabitronTimeoutError(
-                f"Hub at {self._host} not responding"
-            ) from exc
+            raise HabitronTimeoutError(f"Hub at {self._host} not responding") from exc
         except Exception as exc:
             self.logger.error("Error during SmartHub info fetch: %s", exc)
             raise
@@ -349,9 +346,7 @@ class HbtnComm:
 
     async def async_set_rgb_output(self, mod_id: int, nmbr: int, val: int) -> None:
         """Turn RGB light on/off."""
-        await self.client.set_rgb_output(
-            self._convert_mod_id(mod_id), nmbr, bool(val)
-        )
+        await self.client.set_rgb_output(self._convert_mod_id(mod_id), nmbr, bool(val))
 
     async def async_set_rgbval(self, mod_id: int, nmbr: int, val: list[int]) -> None:
         """Send value to dimm output."""
@@ -529,7 +524,7 @@ class HbtnComm:
         """Send device registry id to module."""
         await self.client.send_devregid(mod_nmbr, devreg_id)
 
-    async def update_entity(  # noqa: C901
+    async def update_entity(
         self,
         hub_id: str,
         mod_id: int,
@@ -567,7 +562,7 @@ class HbtnComm:
             return
         try:
             module = self.router.get_module(mod_id)
-        except Exception as err_msg:  # noqa: BLE001
+        except Exception as err_msg:
             self.logger.warning(
                 "Error handling habitron event %s with arg1 %s of module %s: %s",
                 evnt,
@@ -656,7 +651,7 @@ class HbtnComm:
                 elif evnt == HaEvents.CNT_VAL:
                     module.logic[arg1].value = arg2
                     await module.logic[arg1].handle_upd_event()
-            except Exception as err_msg:  # noqa: BLE001
+            except Exception as err_msg:
                 self.logger.warning(
                     "Error handling habitron event %s with arg1 %s of module %s: %s",
                     evnt,

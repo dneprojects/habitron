@@ -235,9 +235,7 @@ async def test_get_smhub_info_timeout_reraises() -> None:
     from habitron_client import HabitronTimeoutError  # noqa: PLC0415
 
     comm = _make_comm()
-    comm._client.get_smhub_info = AsyncMock(
-        side_effect=HabitronTimeoutError("silent")
-    )
+    comm._client.get_smhub_info = AsyncMock(side_effect=HabitronTimeoutError("silent"))
     with pytest.raises(HabitronTimeoutError):
         await comm.get_smhub_info()
 
@@ -571,9 +569,7 @@ async def test_save_config_data_writes_to_disk(tmp_path) -> None:
         return func(*args)
 
     comm._hass.async_add_executor_job = AsyncMock(side_effect=_exec_job)
-    with patch(
-        "custom_components.habitron.communicate._DATA_DIR", tmp_path / "data"
-    ):
+    with patch("custom_components.habitron.communicate._DATA_DIR", tmp_path / "data"):
         await comm.save_config_data("test.txt", "hello")
     out_file = tmp_path / "data" / "test.txt"
     assert out_file.read_text() == "hello"

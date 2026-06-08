@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.module import HbtnModule
-from custom_components.habitron.router import AlarmMode, DaytimeMode, HbtnRouter
+from custom_components.habitron.router import DaytimeMode, HbtnRouter
 from custom_components.habitron.select import (
     HbtnMode,
     HbtnSelectAlarmMode,
@@ -549,4 +549,6 @@ async def test_hbtn_select_logging_level_async_select_option_forwards() -> None:
     coord = MagicMock()
     entity = HbtnSelectLoggingLevel(smhub, level, coord, 0)
     await entity.async_select_option("error")
-    smhub.comm.async_set_log_level.assert_awaited_with(0, LoggingLevels["error"].value * 10)
+    smhub.comm.async_set_log_level.assert_awaited_with(
+        0, LoggingLevels["error"].value * 10
+    )

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "habitron"
-version = "2.6.3"
+version = "2.7.0"
 description = "Habitron custom integration for Home Assistant"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -33,3 +33,52 @@ exclude_lines = [
     "raise NotImplementedError",
     "if TYPE_CHECKING:",
 ]
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+extend-exclude = ["custom_components/habitron/data"]
+
+[tool.ruff.lint]
+# Conservative subset of the rules HA core uses. The integration was
+# developed inside HA core, so its source already conforms to a far
+# stricter set than this — these are the rules that matter when the
+# repo is checked standalone (without HA core's pyproject.toml in
+# scope).
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "B",    # flake8-bugbear
+    "I",    # isort
+    "UP",   # pyupgrade
+    "C4",   # flake8-comprehensions
+    "ASYNC",
+    "S102", # exec-builtin
+    "S110", # try-except-pass
+    "RUF",  # ruff-specific rules
+]
+ignore = [
+    "E501",   # line too long — handled by formatter
+    "B008",   # function calls in argument defaults (HA fixtures rely on it)
+    "B904",   # raise-from in except blocks — too many places to retrofit
+    "RUF001", # ambiguous-unicode-character — German umlauts in comments are fine
+    "RUF012", # mutable default class attrs (HA entity attrs use this pattern)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "S101",     # asserts are fine in tests
+    "RUF",      # tests can be lax on RUF-specific stylistic rules
+    "E702",     # chained statements per line — compact mock setup is OK
+    "F841",     # unused variables — anchoring values for clarity is OK
+    "ASYNC109", # ``timeout`` kwarg on test helpers — intentional
+    "E402",     # module-level import not at top — conftest does setup first
+]
+"custom_components/habitron/_axml.py" = [
+    "PLR2004", # magic numbers — AXML format constants
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

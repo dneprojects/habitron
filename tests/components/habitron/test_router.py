@@ -180,8 +180,11 @@ def test_pad_sys_status_uneven_length_returns_input() -> None:
 def test_pad_sys_status_already_at_target_passes_through() -> None:
     """A block already at MStatIdx.END is left untouched."""
     blk_len = MStatIdx.END
-    buf = bytes([blk_len]) + b"\x01" * (blk_len - 1) + bytes([blk_len]) + b"\x02" * (
-        blk_len - 1
+    buf = (
+        bytes([blk_len])
+        + b"\x01" * (blk_len - 1)
+        + bytes([blk_len])
+        + b"\x02" * (blk_len - 1)
     )
     assert HbtnRouter._pad_sys_status(buf) == buf
 
@@ -425,8 +428,14 @@ async def test_get_modules_decodes_descriptor_blocks() -> None:
     name_a = b"Living"
     name_b = b"Kitchen"
     payload = (
-        bytes([5]) + b"\x01\x03" + bytes([len(name_a)]) + name_a
-        + bytes([6]) + b"\x0a\x01" + bytes([len(name_b)]) + name_b
+        bytes([5])
+        + b"\x01\x03"
+        + bytes([len(name_a)])
+        + name_a
+        + bytes([6])
+        + b"\x0a\x01"
+        + bytes([len(name_b)])
+        + name_b
     )
     rt.comm.async_get_router_modules = AsyncMock(return_value=payload)
     descs = await rt.get_modules([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
@@ -494,9 +503,7 @@ async def test_update_system_status_creates_issue_when_not_ok() -> None:
     rt.comm.async_get_router_status = AsyncMock(return_value=bytes(rt_status))
 
     with (
-        patch(
-            "custom_components.habitron.router.ir.async_create_issue"
-        ) as mock_create,
+        patch("custom_components.habitron.router.ir.async_create_issue") as mock_create,
         patch("custom_components.habitron.router.ir.async_delete_issue"),
     ):
         await rt.update_system_status(b"")
@@ -617,7 +624,8 @@ async def test_initialize_registers_device_and_seeds_module_instances() -> None:
             new=AsyncMock(),
         ),
     ):
-        dev = MagicMock(); dev.id = "dev-rt"
+        dev = MagicMock()
+        dev.id = "dev-rt"
         mock_dr.return_value.async_get_or_create.return_value = dev
         mock_dr.return_value.async_get_device.return_value = dev
         result = await rt.initialize()

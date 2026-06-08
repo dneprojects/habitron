@@ -126,6 +126,7 @@ def _make_led_module() -> MagicMock:
 async def test_switched_led_turn_on_calls_comm() -> None:
     """SwitchedLed.async_turn_on forwards to ``comm.async_set_led_outp``."""
     from custom_components.habitron.switch import SwitchedLed  # noqa: PLC0415
+
     led = _make_led_descriptor(nmbr=1)
     mod = _make_led_module()
     coord = MagicMock()
@@ -681,7 +682,7 @@ async def test_async_setup_entry_external_area_with_hidden_entity_alias(hass) ->
     area = MagicMock()
     area.get_name_id = MagicMock(return_value="area_5_id")
     # Fill enough areas so the overflow clamp does not kick in for index 5
-    router.areas = {i: area for i in range(6)}
+    router.areas = dict.fromkeys(range(6), area)
 
     entry = MagicMock()
     entry.runtime_data.router = router

@@ -12,8 +12,6 @@ from __future__ import annotations
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
 from custom_components.habitron.ws_provider.voice_pipeline import run_voice_pipeline
 
 
@@ -47,7 +45,9 @@ async def _drive_pipeline(
     audio_queue.put_nowait(None)
     playback_event = asyncio.Event()
 
-    pipeline_kwargs = {"side_effect": pipeline_side_effect} if pipeline_side_effect else {}
+    pipeline_kwargs = (
+        {"side_effect": pipeline_side_effect} if pipeline_side_effect else {}
+    )
     # If side_effect is async, AsyncMock handles it directly.
     pipeline_mock = AsyncMock(**pipeline_kwargs)
     with patch(
@@ -193,6 +193,7 @@ async def test_run_voice_pipeline_event_callback_logs_when_no_satellite() -> Non
     )
 
     provider = _make_provider()
+
     # No satellite registered → the event_callback hits the warning branch.
     async def _fire_event(*args, **kwargs):
         cb = kwargs["event_callback"]
@@ -255,7 +256,9 @@ async def test_run_voice_pipeline_tts_end_streams_audio_to_client() -> None:
             await coro
     # The provider should have sent at least one tts chunk + an empty terminator
     sent_types = [
-        c.call_args.kwargs.get("msg", c.call_args.args[1] if len(c.call_args.args) > 1 else {})
+        c.call_args.kwargs.get(
+            "msg", c.call_args.args[1] if len(c.call_args.args) > 1 else {}
+        )
         for c in provider.async_send_json_message.await_args_list
     ]
     # Easier: count call_args directly
@@ -346,7 +349,9 @@ async def test_run_voice_pipeline_tts_streaming_exception_is_logged() -> None:
             await coro
 
 
-async def test_run_voice_pipeline_waits_for_playback_finished_when_tts_streamed() -> None:
+async def test_run_voice_pipeline_waits_for_playback_finished_when_tts_streamed() -> (
+    None
+):
     """When TTS was streamed the pipeline awaits the playback_finished event."""
     from homeassistant.components.assist_pipeline import (  # noqa: PLC0415
         PipelineEvent,

@@ -151,7 +151,13 @@ class DimmedOutput(SwitchedLight):
     _attr_supported_color_modes = {ColorMode.BRIGHTNESS}
     _attr_translation_key = "dimmed_output"
 
-    def __init__(self, output: IfDescriptor, module: HbtnModule, coord: DataUpdateCoordinator[None], idx: int) -> None:
+    def __init__(
+        self,
+        output: IfDescriptor,
+        module: HbtnModule,
+        coord: DataUpdateCoordinator[None],
+        idx: int,
+    ) -> None:
         """Initialize a dimmable Habitron Light."""
         super().__init__(output, module, coord, idx)
         if module.typ[0] == 1:
@@ -211,7 +217,13 @@ class DimmedOutputPush(SwitchedLightPush):
     _attr_color_mode = ColorMode.BRIGHTNESS
     _attr_supported_color_modes = {ColorMode.BRIGHTNESS}
 
-    def __init__(self, output: IfDescriptor, module: HbtnModule, coord: DataUpdateCoordinator[None], idx: int) -> None:
+    def __init__(
+        self,
+        output: IfDescriptor,
+        module: HbtnModule,
+        coord: DataUpdateCoordinator[None],
+        idx: int,
+    ) -> None:
         """Initialize a dimmable Habitron Light."""
         super().__init__(output, module, coord, idx)
         if module.typ[0] == 1:
@@ -226,8 +238,8 @@ class DimmedOutputPush(SwitchedLightPush):
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
         self._attr_is_on = self._output.value == 1
-        self._brightness = int(
-            round(self._module.dimmers[self._nmbr - self._out_offs].value * 2.55)
+        self._brightness = round(
+            self._module.dimmers[self._nmbr - self._out_offs].value * 2.55
         )
         self.async_write_ha_state()
 
@@ -240,7 +252,7 @@ class DimmedOutputPush(SwitchedLightPush):
         await self._module.comm.async_set_dimmval(
             self._module.mod_addr,
             self._nmbr - self._out_offs + 1,
-            int(round(self._brightness * 100.0 / 255)),
+            round(self._brightness * 100.0 / 255),
         )
 
 

@@ -267,7 +267,7 @@ class HbtnShutter(CoordinatorEntity[DataUpdateCoordinator[None]], CoverEntity):
 
     async def async_set_cover_position(self, **kwargs: Any) -> None:
         """Move the cover to position."""
-        tmp_position = int(kwargs.get(ATTR_POSITION))  # type: ignore  # noqa: PGH003
+        tmp_position = int(kwargs.get(ATTR_POSITION))  # type: ignore
         self._position = 100 - int(self._cover.value)
         sh_nmbr = self._nmbr + 1
         if self._module.mod_type[:16] == "Smart Controller":
@@ -340,7 +340,7 @@ class HbtnBlind(HbtnShutter):
 
     async def async_set_cover_tilt_position(self, **kwargs: Any) -> None:
         """Set the tilt angle."""
-        tmp_tilt_position = int(kwargs.get(ATTR_TILT_POSITION))  # type: ignore  # noqa: PGH003
+        tmp_tilt_position = int(kwargs.get(ATTR_TILT_POSITION))  # type: ignore
         self._tilt_position = 100 - self._module.covers[self._nmbr].tilt
         sh_nmbr = self._nmbr + 1
         if self._module.mod_type[:16] == "Smart Controller":

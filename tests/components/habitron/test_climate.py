@@ -377,8 +377,8 @@ async def test_climate_async_setup_entry_dual_mode_enable_logic_enables(hass) ->
     entry.runtime_data.router = router
 
     listener_holder: list = []
-    router.coord.async_add_listener = lambda cb: listener_holder.append(cb) or (
-        lambda: None
+    router.coord.async_add_listener = lambda cb: (
+        listener_holder.append(cb) or (lambda: None)
     )
 
     await async_setup_entry(hass, entry, lambda es: None)
@@ -414,8 +414,8 @@ async def test_climate_async_setup_entry_single_mode_disables(hass) -> None:
     entry.runtime_data.router = router
 
     listener_holder: list = []
-    router.coord.async_add_listener = lambda cb: listener_holder.append(cb) or (
-        lambda: None
+    router.coord.async_add_listener = lambda cb: (
+        listener_holder.append(cb) or (lambda: None)
     )
 
     await async_setup_entry(hass, entry, lambda es: None)

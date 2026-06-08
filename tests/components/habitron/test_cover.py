@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from homeassistant.components.cover import CoverDeviceClass
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -262,7 +260,9 @@ def test_shutter_handle_coordinator_update_moving_up_at_top_schedules_stop() -> 
     shutter._schedule_stop.assert_called_with(5)
 
 
-def test_shutter_handle_coordinator_update_moving_down_at_bottom_schedules_stop() -> None:
+def test_shutter_handle_coordinator_update_moving_down_at_bottom_schedules_stop() -> (
+    None
+):
     """Position at 0, moving down → schedule a stop task."""
     cov = _make_cover_descriptor()
     cov.value = 100  # position = 0

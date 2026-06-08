@@ -12,11 +12,10 @@ import asyncio
 import base64
 import logging
 import struct
-from typing import TYPE_CHECKING, Any
 from collections.abc import AsyncIterator
+from typing import TYPE_CHECKING
 
-from homeassistant.components import tts, websocket_api
-from homeassistant.components.websocket_api import ActiveConnection  # type: ignore[attr-defined]
+from homeassistant.components import tts
 from homeassistant.components.assist_pipeline import (
     PipelineEvent,
     PipelineEventType,
@@ -29,6 +28,9 @@ from homeassistant.components.stt import (
     AudioFormats,
     AudioSampleRates,
     SpeechMetadata,
+)
+from homeassistant.components.websocket_api import (  # type: ignore[attr-defined]
+    ActiveConnection,
 )
 from homeassistant.core import Context, callback
 
@@ -148,9 +150,7 @@ async def run_voice_pipeline(
 
                 async def _stream_tts_to_client() -> None:
                     """Fetch TTS audio stream and send chunks to the client."""
-                    _LOGGER.debug(
-                        "Starting TTS stream to client for token %s", token
-                    )
+                    _LOGGER.debug("Starting TTS stream to client for token %s", token)
                     try:
                         # Get the TTS audio stream using the token
                         stream = tts.async_get_stream(provider.hass, token)
@@ -167,9 +167,9 @@ async def run_voice_pipeline(
                                     stream_name,
                                     {
                                         "type": "habitron/voice_tts_chunk",
-                                        "payload": base64.b64encode(
-                                            chunk
-                                        ).decode("utf-8"),
+                                        "payload": base64.b64encode(chunk).decode(
+                                            "utf-8"
+                                        ),
                                     },
                                 )
                         # Send empty payload to signal end of TTS stream
@@ -237,9 +237,7 @@ async def run_voice_pipeline(
                 )
                 try:
                     # Wait for the event set by handle_tts_playback_finished
-                    await asyncio.wait_for(
-                        playback_finished_event.wait(), timeout=30
-                    )
+                    await asyncio.wait_for(playback_finished_event.wait(), timeout=30)
                     _LOGGER.debug(
                         "Client confirmed TTS playback finished for stream %s",
                         stream_name,
@@ -251,9 +249,7 @@ async def run_voice_pipeline(
                     )
 
     except asyncio.CancelledError:
-        _LOGGER.info(
-            "Voice pipeline task cancelled for stream '%s'", stream_name
-        )
+        _LOGGER.info("Voice pipeline task cancelled for stream '%s'", stream_name)
     except Exception as err:
         _LOGGER.exception(
             "Unexpected error in voice pipeline for stream '%s'", stream_name

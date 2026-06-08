@@ -8,7 +8,8 @@ from typing import TYPE_CHECKING
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import area_registry as ar, device_registry as dr
+from homeassistant.helpers import area_registry as ar
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.config_validation import slugify
 
 from .binary_sensor import ListeningStatusSensor
@@ -167,7 +168,7 @@ class HbtnModule:
             return math.ceil(out_no / 2) - 1
         return -1
 
-    async def get_names(self) -> bool:  # noqa: C901
+    async def get_names(self) -> bool:
         """Get summary of Habitron module."""
         resp = await self.comm.async_get_module_definitions(self._addr)
         if resp == b"":
@@ -269,7 +270,7 @@ class HbtnModule:
                             # Description of outputs
                             self.outputs[arg_code - 60].name = text
                             self.outputs[arg_code - 60].area = line[1]
-                    except Exception as err_msg:  # noqa: BLE001
+                    except Exception as err_msg:
                         self.logger.warning(
                             "Error processing line '%s': %s", line, err_msg
                         )
@@ -498,9 +499,7 @@ class SmartController(HbtnModule):
         self.dimmers = [IfDescriptor("", i, -1, 0) for i in range(2)]
         self.leds = [IfDescriptor("", i, 0, 0) for i in range(9)]
         if self.typ[1] == 4:  # Smart Touch
-            self.cleds = [
-                CLedDescriptor("", i, 4, [0, 0, 0, 0]) for i in range(5)
-            ]
+            self.cleds = [CLedDescriptor("", i, 4, [0, 0, 0, 0]) for i in range(5)]
         self.diags = [IfDescriptor("", i, 0, 0) for i in range(2)]
         self.setvalues = [IfDescriptor("Set temperature", 0, 2, 20.0)]
         self.setvalues.append(IfDescriptor("Set temperature 2", 1, 2, 20.0))
@@ -636,9 +635,7 @@ class SmartControllerMini(HbtnModule):
         self.outputs = [IfDescriptor("", i, 1, 0) for i in range(2)]
         self.covers = [CovDescriptor("", -1, 0, 0, 0) for i in range(0)]
         self.dimmers = [IfDescriptor("", i, -1, 0) for i in range(0)]
-        self.cleds = [
-            CLedDescriptor("", i, 4, [0, 0, 0, 0]) for i in range(5)
-        ]
+        self.cleds = [CLedDescriptor("", i, 4, [0, 0, 0, 0]) for i in range(5)]
         self.diags = [IfDescriptor("", i, 0, 0) for i in range(1)]
         self.setvalues = [IfDescriptor("Set temperature", 0, 2, 20.0)]
         self.setvalues.append(IfDescriptor("Set temperature 2", 1, 2, 20.0))

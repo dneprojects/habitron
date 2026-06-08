@@ -218,7 +218,9 @@ async def test_get_version_strips_smartip_prefix(
     """``get_version`` strips the leading SmartIP marker from the reply."""
     # ``get_version`` returns ver_string[9:] when the SmartIP prefix is
     # present — so the version payload sits at byte index 9.
-    smart_hub_stub.comm.get_smhub_version = AsyncMock(return_value=b"SmartIP\x00\x001.2.3.4")
+    smart_hub_stub.comm.get_smhub_version = AsyncMock(
+        return_value=b"SmartIP\x00\x001.2.3.4"
+    )
     ver = await smart_hub_stub.get_version()
     assert ver == "1.2.3.4"
 

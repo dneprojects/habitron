@@ -3,15 +3,13 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
 import logging
+from collections.abc import Callable
+from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
 from aiohttp import ClientError, ClientSession
-
 from homeassistant.components import media_source
-from datetime import timedelta
-
 from homeassistant.components.media_player import (  # type: ignore[attr-defined]
     BrowseMedia,
     MediaPlayerEnqueue,
@@ -253,7 +251,7 @@ class HbtnMediaPlayer(MediaPlayerEntity, RestoreEntity):
 
                 item = QueueItem(media_id, media_type, media_url, metadata)
 
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 _LOGGER.error("[%s] Error processing media_id: %s", self.entity_id, e)
                 return
 
@@ -397,7 +395,7 @@ class HbtnMediaPlayer(MediaPlayerEntity, RestoreEntity):
                     artwork_url,
                 )
 
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 _LOGGER.warning(
                     "[%s] Failed to fetch rich metadata via media_source browse: %s",
                     self.entity_id,
@@ -514,7 +512,7 @@ class HbtnMediaPlayer(MediaPlayerEntity, RestoreEntity):
                     return f"{self.hass.config.internal_url}{url}"
 
                 # If it's already absolute (e.g., from a radio stream), return as is.
-                return url  # noqa: TRY300
+                return url
 
             except Exception:
                 _LOGGER.exception(
@@ -782,7 +780,7 @@ class HbtnMediaPlayer(MediaPlayerEntity, RestoreEntity):
                     self._attr_media_artist = attributes.get("media_artist")
                     self._attr_media_image_url = attributes.get("entity_picture")
 
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             _LOGGER.error("Error updating attributes from client: %s", e)
 
         self.async_write_ha_state()

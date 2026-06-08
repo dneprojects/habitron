@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-from typing import Any
 
 from homeassistant.components.assist_pipeline.pipeline import (
     PipelineEvent,

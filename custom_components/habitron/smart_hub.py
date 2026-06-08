@@ -84,9 +84,7 @@ class SmartHub:
         self.router.b_uid = self.uid
 
         if self.comm.is_addon:
-            self.base_url = (
-                f"http://{self.host}:8123/{self.addon_slug}/ingress?index="
-            )
+            self.base_url = f"http://{self.host}:8123/{self.addon_slug}/ingress?index="
         else:
             self.base_url = f"http://{self.host}:7780"
 
@@ -119,8 +117,10 @@ class SmartHub:
                 [path_config],
             )
             add_extra_js_url(self.hass, "/habitronfiles/hbt-icons.js")
-        except Exception:  # noqa: BLE001
-            # install only once
+        except Exception:  # noqa: S110
+            # The static-path registration is per-process; on integration
+            # reload, the second call raises but the path is still wired
+            # from the first call. Swallow and continue.
             pass
 
         # 4. Initialize Diagnostics (Logic depends on self._type)

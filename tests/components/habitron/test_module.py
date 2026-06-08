@@ -13,8 +13,8 @@ from custom_components.habitron.module import (
     SmartDimm,
     SmartEKey,
     SmartGSM,
-    SmartIO2,
     SmartInput,
+    SmartIO2,
     SmartNature,
     SmartOutput,
     SmartSensor,
@@ -95,6 +95,7 @@ def test_module_area_uses_router_area_name() -> None:
 def test_module_get_cover_index_paired_outputs() -> None:
     """``get_cover_index`` walks the outputs to map a pair to a cover."""
     from custom_components.habitron.interfaces import IfDescriptor  # noqa: PLC0415
+
     desc = _make_descriptor()
     mod = HbtnModule(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
     # Populate at least two paired outputs (type 1 == standard digital out).
@@ -118,6 +119,7 @@ def test_module_set_default_names_assigns_indexed_names() -> None:
     desc = _make_descriptor()
     mod = HbtnModule(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
     from custom_components.habitron.interfaces import IfDescriptor  # noqa: PLC0415
+
     items = [
         IfDescriptor("", 0, 0, 0),
         IfDescriptor("Custom", 1, 0, 0),
@@ -187,9 +189,7 @@ def test_smart_controller_set_assist_entity() -> None:
 def test_smart_controller_mini_initializes_cleds_and_outputs() -> None:
     """SC Mini wires colour LEDs (cleds) on top of the base lists."""
     desc = _make_descriptor(mtype=b"\x32\x01", name="Mini")
-    mini = SmartControllerMini(
-        desc, MagicMock(), MagicMock(), "HUB-1", _make_comm()
-    )
+    mini = SmartControllerMini(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
     assert mini.type == "Smart Controller Mini"
     assert hasattr(mini, "cleds")
     assert len(mini.cleds) > 0
@@ -320,9 +320,7 @@ def test_smart_controller_touch_update_runs_against_zero_status() -> None:
 def test_smart_controller_mini_update_runs_against_zero_status() -> None:
     """SmartControllerMini.update is exercised against the zero-status block."""
     desc = _make_descriptor(mtype=b"\x32\x01", name="Mini")
-    mini = SmartControllerMini(
-        desc, MagicMock(), MagicMock(), "HUB-1", _make_comm()
-    )
+    mini = SmartControllerMini(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
     mini.status = _ZERO_STATUS
     mini.update(_ZERO_STATUS)
 
@@ -428,9 +426,7 @@ def test_smart_controller_touch_update_runs_against_full_status() -> None:
 def test_smart_controller_mini_update_runs_against_full_status() -> None:
     """SmartControllerMini handles the all-bits-set CLED scenario."""
     desc = _make_descriptor(mtype=b"\x32\x01", name="Mini")
-    mini = SmartControllerMini(
-        desc, MagicMock(), MagicMock(), "HUB-1", _make_comm()
-    )
+    mini = SmartControllerMini(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
     mini.status = _FULL_STATUS
     mini.update(_FULL_STATUS)
 
@@ -640,9 +636,7 @@ def test_smart_controller_mini_update_flag_bit_set() -> None:
     from custom_components.habitron.interfaces import StateDescriptor  # noqa: PLC0415
 
     desc = _make_descriptor(mtype=b"\x32\x01", name="Mini")
-    mini = SmartControllerMini(
-        desc, MagicMock(), MagicMock(), "HUB-1", _make_comm()
-    )
+    mini = SmartControllerMini(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
     mini.flags = [StateDescriptor("flg", 0, 1, 1, False)]
     status = bytearray(_ZERO_STATUS)
     status[MStatIdx.FLAG_LOC] = 0x01
@@ -936,7 +930,9 @@ def test_module_update_falls_back_to_notavailable_counter() -> None:
 # ---------- get_names() line-loop coverage ----------
 
 
-def _build_name_line(sub_code: int, area: int, arg_code: int, text: bytes, lang: int = 1) -> bytes:
+def _build_name_line(
+    sub_code: int, area: int, arg_code: int, text: bytes, lang: int = 1
+) -> bytes:
     """Build one ``Beschriftung`` (event 235) line for the get_names parser.
 
     Layout (read from production code):
@@ -951,9 +947,7 @@ def _build_name_line(sub_code: int, area: int, arg_code: int, text: bytes, lang:
     """
     payload = text + b"\x00"  # text + trailing
     line_len = 8 + len(payload)
-    return bytes(
-        [sub_code, area, 235, arg_code, lang, line_len - 5, 0, 0]
-    ) + payload
+    return bytes([sub_code, area, 235, arg_code, lang, line_len - 5, 0, 0]) + payload
 
 
 def _build_get_names_response(lines: list[bytes]) -> bytes:

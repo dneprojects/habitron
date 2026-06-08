@@ -34,6 +34,7 @@ async def test_get_triggers_filters_inactive_and_finger(
     entry = setup_integration
     smhub = entry.runtime_data
     from homeassistant.helpers import device_registry as dr  # noqa: PLC0415
+
     dev_reg = dr.async_get(hass)
     device = dev_reg.async_get_or_create(
         config_entry_id=entry.entry_id,
@@ -45,7 +46,9 @@ async def test_get_triggers_filters_inactive_and_finger(
         platform="habitron",
         unique_id="test-event-1",
         device_id=device.id,
-        capabilities={"event_types": ["single_press", "long_press", "inactive", "finger"]},
+        capabilities={
+            "event_types": ["single_press", "long_press", "inactive", "finger"]
+        },
     )
 
     triggers = await async_get_triggers(hass, device.id)

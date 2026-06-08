@@ -17,5 +17,9 @@ syrupy>=4.6
 # Runtime dependencies that the integration imports at module level.
 # Mocking covers most external behavior, but the import statements
 # still resolve, so the packages need to be present.
-habitron_client
-apkutils
+habitron_client>=1.0.0
+
+# Lint + type-check tooling. Pinned only loosely; CI uses whatever
+# the resolver lands on for the current Python version.
+ruff>=0.13
+mypy>=1.13

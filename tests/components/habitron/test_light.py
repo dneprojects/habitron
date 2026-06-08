@@ -31,9 +31,13 @@ def test_color_modes_class_level() -> None:
     assert class_attr(SwitchedLight, "_attr_supported_color_modes") == {ColorMode.ONOFF}
     # DimmedOutput / DimmedOutputPush: BRIGHTNESS
     assert class_attr(DimmedOutput, "_attr_color_mode") is ColorMode.BRIGHTNESS
-    assert class_attr(DimmedOutput, "_attr_supported_color_modes") == {ColorMode.BRIGHTNESS}
+    assert class_attr(DimmedOutput, "_attr_supported_color_modes") == {
+        ColorMode.BRIGHTNESS
+    }
     assert class_attr(DimmedOutputPush, "_attr_color_mode") is ColorMode.BRIGHTNESS
-    assert class_attr(DimmedOutputPush, "_attr_supported_color_modes") == {ColorMode.BRIGHTNESS}
+    assert class_attr(DimmedOutputPush, "_attr_supported_color_modes") == {
+        ColorMode.BRIGHTNESS
+    }
     # ColorLed: RGB
     assert class_attr(ColorLed, "_attr_color_mode") is ColorMode.RGB
     assert class_attr(ColorLed, "_attr_supported_color_modes") == {ColorMode.RGB}
@@ -454,7 +458,7 @@ async def test_async_setup_entry_assigns_external_area(hass) -> None:
     router.coord = MagicMock()
     area = MagicMock()
     area.get_name_id = MagicMock(return_value="area_5_id")
-    router.areas = {i: area for i in range(6)}
+    router.areas = dict.fromkeys(range(6), area)
 
     entry = MagicMock()
     entry.runtime_data.router = router

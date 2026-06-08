@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from habitron_client import HabitronTimeoutError
-
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
@@ -59,7 +58,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: HabitronConfigEntry) -> 
         async_setup_services(hass)
 
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-        return True  # noqa: TRY300
+        return True
 
     except (TimeoutError, HabitronTimeoutError) as ex:
         raise ConfigEntryNotReady("Timeout while connecting to SmartHub") from ex

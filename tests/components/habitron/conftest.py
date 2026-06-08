@@ -25,6 +25,7 @@ def class_attr(cls: type, name: str) -> Any:
     instance = cls.__new__(cls)
     return getattr(instance, name)
 
+
 from .const import (
     MOCK_CONFIG_DATA,
     MOCK_CONFIG_OPTIONS,

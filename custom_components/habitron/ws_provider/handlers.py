@@ -15,13 +15,14 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
-
 from homeassistant.components import websocket_api
 from homeassistant.components.camera import (  # type: ignore[attr-defined]
     RTCIceCandidateInit,
     WebRTCCandidate,
 )
-from homeassistant.components.websocket_api import ActiveConnection  # type: ignore[attr-defined]
+from homeassistant.components.websocket_api import (  # type: ignore[attr-defined]
+    ActiveConnection,
+)
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 
@@ -35,7 +36,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 @callback
-def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
+def register_handlers(provider: HabitronWebRTCProvider) -> None:
     """Register every Habitron WebSocket command handler on ``hass``.
 
     All handlers stay as nested closures over ``provider`` so they can
@@ -81,7 +82,9 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
         }
     )
     @websocket_api.async_response  # type: ignore[attr-defined]
-    async def handle_voice_pipeline_status(hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]) -> None:
+    async def handle_voice_pipeline_status(
+        hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
+    ) -> None:
         """Handle request from client to start the voice pipeline."""
         stream_name = provider._get_stream_or_send_error(connection, msg)
         if not stream_name:
@@ -121,7 +124,9 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
         }
     )
     @websocket_api.async_response  # type: ignore[attr-defined]
-    async def handle_voice_pipeline_start(hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]) -> None:
+    async def handle_voice_pipeline_start(
+        hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
+    ) -> None:
         """Handle request from client to start the voice pipeline."""
         stream_name = provider._get_stream_or_send_error(connection, msg)
         if not stream_name:
@@ -212,7 +217,9 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
         }
     )
     @websocket_api.async_response  # type: ignore[attr-defined]  # Use async_response for commands that don't need a result
-    async def handle_voice_audio_chunk(hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]) -> None:
+    async def handle_voice_audio_chunk(
+        hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
+    ) -> None:
         """Handle incoming audio chunks from the client."""
         stream_name = provider._get_stream_or_send_error(connection, msg)
         if not stream_name:
@@ -229,20 +236,18 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
                 audio_data = base64.b64decode(msg["payload"])
                 await queue.put(audio_data)
             except (TypeError, ValueError):
-                _LOGGER.error(
-                    "Failed to decode base64 audio chunk for %s", stream_name
-                )
+                _LOGGER.error("Failed to decode base64 audio chunk for %s", stream_name)
             except asyncio.QueueFull:
-                _LOGGER.warning(
-                    "Audio queue full for %s, dropping chunk", stream_name
-                )
+                _LOGGER.warning("Audio queue full for %s, dropping chunk", stream_name)
         # No result message is sent back for chunks to minimize overhead
 
     @websocket_api.websocket_command(  # type: ignore[attr-defined]
         {vol.Required("type"): "habitron/voice_pipeline_abort"}
     )
     @websocket_api.async_response  # type: ignore[attr-defined]
-    async def handle_voice_pipeline_abort(hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]) -> None:
+    async def handle_voice_pipeline_abort(
+        hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
+    ) -> None:
         """Handle explicit abort from client on timeout."""
         stream_name = provider._get_stream_or_send_error(connection, msg)
         if not stream_name:
@@ -541,9 +546,7 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
             connection.send_result(msg["id"])
         except Exception as e:
             # Handle any errors during the announcement process
-            _LOGGER.exception(
-                "Error processing call_announcement for %s", stream_name
-            )
+            _LOGGER.exception("Error processing call_announcement for %s", stream_name)
             connection.send_result(msg["id"], {"success": False, "error": str(e)})
 
     @websocket_api.websocket_command(  # type: ignore[attr-defined]
@@ -617,9 +620,7 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
 
         success = False
         if player := provider.media_players.get(stream_name):
-            _LOGGER.debug(
-                "Forwarding previous_track command to player %s", player.name
-            )
+            _LOGGER.debug("Forwarding previous_track command to player %s", player.name)
             try:
                 await player.async_media_previous_track()
                 success = True
@@ -646,9 +647,7 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
             return  # Stream unknown, error already sent
 
         payload = msg["payload"]
-        _LOGGER.debug(
-            "Received device state report for %s: %s", stream_name, payload
-        )
+        _LOGGER.debug("Received device state report for %s: %s", stream_name, payload)
 
         module = provider.rtr.get_module_by_stream(stream_name)
         if module:

@@ -37,7 +37,9 @@ def test_translation_keys_set() -> None:
     assert class_attr(MotionSensor, "_attr_translation_key") == "motion"
     assert class_attr(RainSensor, "_attr_translation_key") == "rain"
     assert class_attr(HbtnState, "_attr_translation_key") == "hub_state"
-    assert class_attr(ListeningStatusSensor, "_attr_translation_key") == "listening_status"
+    assert (
+        class_attr(ListeningStatusSensor, "_attr_translation_key") == "listening_status"
+    )
 
 
 def _make_input(name: str = "Sw 1", nmbr: int = 0, type_: int = 2) -> MagicMock:

@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
-
 from datetime import timedelta
+from unittest.mock import MagicMock
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
@@ -19,7 +18,9 @@ from custom_components.habitron.diagnostics import (
 from .const import MOCK_HWTYPE, MOCK_NAME, MOCK_UID, MOCK_VERSION
 
 
-def _module(uid: str = "MOD-1", name: str = "Living room", typ: bytes = b"\x01\x04") -> MagicMock:
+def _module(
+    uid: str = "MOD-1", name: str = "Living room", typ: bytes = b"\x01\x04"
+) -> MagicMock:
     """Build a stub module the diagnostics helper can iterate."""
     m = MagicMock()
     m.uid = uid

@@ -9,10 +9,10 @@ import socket
 from typing import Any
 from urllib.parse import urlparse
 
-# pylint:disable=unused-import
-from habitron_client import test_connection
 import voluptuous as vol
 
+# pylint:disable=unused-import
+from habitron_client import test_connection
 from homeassistant import config_entries, exceptions
 from homeassistant.components import network
 from homeassistant.core import HomeAssistant, callback
@@ -46,7 +46,7 @@ async def _get_local_ip(hass: HomeAssistant) -> str:
     """Get the local IP address using HA network utilities."""
     try:
         return await network.async_get_source_ip(hass, target_ip="8.8.8.8")
-    except Exception:  # pylint: disable=broad-except  # noqa: BLE001
+    except Exception:  # pylint: disable=broad-except
         return "127.0.0.1"
 
 
@@ -128,7 +128,9 @@ class UDPDiscoveryProtocol(asyncio.DatagramProtocol):
             if "host" in resp and "ip" in resp:
                 if not any(d.get("ip") == resp["ip"] for d in self.found_devices):
                     self.found_devices.append(resp)
-        except Exception:  # pylint: disable=broad-except  # noqa: BLE001
+        except Exception:  # pylint: disable=broad-except  # noqa: S110
+            # Malformed discovery responses are routine — best to ignore the
+            # individual packet and keep listening for the rest.
             pass
 
     def error_received(self, exc: Exception) -> None:
@@ -209,9 +211,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if unique_id is None:
             devices = await self._discover_habitron()
-            target_device = next(
-                (d for d in devices if d.get("ip") == host_str), None
-            )
+            target_device = next((d for d in devices if d.get("ip") == host_str), None)
             if target_device:
                 unique_id = target_device.get("serial")
 
@@ -257,7 +257,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             try:
                 info = await validate_input(self.hass, data)
                 return self.async_create_entry(title=info["title"], data=data)
-            except Exception:  # pylint: disable=broad-except  # noqa: BLE001
+            except Exception:  # pylint: disable=broad-except
                 return self.async_abort(reason="unknown")
 
         self._set_confirm_only()
@@ -390,9 +390,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="reconfigure",
             data_schema=vol.Schema(
                 {
-                    vol.Required(
-                        KEY_HOST, default=existing.data.get(KEY_HOST)
-                    ): str,
+                    vol.Required(KEY_HOST, default=existing.data.get(KEY_HOST)): str,
                     vol.Required(
                         KEY_INTERVAL,
                         default=existing.data.get(KEY_INTERVAL, CONF_DEFAULT_INTERVAL),

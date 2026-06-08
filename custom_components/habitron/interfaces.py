@@ -68,9 +68,7 @@ class IfDescriptor:
 class CLedDescriptor(IfDescriptor):
     """Habitron colour-LED descriptor (RGB value list)."""
 
-    def __init__(
-        self, iname: str, inmbr: int, itype: int, ivalue: list[int]
-    ) -> None:
+    def __init__(self, iname: str, inmbr: int, itype: int, ivalue: list[int]) -> None:
         """Initialize interface."""
         super().__init__(iname, inmbr, itype, ivalue[0])
         self.value: list[int] = ivalue

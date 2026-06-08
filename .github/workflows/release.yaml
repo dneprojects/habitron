@@ -11,8 +11,34 @@ permissions:
   contents: write
 
 jobs:
+  # Gate the release on a fresh test run against the version that's about
+  # to ship. This duplicates ``test.yml`` for manifest-touching commits but
+  # gives us a hard guarantee that an automatic release never goes out on
+  # a red main.
+  test:
+    name: Pre-release tests (${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        python-version: ["3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements_test.txt
+      - run: python -m ruff check .
+      - run: python -m ruff format --check .
+      - run: python -m mypy --strict custom_components/habitron
+      - run: python -m pytest --cov --cov-report=term
+
   release:
     name: Create Release
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -48,7 +74,7 @@ jobs:
           git checkout main
           git merge origin/dev
           git push origin main
-      
+
       # Extract notes from changelog.md
       - name: Extract Release Notes
         if: steps.check_tag.outputs.exists == 'false'
@@ -58,7 +84,7 @@ jobs:
           # Look for header "## VERSION" or "## vVERSION"
           # and takes all until next header.
           awk "/^## v?$VERSION/{flag=1; next} /^## /{flag=0} flag" changelog.md > release_notes.md
-          
+
           # Fallback use standard text
           if [ ! -s release_notes.md ]; then
             echo "Release v$VERSION" > release_notes.md

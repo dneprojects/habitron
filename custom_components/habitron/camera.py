@@ -5,11 +5,10 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from webrtc_models import RTCIceCandidateInit
-
 from homeassistant.components.camera import Camera, CameraEntityFeature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from webrtc_models import RTCIceCandidateInit
 
 from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
@@ -99,7 +98,7 @@ class HbtnCam(Camera):
             return await self._provider.async_take_snapshot(
                 stream_name=self._stream_name
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             _LOGGER.warning(
                 "Failed to get snapshot for camera '%s': %s", self._stream_name, e
             )
