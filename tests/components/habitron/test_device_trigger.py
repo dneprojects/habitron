@@ -110,7 +110,14 @@ async def test_attach_trigger_ignores_non_matching_event(
         "entity_id": "event.test2",
         "type": "long_press",
     }
-    unsub = await async_attach_trigger(hass, config, action, {})
+    trigger_info = {
+        "domain": "habitron",
+        "name": "device-trigger",
+        "home_assistant_start": False,
+        "variables": {},
+        "trigger_data": {"id": "trig-1", "idx": "0", "alias": "test-trigger"},
+    }
+    unsub = await async_attach_trigger(hass, config, action, trigger_info)
 
     hass.states.async_set(
         "event.test2",
@@ -134,7 +141,14 @@ async def test_attach_trigger_ignores_entity_removal(
         "entity_id": "event.test3",
         "type": "single_press",
     }
-    unsub = await async_attach_trigger(hass, config, action, {})
+    trigger_info = {
+        "domain": "habitron",
+        "name": "device-trigger",
+        "home_assistant_start": False,
+        "variables": {},
+        "trigger_data": {"id": "trig-1", "idx": "0", "alias": "test-trigger"},
+    }
+    unsub = await async_attach_trigger(hass, config, action, trigger_info)
 
     # Seed an entity and immediately remove it. The removal fires a
     # state_changed event with new_state == None — the trigger must
