@@ -1,61 +1,47 @@
 name: Auto Release from Manifest
 
-# Triggers on every push to dev plus a manual button. The release job
+# Triggers AFTER the Tests workflow completes on dev. The release job
 # checks whether the version currently in manifest.json is already
 # tagged on GitHub and is a no-op when it is — so this workflow is
-# self-healing: if a release run goes red because of a transient
-# issue (missing system lib, flaky test), the next push to dev that
-# turns the tests green also publishes the still-missing release,
-# without anyone having to bump the manifest just to retrigger.
+# self-healing: a release that gets stuck on a transient red CI run
+# is automatically published by the next green ``Tests`` run without
+# anyone having to bump the manifest just to retrigger.
+#
+# ``workflow_dispatch`` is kept so the workflow can also be fired
+# manually from the Actions UI (e.g. after a tag was deleted by
+# hand).
 on:
-  push:
-    branches:
-      - dev
+  workflow_run:
+    workflows: ["Tests"]
+    types: [completed]
+    branches: [dev]
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  # Gate the release on a fresh test run against the version that's about
-  # to ship. This duplicates ``test.yml`` for manifest-touching commits but
-  # gives us a hard guarantee that an automatic release never goes out on
-  # a red main.
-  test:
-    name: Pre-release tests (${{ matrix.python-version }})
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: true
-      matrix:
-        python-version: ["3.14"]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-          cache: pip
-      - run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements_test.txt
-      - run: python -m ruff check .
-      - run: python -m ruff format --check .
-      - run: python -m mypy --strict custom_components/habitron
-      - run: python -m pytest --cov --cov-report=term
-
   release:
     name: Create Release
-    needs: test
     runs-on: ubuntu-latest
+    # Only proceed when triggered manually OR when the upstream Tests
+    # workflow concluded successfully.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # important for merge
+          # workflow_run defaults to the triggering workflow's commit;
+          # be explicit so manual dispatches and rerun behaviour stay
+          # predictable.
+          ref: dev
+          fetch-depth: 0
 
       - name: Get version from manifest
         id: version
         run: |
-          # Reads version from JSON file
           VERSION=$(jq -r '.version' custom_components/habitron/manifest.json)
           echo "Version found: $VERSION"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
@@ -75,23 +61,20 @@ jobs:
         run: |
           git config user.name "GitHub Action Bot"
           git config user.email "action@github.com"
-
-          # Wechsel zu main und merge dev
           git checkout main
           git merge origin/dev
           git push origin main
 
-      # Extract notes from changelog.md
       - name: Extract Release Notes
         if: steps.check_tag.outputs.exists == 'false'
         id: extract_release_notes
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          # Look for header "## VERSION" or "## vVERSION"
-          # and takes all until next header.
+          # Look for header "## VERSION" or "## vVERSION" and take all
+          # lines until the next "## " header.
           awk "/^## v?$VERSION/{flag=1; next} /^## /{flag=0} flag" changelog.md > release_notes.md
 
-          # Fallback use standard text
+          # Fallback if the version isn't in the changelog yet.
           if [ ! -s release_notes.md ]; then
             echo "Release v$VERSION" > release_notes.md
           fi
