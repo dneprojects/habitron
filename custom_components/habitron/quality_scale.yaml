@@ -93,15 +93,13 @@ rules:
       upstream project.
   inject-websession: done
   strict-typing:
-    status: todo
+    status: done
     comment: |
-      ``mypy.ini`` is in place with ``strict = True`` and the necessary
-      ``ignore_missing_imports`` overrides for the upstream
-      ``habitron_client``/``apkutils`` libraries that ship without
-      stubs. Running ``mypy --strict custom_components/habitron`` is
-      part of the migration backlog: ~420 errors remain, predominantly
-      ``no-untyped-def`` on legacy bus-handling functions and a handful
-      of ``attr-defined`` findings that point at real type confusion
-      (``HbtnModule`` vs ``SmartController`` subclass attributes,
-      ``bytes`` vs ``str`` mix-ups) which need code-level fixes rather
-      than annotation changes.
+      ``mypy --strict custom_components/habitron`` reports zero errors
+      across all 33 source files (down from an initial 420). ``mypy.ini``
+      sets ``strict = True`` with ``ignore_missing_imports`` overrides
+      for the upstream ``habitron_client`` and ``apkutils`` libraries,
+      which do not yet ship ``py.typed`` markers. Their PEP 561
+      compliance is an upstream prerequisite for migrating the
+      integration into Home Assistant core, but does not affect the
+      local strict-typing guarantee provided by this integration.
