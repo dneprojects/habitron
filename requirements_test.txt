@@ -21,11 +21,20 @@ habitron_client>=1.0.0
 
 # HA-core transitive dependencies. ``pytest-homeassistant-custom-component``
 # pulls in HA core itself but not the requirements declared by HA core's
-# individual components. The integration imports ``homeassistant.components
-# .camera`` (via ``ws_provider``), whose ``img_util`` module imports
-# ``turbojpeg`` at module load — so PyTurboJPEG must be available for the
-# tests to even collect.
+# individual components. The integration touches several HA components at
+# import time and their module-level imports fail without these wheels:
+#
+#   homeassistant.components.camera        -> PyTurboJPEG
+#   homeassistant.components.tts           -> mutagen
+#   homeassistant.components.conversation  -> hassil (pulled via
+#                                                    assist_pipeline)
+#
+# Versions pinned to whatever the corresponding HA-core component manifest
+# currently requires; the wheel-only install (no system libs) is enough
+# because tests mock the actual codec / NLU surfaces.
 PyTurboJPEG==1.8.3
+mutagen==1.47.0
+hassil==3.4.0
 
 # Lint + type-check tooling. Pinned only loosely; CI uses whatever
 # the resolver lands on for the current Python version.
