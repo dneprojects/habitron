@@ -427,6 +427,8 @@ async def test_validate_input_host_not_found_for_dns_failure(
 
 def test_udp_discovery_protocol_connection_made_sends_broadcast() -> None:
     """``connection_made`` enables broadcast and sends the discovery packet."""
+    import asyncio  # noqa: PLC0415
+
     from custom_components.habitron.config_flow import (  # noqa: PLC0415
         DISCOVERY_MESSAGE,
         DISCOVERY_PORT,
@@ -434,7 +436,7 @@ def test_udp_discovery_protocol_connection_made_sends_broadcast() -> None:
     )
 
     proto = UDPDiscoveryProtocol()
-    transport = MagicMock()
+    transport = MagicMock(spec=asyncio.DatagramTransport)
     sock = MagicMock()
     transport.get_extra_info.return_value = sock
 
@@ -447,10 +449,12 @@ def test_udp_discovery_protocol_connection_made_sends_broadcast() -> None:
 
 def test_udp_discovery_protocol_connection_made_no_socket() -> None:
     """``connection_made`` is robust against a missing socket info."""
+    import asyncio  # noqa: PLC0415
+
     from custom_components.habitron.config_flow import UDPDiscoveryProtocol  # noqa: PLC0415
 
     proto = UDPDiscoveryProtocol()
-    transport = MagicMock()
+    transport = MagicMock(spec=asyncio.DatagramTransport)
     transport.get_extra_info.return_value = None
     proto.connection_made(transport)
     transport.sendto.assert_called()

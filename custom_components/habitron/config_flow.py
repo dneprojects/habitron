@@ -111,6 +111,7 @@ class UDPDiscoveryProtocol(asyncio.DatagramProtocol):
 
     def connection_made(self, transport: asyncio.BaseTransport) -> None:
         """Set up transport for broadcast."""
+        assert isinstance(transport, asyncio.DatagramTransport)
         self.transport = transport
         sock = transport.get_extra_info("socket")
         if sock:

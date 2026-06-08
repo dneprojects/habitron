@@ -26,7 +26,7 @@ async def async_setup_entry(
     hbtn_rt: HbtnRouter = entry.runtime_data.router
     hbtn_cord: DataUpdateCoordinator[None] = hbtn_rt.coord
 
-    new_devices = []
+    new_devices: list[SensorEntity] = []
     for hbt_module in hbtn_rt.modules:
         for mod_sensor in hbt_module.sensors:
             if mod_sensor.name == "Identifier":
@@ -45,7 +45,7 @@ async def async_setup_entry(
         async_add_entities(new_devices)
 
 
-class EKeySensorUsr(CoordinatorEntity, SensorEntity):
+class EKeySensorUsr(CoordinatorEntity[DataUpdateCoordinator[None]], SensorEntity):
     """Representation of a Habitron ekey finger print sensor."""
 
     _attr_has_entity_name = True
@@ -118,7 +118,7 @@ class EKeySensorUsr(CoordinatorEntity, SensorEntity):
         self.async_write_ha_state()
 
 
-class EKeySensorFngr(CoordinatorEntity, SensorEntity):
+class EKeySensorFngr(CoordinatorEntity[DataUpdateCoordinator[None]], SensorEntity):
     """Representation of a Habitron ekey finger print sensor."""
 
     _attr_has_entity_name = True

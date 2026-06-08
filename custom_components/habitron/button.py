@@ -84,7 +84,7 @@ class CollCmdButton(ButtonEntity):
 
     async def async_press(self) -> None:
         """Handle the button press."""
-        await self._module.comm.async_call_coll_command(self._module.id, self._nmbr)
+        await self._module.comm.async_call_coll_command(self._nmbr)
 
 
 class DirCmdButton(ButtonEntity):
@@ -362,7 +362,7 @@ class ResetChannelPowerButton(ButtonEntity):
 
     async def async_press(self) -> None:
         """Handle the button press."""
-        await self._router.comm.async_power_cycle_channel(self._router.id, self._chan)
+        await self._router.comm.async_power_cycle_channel(self._chan)
 
 
 class SpeechButton(ButtonEntity):
@@ -382,7 +382,9 @@ class SpeechButton(ButtonEntity):
         self._module = module
         self._stream_name = module.stream_name
         self._provider = module.comm.router.smhub.ws_provider
-        self._active_ws_connections = self._provider.active_ws_connections
+        self._active_ws_connections = (
+            self._provider.active_ws_connections if self._provider else {}
+        )
         self._attr_unique_id = f"Mod_{self._module.uid}_{self._name}"
         self._attr_name = "Activate voice input"
 
@@ -399,9 +401,12 @@ class SpeechButton(ButtonEntity):
         ws_connection = self._active_ws_connections.get(self._stream_name)
 
         if ws_connection:
-            if not self._provider.assist_satellites.get(
-                self._stream_name
-            ).recognition_disabled:
+            satellite = (
+                self._provider.assist_satellites.get(self._stream_name)
+                if self._provider
+                else None
+            )
+            if satellite is not None and not satellite.recognition_disabled:
                 ws_connection.send_message(
                     {
                         "type": "habitron/voice_activate_request",

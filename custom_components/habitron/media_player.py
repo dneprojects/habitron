@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 import logging
 from typing import TYPE_CHECKING, Any
 
 from aiohttp import ClientError, ClientSession
 
 from homeassistant.components import media_source
-from homeassistant.components.media_player import (
+from datetime import timedelta
+
+from homeassistant.components.media_player import (  # type: ignore[attr-defined]
     BrowseMedia,
     MediaPlayerEnqueue,
     MediaPlayerEntity,
@@ -20,7 +23,7 @@ from homeassistant.components.media_player import (
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.event import async_track_time_interval, timedelta
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import DOMAIN
@@ -119,7 +122,7 @@ class HbtnMediaPlayer(MediaPlayerEntity, RestoreEntity):
         self._source_player_entity_id: str | None = None
         self._internal_auth_token: str
         self._track_mode: str = "single"  # 'single' or 'multi'
-        self._poll_remove = None
+        self._poll_remove: Callable[[], None] | None = None
 
     @property
     def stream_name(self) -> str:
@@ -175,7 +178,7 @@ class HbtnMediaPlayer(MediaPlayerEntity, RestoreEntity):
 
         return base_features
 
-    async def get_token(self):
+    async def get_token(self) -> None:
         """Get an internal Home Assistant auth token for API calls."""
         owner = await self.hass.auth.async_get_owner()
         if not owner:
@@ -189,14 +192,14 @@ class HbtnMediaPlayer(MediaPlayerEntity, RestoreEntity):
         )
 
     async def _async_resolve_tts_url(
-        self, session: ClientSession, url: str, payload: dict
+        self, session: ClientSession, url: str, payload: dict[str, Any]
     ) -> str | int | None:
         """Make the API call to resolve the TTS URL."""
         headers = {"Authorization": f"Bearer {self._internal_auth_token}"}
         async with session.post(url, json=payload, headers=headers) as response:
             if response.status == 200:
                 data = await response.json()
-                resolved_path = data.get("path")
+                resolved_path: str | None = data.get("path")
                 _LOGGER.info("Successfully resolved TTS path: %s", resolved_path)
                 return resolved_path
             # Return status code for error handling (e.g., 401 Unauthorized)
@@ -300,7 +303,7 @@ class HbtnMediaPlayer(MediaPlayerEntity, RestoreEntity):
                     "[%s] Player is busy or not idle, queueing track", self.entity_id
                 )
 
-    async def _poll_ma_metadata(self, _now) -> None:
+    async def _poll_ma_metadata(self, _now: Any) -> None:
         """Log metadata from Music Assistant if available."""
 
         if self._attr_state != MediaPlayerState.PLAYING:
@@ -345,14 +348,16 @@ class HbtnMediaPlayer(MediaPlayerEntity, RestoreEntity):
             },
         )
 
-    async def _stop_proxy_polling(self):
+    async def _stop_proxy_polling(self) -> None:
         """Beende das Polling, falls aktiv."""
         if self._poll_remove:
             self._poll_remove()  # deregister the listener
             self._poll_remove = None
             _LOGGER.debug("[%s] Stopped proxy metadata polling", self.entity_id)
 
-    async def _extract_metadata(self, media_id: str, kwargs: dict[str, Any]) -> dict:
+    async def _extract_metadata(
+        self, media_id: str, kwargs: dict[str, Any]
+    ) -> dict[str, Any]:
         """Helper to extract metadata from kwargs or browse_media."""
 
         metadata_in = kwargs.get("extra", {}).get("metadata", {})
@@ -725,8 +730,11 @@ class HbtnMediaPlayer(MediaPlayerEntity, RestoreEntity):
             return None, None
 
     async def async_get_browse_image(
-        self, media_content_type, media_content_id, media_image_id=None
-    ):
+        self,
+        media_content_type: str,
+        media_content_id: str,
+        media_image_id: str | None = None,
+    ) -> tuple[bytes | None, str | None]:
         """Serve album art. Returns (content, content_type)."""
         image_url = self._attr_media_image_url
         if not image_url:

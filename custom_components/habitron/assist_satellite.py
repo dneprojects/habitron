@@ -137,8 +137,14 @@ class HbtnAssistSat(AssistSatelliteEntity):
     async def async_announce(self, announcement: AssistSatelliteAnnouncement) -> None:
         """Sends an announcement to the device.."""
         _LOGGER.debug("Sending media URL to Flutter client: %s", announcement.media_id)
+        media_player = self._module.media_player
+        if media_player is None:
+            _LOGGER.warning(
+                "No media player available for %s, cannot announce", self._stream_name
+            )
+            return
         if announcement.preannounce_media_id:
-            media_url = await self._module.media_player.process_media_id(
+            media_url = await media_player.process_media_id(
                 announcement.preannounce_media_id
             )
             await self._provider.async_send_json_message(
@@ -150,9 +156,7 @@ class HbtnAssistSat(AssistSatelliteEntity):
             )
             await asyncio.sleep(0.2)
 
-        media_url = await self._module.media_player.process_media_id(
-            announcement.media_id
-        )
+        media_url = await media_player.process_media_id(announcement.media_id)
         await self._provider.async_send_json_message(
             self._stream_name,
             {
@@ -163,13 +167,15 @@ class HbtnAssistSat(AssistSatelliteEntity):
 
     # The following methods are required by the base class but can be minimal
     # if your device doesn't support on-device wake word or VAD configuration.
-    async def async_get_configuration(self) -> AssistSatelliteConfiguration | None:
+    @callback
+    def async_get_configuration(self) -> AssistSatelliteConfiguration:
         """Return the current pipeline configuration for this satellite."""
-
         wake_word = AssistSatelliteWakeWord("ok_home", "OK, home", ["de"])
         return AssistSatelliteConfiguration([wake_word], ["OK, home"], 1)
 
-    async def async_set_configuration(self, config: dict[str, Any]) -> None:
+    async def async_set_configuration(
+        self, config: AssistSatelliteConfiguration
+    ) -> None:
         """Set the pipeline configuration for this satellite."""
 
     async def respond_no_text_recognized(self) -> None:

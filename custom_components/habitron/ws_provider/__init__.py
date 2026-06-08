@@ -16,7 +16,9 @@ level ``async_register_webrtc_provider`` from the camera component) from
 
 from __future__ import annotations
 
-from homeassistant.components.camera import async_register_webrtc_provider
+from homeassistant.components.camera import (  # type: ignore[attr-defined]
+    async_register_webrtc_provider,
+)
 
 from .provider import HabitronWebRTCProvider
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from homeassistant.components.climate import (
+from homeassistant.components.climate import (  # type: ignore[attr-defined]
     ClimateEntity,
     ClimateEntityFeature,
     HVACAction,
@@ -55,7 +55,7 @@ async def async_setup_entry(
 
                 # Logic to monitor and toggle the second entity
                 @callback
-                def clean_enable_logic(module=hbt_module):
+                def clean_enable_logic(module: HbtnModule = hbt_module) -> None:
                     registry = er.async_get(hass)
                     u_id = f"Mod_{module.uid}_climate_2"
                     entity_id = registry.async_get_entity_id("climate", DOMAIN, u_id)
@@ -88,7 +88,7 @@ async def async_setup_entry(
         async_add_entities(new_devices)
 
 
-class HbtnClimate(CoordinatorEntity, ClimateEntity):
+class HbtnClimate(CoordinatorEntity[DataUpdateCoordinator[None]], ClimateEntity):
     """Representation of habitron climate entities."""
 
     _attr_has_entity_name = True

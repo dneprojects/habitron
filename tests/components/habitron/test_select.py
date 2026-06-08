@@ -174,7 +174,7 @@ async def test_hbtn_select_alarm_mode_select_router_path() -> None:
     coord = MagicMock()
     entity = HbtnSelectAlarmMode(0, rt, coord, 0)
     await entity.async_select_option("on")
-    rt.comm.async_set_alarm_mode.assert_awaited_with(rt.id, 0, True)
+    rt.comm.async_set_alarm_mode.assert_awaited_with(0, True)
 
 
 async def test_hbtn_select_alarm_mode_select_module_path() -> None:
@@ -246,7 +246,7 @@ async def test_hbtn_select_group_mode_select_router_path() -> None:
     coord = MagicMock()
     entity = HbtnSelectGroupMode(0, rt, coord, 0)
     await entity.async_select_option("absent")
-    rt.comm.async_set_group_mode.assert_awaited_with(rt.id, 0, 16)
+    rt.comm.async_set_group_mode.assert_awaited_with(0, 16)
 
 
 async def test_hbtn_select_group_mode_select_module_path() -> None:
