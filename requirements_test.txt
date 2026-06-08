@@ -26,15 +26,18 @@ habitron_client>=1.0.0
 #
 #   homeassistant.components.camera        -> PyTurboJPEG
 #   homeassistant.components.tts           -> mutagen
-#   homeassistant.components.conversation  -> hassil (pulled via
-#                                                    assist_pipeline)
+#   homeassistant.components.ffmpeg        -> ha-ffmpeg
+#   homeassistant.components.conversation  -> hassil + home-assistant-intents
+#                                             (pulled via assist_pipeline)
 #
 # Versions pinned to whatever the corresponding HA-core component manifest
 # currently requires; the wheel-only install (no system libs) is enough
 # because tests mock the actual codec / NLU surfaces.
 PyTurboJPEG==1.8.3
 mutagen==1.47.0
-hassil==3.4.0
+ha-ffmpeg==3.2.2
+hassil==3.5.0
+home-assistant-intents==2026.6.1
 
 # Lint + type-check tooling. Pinned only loosely; CI uses whatever
 # the resolver lands on for the current Python version.
