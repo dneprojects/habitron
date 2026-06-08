@@ -25,6 +25,7 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
 )
 
+from ._axml import read_apk_version_name
 from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
 from .module import HbtnModule
@@ -97,57 +98,44 @@ class SCTouchAppUpdate(UpdateEntity):
         await self.async_update()
 
     def scan_firmware_dir_blocking(self) -> tuple[str | None, str | None]:
-        """Blocking job to scan for APK files."""
+        """Find the newest ``sctouch_*.apk`` in the firmware directory.
 
-        import apkutils  # noqa: PLC0415
-
+        Returns ``(version, filename)`` of the highest version, or
+        ``(None, None)`` if the directory is missing, empty, or
+        contains no parseable APKs.
+        """
         if not self.firmware_dir.is_dir():
             _LOGGER.warning("Firmware directory not found: %s", self.firmware_dir)
             return None, None
 
         latest_version = parse_version("0.0.0")
-        latest_filename = None
+        latest_filename: str | None = None
 
         try:
             for file_path in self.firmware_dir.iterdir():
-                if file_path.name.startswith("sctouch_") and file_path.suffix == ".apk":
-                    # Mute axml log noise
-                    axml_logger = logging.getLogger("axml")
-                    original_level = axml_logger.level
-                    axml_logger.setLevel(logging.WARNING)
-
-                    version_name = None
-                    apk = None
-                    try:
-                        apk = apkutils.APK.from_file(str(file_path))
-                        apk.get_manifest()
-                        version_name = apk.version_name
-                        _LOGGER.debug(
-                            "Parsed APK %s, found version %s",
-                            file_path.name,
-                            version_name,
-                        )
-                    except Exception as e:  # noqa: BLE001
-                        _LOGGER.warning("Failed to parse APK %s: %s", file_path.name, e)
-                    finally:
-                        if apk:
-                            apk.close()
-                        axml_logger.setLevel(original_level)
-                    # --- End of suppression ---
-
-                    if version_name:
-                        apk_version_obj = parse_version(str(version_name))
-                        if apk_version_obj > latest_version:
-                            latest_version = apk_version_obj
-                            latest_filename = file_path.name
-
-            if latest_filename:
-                return str(latest_version), latest_filename
-
-        except Exception as e:  # noqa: BLE001
+                if not (
+                    file_path.name.startswith("sctouch_")
+                    and file_path.suffix == ".apk"
+                ):
+                    continue
+                version_name = read_apk_version_name(file_path)
+                if version_name is None:
+                    _LOGGER.warning("Could not read version from %s", file_path.name)
+                    continue
+                _LOGGER.debug(
+                    "Parsed APK %s, found version %s", file_path.name, version_name
+                )
+                apk_version_obj = parse_version(version_name)
+                if apk_version_obj > latest_version:
+                    latest_version = apk_version_obj
+                    latest_filename = file_path.name
+        except OSError as e:
             _LOGGER.error("Error scanning firmware directory: %s", e)
+            return None, None
 
-        return None, None
+        if latest_filename is None:
+            return None, None
+        return str(latest_version), latest_filename
 
     def _update_path(self) -> None:
         """Determine firmware path based on environment."""

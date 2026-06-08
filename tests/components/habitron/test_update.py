@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -222,37 +221,32 @@ def test_scan_firmware_dir_finds_latest_apk(tmp_path: Path) -> None:
     """The scanner picks the highest sctouch_*.apk version it can parse."""
     app = _make_app()
     app.firmware_dir = tmp_path
-    (tmp_path / "sctouch_1.0.0.apk").touch()
-    (tmp_path / "sctouch_2.5.0.apk").touch()
+    (tmp_path / "sctouch_v1.0.0.apk").touch()
+    (tmp_path / "sctouch_v2.5.0.apk").touch()
     (tmp_path / "other.apk").touch()  # ignored — doesn't start with sctouch_
 
-    def _fake_apk_factory(file_path):
-        apk = MagicMock()
-        if "2.5.0" in file_path:
-            apk.version_name = "2.5.0"
-        else:
-            apk.version_name = "1.0.0"
-        apk.get_manifest = MagicMock()
-        apk.close = MagicMock()
-        return apk
+    def _fake_version(path: Path) -> str:
+        return "2.5.0" if "2.5.0" in path.name else "1.0.0"
 
-    apk_module = MagicMock()
-    apk_module.APK.from_file = MagicMock(side_effect=_fake_apk_factory)
-    with patch.dict("sys.modules", {"apkutils": apk_module}):
+    with patch(
+        "custom_components.habitron.update.read_apk_version_name",
+        side_effect=_fake_version,
+    ):
         version, filename = app.scan_firmware_dir_blocking()
     assert version == "2.5.0"
-    assert filename == "sctouch_2.5.0.apk"
+    assert filename == "sctouch_v2.5.0.apk"
 
 
-def test_scan_firmware_dir_handles_parse_failure(tmp_path: Path) -> None:
-    """A broken APK is logged + skipped without failing the entire scan."""
+def test_scan_firmware_dir_handles_unreadable_apk(tmp_path: Path) -> None:
+    """An APK whose version can't be read is logged + skipped."""
     app = _make_app()
     app.firmware_dir = tmp_path
-    (tmp_path / "sctouch_1.0.0.apk").touch()
+    (tmp_path / "sctouch_v1.0.0.apk").touch()
 
-    apk_module = MagicMock()
-    apk_module.APK.from_file = MagicMock(side_effect=RuntimeError("bad apk"))
-    with patch.dict("sys.modules", {"apkutils": apk_module}):
+    with patch(
+        "custom_components.habitron.update.read_apk_version_name",
+        return_value=None,
+    ):
         version, filename = app.scan_firmware_dir_blocking()
     assert version is None
     assert filename is None
@@ -264,27 +258,9 @@ def test_scan_firmware_dir_handles_iter_error(tmp_path: Path) -> None:
     app.firmware_dir = MagicMock()
     app.firmware_dir.is_dir = MagicMock(return_value=True)
     app.firmware_dir.iterdir = MagicMock(side_effect=OSError("permission"))
-    apk_module = MagicMock()
-    with patch.dict("sys.modules", {"apkutils": apk_module}):
-        version, filename = app.scan_firmware_dir_blocking()
+    version, filename = app.scan_firmware_dir_blocking()
     assert version is None
     assert filename is None
-
-
-def test_scan_firmware_dir_restores_axml_logger_level(tmp_path: Path) -> None:
-    """The scanner restores axml's original log level even after exceptions."""
-    app = _make_app()
-    app.firmware_dir = tmp_path
-    (tmp_path / "sctouch_1.apk").touch()
-    axml = logging.getLogger("axml")
-    axml.setLevel(logging.DEBUG)
-
-    apk_module = MagicMock()
-    apk_module.APK.from_file = MagicMock(side_effect=RuntimeError("boom"))
-    with patch.dict("sys.modules", {"apkutils": apk_module}):
-        app.scan_firmware_dir_blocking()
-    # The "axml" logger's DEBUG level is restored after the scan.
-    assert axml.level == logging.DEBUG
 
 
 # ---------- async_update ----------
