@@ -19,6 +19,14 @@ syrupy>=4.6
 # still resolve, so the packages need to be present.
 habitron_client>=1.0.0
 
+# HA-core transitive dependencies. ``pytest-homeassistant-custom-component``
+# pulls in HA core itself but not the requirements declared by HA core's
+# individual components. The integration imports ``homeassistant.components
+# .camera`` (via ``ws_provider``), whose ``img_util`` module imports
+# ``turbojpeg`` at module load — so PyTurboJPEG must be available for the
+# tests to even collect.
+PyTurboJPEG==1.8.3
+
 # Lint + type-check tooling. Pinned only loosely; CI uses whatever
 # the resolver lands on for the current Python version.
 ruff>=0.13
