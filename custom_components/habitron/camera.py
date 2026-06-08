@@ -36,7 +36,7 @@ async def async_setup_entry(
         return
     provider: HabitronWebRTCProvider = smhub.ws_provider
 
-    new_devices = []
+    new_devices: list[Camera] = []
     for hbt_module in hbtn_rt.modules:
         if hbt_module.mod_type == "Smart Controller Touch":
             new_devices.append(

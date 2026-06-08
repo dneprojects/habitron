@@ -101,7 +101,8 @@ def _primary_hub(hass: HomeAssistant) -> SmartHub:
             len(entries),
             entries[0].entry_id,
         )
-    return entries[0].runtime_data
+    hub: SmartHub = entries[0].runtime_data
+    return hub
 
 
 async def _async_restart_hub(call: ServiceCall) -> None:
@@ -155,14 +156,14 @@ async def _async_save_router_status(call: ServiceCall) -> None:
 
 async def _async_update_entity(call: ServiceCall) -> None:
     """Forward an entity-state update event to the matching hub."""
-    hub_id = call.data.get(HUB_UID)
-    mod_id = call.data.get(MOD_NMBR)
-    evnt = call.data.get(EVNT_TYPE)
-    arg1 = call.data.get(EVNT_ARG1)
-    arg2 = call.data.get(EVNT_ARG2)
-    arg3 = call.data.get(EVNT_ARG3, 0)
-    arg4 = call.data.get(EVNT_ARG4, 0)
-    arg5 = call.data.get(EVNT_ARG5, 0)
+    hub_id: str = call.data[HUB_UID]
+    mod_id: int = call.data[MOD_NMBR]
+    evnt: int = call.data[EVNT_TYPE]
+    arg1: int = call.data[EVNT_ARG1]
+    arg2: int = call.data[EVNT_ARG2]
+    arg3: int = call.data.get(EVNT_ARG3, 0)
+    arg4: int = call.data.get(EVNT_ARG4, 0)
+    arg5: int = call.data.get(EVNT_ARG5, 0)
     for entry in call.hass.config_entries.async_loaded_entries(DOMAIN):
         hub: SmartHub = entry.runtime_data
         if hub.host == hub_id:

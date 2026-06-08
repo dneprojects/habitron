@@ -139,7 +139,7 @@ async def test_reset_channel_power_button_press_forwards_channel() -> None:
     rt = _make_router()
     btn = ResetChannelPowerButton(rt, 3)
     await btn.async_press()
-    rt.comm.async_power_cycle_channel.assert_awaited_with(rt.id, 3)
+    rt.comm.async_power_cycle_channel.assert_awaited_with(3)
 
 
 def test_restart_hub_button_unique_id_contains_hub_uid() -> None:
@@ -186,7 +186,7 @@ async def test_coll_cmd_button_press_forwards() -> None:
     coll.name = "All off"
     btn = CollCmdButton(coll, mod)
     await btn.async_press()
-    mod.comm.async_call_coll_command.assert_awaited_with(7, 1)
+    mod.comm.async_call_coll_command.assert_awaited_with(1)
 
 
 def test_dir_cmd_button_device_info_and_name() -> None:

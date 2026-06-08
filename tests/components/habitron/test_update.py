@@ -162,7 +162,7 @@ def test_sc_touch_release_notes_reports_latest_version() -> None:
     """``release_notes`` exposes the cached latest version string."""
     app = _make_app()
     app._attr_latest_version = "2.0.0"
-    assert "2.0.0" in app.release_notes
+    assert "2.0.0" in app.release_notes()
 
 
 async def test_sc_touch_async_added_to_hass_triggers_update() -> None:
@@ -474,7 +474,7 @@ async def test_hbtn_module_update_install_for_module() -> None:
         "custom_components.habitron.update.sleep", new=AsyncMock()
     ):
         await entity.async_install(version="9.9.9", backup=False)
-    entity._module.comm.update_firmware.assert_awaited_with(100, 5)
+    entity._module.comm.update_firmware.assert_awaited_with(105)
     assert entity._module.sw_version == "9.9.9"
     assert entity.flash_in_progress is False
 
@@ -489,7 +489,7 @@ async def test_hbtn_module_update_install_for_router() -> None:
         "custom_components.habitron.update.sleep", new=AsyncMock()
     ):
         await entity.async_install(version="9.9.9", backup=False)
-    rt.comm.update_firmware.assert_awaited_with(rt.id, 0)
+    rt.comm.update_firmware.assert_awaited_with(rt.id)
     assert rt.version == "9.9.9"
 
 

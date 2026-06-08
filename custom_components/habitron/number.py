@@ -31,7 +31,7 @@ async def async_setup_entry(
     hbtn_rt: HbtnRouter = entry.runtime_data.router
     hbtn_cord = hbtn_rt.coord
 
-    new_devices = []
+    new_devices: list[NumberEntity] = []
     for hbt_module in hbtn_rt.modules:
         for set_val in hbt_module.setvalues:
             new_devices.append(
@@ -69,7 +69,7 @@ async def async_setup_entry(
                         )
 
 
-class HbtnSetTemperature(CoordinatorEntity, NumberEntity):
+class HbtnSetTemperature(CoordinatorEntity[DataUpdateCoordinator[None]], NumberEntity):
     """Representation of a input number."""
 
     _attr_has_entity_name = True
@@ -79,7 +79,13 @@ class HbtnSetTemperature(CoordinatorEntity, NumberEntity):
     _attr_native_step = 0.5
     _attr_mode = NumberMode.BOX
 
-    def __init__(self, setval, module, coord, idx) -> None:
+    def __init__(
+        self,
+        setval: IfDescriptor,
+        module: HbtnModule,
+        coord: DataUpdateCoordinator[None],
+        idx: int,
+    ) -> None:
         """Initialize a Habitron set value, pass coordinator to CoordinatorEntity."""
         super().__init__(coord, context=idx)
         self.idx = idx
@@ -119,7 +125,7 @@ class HbtnSetTemperature(CoordinatorEntity, NumberEntity):
         await self.coordinator.async_request_refresh()
 
 
-class HbtnAnalogOutput(CoordinatorEntity, NumberEntity):
+class HbtnAnalogOutput(CoordinatorEntity[DataUpdateCoordinator[None]], NumberEntity):
     """Representation of an analog output number."""
 
     _attr_has_entity_name = True

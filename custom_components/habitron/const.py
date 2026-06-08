@@ -303,7 +303,9 @@ class SMirrIdx:
 class ModuleDescriptor:
     """Habitron modules descriptor."""
 
-    def __init__(self, uid, addr, mtype, name, group) -> None:
+    def __init__(
+        self, uid: str, addr: int, mtype: bytes, name: str, group: int
+    ) -> None:
         """Initialize descriptor.
 
         uid: unique id string, derived from hub's mac + rt uid

@@ -7,6 +7,7 @@ import hashlib
 import logging
 from pathlib import Path
 import shutil
+from typing import Any
 
 from packaging.version import parse as parse_version
 
@@ -19,11 +20,15 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.update_coordinator import (
+    CoordinatorEntity,
+    DataUpdateCoordinator,
+)
 
 from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
-from .router import HbtnModule, HbtnRouter
+from .module import HbtnModule
+from .router import HbtnRouter
 
 PARALLEL_UPDATES = 1
 
@@ -39,7 +44,7 @@ async def async_setup_entry(
     hbtn_rt: HbtnRouter = entry.runtime_data.router
     hbtn_cord = hbtn_rt.coord
 
-    new_devices = []
+    new_devices: list[UpdateEntity] = []
     # Add router update entity
     new_devices.append(HbtnModuleUpdate(hbtn_rt, hbtn_cord, len(new_devices)))
 
@@ -91,7 +96,7 @@ class SCTouchAppUpdate(UpdateEntity):
         )
         await self.async_update()
 
-    def scan_firmware_dir_blocking(self):
+    def scan_firmware_dir_blocking(self) -> tuple[str | None, str | None]:
         """Blocking job to scan for APK files."""
 
         import apkutils  # noqa: PLC0415
@@ -144,7 +149,7 @@ class SCTouchAppUpdate(UpdateEntity):
 
         return None, None
 
-    def _update_path(self):
+    def _update_path(self) -> None:
         """Determine firmware path based on environment."""
         base_path = Path(self._hass.config.path())
         if self._router.smhub.addon_slug:
@@ -191,7 +196,7 @@ class SCTouchAppUpdate(UpdateEntity):
         public_dir = config_dir / "www" / "firmware"
         public_file = public_dir / filename
 
-        def _copy_job():
+        def _copy_job() -> tuple[str | None, str | None]:
             try:
                 public_dir.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(source_file, public_file)
@@ -209,8 +214,11 @@ class SCTouchAppUpdate(UpdateEntity):
 
         return await self._hass.async_add_executor_job(_copy_job)
 
-    async def async_install(self, version: str | None, backup: bool) -> None:
+    async def async_install(
+        self, version: str | None, backup: bool, **kwargs: Any
+    ) -> None:
         """Trigger update on the mobile client."""
+        del version, backup, kwargs
         module_name = getattr(self._module, "name", self._module.uid)
 
         if not self._attr_latest_version:
@@ -218,10 +226,15 @@ class SCTouchAppUpdate(UpdateEntity):
 
         stream_name = self._module.stream_name
         provider = self._router.smhub.ws_provider
+        if provider is None:
+            raise HomeAssistantError("WebRTC provider not available")
 
         if not provider.active_ws_connections.get(stream_name):
             _LOGGER.error("Client for %s is not connected", module_name)
             raise HomeAssistantError(f"Client {module_name} not connected")
+
+        if self._latest_apk_filename is None:
+            raise HomeAssistantError("No APK filename available")
 
         url, checksum = await self._copy_apk_to_www(self._latest_apk_filename)
         if not url:
@@ -238,13 +251,12 @@ class SCTouchAppUpdate(UpdateEntity):
             stream_name, {"type": "habitron/update_available", "payload": payload}
         )
 
-    @property
     def release_notes(self) -> str | None:
         """Return release notes."""
         return f"Latest APK version: {self._attr_latest_version}"
 
 
-class HbtnModuleUpdate(CoordinatorEntity, UpdateEntity):
+class HbtnModuleUpdate(CoordinatorEntity[DataUpdateCoordinator[None]], UpdateEntity):
     """Module firmware update entity."""
 
     _attr_device_class = UpdateDeviceClass.FIRMWARE
@@ -257,11 +269,16 @@ class HbtnModuleUpdate(CoordinatorEntity, UpdateEntity):
     # firmware bumped on the device shows up without an HA reload.
     _attr_should_poll = True
 
-    def __init__(self, module, coord, idx) -> None:
+    def __init__(
+        self,
+        module: HbtnModule | HbtnRouter,
+        coord: DataUpdateCoordinator[None],
+        idx: int,
+    ) -> None:
         """Initialize entity."""
         super().__init__(coord)
         self.idx = idx
-        self._module = module
+        self._module: HbtnModule | HbtnRouter = module
         self._attr_name = "Firmware"
         self._attr_unique_id = f"Mod_{self._module.uid}_update"
         self.flash_in_progress = False
@@ -276,19 +293,21 @@ class HbtnModuleUpdate(CoordinatorEntity, UpdateEntity):
         """Return if update is in progress."""
         return self.flash_in_progress
 
-    async def async_install(self, version: str | None, backup: bool) -> None:
+    async def async_install(
+        self, version: str | None, backup: bool, **kwargs: Any
+    ) -> None:
         """Start firmware update."""
+        del backup, kwargs
         self.flash_in_progress = True
         self.async_write_ha_state()
         await sleep(0.1)
         try:
             if isinstance(self._module, HbtnRouter):
-                await self._module.comm.update_firmware(self._module.id, 0)
-                self._module.version = version
+                await self._module.comm.update_firmware(self._module.id)
+                self._module.version = version or ""
             else:
-                addr = int(self._module.mod_addr / 100) * 100
-                await self._module.comm.update_firmware(addr, self._module.raddr)
-                self._module.sw_version = version
+                await self._module.comm.update_firmware(self._module.mod_addr)
+                self._module.sw_version = version or ""
         finally:
             self.flash_in_progress = False
             await self.async_update()

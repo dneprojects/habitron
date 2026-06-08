@@ -18,7 +18,8 @@ from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
 from .module import HbtnModule
 from .router import AlarmMode, DaytimeMode, HbtnRouter
-from .smart_hub import LoggingLevels
+from .interfaces import IfDescriptor
+from .smart_hub import LoggingLevels, SmartHub
 
 PARALLEL_UPDATES = 1
 
@@ -33,7 +34,7 @@ async def async_setup_entry(
     hbtn_cord: DataUpdateCoordinator[None] = hbtn_rt.coord
     smhub = entry.runtime_data
 
-    new_devices = []
+    new_devices: list[SelectEntity] = []
     for hbt_module in hbtn_rt.modules:
         if hbt_module.mod_type[:16] == "Smart Controller":
             # Mode setting is per group, entities linked to smart controllers only
@@ -73,7 +74,7 @@ async def async_setup_entry(
         async_add_entities(new_devices)
 
 
-class HbtnMode(CoordinatorEntity, SelectEntity):
+class HbtnMode(CoordinatorEntity[DataUpdateCoordinator[None]], SelectEntity):
     """Representation of a input select for Habitron modes."""
 
     _attr_has_entity_name = True
@@ -88,10 +89,9 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
         """Initialize a Habitron mode, pass coordinator to CoordinatorEntity."""
         super().__init__(coord, context=idx)
         self.idx = idx
-        if isinstance(module, int):
-            self._module = hbtnr
-        else:
-            self._module = module
+        self._module: HbtnModule | HbtnRouter = (
+            hbtnr if isinstance(module, int) else module
+        )
         self._mode = (
             int(hbtnr.mode.value) if isinstance(module, int) else int(module.mode.value)
         )
@@ -99,7 +99,7 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
         self.hbtnr = hbtnr
         self._attr_translation_key = "habitron_mode"
         self._value = 0
-        self._enum = DaytimeMode
+        self._enum: type[Enum] = DaytimeMode
         self._mask: int = 0
 
     @property
@@ -131,14 +131,6 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
         """Return the current mode name."""
         return self._current_option
 
-    @property
-    def state(self) -> str | None:
-        """Return the entity state."""
-        current_option = self._current_option
-        if current_option is None or current_option not in self.options:
-            return None
-        return current_option
-
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator, get current module mode."""
@@ -158,7 +150,8 @@ class HbtnMode(CoordinatorEntity, SelectEntity):
         mode_val = self._enum[option].value
         self._mode = (int(self._module.mode.value) & (0xFF - self._mask)) + mode_val
         if isinstance(self._module, HbtnRouter):
-            await self.hbtnr.comm.async_set_group_mode(self.hbtnr.id, 0, self._mode)
+            # Router-level mode change targets group 0.
+            await self.hbtnr.comm.async_set_group_mode(0, self._mode)
         else:
             await self._module.comm.async_set_group_mode(self._module.group, self._mode)
 
@@ -233,10 +226,9 @@ class HbtnSelectAlarmMode(HbtnMode):
 
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
-        set_val = self._enum[option].value > 0
+        set_val = bool(self._enum[option].value > 0)
         if isinstance(self._module, HbtnRouter):
-            # router
-            await self.hbtnr.comm.async_set_alarm_mode(self.hbtnr.id, 0, set_val)
+            await self.hbtnr.comm.async_set_alarm_mode(0, set_val)
         else:
             await self._module.comm.async_set_alarm_mode(self._module.group, set_val)
 
@@ -244,7 +236,13 @@ class HbtnSelectAlarmMode(HbtnMode):
 class HbtnSelectGroupMode(HbtnMode):
     """Group mode object."""
 
-    def __init__(self, module, hbtnr, coord, idx) -> None:
+    def __init__(
+        self,
+        module: int | HbtnModule,
+        hbtnr: HbtnRouter,
+        coord: DataUpdateCoordinator[None],
+        idx: int,
+    ) -> None:
         """Initialize group mode selector."""
         super().__init__(module, hbtnr, coord, idx)
         self._mask = 0xF0
@@ -258,7 +256,7 @@ class HbtnSelectGroupMode(HbtnMode):
         if user1_name == user2_name:
             # e.g. both "UNBEKANNT"
             user2_name += "2"
-        group_enum = Enum(
+        group_enum = Enum(  # type: ignore[misc]
             value="group_enum",
             names=[
                 ("absent", 16),
@@ -287,8 +285,7 @@ class HbtnSelectGroupMode(HbtnMode):
         """Change the selected option."""
         set_val = self._enum[option].value
         if isinstance(self._module, HbtnRouter):
-            # router
-            await self.hbtnr.comm.async_set_group_mode(self.hbtnr.id, 0, set_val)
+            await self.hbtnr.comm.async_set_group_mode(0, set_val)
         else:
             await self._module.comm.async_set_group_mode(self._module.group, set_val)
 
@@ -359,12 +356,18 @@ class HbtnSelectGroupModePush(HbtnSelectGroupMode):
             self._module.mode.remove_callback(self._handle_coordinator_update)
 
 
-class HbtnSelectLoggingLevel(CoordinatorEntity, SelectEntity):
+class HbtnSelectLoggingLevel(CoordinatorEntity[DataUpdateCoordinator[None]], SelectEntity):
     """Logging level object."""
 
     _attr_has_entity_name = True
 
-    def __init__(self, smhub, level, coord, idx) -> None:
+    def __init__(
+        self,
+        smhub: SmartHub,
+        level: IfDescriptor,
+        coord: DataUpdateCoordinator[None],
+        idx: int,
+    ) -> None:
         """Initialize a Habitron mode, pass coordinator to CoordinatorEntity."""
         super().__init__(coord, context=idx)
         self.idx = idx
@@ -404,14 +407,6 @@ class HbtnSelectLoggingLevel(CoordinatorEntity, SelectEntity):
     def current_option(self) -> str:
         """Return the current mode name."""
         return self._current_option
-
-    @property
-    def state(self) -> str | None:
-        """Return the entity state."""
-        current_option = self._current_option
-        if current_option is None or current_option not in self.options:
-            return None
-        return current_option
 
     @callback
     def _handle_coordinator_update(self) -> None:

@@ -117,7 +117,7 @@ async def test_async_announce_with_preannounce_sends_both_messages() -> None:
 async def test_async_get_configuration_returns_de_wake_word() -> None:
     """async_get_configuration returns the German "OK, home" wake word."""
     sat = _make_sat()
-    config = await sat.async_get_configuration()
+    config = sat.async_get_configuration()
     assert config is not None
     assert any(ww.id == "ok_home" for ww in config.available_wake_words)
 
@@ -125,7 +125,7 @@ async def test_async_get_configuration_returns_de_wake_word() -> None:
 async def test_async_set_configuration_is_a_no_op() -> None:
     """async_set_configuration is a placeholder; just verify it does not raise."""
     sat = _make_sat()
-    await sat.async_set_configuration({})
+    await sat.async_set_configuration(MagicMock())
 
 
 async def test_respond_no_text_recognized_runs_internal_announce() -> None:

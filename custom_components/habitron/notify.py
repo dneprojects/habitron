@@ -10,6 +10,8 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
+from .interfaces import IfDescriptor
+from .module import HbtnModule
 
 PARALLEL_UPDATES = 1
 
@@ -21,7 +23,7 @@ async def async_setup_entry(
 ) -> None:
     """Add event entities for Habitron system."""
     hbtn_rt = entry.runtime_data.router
-    new_devices = []
+    new_devices: list[NotifyEntity] = []
     for hbt_module in hbtn_rt.modules:
         if hbt_module.typ in [b"\x01\x02", b"\x01\x03", b"\x32\x01"]:
             new_devices.append(HbtnMessage(hbt_module, len(new_devices)))
@@ -36,7 +38,7 @@ async def async_setup_entry(
 class HbtnMessage(NotifyEntity):
     """Representation of habitron notification."""
 
-    def __init__(self, module, idx) -> None:
+    def __init__(self, module: HbtnModule, idx: int) -> None:
         """Initialize an HbtnEvent, pass coordinator to CoordinatorEntity."""
         super().__init__()
         self.idx = idx
@@ -67,7 +69,9 @@ class HbtnMessage(NotifyEntity):
 class HbtnGSMMessage(NotifyEntity):
     """Representation of habitron notification."""
 
-    def __init__(self, module, gsm_number, idx) -> None:
+    def __init__(
+        self, module: HbtnModule, gsm_number: IfDescriptor, idx: int
+    ) -> None:
         """Initialize an HbtnEvent, pass coordinator to CoordinatorEntity."""
         super().__init__()
         self.idx = idx
