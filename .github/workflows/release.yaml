@@ -1,11 +1,17 @@
 name: Auto Release from Manifest
 
+# Triggers on every push to dev plus a manual button. The release job
+# checks whether the version currently in manifest.json is already
+# tagged on GitHub and is a no-op when it is — so this workflow is
+# self-healing: if a release run goes red because of a transient
+# issue (missing system lib, flaky test), the next push to dev that
+# turns the tests green also publishes the still-missing release,
+# without anyone having to bump the manifest just to retrigger.
 on:
   push:
     branches:
       - dev
-    paths:
-      - 'custom_components/habitron/manifest.json'
+  workflow_dispatch:
 
 permissions:
   contents: write
