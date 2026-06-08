@@ -120,18 +120,16 @@ async def test_async_remove_config_entry_device(
         name="Hub",
     )
     # Hub device identifies the smhub itself → must NOT be removable.
-    assert (
-        await async_remove_config_entry_device(hass, entry, hub_device) is False
-    ), f"Expected False; smhub.uid={smhub.uid!r}, identifiers={hub_device.identifiers!r}"
+    assert await async_remove_config_entry_device(hass, entry, hub_device) is False, (
+        f"Expected False; smhub.uid={smhub.uid!r}, identifiers={hub_device.identifiers!r}"
+    )
 
     other_device = dev_reg.async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, "some-other-uid")},
         name="Sub module",
     )
-    assert (
-        await async_remove_config_entry_device(hass, entry, other_device) is True
-    )
+    assert await async_remove_config_entry_device(hass, entry, other_device) is True
 
 
 async def test_setup_entry_connection_refused_marks_retry(

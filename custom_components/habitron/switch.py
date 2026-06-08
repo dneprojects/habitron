@@ -65,7 +65,7 @@ async def async_setup_entry(
         flg_idx = 0
         for mod_flg in hbt_module.flags:
             new_devices.append(HbtnFlagPush(mod_flg, hbt_module, hbtn_cord, flg_idx))
-            flg_idx += 1  # noqa: SIM113
+            flg_idx += 1
 
         if hbt_module.mod_type.startswith("Smart Controller"):
             new_devices.append(ClimateCtlSwitch(hbt_module))
@@ -104,7 +104,7 @@ async def async_setup_entry(
                     entity: er.RegistryEntry | None = registry.async_get(entity_entry)
                     if entity is not None and entity.hidden:
                         device_entities: list[er.RegistryEntry] = (
-                            er.async_entries_for_device(registry, entity.device_id)  # type: ignore  # noqa: PGH003
+                            er.async_entries_for_device(registry, entity.device_id)  # type: ignore
                         )
                         for dev_entity in device_entities:
                             if dev_entity.original_name == entity.original_name:
@@ -301,7 +301,6 @@ class HbtnFlag(CoordinatorEntity[DataUpdateCoordinator[None]], SwitchEntity):
     def is_on(self) -> bool:
         """Return status of output."""
         return self._state
-
 
     @callback
     def _handle_coordinator_update(self) -> None:

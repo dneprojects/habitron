@@ -5,11 +5,11 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import pytest
-
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
+from custom_components.habitron.interfaces import TYPE_DIAG
 from custom_components.habitron.sensor import (
     AIRQUALITY_DESCRIPTION,
     CURRENT_DESCRIPTION,
@@ -21,7 +21,6 @@ from custom_components.habitron.sensor import (
     HbtnDescribedSensor,
     HbtnSensorEntityDescription,
 )
-from custom_components.habitron.interfaces import TYPE_DIAG
 
 
 def _make_module(uid: str = "MOD-1") -> MagicMock:
@@ -102,9 +101,7 @@ def test_described_sensor_marks_diagnostic_entity_when_flagged() -> None:
     module = _make_module()
     sensor_desc = _make_sensor_descriptor(name="Iload", type_=TYPE_DIAG)
     coord = MagicMock(spec=DataUpdateCoordinator)
-    entity = HbtnDescribedSensor(
-        module, sensor_desc, coord, 0, CURRENT_DESCRIPTION
-    )
+    entity = HbtnDescribedSensor(module, sensor_desc, coord, 0, CURRENT_DESCRIPTION)
     assert entity.entity_description is CURRENT_DESCRIPTION
     assert entity._attr_entity_registry_enabled_default is False
 
@@ -114,9 +111,7 @@ def test_described_sensor_not_diagnostic_for_normal_type() -> None:
     module = _make_module()
     sensor_desc = _make_sensor_descriptor(type_=1)
     coord = MagicMock(spec=DataUpdateCoordinator)
-    entity = HbtnDescribedSensor(
-        module, sensor_desc, coord, 0, HUMIDITY_DESCRIPTION
-    )
+    entity = HbtnDescribedSensor(module, sensor_desc, coord, 0, HUMIDITY_DESCRIPTION)
     # ``_attr_entity_registry_enabled_default`` is the SensorEntity
     # default (True / unset) for normal entities.
     assert getattr(entity, "_attr_entity_registry_enabled_default", True) is not False
@@ -128,9 +123,7 @@ def test_described_sensor_value_fn_humidity() -> None:
     module.sensors[0] = _make_value(42.0)
     sensor_desc = _make_sensor_descriptor()
     coord = MagicMock(spec=DataUpdateCoordinator)
-    entity = HbtnDescribedSensor(
-        module, sensor_desc, coord, 0, HUMIDITY_DESCRIPTION
-    )
+    entity = HbtnDescribedSensor(module, sensor_desc, coord, 0, HUMIDITY_DESCRIPTION)
     entity.async_write_ha_state = MagicMock()
     entity._handle_coordinator_update()
     assert entity._attr_native_value == 42.0
@@ -142,9 +135,7 @@ def test_described_sensor_value_fn_current_from_chan_currents() -> None:
     module.chan_currents[0] = _make_value(1.25)
     sensor_desc = _make_sensor_descriptor(type_=1)
     coord = MagicMock(spec=DataUpdateCoordinator)
-    entity = HbtnDescribedSensor(
-        module, sensor_desc, coord, 0, CURRENT_DESCRIPTION
-    )
+    entity = HbtnDescribedSensor(module, sensor_desc, coord, 0, CURRENT_DESCRIPTION)
     entity.async_write_ha_state = MagicMock()
     entity._handle_coordinator_update()
     assert entity._attr_native_value == 1.25
@@ -156,9 +147,7 @@ def test_described_sensor_value_fn_voltage_from_voltages() -> None:
     module.voltages[0] = _make_value(231.5)
     sensor_desc = _make_sensor_descriptor(type_=1)
     coord = MagicMock(spec=DataUpdateCoordinator)
-    entity = HbtnDescribedSensor(
-        module, sensor_desc, coord, 0, VOLTAGE_DESCRIPTION
-    )
+    entity = HbtnDescribedSensor(module, sensor_desc, coord, 0, VOLTAGE_DESCRIPTION)
     entity.async_write_ha_state = MagicMock()
     entity._handle_coordinator_update()
     assert entity._attr_native_value == 231.5
@@ -170,9 +159,7 @@ def test_described_sensor_value_fn_timeout_from_chan_timeouts() -> None:
     module.chan_timeouts[0] = _make_value(7)
     sensor_desc = _make_sensor_descriptor(type_=1)
     coord = MagicMock(spec=DataUpdateCoordinator)
-    entity = HbtnDescribedSensor(
-        module, sensor_desc, coord, 0, TIMEOUT_DESCRIPTION
-    )
+    entity = HbtnDescribedSensor(module, sensor_desc, coord, 0, TIMEOUT_DESCRIPTION)
     entity.async_write_ha_state = MagicMock()
     entity._handle_coordinator_update()
     assert entity._attr_native_value == 7
@@ -183,16 +170,12 @@ def test_described_sensor_inherits_measurement_state_class() -> None:
     module = _make_module()
     sensor_desc = _make_sensor_descriptor()
     coord = MagicMock(spec=DataUpdateCoordinator)
-    entity = HbtnDescribedSensor(
-        module, sensor_desc, coord, 0, HUMIDITY_DESCRIPTION
-    )
+    entity = HbtnDescribedSensor(module, sensor_desc, coord, 0, HUMIDITY_DESCRIPTION)
     # State class comes from HbtnSensor base.
     assert entity._attr_state_class is SensorStateClass.MEASUREMENT
 
 
-async def test_sensor_platform_setup(
-    hass: HomeAssistant, setup_integration
-) -> None:
+async def test_sensor_platform_setup(hass: HomeAssistant, setup_integration) -> None:
     """The platform sets up without error against an empty router."""
     # ``setup_integration`` already exercises the entire setup chain.
     # The router fixture starts with no modules so no entities are
@@ -420,7 +403,6 @@ from unittest.mock import AsyncMock, patch  # noqa: E402
 from custom_components.habitron.module import SmartController  # noqa: E402
 from custom_components.habitron.sensor import (  # noqa: E402
     HabitronClientSensor,
-    HbtnSensor,
     LogicSensorPush,
     async_setup_entry,
 )
@@ -607,11 +589,18 @@ def test_habitron_client_sensor_init_text_metric_keeps_no_unit() -> None:
     mod.uid = "MOD-T"
     mod.stream_name = None
     entity = HabitronClientSensor(
-        mod, "battery_health", "Battery Health", None, None,
-        "mdi:battery-heart-variant", None,
+        mod,
+        "battery_health",
+        "Battery Health",
+        None,
+        None,
+        "mdi:battery-heart-variant",
+        None,
     )
     assert entity._attr_icon == "mdi:battery-heart-variant"
-    assert getattr(entity, "_attr_state_class", None) is not SensorStateClass.MEASUREMENT
+    assert (
+        getattr(entity, "_attr_state_class", None) is not SensorStateClass.MEASUREMENT
+    )
 
 
 def test_habitron_client_sensor_device_info() -> None:
@@ -620,8 +609,13 @@ def test_habitron_client_sensor_device_info() -> None:
     mod.uid = "MOD-T"
     mod.stream_name = "touch_1"
     entity = HabitronClientSensor(
-        mod, "voltage", "Battery Voltage",
-        SensorDeviceClass.VOLTAGE, "V", None, 2,
+        mod,
+        "voltage",
+        "Battery Voltage",
+        SensorDeviceClass.VOLTAGE,
+        "V",
+        None,
+        2,
     )
     assert ("habitron", "MOD-T") in entity.device_info["identifiers"]
 
@@ -632,7 +626,13 @@ def test_habitron_client_sensor_handle_event_other_stream_skipped() -> None:
     mod.uid = "MOD-T"
     mod.stream_name = "touch_1"
     entity = HabitronClientSensor(
-        mod, "voltage", "V", SensorDeviceClass.VOLTAGE, "V", None, 2,
+        mod,
+        "voltage",
+        "V",
+        SensorDeviceClass.VOLTAGE,
+        "V",
+        None,
+        2,
     )
     entity.async_write_ha_state = MagicMock()
     event = MagicMock()
@@ -647,7 +647,13 @@ def test_habitron_client_sensor_handle_event_missing_data_skipped() -> None:
     mod.uid = "MOD-T"
     mod.stream_name = "touch_1"
     entity = HabitronClientSensor(
-        mod, "voltage", "V", SensorDeviceClass.VOLTAGE, "V", None, 2,
+        mod,
+        "voltage",
+        "V",
+        SensorDeviceClass.VOLTAGE,
+        "V",
+        None,
+        2,
     )
     entity.async_write_ha_state = MagicMock()
     event = MagicMock()
@@ -662,7 +668,13 @@ def test_habitron_client_sensor_handle_event_writes_state() -> None:
     mod.uid = "MOD-T"
     mod.stream_name = "touch_1"
     entity = HabitronClientSensor(
-        mod, "voltage", "V", SensorDeviceClass.VOLTAGE, "V", None, 2,
+        mod,
+        "voltage",
+        "V",
+        SensorDeviceClass.VOLTAGE,
+        "V",
+        None,
+        2,
     )
     entity.async_write_ha_state = MagicMock()
     event = MagicMock()
@@ -677,7 +689,13 @@ async def test_habitron_client_sensor_async_added_listens_for_bus_event(hass) ->
     mod.uid = "MOD-T"
     mod.stream_name = "touch_1"
     entity = HabitronClientSensor(
-        mod, "voltage", "V", SensorDeviceClass.VOLTAGE, "V", None, 2,
+        mod,
+        "voltage",
+        "V",
+        SensorDeviceClass.VOLTAGE,
+        "V",
+        None,
+        2,
     )
     entity.hass = hass
     entity.async_on_remove = MagicMock()
@@ -688,24 +706,74 @@ async def test_habitron_client_sensor_async_added_listens_for_bus_event(hass) ->
 async def test_async_setup_entry_emits_all_sensor_types(hass) -> None:
     """async_setup_entry creates the broad mix of sensor entities."""
     # SmartHub-level sensors
-    mem = MagicMock(); mem.name = "Memory free"; mem.nmbr = 0; mem.type = 1
-    disk = MagicMock(); disk.name = "Disk free"; disk.nmbr = 1; disk.type = 1
-    cpu_freq = MagicMock(); cpu_freq.name = "CPU Frequency"; cpu_freq.nmbr = 0; cpu_freq.type = 1
-    cpu_load = MagicMock(); cpu_load.name = "CPU load"; cpu_load.nmbr = 1; cpu_load.type = 1
-    cpu_temp = MagicMock(); cpu_temp.name = "CPU Temperature"; cpu_temp.nmbr = 2; cpu_temp.type = 1
+    mem = MagicMock()
+    mem.name = "Memory free"
+    mem.nmbr = 0
+    mem.type = 1
+    disk = MagicMock()
+    disk.name = "Disk free"
+    disk.nmbr = 1
+    disk.type = 1
+    cpu_freq = MagicMock()
+    cpu_freq.name = "CPU Frequency"
+    cpu_freq.nmbr = 0
+    cpu_freq.type = 1
+    cpu_load = MagicMock()
+    cpu_load.name = "CPU load"
+    cpu_load.nmbr = 1
+    cpu_load.type = 1
+    cpu_temp = MagicMock()
+    cpu_temp.name = "CPU Temperature"
+    cpu_temp.nmbr = 2
+    cpu_temp.type = 1
 
     # Module-level sensors
-    temp = MagicMock(); temp.name = "Temperature"; temp.nmbr = 0; temp.type = 1
-    hum = MagicMock(); hum.name = "Humidity"; hum.nmbr = 1; hum.type = 1
-    illum = MagicMock(); illum.name = "Illuminance"; illum.nmbr = 2; illum.type = 1
-    wind = MagicMock(); wind.name = "Wind"; wind.nmbr = 3; wind.type = 1
-    air = MagicMock(); air.name = "Airquality"; air.nmbr = 4; air.type = 1
-    ident = MagicMock(); ident.name = "Identifier"; ident.nmbr = 5; ident.type = 1
-    finger = MagicMock(); finger.name = "Finger"; finger.nmbr = 6; finger.type = 1
-    ain = MagicMock(); ain.name = "AIn 1"; ain.nmbr = 0; ain.type = 3; ain.area = 0
-    logic = MagicMock(); logic.nmbr = 0; logic.idx = 0; logic.name = "Cnt"; logic.type = 5
-    status = MagicMock(); status.name = "Status"; status.nmbr = 0; status.type = 1
-    power_temp = MagicMock(); power_temp.name = "PowerTemp"; power_temp.nmbr = 1; power_temp.type = 1
+    temp = MagicMock()
+    temp.name = "Temperature"
+    temp.nmbr = 0
+    temp.type = 1
+    hum = MagicMock()
+    hum.name = "Humidity"
+    hum.nmbr = 1
+    hum.type = 1
+    illum = MagicMock()
+    illum.name = "Illuminance"
+    illum.nmbr = 2
+    illum.type = 1
+    wind = MagicMock()
+    wind.name = "Wind"
+    wind.nmbr = 3
+    wind.type = 1
+    air = MagicMock()
+    air.name = "Airquality"
+    air.nmbr = 4
+    air.type = 1
+    ident = MagicMock()
+    ident.name = "Identifier"
+    ident.nmbr = 5
+    ident.type = 1
+    finger = MagicMock()
+    finger.name = "Finger"
+    finger.nmbr = 6
+    finger.type = 1
+    ain = MagicMock()
+    ain.name = "AIn 1"
+    ain.nmbr = 0
+    ain.type = 3
+    ain.area = 0
+    logic = MagicMock()
+    logic.nmbr = 0
+    logic.idx = 0
+    logic.name = "Cnt"
+    logic.type = 5
+    status = MagicMock()
+    status.name = "Status"
+    status.nmbr = 0
+    status.type = 1
+    power_temp = MagicMock()
+    power_temp.name = "PowerTemp"
+    power_temp.nmbr = 1
+    power_temp.type = 1
 
     mod = MagicMock(spec=SmartController)
     mod.uid = "MOD-1"
@@ -723,9 +791,18 @@ async def test_async_setup_entry_emits_all_sensor_types(hass) -> None:
     smhub.diags = [cpu_freq, cpu_load, cpu_temp]
     smhub.uid = "HUB-1"
 
-    chan_to = MagicMock(); chan_to.nmbr = 0; chan_to.value = 100; chan_to.type = 1
-    chan_curr = MagicMock(); chan_curr.nmbr = 0; chan_curr.value = 1.0; chan_curr.type = 1
-    rt_vtg = MagicMock(); rt_vtg.nmbr = 0; rt_vtg.value = 230; rt_vtg.type = 1
+    chan_to = MagicMock()
+    chan_to.nmbr = 0
+    chan_to.value = 100
+    chan_to.type = 1
+    chan_curr = MagicMock()
+    chan_curr.nmbr = 0
+    chan_curr.value = 1.0
+    chan_curr.type = 1
+    rt_vtg = MagicMock()
+    rt_vtg.nmbr = 0
+    rt_vtg.value = 230
+    rt_vtg.type = 1
     router = MagicMock()
     router.modules = [mod]
     router.coord = MagicMock()
@@ -760,7 +837,11 @@ async def test_async_setup_entry_emits_all_sensor_types(hass) -> None:
 
 async def test_async_setup_entry_analog_area_assignment_external(hass) -> None:
     """An analog input with a non-default area gets the area_id assigned."""
-    ain = MagicMock(); ain.name = "AIn 1"; ain.nmbr = 0; ain.type = 3; ain.area = 5
+    ain = MagicMock()
+    ain.name = "AIn 1"
+    ain.nmbr = 0
+    ain.type = 3
+    ain.area = 5
     mod = MagicMock()
     mod.uid = "MOD-A"
     mod.mod_type = "Other"
@@ -771,14 +852,19 @@ async def test_async_setup_entry_analog_area_assignment_external(hass) -> None:
     mod.logic = []
     mod.diags = []
 
-    smhub = MagicMock(); smhub.sensors = []; smhub.diags = []; smhub.uid = "HUB-1"
+    smhub = MagicMock()
+    smhub.sensors = []
+    smhub.diags = []
+    smhub.uid = "HUB-1"
     router = MagicMock()
     router.modules = [mod]
     router.coord = MagicMock()
-    router.chan_timeouts = []; router.chan_currents = []; router.voltages = []
+    router.chan_timeouts = []
+    router.chan_currents = []
+    router.voltages = []
     area = MagicMock()
     area.get_name_id = MagicMock(return_value="area_5_id")
-    router.areas = {i: area for i in range(6)}
+    router.areas = dict.fromkeys(range(6), area)
 
     entry = MagicMock()
     entry.runtime_data = smhub
@@ -790,14 +876,16 @@ async def test_async_setup_entry_analog_area_assignment_external(hass) -> None:
         mock_get.return_value = registry
         await async_setup_entry(hass, entry, lambda es: None)
 
-    registry.async_update_entity.assert_called_with(
-        "sensor.fake", area_id="area_5_id"
-    )
+    registry.async_update_entity.assert_called_with("sensor.fake", area_id="area_5_id")
 
 
 async def test_async_setup_entry_analog_area_overflow_falls_back(hass) -> None:
     """An out-of-range analog area is clamped to the default."""
-    ain = MagicMock(); ain.name = "AIn 1"; ain.nmbr = 0; ain.type = 3; ain.area = 99
+    ain = MagicMock()
+    ain.name = "AIn 1"
+    ain.nmbr = 0
+    ain.type = 3
+    ain.area = 99
     mod = MagicMock()
     mod.uid = "MOD-OV"
     mod.mod_type = "Other"
@@ -808,11 +896,16 @@ async def test_async_setup_entry_analog_area_overflow_falls_back(hass) -> None:
     mod.logic = []
     mod.diags = []
 
-    smhub = MagicMock(); smhub.sensors = []; smhub.diags = []; smhub.uid = "HUB-1"
+    smhub = MagicMock()
+    smhub.sensors = []
+    smhub.diags = []
+    smhub.uid = "HUB-1"
     router = MagicMock()
     router.modules = [mod]
     router.coord = MagicMock()
-    router.chan_timeouts = []; router.chan_currents = []; router.voltages = []
+    router.chan_timeouts = []
+    router.chan_currents = []
+    router.voltages = []
     router.areas = {0: MagicMock()}
 
     entry = MagicMock()

@@ -32,8 +32,7 @@ def _make_provider() -> HabitronWebRTCProvider:
     hass.async_create_background_task = MagicMock()
     rtr = MagicMock()
     with patch(
-        "custom_components.habitron.ws_provider.provider."
-        "async_register_webrtc_provider"
+        "custom_components.habitron.ws_provider.provider.async_register_webrtc_provider"
     ):
         return HabitronWebRTCProvider(hass, rtr)
 
@@ -69,11 +68,7 @@ def test_register_handlers_registers_15_commands() -> None:
     """15 habitron/* command handlers (now including the abort) are registered."""
     provider = _make_provider()
     register_handlers(provider)
-    cmds = [
-        k
-        for k in provider.hass.data["websocket_api"]
-        if k.startswith("habitron/")
-    ]
+    cmds = [k for k in provider.hass.data["websocket_api"] if k.startswith("habitron/")]
     assert len(cmds) == 15
     assert "habitron/voice_pipeline_abort" in cmds
 
@@ -118,8 +113,12 @@ async def test_register_stream_stores_connection_and_runs_disconnect() -> None:
     await handlers["register_stream"](
         provider.hass,
         conn,
-        {"id": 1, "type": "habitron/register_stream",
-         "stream_name": "touch_1", "version": "1.0"},
+        {
+            "id": 1,
+            "type": "habitron/register_stream",
+            "stream_name": "touch_1",
+            "version": "1.0",
+        },
     )
     # Connection stored and ack sent
     assert provider.active_ws_connections["touch_1"] is conn
@@ -155,8 +154,12 @@ async def test_register_stream_warns_when_existing_connection_replaced() -> None
     await handlers["register_stream"](
         provider.hass,
         new,
-        {"id": 2, "type": "habitron/register_stream",
-         "stream_name": "touch_1", "version": "1.0"},
+        {
+            "id": 2,
+            "type": "habitron/register_stream",
+            "stream_name": "touch_1",
+            "version": "1.0",
+        },
     )
     assert provider.active_ws_connections["touch_1"] is new
 
@@ -170,8 +173,12 @@ async def test_register_stream_disconnect_skips_done_future() -> None:
     await handlers["register_stream"](
         provider.hass,
         conn,
-        {"id": 1, "type": "habitron/register_stream",
-         "stream_name": "touch_1", "version": "1.0"},
+        {
+            "id": 1,
+            "type": "habitron/register_stream",
+            "stream_name": "touch_1",
+            "version": "1.0",
+        },
     )
     fut = asyncio.Future()
     fut.set_result("ans")  # already done
@@ -189,8 +196,12 @@ async def test_register_stream_disconnect_skips_done_task() -> None:
     await handlers["register_stream"](
         provider.hass,
         conn,
-        {"id": 1, "type": "habitron/register_stream",
-         "stream_name": "touch_1", "version": "1.0"},
+        {
+            "id": 1,
+            "type": "habitron/register_stream",
+            "stream_name": "touch_1",
+            "version": "1.0",
+        },
     )
     done = MagicMock(done=lambda: True)
     provider.voice_pipelines["touch_1"] = {"task": done}
@@ -286,7 +297,10 @@ async def test_voice_pipeline_start_seeds_voice_pipelines_entry() -> None:
     def _swallow_coroutine(coro, name=None):  # noqa: ARG001
         coro.close()
         return MagicMock()
-    provider.hass.async_create_background_task = MagicMock(side_effect=_swallow_coroutine)
+
+    provider.hass.async_create_background_task = MagicMock(
+        side_effect=_swallow_coroutine
+    )
 
     await handlers["voice_pipeline_start"](
         provider.hass,
@@ -319,13 +333,17 @@ async def test_voice_pipeline_start_falls_back_without_satellite() -> None:
     handlers = _registered_handlers(provider)
     conn = _make_connection()
     provider.active_ws_connections["touch_1"] = conn
+
     # Swallow the spawned ``run_voice_pipeline`` coroutine — the handler
     # tests verify only that the call happens; the pipeline itself has
     # its own dedicated test module.
     def _swallow_coroutine(coro, name=None):  # noqa: ARG001
         coro.close()
         return MagicMock()
-    provider.hass.async_create_background_task = MagicMock(side_effect=_swallow_coroutine)
+
+    provider.hass.async_create_background_task = MagicMock(
+        side_effect=_swallow_coroutine
+    )
     await handlers["voice_pipeline_start"](
         provider.hass,
         conn,
@@ -344,13 +362,17 @@ async def test_voice_pipeline_start_with_satellite_no_registry_entry() -> None:
     sat.entity_id = "assist_satellite.touch_1"
     sat.registry_entry = None
     provider.assist_satellites["touch_1"] = sat
+
     # Swallow the spawned ``run_voice_pipeline`` coroutine — the handler
     # tests verify only that the call happens; the pipeline itself has
     # its own dedicated test module.
     def _swallow_coroutine(coro, name=None):  # noqa: ARG001
         coro.close()
         return MagicMock()
-    provider.hass.async_create_background_task = MagicMock(side_effect=_swallow_coroutine)
+
+    provider.hass.async_create_background_task = MagicMock(
+        side_effect=_swallow_coroutine
+    )
     await handlers["voice_pipeline_start"](
         provider.hass,
         conn,
@@ -373,13 +395,17 @@ async def test_voice_pipeline_start_with_non_string_pipeline_option() -> None:
     reg.options = {"pipeline": 7, "tts_voice": 7}
     sat.registry_entry = reg
     provider.assist_satellites["touch_1"] = sat
+
     # Swallow the spawned ``run_voice_pipeline`` coroutine — the handler
     # tests verify only that the call happens; the pipeline itself has
     # its own dedicated test module.
     def _swallow_coroutine(coro, name=None):  # noqa: ARG001
         coro.close()
         return MagicMock()
-    provider.hass.async_create_background_task = MagicMock(side_effect=_swallow_coroutine)
+
+    provider.hass.async_create_background_task = MagicMock(
+        side_effect=_swallow_coroutine
+    )
     await handlers["voice_pipeline_start"](
         provider.hass,
         conn,
@@ -400,8 +426,11 @@ async def test_voice_audio_chunk_returns_when_no_pipeline() -> None:
     await handlers["voice_audio_chunk"](
         provider.hass,
         conn,
-        {"id": 1, "type": "habitron/voice_audio_chunk",
-         "payload": base64.b64encode(b"chunk").decode("ascii")},
+        {
+            "id": 1,
+            "type": "habitron/voice_audio_chunk",
+            "payload": base64.b64encode(b"chunk").decode("ascii"),
+        },
     )
 
 
@@ -416,8 +445,11 @@ async def test_voice_audio_chunk_puts_to_queue() -> None:
     await handlers["voice_audio_chunk"](
         provider.hass,
         conn,
-        {"id": 1, "type": "habitron/voice_audio_chunk",
-         "payload": base64.b64encode(b"chunk").decode("ascii")},
+        {
+            "id": 1,
+            "type": "habitron/voice_audio_chunk",
+            "payload": base64.b64encode(b"chunk").decode("ascii"),
+        },
     )
     assert await queue.get() == b"chunk"
 
@@ -454,8 +486,11 @@ async def test_voice_audio_chunk_handles_queue_full() -> None:
     await handlers["voice_audio_chunk"](
         provider.hass,
         conn,
-        {"id": 1, "type": "habitron/voice_audio_chunk",
-         "payload": base64.b64encode(b"chunk").decode("ascii")},
+        {
+            "id": 1,
+            "type": "habitron/voice_audio_chunk",
+            "payload": base64.b64encode(b"chunk").decode("ascii"),
+        },
     )
 
 
@@ -568,8 +603,13 @@ async def test_webrtc_answer_sets_future_result() -> None:
     await handlers["webrtc_answer"](
         provider.hass,
         conn,
-        {"id": 1, "type": "habitron/webrtc_answer",
-         "session_id": "sess-1", "sdp": "answer-sdp", "stream_name": "touch_1"},
+        {
+            "id": 1,
+            "type": "habitron/webrtc_answer",
+            "session_id": "sess-1",
+            "sdp": "answer-sdp",
+            "stream_name": "touch_1",
+        },
     )
     assert fut.result() == "answer-sdp"
 
@@ -583,8 +623,13 @@ async def test_webrtc_answer_unknown_session_is_logged_not_raised() -> None:
     await handlers["webrtc_answer"](
         provider.hass,
         conn,
-        {"id": 1, "type": "habitron/webrtc_answer",
-         "session_id": "ghost", "sdp": "x", "stream_name": "touch_1"},
+        {
+            "id": 1,
+            "type": "habitron/webrtc_answer",
+            "session_id": "ghost",
+            "sdp": "x",
+            "stream_name": "touch_1",
+        },
     )
     conn.send_result.assert_called()
 
@@ -603,9 +648,14 @@ async def test_webrtc_candidate_forwards_to_send_message_when_callback_known() -
     await handlers["webrtc_candidate"](
         provider.hass,
         conn,
-        {"id": 1, "type": "habitron/webrtc_candidate",
-         "session_id": "sess-1", "candidate": "c-str",
-         "sdp_mid": "mid", "sdp_m_line_index": 0},
+        {
+            "id": 1,
+            "type": "habitron/webrtc_candidate",
+            "session_id": "sess-1",
+            "candidate": "c-str",
+            "sdp_mid": "mid",
+            "sdp_m_line_index": 0,
+        },
     )
     sent.assert_called()
 
@@ -619,9 +669,14 @@ async def test_webrtc_candidate_queues_when_no_callback() -> None:
     await handlers["webrtc_candidate"](
         provider.hass,
         conn,
-        {"id": 1, "type": "habitron/webrtc_candidate",
-         "session_id": "sess-1", "candidate": "c-str",
-         "sdp_mid": "mid", "sdp_m_line_index": 0},
+        {
+            "id": 1,
+            "type": "habitron/webrtc_candidate",
+            "session_id": "sess-1",
+            "candidate": "c-str",
+            "sdp_mid": "mid",
+            "sdp_m_line_index": 0,
+        },
     )
     assert "sess-1" in provider.pending_candidates
 
@@ -640,9 +695,12 @@ async def test_snapshot_result_resolves_future_with_bytes() -> None:
     await handlers["snapshot_result"](
         provider.hass,
         conn,
-        {"id": 1, "type": "habitron/snapshot_result",
-         "request_id": "req-1",
-         "data": base64.b64encode(b"png").decode("ascii")},
+        {
+            "id": 1,
+            "type": "habitron/snapshot_result",
+            "request_id": "req-1",
+            "data": base64.b64encode(b"png").decode("ascii"),
+        },
     )
     assert fut.result() == b"png"
 
@@ -658,8 +716,12 @@ async def test_snapshot_result_error_sets_exception() -> None:
     await handlers["snapshot_result"](
         provider.hass,
         conn,
-        {"id": 1, "type": "habitron/snapshot_result",
-         "request_id": "req-1", "error": "client failed"},
+        {
+            "id": 1,
+            "type": "habitron/snapshot_result",
+            "request_id": "req-1",
+            "error": "client failed",
+        },
     )
     assert fut.exception() is not None
 
@@ -679,8 +741,12 @@ async def test_snapshot_result_bad_base64_sets_exception() -> None:
         await handlers["snapshot_result"](
             provider.hass,
             conn,
-            {"id": 1, "type": "habitron/snapshot_result",
-             "request_id": "req-1", "data": "garbage"},
+            {
+                "id": 1,
+                "type": "habitron/snapshot_result",
+                "request_id": "req-1",
+                "data": "garbage",
+            },
         )
     assert fut.exception() is not None
 
@@ -710,8 +776,12 @@ async def test_snapshot_result_unknown_request_logs() -> None:
     await handlers["snapshot_result"](
         provider.hass,
         conn,
-        {"id": 1, "type": "habitron/snapshot_result",
-         "request_id": "ghost", "data": "x"},
+        {
+            "id": 1,
+            "type": "habitron/snapshot_result",
+            "request_id": "ghost",
+            "data": "x",
+        },
     )
     conn.send_result.assert_called()
 
@@ -799,12 +869,14 @@ async def test_update_media_state_forwards_to_player() -> None:
     await handlers["update_media_state"](
         provider.hass,
         conn,
-        {"id": 1, "type": "habitron/update_media_state",
-         "state": "playing", "attributes": {"volume_level": 0.5}},
+        {
+            "id": 1,
+            "type": "habitron/update_media_state",
+            "state": "playing",
+            "attributes": {"volume_level": 0.5},
+        },
     )
-    player.update_from_client.assert_called_with(
-        "playing", {"volume_level": 0.5}
-    )
+    player.update_from_client.assert_called_with("playing", {"volume_level": 0.5})
 
 
 async def test_update_media_state_returns_failure_when_no_player() -> None:
@@ -816,8 +888,12 @@ async def test_update_media_state_returns_failure_when_no_player() -> None:
     await handlers["update_media_state"](
         provider.hass,
         conn,
-        {"id": 1, "type": "habitron/update_media_state",
-         "state": "playing", "attributes": {}},
+        {
+            "id": 1,
+            "type": "habitron/update_media_state",
+            "state": "playing",
+            "attributes": {},
+        },
     )
     result = conn.send_result.call_args.args
     assert result[1]["success"] is False
@@ -929,8 +1005,11 @@ async def test_report_state_fires_bus_event_and_records_version() -> None:
     await handlers["report_state"](
         provider.hass,
         conn,
-        {"id": 1, "type": "habitron/report_state",
-         "payload": {"version": "1.2.3", "battery_level": 80}},
+        {
+            "id": 1,
+            "type": "habitron/report_state",
+            "payload": {"version": "1.2.3", "battery_level": 80},
+        },
     )
     assert mod.client_version == "1.2.3"
     provider.hass.bus.async_fire.assert_called()

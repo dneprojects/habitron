@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from habitron_client import HabitronTimeoutError
 import pytest
-
+from habitron_client import HabitronTimeoutError
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
@@ -290,9 +289,7 @@ async def test_options_flow(
         "update_interval": 10,
         "websock_token": "test-token-not-real",  # noqa: S106
     }
-    with patch.object(
-        hass.config_entries, "async_reload", return_value=True
-    ):
+    with patch.object(hass.config_entries, "async_reload", return_value=True):
         result = await hass.config_entries.options.async_configure(
             result["flow_id"], user_input=new_input
         )
@@ -335,9 +332,9 @@ async def test_validate_input_local_loopback_rewrites_host(
 async def test_validate_input_invalid_host_too_short(hass: HomeAssistant) -> None:
     """A host string shorter than 4 chars raises ``InvalidHost``."""
     from custom_components.habitron.config_flow import (  # noqa: PLC0415
-        InvalidHost,
         KEY_HOST,
         KEY_INTERVAL,
+        InvalidHost,
         validate_input,
     )
 
@@ -355,9 +352,9 @@ async def test_validate_input_invalid_host_too_short(hass: HomeAssistant) -> Non
 async def test_validate_input_invalid_interval_type(hass: HomeAssistant) -> None:
     """A non-int interval raises ``InvalidInterval``."""
     from custom_components.habitron.config_flow import (  # noqa: PLC0415
-        InvalidInterval,
         KEY_HOST,
         KEY_INTERVAL,
+        InvalidInterval,
         validate_input,
     )
 
@@ -375,9 +372,9 @@ async def test_validate_input_invalid_interval_type(hass: HomeAssistant) -> None
 async def test_validate_input_interval_too_long(hass: HomeAssistant) -> None:
     """A too-high interval raises ``IntervalTooLong``."""
     from custom_components.habitron.config_flow import (  # noqa: PLC0415
-        IntervalTooLong,
         KEY_HOST,
         KEY_INTERVAL,
+        IntervalTooLong,
         validate_input,
     )
 
@@ -399,9 +396,9 @@ async def test_validate_input_host_not_found_for_dns_failure(
     import socket  # noqa: PLC0415
 
     from custom_components.habitron.config_flow import (  # noqa: PLC0415
-        HostNotFound,
         KEY_HOST,
         KEY_INTERVAL,
+        HostNotFound,
         validate_input,
     )
 
@@ -451,7 +448,9 @@ def test_udp_discovery_protocol_connection_made_no_socket() -> None:
     """``connection_made`` is robust against a missing socket info."""
     import asyncio  # noqa: PLC0415
 
-    from custom_components.habitron.config_flow import UDPDiscoveryProtocol  # noqa: PLC0415
+    from custom_components.habitron.config_flow import (
+        UDPDiscoveryProtocol,  # noqa: PLC0415
+    )
 
     proto = UDPDiscoveryProtocol()
     transport = MagicMock(spec=asyncio.DatagramTransport)
@@ -464,7 +463,9 @@ def test_udp_discovery_protocol_datagram_collects_unique_devices() -> None:
     """``datagram_received`` collects host/ip pairs and dedupes by ip."""
     import json  # noqa: PLC0415
 
-    from custom_components.habitron.config_flow import UDPDiscoveryProtocol  # noqa: PLC0415
+    from custom_components.habitron.config_flow import (
+        UDPDiscoveryProtocol,  # noqa: PLC0415
+    )
 
     proto = UDPDiscoveryProtocol()
     payload = json.dumps({"host": "hub1", "ip": "10.0.0.1"}).encode()
@@ -475,7 +476,9 @@ def test_udp_discovery_protocol_datagram_collects_unique_devices() -> None:
 
 def test_udp_discovery_protocol_datagram_swallows_bad_payload() -> None:
     """Non-JSON datagrams are ignored without raising."""
-    from custom_components.habitron.config_flow import UDPDiscoveryProtocol  # noqa: PLC0415
+    from custom_components.habitron.config_flow import (
+        UDPDiscoveryProtocol,  # noqa: PLC0415
+    )
 
     proto = UDPDiscoveryProtocol()
     proto.datagram_received(b"\xff\xfe garbage", ("10.0.0.1", 7777))
@@ -484,7 +487,9 @@ def test_udp_discovery_protocol_datagram_swallows_bad_payload() -> None:
 
 def test_udp_discovery_protocol_error_received_logs() -> None:
     """``error_received`` accepts a generic error without raising."""
-    from custom_components.habitron.config_flow import UDPDiscoveryProtocol  # noqa: PLC0415
+    from custom_components.habitron.config_flow import (
+        UDPDiscoveryProtocol,  # noqa: PLC0415
+    )
 
     proto = UDPDiscoveryProtocol()
     proto.error_received(RuntimeError("oops"))
@@ -1188,9 +1193,7 @@ async def test_user_flow_picks_up_serial_from_udp_probe(
     """A matching UDP serial becomes the unique id."""
     with patch(
         "custom_components.habitron.config_flow.ConfigFlow._discover_habitron",
-        return_value=[
-            {"host": MOCK_HOST, "ip": MOCK_HOST, "serial": "SERIAL-X"}
-        ],
+        return_value=[{"host": MOCK_HOST, "ip": MOCK_HOST, "serial": "SERIAL-X"}],
     ):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": config_entries.SOURCE_USER}

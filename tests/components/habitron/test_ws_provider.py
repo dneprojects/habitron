@@ -331,10 +331,13 @@ async def test_async_handle_webrtc_offer_wraps_inner_exception() -> None:
     camera = _make_camera_with_stream()
     send_message = MagicMock()
 
-    with patch(
-        "custom_components.habitron.ws_provider.provider._filter_ipv6_candidates",
-        side_effect=RuntimeError("boom"),
-    ), pytest.raises(HomeAssistantError):
+    with (
+        patch(
+            "custom_components.habitron.ws_provider.provider._filter_ipv6_candidates",
+            side_effect=RuntimeError("boom"),
+        ),
+        pytest.raises(HomeAssistantError),
+    ):
         await provider.async_handle_async_webrtc_offer(
             camera, "sdp", "sess-1", send_message
         )
@@ -414,10 +417,13 @@ async def test_async_take_snapshot_raises_on_timeout() -> None:
     async def _fast_timeout(fut, timeout):
         return await real_wait_for(fut, timeout=0.001)
 
-    with patch(
-        "custom_components.habitron.ws_provider.provider.asyncio.wait_for",
-        new=_fast_timeout,
-    ), pytest.raises(HomeAssistantError):
+    with (
+        patch(
+            "custom_components.habitron.ws_provider.provider.asyncio.wait_for",
+            new=_fast_timeout,
+        ),
+        pytest.raises(HomeAssistantError),
+    ):
         await provider.async_take_snapshot("touch_1")
     # The future was cleaned up via the finally
     assert provider.snapshot_futures == {}

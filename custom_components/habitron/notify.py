@@ -82,9 +82,7 @@ class HbtnMessage(NotifyEntity):
 class HbtnGSMMessage(NotifyEntity):
     """Representation of habitron notification."""
 
-    def __init__(
-        self, module: HbtnModule, gsm_number: IfDescriptor, idx: int
-    ) -> None:
+    def __init__(self, module: HbtnModule, gsm_number: IfDescriptor, idx: int) -> None:
         """Initialize an HbtnEvent, pass coordinator to CoordinatorEntity."""
         super().__init__()
         self.idx = idx

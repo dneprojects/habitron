@@ -10,9 +10,9 @@ Format reference: AOSP ``frameworks/base/include/androidfw/ResourceTypes.h``.
 
 from __future__ import annotations
 
-from pathlib import Path
 import struct
 import zipfile
+from pathlib import Path
 
 _RES_XML_TYPE = 0x0003
 _CHUNK_STRING_POOL = 0x0001

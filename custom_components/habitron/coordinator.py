@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import timedelta
 import logging
+from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from homeassistant.config_entries import ConfigEntry
@@ -58,12 +58,12 @@ class HbtnCoordinator(DataUpdateCoordinator[None]):
             name="Habitron updates",
             config_entry=entry,
             update_interval=timedelta(
-                seconds=hbtn_comm._config.data["update_interval"]  # noqa: SLF001
+                seconds=hbtn_comm._config.data["update_interval"]
             ),
             always_update=True,
         )
         self.comm = hbtn_comm
-        self.config = hbtn_comm._config  # noqa: SLF001
+        self.config = hbtn_comm._config
         self.rtr_id = 1
         self.previous_devices: set[str] = set()
 
@@ -90,9 +90,7 @@ class HbtnCoordinator(DataUpdateCoordinator[None]):
             async with asyncio.timeout(20):
                 await self.comm.async_system_update()
         except TimeoutError as err:
-            raise UpdateFailed(
-                "Timeout fetching system status from SmartHub"
-            ) from err
+            raise UpdateFailed("Timeout fetching system status from SmartHub") from err
         except (OSError, ConnectionError) as err:
             raise UpdateFailed(
                 f"Network error fetching status from SmartHub: {err}"

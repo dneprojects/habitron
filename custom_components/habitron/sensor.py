@@ -42,7 +42,7 @@ if TYPE_CHECKING:
 PARALLEL_UPDATES = 1
 
 
-async def async_setup_entry(  # noqa: C901
+async def async_setup_entry(
     hass: HomeAssistant,
     entry: HabitronConfigEntry,
     async_add_entities: AddEntitiesCallback,
@@ -417,7 +417,13 @@ class AnalogSensor(HbtnSensor):
     _attr_native_unit_of_measurement = PERCENTAGE
     _attr_translation_key = "analog_sensor"
 
-    def __init__(self, module: HbtnModule, sensor: IfDescriptor, coord: DataUpdateCoordinator[None], idx: int) -> None:
+    def __init__(
+        self,
+        module: HbtnModule,
+        sensor: IfDescriptor,
+        coord: DataUpdateCoordinator[None],
+        idx: int,
+    ) -> None:
         """Initialize the sensor."""
         super().__init__(module, sensor, coord, idx)
         self._attr_unique_id = f"Mod_{self._module.uid}_adin{sensor.nmbr}"
@@ -453,7 +459,13 @@ class TemperatureSensor(HbtnSensor):
     _attr_device_class = SensorDeviceClass.TEMPERATURE
     _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
 
-    def __init__(self, module: HbtnModule, sensor: IfDescriptor, coord: DataUpdateCoordinator[None], idx: int) -> None:
+    def __init__(
+        self,
+        module: HbtnModule,
+        sensor: IfDescriptor,
+        coord: DataUpdateCoordinator[None],
+        idx: int,
+    ) -> None:
         """Initialize the sensor."""
         super().__init__(module, sensor, coord, idx)
         if sensor.name == "Temperature ext.":
@@ -467,7 +479,13 @@ class EKeySensorId(HbtnSensor):
 
     _attr_translation_key = "ekey_id"
 
-    def __init__(self, module: HbtnModule, sensor: IfDescriptor, coord: DataUpdateCoordinator[None], idx: int) -> None:
+    def __init__(
+        self,
+        module: HbtnModule,
+        sensor: IfDescriptor,
+        coord: DataUpdateCoordinator[None],
+        idx: int,
+    ) -> None:
         """Initialize the sensor."""
         super().__init__(module, sensor, coord, idx)
         self.sensor = sensor
@@ -496,7 +514,13 @@ class EKeySensorFngr(HbtnSensor):
 
     _attr_translation_key = "ekey_finger"
 
-    def __init__(self, module: HbtnModule, sensor: IfDescriptor, coord: DataUpdateCoordinator[None], idx: int) -> None:
+    def __init__(
+        self,
+        module: HbtnModule,
+        sensor: IfDescriptor,
+        coord: DataUpdateCoordinator[None],
+        idx: int,
+    ) -> None:
         """Initialize the sensor."""
         super().__init__(module, sensor, coord, idx)
         self.sensor = sensor
@@ -563,7 +587,13 @@ class TemperatureDSensor(HbtnDiagSensor):
     _attr_device_class = SensorDeviceClass.TEMPERATURE
     _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
 
-    def __init__(self, module: HbtnModule, diag: IfDescriptor, coord: DataUpdateCoordinator[None], idx: int) -> None:
+    def __init__(
+        self,
+        module: HbtnModule,
+        diag: IfDescriptor,
+        coord: DataUpdateCoordinator[None],
+        idx: int,
+    ) -> None:
         """Initialize the sensor."""
         super().__init__(module, diag, coord, idx)
         self._attr_unique_id = f"Mod_{self._module.uid}_{diag.name}"
@@ -573,7 +603,13 @@ class TemperatureDSensor(HbtnDiagSensor):
 class StatusSensor(HbtnDiagSensor):
     """Representation of a Sensor."""
 
-    def __init__(self, module: HbtnModule, diag: IfDescriptor, coord: DataUpdateCoordinator[None], idx: int) -> None:
+    def __init__(
+        self,
+        module: HbtnModule,
+        diag: IfDescriptor,
+        coord: DataUpdateCoordinator[None],
+        idx: int,
+    ) -> None:
         """Initialize the sensor."""
         super().__init__(module, diag, coord, idx)
         self._attr_unique_id = f"Mod_{self._module.uid}_module_status"
@@ -596,7 +632,13 @@ class LogicSensor(HbtnSensor):
     _attr_native_unit_of_measurement = ""
     _attr_translation_key = "logic_state"
 
-    def __init__(self, module: HbtnModule, logic: LgcDescriptor, coord: DataUpdateCoordinator[None], idx: int) -> None:
+    def __init__(
+        self,
+        module: HbtnModule,
+        logic: LgcDescriptor,
+        coord: DataUpdateCoordinator[None],
+        idx: int,
+    ) -> None:
         """Initialize the sensor."""
         super().__init__(module, logic, coord, idx)
         self.idx = logic.idx
@@ -631,23 +673,27 @@ class LogicSensorPush(LogicSensor):
         self.logic.remove_callback(self._handle_coordinator_update)
 
 
-
-
 class PercSensor(HbtnSensor):
     """Representation of a percentage sensor."""
 
     _attr_native_unit_of_measurement = PERCENTAGE
 
-    def __init__(self, module: SmartHub, perctg: IfDescriptor, coord: DataUpdateCoordinator[None], idx: int) -> None:
+    def __init__(
+        self,
+        module: SmartHub,
+        perctg: IfDescriptor,
+        coord: DataUpdateCoordinator[None],
+        idx: int,
+    ) -> None:
         """Initialize the sensor."""
         super().__init__(cast("HbtnModule", module), perctg, coord, idx)
         self.type = perctg.type
         self._attr_unique_id = f"Mod_{self._module.uid}_perc{perctg.nmbr}"
-        if self._attr_name[:6].lower() == "memory":  # type: ignore  # noqa: PGH003
+        if self._attr_name[:6].lower() == "memory":  # type: ignore
             self._attr_icon = "mdi:memory"
-        elif self._attr_name[:4].lower() == "disk":  # type: ignore  # noqa: PGH003
+        elif self._attr_name[:4].lower() == "disk":  # type: ignore
             self._attr_icon = "mdi:harddisk"
-        elif self._attr_name.lower() == "cpu load":  # type: ignore  # noqa: PGH003
+        elif self._attr_name.lower() == "cpu load":  # type: ignore
             self._attr_icon = "mdi:timer-alert-outline"
         else:
             self._attr_icon = "mdi:percent-circle-outline"
@@ -674,11 +720,17 @@ class FrequencySensor(HbtnSensor):
     _attr_device_class = SensorDeviceClass.FREQUENCY
     _attr_native_unit_of_measurement = UnitOfFrequency.HERTZ
 
-    def __init__(self, module: SmartHub, freq: IfDescriptor, coord: DataUpdateCoordinator[None], idx: int) -> None:
+    def __init__(
+        self,
+        module: SmartHub,
+        freq: IfDescriptor,
+        coord: DataUpdateCoordinator[None],
+        idx: int,
+    ) -> None:
         """Initialize the sensor."""
         super().__init__(cast("HbtnModule", module), freq, coord, idx)
         self.type = freq.type
-        if self._attr_name.lower() == "cpu frequency":  # type: ignore  # noqa: PGH003
+        if self._attr_name.lower() == "cpu frequency":  # type: ignore
             self._attr_icon = "mdi:clock-fast"
         else:
             self._attr_icon = "mdi:sine-wave"

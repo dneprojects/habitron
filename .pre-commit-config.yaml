@@ -1,0 +1,17 @@
+# Pre-commit hooks for the Habitron integration repo.
+#
+# Local install: ``pip install pre-commit && pre-commit install``.
+# Then ``git commit`` runs ruff (lint + format) on staged files
+# before the commit goes through. mypy and pytest are NOT in here
+# on purpose — they need the full project to be installed in a
+# venv that matches HA core's, which is heavier than a pre-commit
+# hook should be. Run those locally before push, or rely on the
+# Tests workflow on PR / push.
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.13.0
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format

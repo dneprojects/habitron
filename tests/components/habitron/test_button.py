@@ -37,7 +37,10 @@ async def test_button_setup(setup_integration: MockConfigEntry) -> None:
 def test_translation_keys_set() -> None:
     """Every button class exposes the icon translation key."""
     assert class_attr(RestartButton, "_attr_translation_key") == "module_reset"
-    assert class_attr(RestartFwdTableButton, "_attr_translation_key") == "restart_fwd_table"
+    assert (
+        class_attr(RestartFwdTableButton, "_attr_translation_key")
+        == "restart_fwd_table"
+    )
     assert class_attr(RestartAllButton, "_attr_translation_key") == "router_reset_all"
     assert class_attr(RestartHubButton, "_attr_translation_key") == "hub_restart"
     assert class_attr(RebootHubButton, "_attr_translation_key") == "hub_reboot"

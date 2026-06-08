@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.media_player import (
@@ -186,7 +185,9 @@ def _enable_play_media(player: HbtnMediaPlayer) -> None:
 
 async def test_async_play_media_replace_mode_clears_queue_and_plays() -> None:
     """REPLACE clears the queue and triggers immediate playback."""
-    from homeassistant.components.media_player import MediaPlayerEnqueue  # noqa: PLC0415
+    from homeassistant.components.media_player import (
+        MediaPlayerEnqueue,  # noqa: PLC0415
+    )
 
     player = _make_player()
     _enable_play_media(player)
@@ -273,29 +274,29 @@ async def test_async_play_media_play_mode_inserts_and_forces_play() -> None:
 
 async def test_async_play_media_unresolvable_id_logs_and_returns() -> None:
     """A blank resolved URL aborts the play_media flow."""
-    from homeassistant.components.media_player import MediaPlayerEnqueue  # noqa: PLC0415
+    from homeassistant.components.media_player import (
+        MediaPlayerEnqueue,  # noqa: PLC0415
+    )
 
     player = _make_player()
     player._process_media_id = AsyncMock(return_value="")
     player._extract_metadata = AsyncMock()
     player.async_write_ha_state = MagicMock()
-    await player.async_play_media(
-        "music", "bad-id", enqueue=MediaPlayerEnqueue.REPLACE
-    )
+    await player.async_play_media("music", "bad-id", enqueue=MediaPlayerEnqueue.REPLACE)
     # No queue items were added
     assert player._queue == []
 
 
 async def test_async_play_media_resolver_exception_logged_and_returned() -> None:
     """An exception during resolution is caught + logged."""
-    from homeassistant.components.media_player import MediaPlayerEnqueue  # noqa: PLC0415
+    from homeassistant.components.media_player import (
+        MediaPlayerEnqueue,  # noqa: PLC0415
+    )
 
     player = _make_player()
     player._process_media_id = AsyncMock(side_effect=RuntimeError("boom"))
     player.async_write_ha_state = MagicMock()
-    await player.async_play_media(
-        "music", "bad-id", enqueue=MediaPlayerEnqueue.REPLACE
-    )
+    await player.async_play_media("music", "bad-id", enqueue=MediaPlayerEnqueue.REPLACE)
 
 
 # ---------- Internal queue flow + metadata polling ----------
@@ -333,7 +334,9 @@ async def test_send_item_to_client_writes_payload() -> None:
     player = _make_player()
     player.async_write_ha_state = MagicMock()
     item = QueueItem(
-        "id", "music", "url",
+        "id",
+        "music",
+        "url",
         {"title": "T", "artist": "A", "entity_picture": "pic"},
     )
     await player._send_item_to_client(item)
@@ -479,7 +482,9 @@ async def test_extract_metadata_relative_artwork_becomes_absolute() -> None:
     """A leading-slash artwork URL is prefixed with ``hass.config.internal_url``."""
     player = _make_player()
     player.hass.config.internal_url = "http://ha.local"
-    kwargs = {"extra": {"metadata": {"title": "T", "artist": "A", "imageUrl": "/art.png"}}}
+    kwargs = {
+        "extra": {"metadata": {"title": "T", "artist": "A", "imageUrl": "/art.png"}}
+    }
     out = await player._extract_metadata("http://x", kwargs)
     assert out["entity_picture"] == "http://ha.local/art.png"
 

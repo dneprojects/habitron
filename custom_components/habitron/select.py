@@ -16,9 +16,9 @@ from homeassistant.helpers.update_coordinator import (
 
 from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
+from .interfaces import IfDescriptor
 from .module import HbtnModule
 from .router import AlarmMode, DaytimeMode, HbtnRouter
-from .interfaces import IfDescriptor
 from .smart_hub import LoggingLevels, SmartHub
 
 PARALLEL_UPDATES = 1
@@ -140,7 +140,7 @@ class HbtnMode(CoordinatorEntity[DataUpdateCoordinator[None]], SelectEntity):
             return
         self._value = self._mode & self._mask
         if self._value not in [c.value for c in self._enum]:
-            self.hbtnr.logger.warning(f"Could not find {self._value} in mode enum")  # noqa: G004
+            self.hbtnr.logger.warning(f"Could not find {self._value} in mode enum")
             return
         self._current_option = self._enum(self._value).name
         self.async_write_ha_state()
@@ -356,7 +356,9 @@ class HbtnSelectGroupModePush(HbtnSelectGroupMode):
             self._module.mode.remove_callback(self._handle_coordinator_update)
 
 
-class HbtnSelectLoggingLevel(CoordinatorEntity[DataUpdateCoordinator[None]], SelectEntity):
+class HbtnSelectLoggingLevel(
+    CoordinatorEntity[DataUpdateCoordinator[None]], SelectEntity
+):
     """Logging level object."""
 
     _attr_has_entity_name = True
