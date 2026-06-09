@@ -133,3 +133,4 @@ dmypy.json
 
 # Habitron runtime artifacts (created by save_module_smc / save_router_smr etc.)
 custom_components/habitron/data/
+core-migration-plan.md
