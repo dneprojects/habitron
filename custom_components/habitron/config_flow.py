@@ -29,6 +29,7 @@ from .const import (
     CONF_MIN_INTERVAL,
     DOMAIN,
 )
+from .coordinator import HabitronConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -153,7 +154,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(
-        config_entry: config_entries.ConfigEntry,
+        config_entry: HabitronConfigEntry,
     ) -> config_entries.OptionsFlow:
         """Create the options flow."""
         return MyOptionsFlowHandler()
