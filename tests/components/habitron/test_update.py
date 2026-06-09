@@ -194,14 +194,27 @@ def test_update_path_uses_share_when_addon_slug_set() -> None:
     assert str(app.firmware_dir) == "/share/habitron_addon/firmware"
 
 
-def test_update_path_uses_custom_components_when_not_addon() -> None:
-    """A non-addon install routes the firmware dir under custom_components/<domain>."""
+def test_update_path_uses_config_habitron_when_not_addon(tmp_path: Path) -> None:
+    """A non-addon install routes the firmware dir to <config>/<DOMAIN>/firmware."""
     rt = _make_router_with_smhub()
     rt.smhub.addon_slug = ""
+    rt.hass.config.path = MagicMock(return_value=str(tmp_path))
     app = _make_app(rt=rt)
     app._update_path()
-    assert "custom_components" in str(app.firmware_dir)
-    assert "habitron" in str(app.firmware_dir)
+    assert str(app.firmware_dir) == str(tmp_path / "habitron" / "firmware")
+
+
+def test_update_path_falls_back_to_legacy_custom_components(tmp_path: Path) -> None:
+    """If only the legacy custom_components/<DOMAIN>/firmware exists, use it."""
+    rt = _make_router_with_smhub()
+    rt.smhub.addon_slug = ""
+    rt.hass.config.path = MagicMock(return_value=str(tmp_path))
+    # Create only the legacy path; the new <config>/<DOMAIN>/firmware is absent.
+    legacy = tmp_path / "custom_components" / "habitron" / "firmware"
+    legacy.mkdir(parents=True)
+    app = _make_app(rt=rt)
+    app._update_path()
+    assert app.firmware_dir == legacy
 
 
 # ---------- scan_firmware_dir_blocking ----------
@@ -271,36 +284,22 @@ def test_scan_firmware_dir_handles_iter_error(tmp_path: Path) -> None:
 # ---------- async_update ----------
 
 
-async def test_sc_touch_async_update_no_new_version_does_not_copy() -> None:
-    """When no APK is newer than installed, no copy happens."""
-    app = _make_app()
-    app._attr_installed_version = "5.0.0"
-    app._update_path = MagicMock()
-    app._copy_apk_to_www = AsyncMock()
-    app.hass.async_add_executor_job = AsyncMock(return_value=("1.0.0", "sctouch.apk"))
-    app._module.client_version = "5.0.0"
-    await app.async_update()
-    app._copy_apk_to_www.assert_not_awaited()
-    assert app._attr_latest_version == "1.0.0"
-
-
-async def test_sc_touch_async_update_copies_when_newer_available() -> None:
-    """A newer APK triggers _copy_apk_to_www."""
+async def test_sc_touch_async_update_records_latest_version() -> None:
+    """async_update records the latest version + filename without touching files."""
     app = _make_app()
     app._attr_installed_version = "1.0.0"
     app._update_path = MagicMock()
-    app._copy_apk_to_www = AsyncMock()
     app.hass.async_add_executor_job = AsyncMock(return_value=("2.0.0", "sctouch.apk"))
     app._module.client_version = "1.0.0"
     await app.async_update()
-    app._copy_apk_to_www.assert_awaited_with("sctouch.apk")
+    assert app._attr_latest_version == "2.0.0"
+    assert app._latest_apk_filename == "sctouch.apk"
 
 
 async def test_sc_touch_async_update_picks_up_module_version() -> None:
     """A non-unknown module client_version overrides the cached installed_version."""
     app = _make_app()
     app._update_path = MagicMock()
-    app._copy_apk_to_www = AsyncMock()
     app._module.client_version = "3.3.3"
     app.hass.async_add_executor_job = AsyncMock(return_value=(None, None))
     await app.async_update()
@@ -311,7 +310,6 @@ async def test_sc_touch_async_update_ignores_unknown_module_version() -> None:
     """A 'unknown' client_version is ignored in favour of the cached value."""
     app = _make_app()
     app._update_path = MagicMock()
-    app._copy_apk_to_www = AsyncMock()
     app._module.client_version = "unknown"
     app._attr_installed_version = "1.0.0"
     app.hass.async_add_executor_job = AsyncMock(return_value=(None, None))
@@ -319,39 +317,37 @@ async def test_sc_touch_async_update_ignores_unknown_module_version() -> None:
     assert app._attr_installed_version == "1.0.0"
 
 
-# ---------- _copy_apk_to_www ----------
+# ---------- _apk_url_and_checksum ----------
 
 
-async def test_copy_apk_to_www_returns_url_and_checksum(tmp_path: Path) -> None:
-    """A successful copy returns the public URL + sha256 hex."""
+async def test_apk_url_and_checksum_returns_static_url_and_sha(tmp_path: Path) -> None:
+    """Reads the source file, returns the static-path URL + sha256 hex."""
     rt = _make_router_with_smhub()
-    rt.hass.config.path = MagicMock(return_value=str(tmp_path))
     app = _make_app(rt=rt)
-    src = tmp_path / "firmware"
-    src.mkdir()
-    apk = src / "sctouch_1.apk"
+    apk = tmp_path / "sctouch_1.apk"
     apk.write_bytes(b"apk-contents")
-    app.firmware_dir = src
+    app.firmware_dir = tmp_path
 
     async def _exec_job(func):
         return func()
 
     rt.hass.async_add_executor_job = AsyncMock(side_effect=_exec_job)
-    url, sha = await app._copy_apk_to_www("sctouch_1.apk")
-    assert url == "http://ha.local/local/firmware/sctouch_1.apk"
+    url, sha = await app._apk_url_and_checksum("sctouch_1.apk")
+    assert url == "http://ha.local/habitron-firmware/sctouch_1.apk"
     assert isinstance(sha, str) and len(sha) == 64
 
 
-async def test_copy_apk_to_www_returns_none_on_failure() -> None:
-    """A copy failure (no source file) returns (None, None) + logs."""
+async def test_apk_url_and_checksum_returns_none_on_failure() -> None:
+    """A missing source file yields (None, None) + a logged exception."""
     rt = _make_router_with_smhub()
     app = _make_app(rt=rt)
+    app.firmware_dir = Path("/does/not/exist")
 
     async def _exec_job(func):
         return func()
 
     rt.hass.async_add_executor_job = AsyncMock(side_effect=_exec_job)
-    url, sha = await app._copy_apk_to_www("does-not-exist.apk")
+    url, sha = await app._apk_url_and_checksum("missing.apk")
     assert url is None
     assert sha is None
 
@@ -365,7 +361,7 @@ async def test_sc_touch_async_install_sends_ws_payload() -> None:
     app = _make_app(rt=rt)
     app._attr_latest_version = "2.0.0"
     app._latest_apk_filename = "sctouch_2.0.0.apk"
-    app._copy_apk_to_www = AsyncMock(return_value=("http://x", "abc"))
+    app._apk_url_and_checksum = AsyncMock(return_value=("http://x", "abc"))
     rt.smhub.ws_provider.active_ws_connections[app._module.stream_name] = MagicMock()
     await app.async_install(version=None, backup=False)
     rt.smhub.ws_provider.async_send_json_message.assert_awaited()
@@ -386,21 +382,21 @@ async def test_sc_touch_async_install_raises_without_version() -> None:
 
 
 async def test_sc_touch_async_install_raises_when_client_not_connected() -> None:
-    """No connected client → HomeAssistantError before any copy happens."""
+    """No connected client → HomeAssistantError before any file work happens."""
     from homeassistant.exceptions import HomeAssistantError  # noqa: PLC0415
 
     rt = _make_router_with_smhub()
     app = _make_app(rt=rt)
     app._attr_latest_version = "2.0.0"
-    app._copy_apk_to_www = AsyncMock()
+    app._apk_url_and_checksum = AsyncMock()
     # active_ws_connections is empty by default
     with pytest.raises(HomeAssistantError):
         await app.async_install(version=None, backup=False)
-    app._copy_apk_to_www.assert_not_awaited()
+    app._apk_url_and_checksum.assert_not_awaited()
 
 
-async def test_sc_touch_async_install_raises_when_copy_fails() -> None:
-    """A copy that returns (None, None) raises HomeAssistantError."""
+async def test_sc_touch_async_install_raises_when_hash_fails() -> None:
+    """A hash helper that returns (None, None) raises HomeAssistantError."""
     from homeassistant.exceptions import HomeAssistantError  # noqa: PLC0415
 
     rt = _make_router_with_smhub()
@@ -408,7 +404,7 @@ async def test_sc_touch_async_install_raises_when_copy_fails() -> None:
     app._attr_latest_version = "2.0.0"
     app._latest_apk_filename = "sctouch_2.0.0.apk"
     rt.smhub.ws_provider.active_ws_connections[app._module.stream_name] = MagicMock()
-    app._copy_apk_to_www = AsyncMock(return_value=(None, None))
+    app._apk_url_and_checksum = AsyncMock(return_value=(None, None))
     with pytest.raises(HomeAssistantError):
         await app.async_install(version=None, backup=False)
 

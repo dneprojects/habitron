@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import shutil
 from asyncio import sleep
 from pathlib import Path
 from typing import Any
 
+from homeassistant.components.http import StaticPathConfig
 from homeassistant.components.update import (
     UpdateDeviceClass,
     UpdateEntity,
@@ -33,6 +33,11 @@ from .router import HbtnRouter
 PARALLEL_UPDATES = 1
 
 _LOGGER = logging.getLogger(__name__)
+
+# URL prefix under which we expose the firmware directory via HA's
+# static-path serving. The Touch panel app downloads APKs from there
+# directly — no copy into ``<config>/www/`` necessary.
+_FIRMWARE_URL_PREFIX = "/habitron-firmware"
 
 
 async def async_setup_entry(
@@ -95,6 +100,29 @@ class SCTouchAppUpdate(UpdateEntity):
             "Entity added, triggering immediate update for %s", self._module.uid
         )
         await self.async_update()
+        await self._register_firmware_static_path()
+
+    async def _register_firmware_static_path(self) -> None:
+        """Expose the firmware directory under ``_FIRMWARE_URL_PREFIX``.
+
+        The registration is per-HA-instance; trying to register the same
+        path a second time (e.g. on entry reload or with a second Touch
+        panel) raises — caught and logged at debug level.
+        """
+        if not self.firmware_dir.is_dir():
+            return
+        path_config = StaticPathConfig(
+            _FIRMWARE_URL_PREFIX, str(self.firmware_dir), False
+        )
+        try:
+            await self._hass.http.async_register_static_paths([path_config])
+        except Exception:
+            # Already registered (second Touch panel, entry reload, …).
+            _LOGGER.debug(
+                "Static path %s already registered for %s",
+                _FIRMWARE_URL_PREFIX,
+                self.firmware_dir,
+            )
 
     def scan_firmware_dir_blocking(self) -> tuple[str | None, str | None]:
         """Find the newest ``sctouch_*.apk`` in the firmware directory.
@@ -136,16 +164,41 @@ class SCTouchAppUpdate(UpdateEntity):
         return str(latest_version), latest_filename
 
     def _update_path(self) -> None:
-        """Determine firmware path based on environment."""
+        """Determine firmware path based on environment.
+
+        Resolves to one of (in priority order):
+
+        1. ``/share/<addon_slug>/firmware`` when SmartHub runs as a HA OS
+           add-on. The add-on deposits APKs into ``/share`` by design.
+        2. ``<HA-config>/<DOMAIN>/firmware`` for any other install. This is
+           the path that works in Home Assistant Core; HACS users should
+           migrate to it by moving their existing firmware directory up
+           one level (out of ``custom_components/<DOMAIN>/``).
+        3. ``<HA-config>/custom_components/<DOMAIN>/firmware`` as a
+           backward-compatible fallback for HACS installs that still have
+           their APKs in the old location. Logs a deprecation warning
+           when this path is used.
+        """
         base_path = Path(self._hass.config.path())
         if self._router.smhub.addon_slug:
-            # Path for Home Assistant Add-ons
             self.firmware_dir = (
                 Path("/share") / self._router.smhub.addon_slug / "firmware"
             )
+            return
+
+        new_path = base_path / DOMAIN / "firmware"
+        legacy_path = base_path / "custom_components" / DOMAIN / "firmware"
+        if new_path.is_dir() or not legacy_path.is_dir():
+            self.firmware_dir = new_path
         else:
-            # Default local path
-            self.firmware_dir = base_path / "custom_components" / DOMAIN / "firmware"
+            _LOGGER.warning(
+                "Reading firmware from legacy location %s; move it to %s — "
+                "the legacy path will not exist in a Home Assistant Core "
+                "install of this integration",
+                legacy_path,
+                new_path,
+            )
+            self.firmware_dir = legacy_path
 
     async def async_update(self) -> None:
         """Fetch latest state."""
@@ -172,33 +225,35 @@ class SCTouchAppUpdate(UpdateEntity):
                     self._attr_installed_version,
                     latest_ver,
                 )
-                if latest_file:
-                    await self._copy_apk_to_www(latest_file)
 
-    async def _copy_apk_to_www(self, filename: str) -> tuple[str | None, str | None]:
-        """Copy file to accessible www folder and return URL/hash."""
-        config_dir = Path(self._hass.config.path())
+    async def _apk_url_and_checksum(
+        self, filename: str
+    ) -> tuple[str | None, str | None]:
+        """Return ``(url, sha256)`` for the firmware file served in place.
+
+        The firmware directory is exposed via ``async_register_static_paths``
+        in :meth:`async_added_to_hass`, so there is no copy step — we just
+        compute the SHA256 over the source file and build the URL from the
+        registered prefix.
+        """
         source_file = self.firmware_dir / filename
-        public_dir = config_dir / "www" / "firmware"
-        public_file = public_dir / filename
 
-        def _copy_job() -> tuple[str | None, str | None]:
+        def _hash_job() -> tuple[str | None, str | None]:
             try:
-                public_dir.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(source_file, public_file)
-
                 sha256 = hashlib.sha256()
-                with Path.open(public_file, "rb") as f:
+                with Path.open(source_file, "rb") as f:
                     for chunk in iter(lambda: f.read(65536), b""):
                         sha256.update(chunk)
-
-                url = f"{self._hass.config.internal_url}/local/firmware/{filename}"
+                url = (
+                    f"{self._hass.config.internal_url}"
+                    f"{_FIRMWARE_URL_PREFIX}/{filename}"
+                )
                 return url, sha256.hexdigest()
             except Exception:
-                _LOGGER.exception("Error preparing file %s", filename)
+                _LOGGER.exception("Error hashing file %s", filename)
                 return None, None
 
-        return await self._hass.async_add_executor_job(_copy_job)
+        return await self._hass.async_add_executor_job(_hash_job)
 
     async def async_install(
         self, version: str | None, backup: bool, **kwargs: Any
@@ -222,7 +277,7 @@ class SCTouchAppUpdate(UpdateEntity):
         if self._latest_apk_filename is None:
             raise HomeAssistantError("No APK filename available")
 
-        url, checksum = await self._copy_apk_to_www(self._latest_apk_filename)
+        url, checksum = await self._apk_url_and_checksum(self._latest_apk_filename)
         if not url:
             raise HomeAssistantError("Failed to prepare update file")
 
