@@ -22,13 +22,7 @@ from homeassistant.helpers.service_info.ssdp import (
     SsdpServiceInfo,
 )
 
-from .const import (
-    CONF_DEFAULT_HOST,
-    CONF_DEFAULT_INTERVAL,
-    CONF_MAX_INTERVAL,
-    CONF_MIN_INTERVAL,
-    DOMAIN,
-)
+from .const import CONF_DEFAULT_HOST, DOMAIN
 from .coordinator import HabitronConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
@@ -38,9 +32,7 @@ DISCOVERY_TIMEOUT = 3.0
 DISCOVERY_MESSAGE = b"habitron_discovery"
 
 KEY_HOST = "habitron_host"
-KEY_INTERVAL = "update_interval"
 KEY_TOKEN = "websock_token"
-KEY_UPDATES_ENABLED = "updates_enabled"
 
 
 async def _get_local_ip(hass: HomeAssistant) -> str:
@@ -72,15 +64,6 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     # 2. Basic Validation
     if len(host_to_test) < 4:
         raise InvalidHost
-
-    if not isinstance(data[KEY_INTERVAL], int):
-        raise InvalidInterval
-
-    if data[KEY_INTERVAL] < CONF_MIN_INTERVAL:
-        raise IntervalTooShort
-
-    if data[KEY_INTERVAL] > CONF_MAX_INTERVAL:
-        raise IntervalTooLong
 
     # 3. Connection Test
     try:
@@ -252,7 +235,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 KEY_HOST: self._discovered_device.get(
                     "host", self._discovered_device.get("ip")
                 ),
-                KEY_INTERVAL: 10,
                 KEY_TOKEN: "",
             }
             try:
@@ -276,7 +258,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         default_host = CONF_DEFAULT_HOST
-        default_interval = CONF_DEFAULT_INTERVAL
 
         # Pre-fill with discovery if just opened
         if user_input is None:
@@ -325,26 +306,17 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["base"] = "host_not_found"
             except InvalidHost:
                 errors["base"] = "host_not_found"
-            except InvalidInterval:
-                errors["base"] = "invalid_interval"
-            except IntervalTooShort:
-                errors["base"] = "interval_too_short"
-            except IntervalTooLong:
-                errors["base"] = "interval_too_long"
             except Exception:  # pylint: disable=broad-except
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
 
             default_host = user_input[KEY_HOST]
-            default_interval = user_input[KEY_INTERVAL]
 
-        # Verwendung der Strings passend zur JSON (habitron_host, update_interval)
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema(
                 {
                     vol.Required(KEY_HOST, default=default_host): str,
-                    vol.Required(KEY_INTERVAL, default=default_interval): int,
                     vol.Optional(KEY_TOKEN, default=""): str,
                 }
             ),
@@ -373,12 +345,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["base"] = "host_not_found"
             except InvalidHost:
                 errors["base"] = "host_not_found"
-            except InvalidInterval:
-                errors["base"] = "invalid_interval"
-            except IntervalTooShort:
-                errors["base"] = "interval_too_short"
-            except IntervalTooLong:
-                errors["base"] = "interval_too_long"
             except Exception:  # pylint: disable=broad-except
                 _LOGGER.exception("Unexpected reconfigure error")
                 errors["base"] = "unknown"
@@ -392,10 +358,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema(
                 {
                     vol.Required(KEY_HOST, default=existing.data.get(KEY_HOST)): str,
-                    vol.Required(
-                        KEY_INTERVAL,
-                        default=existing.data.get(KEY_INTERVAL, CONF_DEFAULT_INTERVAL),
-                    ): int,
                     vol.Optional(
                         KEY_TOKEN, default=existing.data.get(KEY_TOKEN, "")
                     ): str,
@@ -428,10 +390,6 @@ class MyOptionsFlowHandler(config_entries.OptionsFlow):
                 return self.async_create_entry(title="", data={})
             except CannotConnect:
                 errors["base"] = "cannot_connect"
-            except IntervalTooShort:
-                errors["base"] = "interval_too_short"
-            except IntervalTooLong:
-                errors["base"] = "interval_too_long"
             except Exception:  # pylint: disable=broad-except
                 _LOGGER.exception("Options flow error")
                 errors["base"] = "unknown"
@@ -443,10 +401,6 @@ class MyOptionsFlowHandler(config_entries.OptionsFlow):
             data_schema=vol.Schema(
                 {
                     vol.Required(KEY_HOST, default=current_config.get(KEY_HOST)): str,
-                    vol.Required(
-                        KEY_INTERVAL,
-                        default=current_config.get(KEY_INTERVAL, CONF_DEFAULT_INTERVAL),
-                    ): int,
                     vol.Optional(
                         KEY_TOKEN, default=current_config.get(KEY_TOKEN, "")
                     ): str,
@@ -466,18 +420,6 @@ class HostNotFound(exceptions.HomeAssistantError):
 
 class InvalidHost(exceptions.HomeAssistantError):
     """Error to indicate there is an invalid hostname."""
-
-
-class InvalidInterval(exceptions.HomeAssistantError):
-    """Error to indicate there is an invalid update interval."""
-
-
-class IntervalTooShort(exceptions.HomeAssistantError):
-    """Error to indicate there is an invalid update interval."""
-
-
-class IntervalTooLong(exceptions.HomeAssistantError):
-    """Error to indicate there is an invalid update interval."""
 
 
 class AlreadyConfigured(exceptions.HomeAssistantError):

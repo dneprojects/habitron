@@ -76,7 +76,7 @@ async def test_update_listener_triggers_reload(
     ) as mock_reload:
         hass.config_entries.async_update_entry(
             entry,
-            options={**entry.options, "update_interval": 8},
+            options={**entry.options, "websock_token": "rotated-token"},
         )
         await hass.async_block_till_done()
         mock_reload.assert_called_with(entry.entry_id)

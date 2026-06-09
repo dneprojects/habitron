@@ -2,21 +2,20 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
+from custom_components.habitron.const import SCAN_INTERVAL
 from custom_components.habitron.coordinator import HbtnCoordinator
 
 
-def _make_comm(hass: HomeAssistant, interval: int = 5) -> MagicMock:
+def _make_comm(hass: HomeAssistant) -> MagicMock:
     """Build a stub for ``HbtnComm`` carrying just what the coordinator reads."""
     comm = MagicMock()
     comm._config = MagicMock()
-    comm._config.data = {"update_interval": interval}
     comm.update_suspended = False
     comm.async_system_update = AsyncMock(return_value=None)
     return comm
@@ -42,15 +41,6 @@ async def test_coordinator_timeout_raises_update_failed(
         await coord._async_update_data()
 
 
-async def test_set_update_interval(hass: HomeAssistant) -> None:
-    """``set_update_interval`` updates both the coordinator and the comm flag."""
-    comm = _make_comm(hass, interval=5)
-    coord = HbtnCoordinator(hass, MagicMock(), comm)
-    coord.set_update_interval(12, updates=False)
-    assert coord.update_interval == timedelta(seconds=12)
-    assert comm.update_suspended is True
-
-
 async def test_coordinator_always_update(hass: HomeAssistant) -> None:
     """``always_update`` is True so the heartbeat fans out on every tick."""
     comm = _make_comm(hass)
@@ -58,11 +48,11 @@ async def test_coordinator_always_update(hass: HomeAssistant) -> None:
     assert coord.always_update is True
 
 
-async def test_coordinator_uses_configured_interval(hass: HomeAssistant) -> None:
-    """The constructor picks up the configured update interval."""
-    comm = _make_comm(hass, interval=7)
+async def test_coordinator_uses_fixed_scan_interval(hass: HomeAssistant) -> None:
+    """The coordinator's interval is the integration's hard-coded SCAN_INTERVAL."""
+    comm = _make_comm(hass)
     coord = HbtnCoordinator(hass, MagicMock(), comm)
-    assert coord.update_interval == timedelta(seconds=7)
+    assert coord.update_interval == SCAN_INTERVAL
 
 
 async def test_async_setup_runs_first_refresh(hass: HomeAssistant) -> None:
