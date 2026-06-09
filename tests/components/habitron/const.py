@@ -14,19 +14,15 @@ MOCK_VERSION: Final = "5.1.0"
 MOCK_HWTYPE: Final = "Raspberry Pi 4 Model B"
 MOCK_SERIAL: Final = "HBT-123456"
 MOCK_UDN: Final = "uuid:12345678-1234-1234-1234-123456789abc"
-MOCK_UPDATE_INTERVAL: Final = 5
 MOCK_WEBSOCK_TOKEN: Final = "test-token-not-real"  # noqa: S105
 
 MOCK_CONFIG_DATA: Final = {
     "habitron_host": MOCK_HOST,
-    "update_interval": MOCK_UPDATE_INTERVAL,
     "websock_token": MOCK_WEBSOCK_TOKEN,
 }
 
 MOCK_CONFIG_OPTIONS: Final = {
     "habitron_host": MOCK_HOST,
-    "update_interval": MOCK_UPDATE_INTERVAL,
-    "updates_enabled": True,
     "websock_token": MOCK_WEBSOCK_TOKEN,
 }
 

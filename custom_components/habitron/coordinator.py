@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from homeassistant.config_entries import ConfigEntry
@@ -13,6 +12,8 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
     UpdateFailed,
 )
+
+from .const import SCAN_INTERVAL
 
 if TYPE_CHECKING:
     from .communicate import HbtnComm
@@ -57,20 +58,13 @@ class HbtnCoordinator(DataUpdateCoordinator[None]):
             _LOGGER,
             name="Habitron updates",
             config_entry=entry,
-            update_interval=timedelta(
-                seconds=hbtn_comm._config.data["update_interval"]
-            ),
+            update_interval=SCAN_INTERVAL,
             always_update=True,
         )
         self.comm = hbtn_comm
         self.config = hbtn_comm._config
         self.rtr_id = 1
         self.previous_devices: set[str] = set()
-
-    def set_update_interval(self, interval: int, updates: bool) -> None:
-        """Update interval for integration re-configuration."""
-        self.update_interval = timedelta(seconds=interval)
-        self.comm.update_suspended = not updates
 
     async def _async_setup(self) -> None:
         """Run a first fetch during ``async_config_entry_first_refresh``."""

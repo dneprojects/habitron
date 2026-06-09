@@ -1,12 +1,16 @@
 """Constants for the Habitron integration."""
 
+from datetime import timedelta
 from typing import Final
 
 DOMAIN = "habitron"  # This is the internal name of the integration, it should also match the directory
 CONF_DEFAULT_HOST = "local"  # default host string of SmartCenter, uses own ip
-CONF_DEFAULT_INTERVAL = 10  # default update interval
-CONF_MIN_INTERVAL = 4  # min update interval
-CONF_MAX_INTERVAL = 60  # max update interval
+
+# Heartbeat interval used by the coordinator. Not user-configurable per
+# Home Assistant integration guidelines — the bus protocol itself is
+# CRC-deduplicated and state changes arrive on a separate push channel,
+# so a fixed value is the right shape.
+SCAN_INTERVAL: Final = timedelta(seconds=10)
 RESTART_RTR = 0
 RESTART_ALL = 0xFF
 HUB_UID = "hub_uid"

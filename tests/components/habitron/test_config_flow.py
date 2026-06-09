@@ -73,23 +73,6 @@ async def test_user_flow_cannot_connect(
     assert result["errors"] == {"base": "cannot_connect"}
 
 
-async def test_user_flow_invalid_interval(
-    hass: HomeAssistant,
-    setup_homeassistant: None,
-    mock_habitron_client: MagicMock,
-) -> None:
-    """An interval below the allowed minimum is rejected."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"],
-        user_input={**MOCK_CONFIG_DATA, "update_interval": 1},
-    )
-    assert result["type"] is FlowResultType.FORM
-    assert result["errors"] == {"base": "interval_too_short"}
-
-
 async def test_user_flow_already_configured(
     hass: HomeAssistant,
     setup_homeassistant: None,
@@ -286,7 +269,6 @@ async def test_options_flow(
 
     new_input = {
         "habitron_host": MOCK_HOST,
-        "update_interval": 10,
         "websock_token": "test-token-not-real",  # noqa: S106
     }
     with patch.object(hass.config_entries, "async_reload", return_value=True):
@@ -319,11 +301,10 @@ async def test_validate_input_local_loopback_rewrites_host(
     """A host equal to the local IP is rewritten to the literal ``local``."""
     from custom_components.habitron.config_flow import (  # noqa: PLC0415
         KEY_HOST,
-        KEY_INTERVAL,
         validate_input,
     )
 
-    data = {KEY_HOST: "192.168.1.10", KEY_INTERVAL: 10, "websock_token": ""}
+    data = {KEY_HOST: "192.168.1.10", "websock_token": ""}
     info = await validate_input(hass, data)
     assert data[KEY_HOST] == "local"
     assert info == {"title": MOCK_NAME}
@@ -333,7 +314,6 @@ async def test_validate_input_invalid_host_too_short(hass: HomeAssistant) -> Non
     """A host string shorter than 4 chars raises ``InvalidHost``."""
     from custom_components.habitron.config_flow import (  # noqa: PLC0415
         KEY_HOST,
-        KEY_INTERVAL,
         InvalidHost,
         validate_input,
     )
@@ -345,47 +325,7 @@ async def test_validate_input_invalid_host_too_short(hass: HomeAssistant) -> Non
         with pytest.raises(InvalidHost):
             await validate_input(
                 hass,
-                {KEY_HOST: "abc", KEY_INTERVAL: 10, "websock_token": ""},
-            )
-
-
-async def test_validate_input_invalid_interval_type(hass: HomeAssistant) -> None:
-    """A non-int interval raises ``InvalidInterval``."""
-    from custom_components.habitron.config_flow import (  # noqa: PLC0415
-        KEY_HOST,
-        KEY_INTERVAL,
-        InvalidInterval,
-        validate_input,
-    )
-
-    with patch(
-        "custom_components.habitron.config_flow._get_local_ip",
-        return_value="10.0.0.5",
-    ):
-        with pytest.raises(InvalidInterval):
-            await validate_input(
-                hass,
-                {KEY_HOST: MOCK_HOST, KEY_INTERVAL: "ten", "websock_token": ""},
-            )
-
-
-async def test_validate_input_interval_too_long(hass: HomeAssistant) -> None:
-    """A too-high interval raises ``IntervalTooLong``."""
-    from custom_components.habitron.config_flow import (  # noqa: PLC0415
-        KEY_HOST,
-        KEY_INTERVAL,
-        IntervalTooLong,
-        validate_input,
-    )
-
-    with patch(
-        "custom_components.habitron.config_flow._get_local_ip",
-        return_value="10.0.0.5",
-    ):
-        with pytest.raises(IntervalTooLong):
-            await validate_input(
-                hass,
-                {KEY_HOST: MOCK_HOST, KEY_INTERVAL: 10_000, "websock_token": ""},
+                {KEY_HOST: "abc", "websock_token": ""},
             )
 
 
@@ -397,7 +337,6 @@ async def test_validate_input_host_not_found_for_dns_failure(
 
     from custom_components.habitron.config_flow import (  # noqa: PLC0415
         KEY_HOST,
-        KEY_INTERVAL,
         HostNotFound,
         validate_input,
     )
@@ -415,7 +354,7 @@ async def test_validate_input_host_not_found_for_dns_failure(
         with pytest.raises(HostNotFound):
             await validate_input(
                 hass,
-                {KEY_HOST: MOCK_HOST, KEY_INTERVAL: 10, "websock_token": ""},
+                {KEY_HOST: MOCK_HOST, "websock_token": ""},
             )
 
 
@@ -684,53 +623,6 @@ async def test_ssdp_discovery_confirm_handles_validate_error(
 # ---------- user flow exception mapping ----------
 
 
-@pytest.mark.parametrize(
-    ("interval", "expected"),
-    [
-        (1, "interval_too_short"),
-        (10_000, "interval_too_long"),
-    ],
-)
-async def test_user_flow_interval_error_mapping(
-    hass: HomeAssistant,
-    setup_homeassistant: None,
-    mock_habitron_client: MagicMock,
-    interval: int,
-    expected: str,
-) -> None:
-    """Each interval edge-case maps to the documented error key."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
-    payload = {**MOCK_CONFIG_DATA, "update_interval": interval}
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], user_input=payload
-    )
-    assert result["type"] is FlowResultType.FORM
-    assert result["errors"] == {"base": expected}
-
-
-async def test_user_flow_invalid_interval_via_validate_input(
-    hass: HomeAssistant,
-    setup_homeassistant: None,
-    mock_habitron_client: MagicMock,
-) -> None:
-    """An InvalidInterval raised from validate_input maps to ``invalid_interval``."""
-    from custom_components.habitron.config_flow import InvalidInterval  # noqa: PLC0415
-
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
-    with patch(
-        "custom_components.habitron.config_flow.validate_input",
-        side_effect=InvalidInterval("interval"),
-    ):
-        result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], user_input=MOCK_CONFIG_DATA
-        )
-    assert result["errors"] == {"base": "invalid_interval"}
-
-
 async def test_user_flow_host_not_found_via_validate_input(
     hass: HomeAssistant,
     setup_homeassistant: None,
@@ -769,60 +661,6 @@ async def test_user_flow_truly_unknown_exception_maps_to_unknown(
             result["flow_id"], user_input=MOCK_CONFIG_DATA
         )
     assert result["errors"] == {"base": "unknown"}
-
-
-async def test_reconfigure_flow_invalid_interval_via_validate_input(
-    hass: HomeAssistant,
-    setup_homeassistant: None,
-    mock_habitron_client: MagicMock,
-) -> None:
-    """The reconfigure flow maps InvalidInterval to ``invalid_interval``."""
-    from custom_components.habitron.config_flow import InvalidInterval  # noqa: PLC0415
-
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        title=MOCK_NAME,
-        unique_id=MOCK_UID,
-        data=MOCK_CONFIG_DATA,
-    )
-    entry.add_to_hass(hass)
-
-    result = await entry.start_reconfigure_flow(hass)
-    with patch(
-        "custom_components.habitron.config_flow.validate_input",
-        side_effect=InvalidInterval("interval"),
-    ):
-        result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], user_input=MOCK_CONFIG_DATA
-        )
-    assert result["errors"] == {"base": "invalid_interval"}
-
-
-async def test_reconfigure_flow_interval_too_long_via_validate_input(
-    hass: HomeAssistant,
-    setup_homeassistant: None,
-    mock_habitron_client: MagicMock,
-) -> None:
-    """The reconfigure flow maps IntervalTooLong to ``interval_too_long``."""
-    from custom_components.habitron.config_flow import IntervalTooLong  # noqa: PLC0415
-
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        title=MOCK_NAME,
-        unique_id=MOCK_UID,
-        data=MOCK_CONFIG_DATA,
-    )
-    entry.add_to_hass(hass)
-
-    result = await entry.start_reconfigure_flow(hass)
-    with patch(
-        "custom_components.habitron.config_flow.validate_input",
-        side_effect=IntervalTooLong("too long"),
-    ):
-        result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], user_input=MOCK_CONFIG_DATA
-        )
-    assert result["errors"] == {"base": "interval_too_long"}
 
 
 async def test_reconfigure_flow_host_not_found_via_validate_input(
@@ -953,7 +791,6 @@ async def test_reconfigure_flow_updates_entry_on_success(
     result = await entry.start_reconfigure_flow(hass)
     new_input = {
         "habitron_host": "10.0.0.99",
-        "update_interval": 12,
         "websock_token": "",
     }
     with patch.object(hass.config_entries, "async_reload", return_value=True):
@@ -963,29 +800,6 @@ async def test_reconfigure_flow_updates_entry_on_success(
         await hass.async_block_till_done()
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reconfigure_successful"
-
-
-async def test_reconfigure_flow_surfaces_interval_too_short(
-    hass: HomeAssistant,
-    setup_homeassistant: None,
-    mock_habitron_client: MagicMock,
-) -> None:
-    """The reconfigure flow surfaces validation errors via form errors."""
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        title=MOCK_NAME,
-        unique_id=MOCK_UID,
-        data=MOCK_CONFIG_DATA,
-    )
-    entry.add_to_hass(hass)
-
-    result = await entry.start_reconfigure_flow(hass)
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"],
-        user_input={**MOCK_CONFIG_DATA, "update_interval": 1},
-    )
-    assert result["type"] is FlowResultType.FORM
-    assert result["errors"] == {"base": "interval_too_short"}
 
 
 async def test_reconfigure_flow_surfaces_cannot_connect(
@@ -1057,7 +871,6 @@ async def test_options_flow_surfaces_cannot_connect(
     result = await hass.config_entries.options.async_init(mock_config_entry.entry_id)
     new_input = {
         "habitron_host": MOCK_HOST,
-        "update_interval": 10,
         "websock_token": "",
     }
     result = await hass.config_entries.options.async_configure(
@@ -1065,60 +878,6 @@ async def test_options_flow_surfaces_cannot_connect(
     )
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {"base": "cannot_connect"}
-
-
-async def test_options_flow_surfaces_interval_too_short(
-    hass: HomeAssistant,
-    setup_homeassistant: None,
-    mock_config_entry: MockConfigEntry,
-    mock_habitron_client: MagicMock,
-    mock_smart_hub_setup: None,
-    mock_ws_provider: MagicMock,
-    mock_coordinator_refresh,
-) -> None:
-    """An interval below the minimum surfaces as ``interval_too_short``."""
-    mock_config_entry.add_to_hass(hass)
-    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
-    await hass.async_block_till_done()
-
-    result = await hass.config_entries.options.async_init(mock_config_entry.entry_id)
-    new_input = {
-        "habitron_host": MOCK_HOST,
-        "update_interval": 1,
-        "websock_token": "",
-    }
-    result = await hass.config_entries.options.async_configure(
-        result["flow_id"], user_input=new_input
-    )
-    assert result["type"] is FlowResultType.FORM
-    assert result["errors"] == {"base": "interval_too_short"}
-
-
-async def test_options_flow_surfaces_interval_too_long(
-    hass: HomeAssistant,
-    setup_homeassistant: None,
-    mock_config_entry: MockConfigEntry,
-    mock_habitron_client: MagicMock,
-    mock_smart_hub_setup: None,
-    mock_ws_provider: MagicMock,
-    mock_coordinator_refresh,
-) -> None:
-    """An interval above the maximum surfaces as ``interval_too_long``."""
-    mock_config_entry.add_to_hass(hass)
-    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
-    await hass.async_block_till_done()
-
-    result = await hass.config_entries.options.async_init(mock_config_entry.entry_id)
-    new_input = {
-        "habitron_host": MOCK_HOST,
-        "update_interval": 10_000,
-        "websock_token": "",
-    }
-    result = await hass.config_entries.options.async_configure(
-        result["flow_id"], user_input=new_input
-    )
-    assert result["type"] is FlowResultType.FORM
-    assert result["errors"] == {"base": "interval_too_long"}
 
 
 async def test_options_flow_surfaces_unknown_exception(
@@ -1145,7 +904,6 @@ async def test_options_flow_surfaces_unknown_exception(
             result["flow_id"],
             user_input={
                 "habitron_host": MOCK_HOST,
-                "update_interval": 10,
                 "websock_token": "",
             },
         )

@@ -107,9 +107,9 @@ Each field of the config flow (and the matching reconfigure flow) maps to a runt
 | Parameter | Required | Description |
 | --- | --- | --- |
 | `Host name or IP of SmartHub` | yes | DNS name or IPv4 address of the SmartHub. Use the literal `local` when HA runs on the SmartCenter itself. |
-| `Update interval [s]` | yes | Heartbeat interval used by the coordinator to fan out state changes that arrive on the bus. Must be 4–60 s. Lower means faster reaction, higher means less CPU on the SmartHub. |
-| `Perform cyclic updates` | yes | Default `true`. Set to `false` to suspend polling temporarily — useful when an external tool (e.g. Habitron's configurator) needs exclusive bus access. |
 | `Token for websocket authentication` | optional | Paste a **Long-Lived Access Token** from your HA profile here. Only required when SC Touch and Assist run on remote HA instances (not in a SmartCenter). |
+
+The coordinator's heartbeat interval is fixed at 10 s, in line with Home Assistant's guideline that polling intervals are not user-configurable.
 
 Parameters can be edited later via the **Configure** button on the integration card (Options flow) or by choosing **Reconfigure** to replace the underlying entry (Reconfigure flow). Both update without removing devices or entities.
 
@@ -118,7 +118,7 @@ Parameters can be edited later via the **Configure** button on the integration c
 The integration combines **push** and **polling**:
 
 - **Push updates**: the SmartHub publishes input / output / sensor changes over a persistent WebSocket as they happen. Entities subscribe via `async_added_to_hass` and update instantly — typically in <100 ms.
-- **Heartbeat polling**: every `Update interval [s]` the coordinator calls `comm.async_system_update()`, which pulls the compact system status from the SmartHub. This serves as a liveness probe — entities flip to *unavailable* when the heartbeat fails (timeout, network error, refused connection).
+- **Heartbeat polling**: every 10 s the coordinator calls `comm.async_system_update()`, which pulls the compact system status from the SmartHub. This serves as a liveness probe — entities flip to *unavailable* when the heartbeat fails (timeout, network error, refused connection).
 - **Push-only paths** (e.g. SC Touch state) bypass the coordinator and use direct callbacks; the heartbeat still drives availability.
 
 Long-running services (firmware updates, status backups) are routed through `hass.async_add_executor_job`, so the asyncio event loop is never blocked by the synchronous `habitron_client` library calls.
@@ -220,7 +220,7 @@ script:
 | Symptom | Likely cause | What to try |
 | --- | --- | --- |
 | Setup is stuck at `Setting up Habitron` | DNS for the SmartHub host doesn't resolve, or port 7777 is unreachable. | Switch to the IP form of the host; check firewalls between HA and the SmartHub. |
-| Every entity is *unavailable* a few minutes after a smooth setup | Coordinator timeout — the SmartHub is no longer responding. | Power-cycle the SmartHub. Reload the integration; if it recovers within the configured `Update interval`, no further action is needed. |
+| Every entity is *unavailable* a few minutes after a smooth setup | Coordinator timeout — the SmartHub is no longer responding. | Power-cycle the SmartHub. Reload the integration; if it recovers within the next 10-second heartbeat, no further action is needed. |
 | Service call raises `ServiceValidationError: hub_not_found` | The `hub_uid` you passed does not match any loaded SmartHub's host string. | Use the host you configured in the entry, not the SmartHub serial. |
 | `sc_system_command` raises `no_matching_module` | The selected device is not an SC Touch (`typ == 0x0104`) or it doesn't expose a `stream_name`. | Pick the SC Touch device, not its sub-modules. |
 | Color picker on RGB CLEDs is empty | Frontend cached the entity's capabilities before the latest update. | Hard-refresh (Ctrl+F5). If still missing, delete the entity from the registry and reload. |

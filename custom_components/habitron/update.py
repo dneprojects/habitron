@@ -245,8 +245,7 @@ class SCTouchAppUpdate(UpdateEntity):
                     for chunk in iter(lambda: f.read(65536), b""):
                         sha256.update(chunk)
                 url = (
-                    f"{self._hass.config.internal_url}"
-                    f"{_FIRMWARE_URL_PREFIX}/{filename}"
+                    f"{self._hass.config.internal_url}{_FIRMWARE_URL_PREFIX}/{filename}"
                 )
                 return url, sha256.hexdigest()
             except Exception:

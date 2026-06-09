@@ -24,7 +24,7 @@ def _make_comm(host: str = "192.168.1.50") -> object:
     hass.data = {"integrations": {"habitron": MagicMock(manifest={"version": "9.9.9"})}}
     hass.async_add_executor_job = AsyncMock()
     config = MagicMock()
-    config.data = {"habitron_host": host, "update_interval": 5}
+    config.data = {"habitron_host": host}
     smhub = MagicMock()
     comm = HbtnComm(hass, config, smhub)
     comm._client = AsyncMock(spec=HabitronClient)

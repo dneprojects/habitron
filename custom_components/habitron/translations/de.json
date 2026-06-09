@@ -7,16 +7,12 @@
     "error": {
       "cannot_connect": "Keine Verbindung zum SmartHub",
       "host_not_found": "Hostname nicht gefunden, evtl. IP eingeben",
-      "interval_too_long": "Intervall zu lang, max. 10 s",
-      "interval_too_short": "Intervall zu kurz, mind. 2 s",
-      "invalid_interval": "Intervall-Eingabe ungültig",
       "unknown": "[%key:common::config_flow::error::unknown%]"
     },
     "step": {
       "user": {
         "data": {
           "habitron_host": "Host-Name oder IP des SmartHub",
-          "update_interval": "Update-Intervall [s]",
           "websock_token": "Token zur Websocket-Authentifizierung"
         },
         "title": "Einstellungen zur Kommunikation"
@@ -24,7 +20,6 @@
       "reconfigure": {
         "data": {
           "habitron_host": "[%key:component::habitron::config::step::user::data::habitron_host%]",
-          "update_interval": "[%key:component::habitron::config::step::user::data::update_interval%]",
           "websock_token": "[%key:component::habitron::config::step::user::data::websock_token%]"
         },
         "title": "SmartHub-Verbindung neu konfigurieren"
@@ -38,16 +33,12 @@
     "error": {
       "cannot_connect": "Keine Verbindung zum SmartHub",
       "host_not_found": "Hostname nicht gefunden, evtl. IP eingeben",
-      "interval_too_long": "Intervall zu lang, max. 60 s",
-      "interval_too_short": "Intervall zu kurz, mind. 4 s",
-      "invalid_interval": "Intervall-Eingabe ungültig",
       "unknown": "[%key:common::config_flow::error::unknown%]"
     },
     "step": {
       "init": {
         "data": {
           "habitron_host": "Host-Name oder IP des SmartHub",
-          "update_interval": "Update-Intervall [s]",
           "updates_enabled": "Zyklische Updates ausführen",
           "websock_token": "Token zur Websocket-Authentifizierung"
         },
