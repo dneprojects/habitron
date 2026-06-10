@@ -7,6 +7,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
+from ._helpers import hbtn_device_info
 from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
 from .interfaces import CmdDescriptor, LgcDescriptor
@@ -73,7 +74,7 @@ class CollCmdButton(ButtonEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
+        return hbtn_device_info(self._module.uid)
 
     @property
     def name(self) -> str | None:
@@ -100,7 +101,7 @@ class DirCmdButton(ButtonEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
+        return hbtn_device_info(self._module.uid)
 
     @property
     def name(self) -> str | None:
@@ -131,7 +132,7 @@ class VisCmdButton(ButtonEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
+        return hbtn_device_info(self._module.uid)
 
     @property
     def name(self) -> str | None:
@@ -164,7 +165,7 @@ class RestartButton(ButtonEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
+        return hbtn_device_info(self._module.uid)
 
     async def async_press(self) -> None:
         """Handle the button press."""
@@ -190,7 +191,7 @@ class RestartFwdTableButton(ButtonEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
+        return hbtn_device_info(self._module.uid)
 
     async def async_press(self) -> None:
         """Handle the button press."""
@@ -216,7 +217,7 @@ class RestartAllButton(ButtonEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._router.uid)}}
+        return hbtn_device_info(self._router.uid)
 
     async def async_press(self) -> None:
         """Handle the button press."""
@@ -242,7 +243,7 @@ class RestartHubButton(ButtonEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._router.b_uid)}}
+        return hbtn_device_info(self._router.b_uid)
 
     async def async_press(self) -> None:
         """Handle the button press."""
@@ -268,7 +269,7 @@ class RebootHubButton(ButtonEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._router.b_uid)}}
+        return hbtn_device_info(self._router.b_uid)
 
     async def async_press(self) -> None:
         """Handle the button press."""
@@ -291,7 +292,7 @@ class CountUpButton(ButtonEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
+        return hbtn_device_info(self._module.uid)
 
     @property
     def name(self) -> str | None:
@@ -321,7 +322,7 @@ class CountDownButton(ButtonEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
+        return hbtn_device_info(self._module.uid)
 
     @property
     def name(self) -> str | None:
@@ -351,7 +352,7 @@ class ResetChannelPowerButton(ButtonEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._router.uid)}}
+        return hbtn_device_info(self._router.uid)
 
     @property
     def name(self) -> str | None:
@@ -391,7 +392,7 @@ class SpeechButton(ButtonEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
+        return hbtn_device_info(self._module.uid)
 
     async def async_press(self) -> None:
         """Handle the button press by sending a WebSocket message to the client."""

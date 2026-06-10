@@ -14,6 +14,7 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
 )
 
+from ._helpers import async_assign_entity_area, hbtn_device_info
 from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
 from .interfaces import AreaDescriptor, IfDescriptor, StateDescriptor
@@ -84,46 +85,15 @@ async def async_setup_entry(
     for hbt_module in hbtn_rt.modules:
         for mod_output in hbt_module.outputs:
             if abs(mod_output.type) == 1:  # standard
-                entity_entry = registry.async_get_entity_id(
-                    "switch", DOMAIN, f"Mod_{hbt_module.uid}_out{mod_output.nmbr}"
+                async_assign_entity_area(
+                    registry,
+                    domain="switch",
+                    unique_id=f"Mod_{hbt_module.uid}_out{mod_output.nmbr}",
+                    area_index=mod_output.area,
+                    area_member=hbt_module.area_member,
+                    area_names=area_names,
+                    propagate_to_hidden_duplicates=True,
                 )
-                if entity_entry:
-                    area_index = mod_output.area
-                    if area_index > len(area_names) - 1:
-                        area_index = 0
-                    if area_index in [0, hbt_module.area_member]:
-                        registry.async_update_entity(
-                            entity_entry, area_id=None
-                        )  # default
-                    else:
-                        registry.async_update_entity(
-                            entity_entry, area_id=area_names[area_index].get_name_id()
-                        )
-                    entity: er.RegistryEntry | None = registry.async_get(entity_entry)
-                    if entity is not None and entity.hidden:
-                        device_entities: list[er.RegistryEntry] = (
-                            er.async_entries_for_device(registry, entity.device_id)  # type: ignore
-                        )
-                        for dev_entity in device_entities:
-                            if dev_entity.original_name == entity.original_name:
-                                if area_index in [0, hbt_module.area_member]:
-                                    registry.async_update_entity(
-                                        dev_entity.entity_id, area_id=None
-                                    )
-                                else:
-                                    registry.async_update_entity(
-                                        dev_entity.entity_id,
-                                        area_id=area_names[area_index].get_name_id(),
-                                    )
-
-                else:
-                    logging.getLogger(__name__).warning(
-                        "Set area for switch, entity not found for output: Mod_%s_out%s",
-                        hbt_module.uid,
-                        mod_output.nmbr,
-                    )
-            else:
-                pass
 
 
 class SwitchedOutput(CoordinatorEntity[DataUpdateCoordinator[None]], SwitchEntity):
@@ -154,7 +124,7 @@ class SwitchedOutput(CoordinatorEntity[DataUpdateCoordinator[None]], SwitchEntit
         if output.type < 0:
             # Entity will not show up
             self._attr_entity_registry_enabled_default = False
-        self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
+        self._attr_device_info = hbtn_device_info(self._module.uid)
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -219,7 +189,7 @@ class SwitchedLed(CoordinatorEntity[DataUpdateCoordinator[None]], SwitchEntity):
         self._nmbr: int = led.nmbr
         self._state: bool = False
         self._attr_unique_id: str | None = f"Mod_{self._module.uid}_led{led.nmbr}"
-        self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
+        self._attr_device_info = hbtn_device_info(self._module.uid)
 
     async def async_added_to_hass(self) -> None:
         """Run when this Entity has been added to HA."""
@@ -293,7 +263,7 @@ class HbtnFlag(CoordinatorEntity[DataUpdateCoordinator[None]], SwitchEntity):
         self._nmbr: int = flag.nmbr
         self._state: bool = False
         self._attr_unique_id: str | None = f"Mod_{self._module.uid}_flag{self._nmbr}"
-        self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
+        self._attr_device_info = hbtn_device_info(self._module.uid)
 
     @property
     def is_on(self) -> bool:
@@ -369,7 +339,7 @@ class MicrophoneSwitch(SwitchEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
+        return hbtn_device_info(self._module.uid)
 
     @property
     def is_on(self) -> bool:
@@ -423,7 +393,7 @@ class ClimateCtlSwitch(SwitchEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
+        return hbtn_device_info(self._module.uid)
 
     @property
     def is_on(self) -> bool:

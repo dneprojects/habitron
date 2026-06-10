@@ -9,6 +9,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
+from ._helpers import async_assign_entity_area, hbtn_device_info
 from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
 
@@ -68,19 +69,14 @@ async def async_setup_entry(
     for hbt_module in hbtn_rt.modules:
         for mod_input in hbt_module.inputs:
             if abs(mod_input.type) == 1:  # pulse switch
-                entity_entry = registry.async_get_entity_id(
-                    "event", DOMAIN, f"Mod_{hbt_module.uid}_evnt{mod_input.nmbr}"
+                async_assign_entity_area(
+                    registry,
+                    domain="event",
+                    unique_id=f"Mod_{hbt_module.uid}_evnt{mod_input.nmbr}",
+                    area_index=mod_input.area,
+                    area_member=hbt_module.area_member,
+                    area_names=area_names,
                 )
-                if entity_entry:
-                    area_index = mod_input.area
-                    if area_index in [0, hbt_module.area_member]:
-                        registry.async_update_entity(
-                            entity_entry, area_id=None
-                        )  # default
-                    else:
-                        registry.async_update_entity(
-                            entity_entry, area_id=area_names[area_index].get_name_id()
-                        )
 
 
 class HbtnEvent(EventEntity):
@@ -112,7 +108,7 @@ class HbtnEvent(EventEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
+        return hbtn_device_info(self._module.uid)
 
     @callback
     def _async_handle_event(self, event: str, *args: Any) -> None:

@@ -23,6 +23,7 @@ from homeassistant.helpers.update_coordinator import (
 from packaging.version import parse as parse_version
 
 from ._axml import read_apk_version_name
+from ._helpers import hbtn_device_info
 from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
 from .module import HbtnModule
@@ -81,7 +82,7 @@ class SCTouchAppUpdate(UpdateEntity):
         self.firmware_dir = Path("")
 
         self._attr_unique_id = f"mod_{self._module.uid}_app_update"
-        self._attr_device_info = {"identifiers": {(DOMAIN, module.uid)}}
+        self._attr_device_info = hbtn_device_info(module.uid)
 
         # Initial version sync from module property
         current_version = getattr(self._module, "client_version", "0.0.0")
@@ -342,7 +343,7 @@ class HbtnModuleUpdate(CoordinatorEntity[DataUpdateCoordinator[None]], UpdateEnt
     @property
     def device_info(self) -> DeviceInfo:
         """Return device info."""
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
+        return hbtn_device_info(self._module.uid)
 
     @property
     def in_progress(self) -> bool:
