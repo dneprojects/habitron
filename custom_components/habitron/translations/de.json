@@ -321,6 +321,15 @@
     }
   },
   "exceptions": {
+    "connect_error": {
+      "message": "Fehler beim Verbinden mit dem SmartHub: {error}"
+    },
+    "connect_refused": {
+      "message": "Verbindung zum SmartHub abgelehnt: {error}"
+    },
+    "connect_timeout": {
+      "message": "Zeitüberschreitung beim Verbinden mit dem SmartHub."
+    },
     "no_hub_loaded": {
       "message": "Habitron-Service aufgerufen, aber kein SmartHub geladen."
     },
@@ -335,6 +344,39 @@
     },
     "no_matching_module": {
       "message": "Kein gültiges Smart-Touch-Modul für Gerät {device_id} gefunden."
+    },
+    "update_apk_prep_failed": {
+      "message": "Update-Datei für die Smart-Touch-App konnte nicht vorbereitet werden."
+    },
+    "update_client_not_connected": {
+      "message": "Client {module_name} ist nicht verbunden."
+    },
+    "update_network_error": {
+      "message": "Netzwerkfehler beim Abrufen des SmartHub-Status: {error}"
+    },
+    "update_no_apk_filename": {
+      "message": "Kein APK-Dateiname für das Smart-Touch-App-Update verfügbar."
+    },
+    "update_no_version_info": {
+      "message": "Keine Versionsinformation für das Smart-Touch-App-Update verfügbar."
+    },
+    "update_no_webrtc_provider": {
+      "message": "WebRTC-Provider nicht verfügbar; Update kann nicht durchgeführt werden."
+    },
+    "update_timeout": {
+      "message": "Zeitüberschreitung beim Abrufen des SmartHub-Status."
+    },
+    "webrtc_negotiation_failed": {
+      "message": "WebRTC-Aushandlung fehlgeschlagen: {error}"
+    },
+    "webrtc_no_active_client": {
+      "message": "Kein aktiver Client für Stream {stream_name}."
+    },
+    "webrtc_snapshot_timeout": {
+      "message": "Zeitüberschreitung bei der Snapshot-Anfrage."
+    },
+    "webrtc_stream_source_unavailable": {
+      "message": "Stream-Quelle nicht verfügbar."
     }
   },
   "system_health": {

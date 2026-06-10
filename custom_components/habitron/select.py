@@ -1,14 +1,12 @@
 """Platform for select integration."""
 
-from __future__ import annotations
-
 from enum import Enum
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
     DataUpdateCoordinator,
@@ -27,7 +25,7 @@ PARALLEL_UPDATES = 1
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: HabitronConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add input_select for passed config_entry in HA."""
     hbtn_rt: HbtnRouter = entry.runtime_data.router
@@ -184,7 +182,7 @@ class HbtnSelectDaytimeMode(HbtnMode):
             self._attr_name = f"Group {self._module.group} daytime"
             self._attr_unique_id = f"Mod_{self._module.uid}_daytime_mode"
             self._attr_entity_registry_enabled_default = (
-                False  # Entity will initally be disabled
+                False  # Entity will initially be disabled
             )
             if self._value == 0:
                 # Not clear, inherit mode of group 0?

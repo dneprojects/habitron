@@ -7,8 +7,6 @@ without spinning up a real Assist pipeline. We can also fire fake
 ``event_callback`` / ``_stream_tts_to_client`` paths.
 """
 
-from __future__ import annotations
-
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 

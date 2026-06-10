@@ -451,18 +451,14 @@ class HbtnComm:
         """Get module settings (smg) and saves them to file."""
         data = await self.async_get_module_settings(mod_id)
         file_name = f"Module_{mod_id}.smg"
-        str_data = ""
-        for byt in data:
-            str_data += f"{byt};"
+        str_data = "".join(f"{byt};" for byt in data)
         await self.save_config_data(file_name, str_data)
 
     async def save_smr_file(self) -> None:
         """Get router settings (smr) and saves them to file."""
         data = await self.get_smr()
         file_name = "Router_1.smr"
-        str_data = ""
-        for byt in data:
-            str_data += f"{byt};"
+        str_data = "".join(f"{byt};" for byt in data)
         await self.save_config_data(file_name, str_data)
 
     async def save_config_data(self, file_name: str, str_data: str) -> None:

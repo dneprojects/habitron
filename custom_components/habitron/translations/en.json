@@ -321,6 +321,15 @@
     }
   },
   "exceptions": {
+    "connect_error": {
+      "message": "Error connecting to SmartHub: {error}"
+    },
+    "connect_refused": {
+      "message": "Connection refused to SmartHub: {error}"
+    },
+    "connect_timeout": {
+      "message": "Timeout while connecting to SmartHub."
+    },
     "no_hub_loaded": {
       "message": "Habitron service called but no SmartHub is loaded."
     },
@@ -335,6 +344,39 @@
     },
     "no_matching_module": {
       "message": "No valid Smart Touch module was found for device {device_id}."
+    },
+    "update_apk_prep_failed": {
+      "message": "Failed to prepare update file for the Smart Touch app."
+    },
+    "update_client_not_connected": {
+      "message": "Client {module_name} is not connected."
+    },
+    "update_network_error": {
+      "message": "Network error fetching status from SmartHub: {error}"
+    },
+    "update_no_apk_filename": {
+      "message": "No APK filename available for the Smart Touch app update."
+    },
+    "update_no_version_info": {
+      "message": "No version information available for the Smart Touch app update."
+    },
+    "update_no_webrtc_provider": {
+      "message": "WebRTC provider not available; cannot perform the update."
+    },
+    "update_timeout": {
+      "message": "Timeout fetching system status from SmartHub."
+    },
+    "webrtc_negotiation_failed": {
+      "message": "WebRTC negotiation failed: {error}"
+    },
+    "webrtc_no_active_client": {
+      "message": "No active client for stream {stream_name}."
+    },
+    "webrtc_snapshot_timeout": {
+      "message": "Snapshot request timed out."
+    },
+    "webrtc_stream_source_unavailable": {
+      "message": "Stream source unavailable."
     }
   },
   "system_health": {

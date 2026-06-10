@@ -1,7 +1,5 @@
 """Tests for the Habitron domain services."""
 
-from __future__ import annotations
-
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest

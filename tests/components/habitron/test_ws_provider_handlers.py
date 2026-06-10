@@ -13,8 +13,6 @@ This is enough to exercise the closure bodies without spinning up an
 actual WebSocket connection.
 """
 
-from __future__ import annotations
-
 import asyncio
 import base64
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -181,7 +179,7 @@ async def test_register_stream_disconnect_skips_done_future() -> None:
         },
     )
     fut = asyncio.Future()
-    fut.set_result("ans")  # already done
+    fut.set_result("answer-sdp")  # already done
     provider.webrtc_futures["sess-X"] = fut
     provider.session_to_stream_map["sess-X"] = "touch_1"
     conn.subscriptions[1]()  # disconnect

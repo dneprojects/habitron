@@ -4,8 +4,6 @@ Skeleton with smoke-level setup test and translation_key sanity checks.
 Extend with per-entity state-transition tests and snapshot-based UI tests.
 """
 
-from __future__ import annotations
-
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -26,6 +24,7 @@ from custom_components.habitron.interfaces import TYPE_DIAG
 from .conftest import class_attr
 
 
+from homeassistant.core import HomeAssistant
 async def test_binary_sensor_setup(setup_integration: MockConfigEntry) -> None:
     """The platform sets up cleanly against an empty router."""
     assert setup_integration.runtime_data is not None
@@ -340,7 +339,7 @@ def test_listening_status_sensor_set_listening_state_noop_when_same() -> None:
     entity.async_write_ha_state.assert_not_called()
 
 
-async def test_async_setup_entry_creates_all_entity_types(hass) -> None:
+async def test_async_setup_entry_creates_all_entity_types(hass: HomeAssistant) -> None:
     """async_setup_entry builds input/motion/rain/listening/state entities."""
     inp = _make_input(type_=2)
     motion = MagicMock()
@@ -385,7 +384,7 @@ async def test_async_setup_entry_creates_all_entity_types(hass) -> None:
         registry = MagicMock()
         registry.async_get_entity_id = MagicMock(return_value="binary_sensor.fake")
         mock_get.return_value = registry
-        await async_setup_entry(hass, entry, lambda es: added.extend(es))
+        await async_setup_entry(hass, entry, added.extend)
 
     assert any(isinstance(e, InputSwitchPush) for e in added)
     assert any(isinstance(e, MotionSensorPush) for e in added)
@@ -395,7 +394,7 @@ async def test_async_setup_entry_creates_all_entity_types(hass) -> None:
     assert mod.vce_stat is not None
 
 
-async def test_async_setup_entry_assigns_area_when_input_area_differs(hass) -> None:
+async def test_async_setup_entry_assigns_area_when_input_area_differs(hass: HomeAssistant) -> None:
     """A switch with area != module.area_member gets an area_id assigned."""
     inp = MagicMock()
     inp.nmbr = 0

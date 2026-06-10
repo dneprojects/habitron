@@ -1,7 +1,5 @@
 """Tests for the Habitron assist_satellite platform."""
 
-from __future__ import annotations
-
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -12,6 +10,7 @@ from custom_components.habitron.assist_satellite import (
 )
 
 
+from homeassistant.core import HomeAssistant
 async def test_assist_satellite_setup(setup_integration: MockConfigEntry) -> None:
     """The assist_satellite platform sets up cleanly against an empty router."""
     assert setup_integration.runtime_data is not None
@@ -261,7 +260,7 @@ def test_on_pipeline_event_error_without_data_sets_idle() -> None:
 # ---------- async_setup_entry ----------
 
 
-async def test_async_setup_entry_creates_satellite_per_touch_module(hass) -> None:
+async def test_async_setup_entry_creates_satellite_per_touch_module(hass: HomeAssistant) -> None:
     """async_setup_entry adds one HbtnAssistSat per Smart Controller Touch."""
     touch = _make_touch_module()
     other = MagicMock()
@@ -275,13 +274,13 @@ async def test_async_setup_entry_creates_satellite_per_touch_module(hass) -> Non
     entry.runtime_data = smhub
 
     added: list = []
-    await async_setup_entry(hass, entry, lambda es: added.extend(es))
+    await async_setup_entry(hass, entry, added.extend)
     assert len(added) == 1
     assert isinstance(added[0], HbtnAssistSat)
     assert provider.assist_satellites["touch_1_5"] is added[0]
 
 
-async def test_async_setup_entry_short_circuits_without_provider(hass) -> None:
+async def test_async_setup_entry_short_circuits_without_provider(hass: HomeAssistant) -> None:
     """No WS provider → no entities and an error log."""
     touch = _make_touch_module()
     smhub = MagicMock()
@@ -292,5 +291,5 @@ async def test_async_setup_entry_short_circuits_without_provider(hass) -> None:
     entry.runtime_data = smhub
 
     added: list = []
-    await async_setup_entry(hass, entry, lambda es: added.extend(es))
+    await async_setup_entry(hass, entry, added.extend)
     assert added == []

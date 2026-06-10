@@ -1,7 +1,5 @@
 """Tests for the Habitron text platform."""
 
-from __future__ import annotations
-
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -15,6 +13,7 @@ from custom_components.habitron.text import (
 from .conftest import class_attr
 
 
+from homeassistant.core import HomeAssistant
 async def test_text_setup(setup_integration: MockConfigEntry) -> None:
     """The text platform sets up cleanly against an empty router."""
     assert setup_integration.runtime_data is not None
@@ -232,7 +231,7 @@ async def test_ekey_fngr_async_will_remove_unregisters() -> None:
     mod.sensors[0].remove_callback.assert_called()
 
 
-async def test_async_setup_entry_emits_ekey_user_and_finger(hass) -> None:
+async def test_async_setup_entry_emits_ekey_user_and_finger(hass: HomeAssistant) -> None:
     """async_setup_entry emits one EKeySensorUsr + one EKeySensorFngr."""
     ident = MagicMock()
     ident.name = "Identifier"
@@ -251,12 +250,12 @@ async def test_async_setup_entry_emits_ekey_user_and_finger(hass) -> None:
     entry.runtime_data.router = router
 
     added: list = []
-    await async_setup_entry(hass, entry, lambda es: added.extend(es))
+    await async_setup_entry(hass, entry, added.extend)
     assert any(isinstance(e, EKeySensorUsr) for e in added)
     assert any(isinstance(e, EKeySensorFngr) for e in added)
 
 
-async def test_async_setup_entry_skips_other_sensors(hass) -> None:
+async def test_async_setup_entry_skips_other_sensors(hass: HomeAssistant) -> None:
     """A non-eKey sensor does not produce any entity."""
     sensor = MagicMock()
     sensor.name = "Temperature"
@@ -270,5 +269,5 @@ async def test_async_setup_entry_skips_other_sensors(hass) -> None:
     entry.runtime_data.router = router
 
     added: list = []
-    await async_setup_entry(hass, entry, lambda es: added.extend(es))
+    await async_setup_entry(hass, entry, added.extend)
     assert added == []

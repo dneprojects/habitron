@@ -1,7 +1,5 @@
 """Tests for the Habitron router class."""
 
-from __future__ import annotations
-
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -254,7 +252,9 @@ async def test_get_descriptions_parses_flags_commands_and_areas() -> None:
     assert rt.cover_autostop_del == 7
 
 
-async def test_get_descriptions_unknown_code_logs_warning(caplog) -> None:
+async def test_get_descriptions_unknown_code_logs_warning(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     """An unknown content code logs a warning but does not raise."""
     rt = _make_router()
     # Use a code that's outside the listed branches AND has byte[2] != 7

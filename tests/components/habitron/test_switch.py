@@ -1,7 +1,5 @@
 """Tests for the Habitron switch platform."""
 
-from __future__ import annotations
-
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -21,6 +19,7 @@ from custom_components.habitron.switch import (
 from .conftest import class_attr
 
 
+from homeassistant.core import HomeAssistant
 async def test_switch_setup(setup_integration: MockConfigEntry) -> None:
     """The switch platform sets up cleanly against an empty router."""
     assert setup_integration.runtime_data is not None
@@ -522,7 +521,7 @@ def test_climate_ctl_switch_device_info() -> None:
     assert ("habitron", "MOD-1") in entity.device_info["identifiers"]
 
 
-async def test_async_setup_entry_emits_switch_and_led_and_flag(hass) -> None:
+async def test_async_setup_entry_emits_switch_and_led_and_flag(hass: HomeAssistant) -> None:
     """async_setup_entry creates Switch, Led, Flag, ClimateCtl, Microphone, RouterFlag."""
     out = _make_output(type_=1, nmbr=0)
     led_white = _make_led_descriptor(nmbr=0)
@@ -572,7 +571,7 @@ async def test_async_setup_entry_emits_switch_and_led_and_flag(hass) -> None:
         reg_entry.hidden = False
         registry.async_get.return_value = reg_entry
         mock_get.return_value = registry
-        await async_setup_entry(hass, entry, lambda es: added.extend(es))
+        await async_setup_entry(hass, entry, added.extend)
 
     assert any(isinstance(e, SwitchedOutputPush) for e in added)
     assert any(isinstance(e, SwitchedLed) for e in added)
@@ -581,7 +580,7 @@ async def test_async_setup_entry_emits_switch_and_led_and_flag(hass) -> None:
     assert any(isinstance(e, MicrophoneSwitch) for e in added)
 
 
-async def test_async_setup_entry_skips_cled_zero_for_rgb(hass) -> None:
+async def test_async_setup_entry_skips_cled_zero_for_rgb(hass: HomeAssistant) -> None:
     """For typ b"\x01\x04" the CLED 0 is dedicated to ambient and is skipped."""
     out = _make_output(type_=1, nmbr=0)
     led_white = _make_led_descriptor(nmbr=0)
@@ -618,14 +617,14 @@ async def test_async_setup_entry_skips_cled_zero_for_rgb(hass) -> None:
         registry = MagicMock()
         registry.async_get_entity_id = MagicMock(return_value=None)
         mock_get.return_value = registry
-        await async_setup_entry(hass, entry, lambda es: added.extend(es))
+        await async_setup_entry(hass, entry, added.extend)
 
     # Only one LED added (the red), not the white one
     leds = [e for e in added if isinstance(e, SwitchedLed)]
     assert len(leds) == 1
 
 
-async def test_async_setup_entry_logs_warning_when_entity_not_found(hass) -> None:
+async def test_async_setup_entry_logs_warning_when_entity_not_found(hass: HomeAssistant) -> None:
     """A missing registry entry triggers a warning log path."""
     out = _make_output(type_=1, nmbr=0)
     out.area = 5
@@ -659,7 +658,7 @@ async def test_async_setup_entry_logs_warning_when_entity_not_found(hass) -> Non
         await async_setup_entry(hass, entry, lambda es: None)
 
 
-async def test_async_setup_entry_external_area_with_hidden_entity_alias(hass) -> None:
+async def test_async_setup_entry_external_area_with_hidden_entity_alias(hass: HomeAssistant) -> None:
     """Hidden entities with the same original name are also moved to the area."""
     out = _make_output(type_=1, nmbr=0)
     out.area = 5
@@ -711,7 +710,7 @@ async def test_async_setup_entry_external_area_with_hidden_entity_alias(hass) ->
     registry.async_update_entity.assert_any_call("switch.alias", area_id="area_5_id")
 
 
-async def test_async_setup_entry_area_overflow_falls_back_to_zero(hass) -> None:
+async def test_async_setup_entry_area_overflow_falls_back_to_zero(hass: HomeAssistant) -> None:
     """An out-of-range area index gets clamped to zero (default)."""
     out = _make_output(type_=1, nmbr=0)
     out.area = 99
@@ -750,7 +749,7 @@ async def test_async_setup_entry_area_overflow_falls_back_to_zero(hass) -> None:
     registry.async_update_entity.assert_called_with("switch.fake", area_id=None)
 
 
-async def test_async_setup_entry_external_area_for_hidden_alias_zero_area(hass) -> None:
+async def test_async_setup_entry_external_area_for_hidden_alias_zero_area(hass: HomeAssistant) -> None:
     """A hidden entity that resolves to area 0 unsets the area on its alias."""
     out = _make_output(type_=1, nmbr=0)
     out.area = 0  # same as module area_member 0 → default branch
@@ -798,7 +797,7 @@ async def test_async_setup_entry_external_area_for_hidden_alias_zero_area(hass) 
     registry.async_update_entity.assert_any_call("switch.alias", area_id=None)
 
 
-async def test_async_setup_entry_skips_non_standard_outputs(hass) -> None:
+async def test_async_setup_entry_skips_non_standard_outputs(hass: HomeAssistant) -> None:
     """Outputs with ``|type|`` != 1 fall through the else-branch of the area loop."""
     out = _make_output(type_=2, nmbr=0)
 

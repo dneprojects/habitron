@@ -1,7 +1,5 @@
 """Platform for switch integration."""
 
-from __future__ import annotations
-
 import logging
 from typing import Any
 
@@ -10,7 +8,7 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
     DataUpdateCoordinator,
@@ -28,7 +26,7 @@ PARALLEL_UPDATES = 1
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: HabitronConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add switches for passed config_entry in HA."""
     hbtn_rt: HbtnRouter = entry.runtime_data.router
@@ -129,7 +127,7 @@ async def async_setup_entry(
 
 
 class SwitchedOutput(CoordinatorEntity[DataUpdateCoordinator[None]], SwitchEntity):
-    """Representation of habitron outout as switch entities."""
+    """Representation of habitron output as switch entities."""
 
     _attr_has_entity_name = True
 
@@ -406,13 +404,13 @@ class ClimateCtlSwitch(SwitchEntity):
 
     def __init__(self, module: HbtnModule) -> None:
         """Initialize a switch for the microphone."""
-        self._name = "Climate Contoller 2"
+        self._name = "Climate Controller 2"
         self._module = module
         self._attr_unique_id = f"Mod_{self._module.uid}_{self._name}"
         self._attr_name = self._name
         self._attr_entity_category = EntityCategory.CONFIG
         self._attr_entity_registry_enabled_default = (
-            False  # Entity will initally be disabled
+            False  # Entity will initially be disabled
         )
         self._state = self._module.climate_ctl12 == 2
 

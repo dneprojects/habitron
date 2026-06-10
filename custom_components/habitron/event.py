@@ -1,14 +1,12 @@
 """Platform for events integration."""
 
-from __future__ import annotations
-
 from typing import Any
 
 from homeassistant.components.event import EventDeviceClass, EventEntity
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .const import DOMAIN
@@ -24,7 +22,7 @@ PARALLEL_UPDATES = 1
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: HabitronConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add event entities for Habitron system."""
     hbtn_rt = entry.runtime_data.router
@@ -154,6 +152,7 @@ class FingerDetected(HbtnEvent):
     """Representation of habitron button short press event."""
 
     _attr_device_class = EventDeviceClass.BUTTON
+    _attr_has_entity_name = True
     _attr_event_types = ["finger"]
 
     def __init__(

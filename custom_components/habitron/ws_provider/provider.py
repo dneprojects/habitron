@@ -182,7 +182,10 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
         _LOGGER.info("Received WebRTC offer for session: %s", session_id)
         stream_source = await camera.stream_source()
         if not stream_source:
-            raise HomeAssistantError("Stream source unavailable")
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="webrtc_stream_source_unavailable",
+            )
 
         stream_name = stream_source.replace("habitron://", "")
         if not self.active_ws_connections.get(stream_name):
@@ -229,7 +232,11 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
         except Exception as err:
             _LOGGER.error("WebRTC negotiation failed: %s", err)
             send_message(WebRTCError(code="negotiation_failed", message=str(err)))
-            raise HomeAssistantError(f"WebRTC negotiation failed: {err}") from err
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="webrtc_negotiation_failed",
+                translation_placeholders={"error": str(err)},
+            ) from err
 
     async def async_on_webrtc_candidate(
         self, session_id: str, candidate: RTCIceCandidateInit
@@ -253,7 +260,11 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
     async def async_take_snapshot(self, stream_name: str) -> bytes:
         """Request a snapshot from the connected client."""
         if not self.active_ws_connections.get(stream_name):
-            raise HomeAssistantError(f"No active client for stream '{stream_name}'")
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="webrtc_no_active_client",
+                translation_placeholders={"stream_name": stream_name},
+            )
 
         request_id = uuid.uuid4().hex
         fut: asyncio.Future[Any] = asyncio.Future()
@@ -268,7 +279,10 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
         try:
             return await asyncio.wait_for(fut, timeout=5)
         except TimeoutError as err:
-            raise HomeAssistantError("Snapshot request timed out") from err
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="webrtc_snapshot_timeout",
+            ) from err
         finally:
             self.snapshot_futures.pop(request_id, None)  # Clean up future
 

@@ -1,13 +1,10 @@
 """Platform for number integration."""
 
-from __future__ import annotations
-
-from homeassistant.components.number import NumberDeviceClass, NumberEntity
-from homeassistant.components.number.const import NumberMode
+from homeassistant.components.number import NumberDeviceClass, NumberEntity, NumberMode
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
     DataUpdateCoordinator,
@@ -25,7 +22,7 @@ PARALLEL_UPDATES = 1
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: HabitronConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add input_number for passed config_entry in HA."""
     hbtn_rt: HbtnRouter = entry.runtime_data.router

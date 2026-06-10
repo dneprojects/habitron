@@ -25,7 +25,7 @@ from homeassistant.const import (
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
     DataUpdateCoordinator,
@@ -45,7 +45,7 @@ PARALLEL_UPDATES = 1
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: HabitronConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add sensors for passed config_entry in HA."""
     hbtn_rt = entry.runtime_data.router
@@ -470,7 +470,7 @@ class TemperatureSensor(HbtnSensor):
         super().__init__(module, sensor, coord, idx)
         if sensor.name == "Temperature ext.":
             self._attr_entity_registry_enabled_default = (
-                False  # Entity will initally be disabled
+                False  # Entity will initially be disabled
             )
 
 
@@ -564,7 +564,7 @@ class HbtnDiagSensor(CoordinatorEntity[DataUpdateCoordinator[None]], SensorEntit
         self._value = 0
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
         self._attr_entity_registry_enabled_default = (
-            False  # Entity will initally be disabled
+            False  # Entity will initially be disabled
         )
 
     # To link this entity to its device, this property must return an
@@ -585,6 +585,7 @@ class TemperatureDSensor(HbtnDiagSensor):
     """Representation of a Sensor."""
 
     _attr_device_class = SensorDeviceClass.TEMPERATURE
+    _attr_has_entity_name = True
     _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
 
     def __init__(
@@ -602,6 +603,8 @@ class TemperatureDSensor(HbtnDiagSensor):
 
 class StatusSensor(HbtnDiagSensor):
     """Representation of a Sensor."""
+
+    _attr_has_entity_name = True
 
     def __init__(
         self,
@@ -701,7 +704,7 @@ class PercSensor(HbtnSensor):
             self._attr_entity_category = EntityCategory.DIAGNOSTIC
             self._attr_unique_id = f"Mod_{self._module.uid}_dperc{perctg.nmbr}"
             self._attr_entity_registry_enabled_default = (
-                False  # Entity will initally be disabled
+                False  # Entity will initially be disabled
             )
 
     @callback
@@ -737,7 +740,7 @@ class FrequencySensor(HbtnSensor):
         if abs(self.type) == TYPE_DIAG:
             self._attr_entity_category = EntityCategory.DIAGNOSTIC
             self._attr_entity_registry_enabled_default = (
-                False  # Entity will initally be disabled
+                False  # Entity will initially be disabled
             )
 
     @callback
@@ -774,7 +777,7 @@ class HabitronClientSensor(SensorEntity):
         self._attr_native_unit_of_measurement = unit_of_measurement
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
         self._attr_entity_registry_enabled_default = (
-            False  # Entity will initally be disabled
+            False  # Entity will initially be disabled
         )
         if icon:
             self._attr_icon = icon

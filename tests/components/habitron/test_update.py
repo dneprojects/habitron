@@ -1,7 +1,5 @@
 """Tests for the Habitron update platform."""
 
-from __future__ import annotations
-
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -18,6 +16,7 @@ from custom_components.habitron.update import (
 from .conftest import class_attr
 
 
+from homeassistant.core import HomeAssistant
 async def test_update_setup(setup_integration: MockConfigEntry) -> None:
     """The update platform sets up cleanly against an empty router."""
     assert setup_integration.runtime_data is not None
@@ -88,7 +87,7 @@ def _make_router_with_smhub() -> MagicMock:
 # ---------- async_setup_entry ----------
 
 
-async def test_async_setup_entry_emits_router_module_and_touch_app(hass) -> None:
+async def test_async_setup_entry_emits_router_module_and_touch_app(hass: HomeAssistant) -> None:
     """async_setup_entry adds router + module + SCTouchAppUpdate for Touch."""
     touch = _make_module(typ=b"\x01\x04")
     other = _make_module(uid="MOD-2", typ=b"\x01\x03")
@@ -103,14 +102,14 @@ async def test_async_setup_entry_emits_router_module_and_touch_app(hass) -> None
     entry.runtime_data.router = rt
 
     added: list = []
-    await async_setup_entry(hass, entry, lambda es: added.extend(es))
+    await async_setup_entry(hass, entry, added.extend)
 
     # 1 router + 2 modules + 1 SCTouchAppUpdate for the Touch
     assert len(added) == 4
     assert any(isinstance(e, SCTouchAppUpdate) for e in added)
 
 
-async def test_async_setup_entry_skips_apk_for_non_touch(hass) -> None:
+async def test_async_setup_entry_skips_apk_for_non_touch(hass: HomeAssistant) -> None:
     """A module that isn't a Smart Controller Touch does not get an APK entity."""
     rt = MagicMock()
     rt.modules = [_make_module(typ=b"\x01\x03")]
@@ -119,7 +118,7 @@ async def test_async_setup_entry_skips_apk_for_non_touch(hass) -> None:
     entry.runtime_data.router = rt
 
     added: list = []
-    await async_setup_entry(hass, entry, lambda es: added.extend(es))
+    await async_setup_entry(hass, entry, added.extend)
     # router + module = 2; no SCTouchAppUpdate
     assert sum(isinstance(e, SCTouchAppUpdate) for e in added) == 0
 

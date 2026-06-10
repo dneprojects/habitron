@@ -1,7 +1,5 @@
 """Tests for the Habitron interfaces descriptor helpers."""
 
-from __future__ import annotations
-
 import asyncio
 from unittest.mock import MagicMock
 

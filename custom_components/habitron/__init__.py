@@ -1,7 +1,5 @@
 """The Habitron integration."""
 
-from __future__ import annotations
-
 from habitron_client import HabitronTimeoutError
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
@@ -61,15 +59,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: HabitronConfigEntry) -> 
         return True
 
     except (TimeoutError, HabitronTimeoutError) as ex:
-        raise ConfigEntryNotReady("Timeout while connecting to SmartHub") from ex
+        raise ConfigEntryNotReady(
+            translation_domain=DOMAIN,
+            translation_key="connect_timeout",
+        ) from ex
     except ConnectionRefusedError as ex:
-        raise ConfigEntryNotReady(f"Connection refused to SmartHub: {ex}") from ex
+        raise ConfigEntryNotReady(
+            translation_domain=DOMAIN,
+            translation_key="connect_refused",
+            translation_placeholders={"error": str(ex)},
+        ) from ex
     except (OSError, ConnectionError) as ex:
         # Network-level failures (DNS, socket errors, ...) are transient
         # and should let HA retry the entry. Programming errors such as
         # AttributeError/KeyError must propagate so they show up in the
         # logs instead of being masked as a retry loop.
-        raise ConfigEntryNotReady(f"Error connecting to SmartHub: {ex}") from ex
+        raise ConfigEntryNotReady(
+            translation_domain=DOMAIN,
+            translation_key="connect_error",
+            translation_placeholders={"error": str(ex)},
+        ) from ex
 
 
 async def async_remove_config_entry_device(

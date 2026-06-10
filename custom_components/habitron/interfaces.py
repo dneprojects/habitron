@@ -4,8 +4,6 @@ Contains interface descriptors for single entities (outputs, sensors, …)
 shared across the Habitron bus / Home Assistant boundary.
 """
 
-from __future__ import annotations
-
 from collections.abc import Callable
 from typing import Any
 

@@ -1,7 +1,5 @@
 """Platform for update integration."""
 
-from __future__ import annotations
-
 import hashlib
 import logging
 from asyncio import sleep
@@ -17,7 +15,7 @@ from homeassistant.components.update import (
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
     DataUpdateCoordinator,
@@ -43,7 +41,7 @@ _FIRMWARE_URL_PREFIX = "/habitron-firmware"
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: HabitronConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add update entities for Habitron system."""
     hbtn_rt: HbtnRouter = entry.runtime_data.router
@@ -70,6 +68,7 @@ class SCTouchAppUpdate(UpdateEntity):
     """Perform SC Touch Android App update."""
 
     _attr_device_class = UpdateDeviceClass.FIRMWARE
+    _attr_has_entity_name = True
     _attr_name = "SC Touch App"
     _attr_should_poll = True
     _attr_supported_features = UpdateEntityFeature.INSTALL
@@ -241,7 +240,7 @@ class SCTouchAppUpdate(UpdateEntity):
         def _hash_job() -> tuple[str | None, str | None]:
             try:
                 sha256 = hashlib.sha256()
-                with Path.open(source_file, "rb") as f:
+                with source_file.open("rb") as f:
                     for chunk in iter(lambda: f.read(65536), b""):
                         sha256.update(chunk)
                 url = (
@@ -262,23 +261,39 @@ class SCTouchAppUpdate(UpdateEntity):
         module_name = getattr(self._module, "name", self._module.uid)
 
         if not self._attr_latest_version:
-            raise HomeAssistantError("No version info available")
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="update_no_version_info",
+            )
 
         stream_name = self._module.stream_name
         provider = self._router.smhub.ws_provider
         if provider is None:
-            raise HomeAssistantError("WebRTC provider not available")
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="update_no_webrtc_provider",
+            )
 
         if not provider.active_ws_connections.get(stream_name):
             _LOGGER.error("Client for %s is not connected", module_name)
-            raise HomeAssistantError(f"Client {module_name} not connected")
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="update_client_not_connected",
+                translation_placeholders={"module_name": str(module_name)},
+            )
 
         if self._latest_apk_filename is None:
-            raise HomeAssistantError("No APK filename available")
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="update_no_apk_filename",
+            )
 
         url, checksum = await self._apk_url_and_checksum(self._latest_apk_filename)
         if not url:
-            raise HomeAssistantError("Failed to prepare update file")
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="update_apk_prep_failed",
+            )
 
         payload = {
             "version": self._attr_latest_version,
@@ -300,6 +315,8 @@ class HbtnModuleUpdate(CoordinatorEntity[DataUpdateCoordinator[None]], UpdateEnt
     """Module firmware update entity."""
 
     _attr_device_class = UpdateDeviceClass.FIRMWARE
+    _attr_has_entity_name = True
+    _attr_name = "Firmware"
     _attr_supported_features = (
         UpdateEntityFeature.INSTALL | UpdateEntityFeature.PROGRESS
     )
@@ -319,7 +336,6 @@ class HbtnModuleUpdate(CoordinatorEntity[DataUpdateCoordinator[None]], UpdateEnt
         super().__init__(coord)
         self.idx = idx
         self._module: HbtnModule | HbtnRouter = module
-        self._attr_name = "Firmware"
         self._attr_unique_id = f"Mod_{self._module.uid}_update"
         self.flash_in_progress = False
 

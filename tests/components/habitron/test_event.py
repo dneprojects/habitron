@@ -1,7 +1,5 @@
 """Tests for the Habitron event platform."""
 
-from __future__ import annotations
-
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
@@ -16,6 +14,7 @@ from custom_components.habitron.event import (
 )
 
 
+from homeassistant.core import HomeAssistant
 async def test_event_setup(setup_integration: MockConfigEntry) -> None:
     """The event platform sets up cleanly against an empty router."""
     assert setup_integration.runtime_data is not None
@@ -268,7 +267,7 @@ def _patch_base_async_added(mock: AsyncMock):
     )
 
 
-async def test_async_setup_entry_iterates_modules(hass) -> None:
+async def test_async_setup_entry_iterates_modules(hass: HomeAssistant) -> None:
     """async_setup_entry builds InputPressed/FingerDetected/EkeyUserEvent."""
     # Pulse-switch module
     inp_pulse = _make_input(nmbr=1, name="Btn 1")
@@ -332,7 +331,7 @@ async def test_async_setup_entry_iterates_modules(hass) -> None:
     registry.async_update_entity.assert_called()
 
 
-async def test_async_setup_entry_with_area_member_skips_area_update(hass) -> None:
+async def test_async_setup_entry_with_area_member_skips_area_update(hass: HomeAssistant) -> None:
     """When mod_input.area is the module's area_member, no area_id set."""
     inp_pulse = _make_input(nmbr=1, name="Btn 1")
     inp_pulse.type = 1
@@ -364,13 +363,13 @@ async def test_async_setup_entry_with_area_member_skips_area_update(hass) -> Non
         registry = MagicMock()
         registry.async_get_entity_id = MagicMock(return_value="event.fake")
         mock_get.return_value = registry
-        await async_setup_entry(hass, entry, lambda es: added.extend(es))
+        await async_setup_entry(hass, entry, added.extend)
 
     # default-area path called async_update_entity with area_id=None
     registry.async_update_entity.assert_called_with("event.fake", area_id=None)
 
 
-async def test_async_setup_entry_external_area_assigns_area_id(hass) -> None:
+async def test_async_setup_entry_external_area_assigns_area_id(hass: HomeAssistant) -> None:
     """An input whose area differs from area_member assigns the area_id."""
     inp_pulse = _make_input(nmbr=1, name="Btn 1")
     inp_pulse.type = 1
@@ -407,7 +406,7 @@ async def test_async_setup_entry_external_area_assigns_area_id(hass) -> None:
     registry.async_update_entity.assert_called_with("event.fake", area_id="area_2_id")
 
 
-async def test_async_setup_entry_skips_missing_registry_entry(hass) -> None:
+async def test_async_setup_entry_skips_missing_registry_entry(hass: HomeAssistant) -> None:
     """Missing registry entries fall through without calling async_update_entity."""
     inp_pulse = _make_input(nmbr=1, name="Btn 1")
     inp_pulse.type = 1

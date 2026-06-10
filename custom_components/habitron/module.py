@@ -590,9 +590,9 @@ class SmartController(HbtnModule):
             self.status[MStatIdx.INP_1_8 : MStatIdx.INP_1_8 + 3],
             "little",
         )
-        for inpt in self.inputs:
-            if inpt.nmbr >= 0 and inpt.type != 3:
-                inpt.value = int((inp_state & (0x01 << inpt.nmbr)) > 0)
+        for inp in self.inputs:
+            if inp.nmbr >= 0 and inp.type != 3:
+                inp.value = int((inp_state & (0x01 << inp.nmbr)) > 0)
 
         flags_state = int.from_bytes(
             self.status[MStatIdx.FLAG_LOC : MStatIdx.FLAG_LOC + 2],
@@ -695,9 +695,9 @@ class SmartControllerMini(HbtnModule):
             self.status[MStatIdx.INP_1_8 : MStatIdx.INP_1_8 + 3],
             "little",
         )
-        for inpt in self.inputs:
-            if inpt.nmbr >= 0:
-                inpt.value = int((inp_state & (0x01 << inpt.nmbr)) > 0)
+        for inp in self.inputs:
+            if inp.nmbr >= 0:
+                inp.value = int((inp_state & (0x01 << inp.nmbr)) > 0)
 
         flags_state = int.from_bytes(
             self.status[MStatIdx.FLAG_LOC : MStatIdx.FLAG_LOC + 2],

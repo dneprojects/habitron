@@ -1,7 +1,5 @@
 """Platform for light integration."""
 
-from __future__ import annotations
-
 from typing import Any
 
 from homeassistant.components.light import (  # type: ignore[attr-defined]
@@ -12,7 +10,7 @@ from homeassistant.components.light import (  # type: ignore[attr-defined]
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
     DataUpdateCoordinator,
@@ -30,7 +28,7 @@ PARALLEL_UPDATES = 1
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: HabitronConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add lights for passed config_entry in HA."""
     hbtn_rt: HbtnRouter = entry.runtime_data.router

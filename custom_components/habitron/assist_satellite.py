@@ -16,7 +16,7 @@ from homeassistant.components.assist_satellite import (
 )
 from homeassistant.components.assist_satellite.entity import AssistSatelliteState
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
@@ -32,7 +32,7 @@ _LOGGER = logging.getLogger(__name__)
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: HabitronConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up Habitron assist satellite entities."""
     smhub: SmartHub = entry.runtime_data
@@ -61,6 +61,9 @@ async def async_setup_entry(
 class HbtnAssistSat(AssistSatelliteEntity):
     """Representation of a Habitron client as an assist satellite."""
 
+    _attr_has_entity_name = True
+    _attr_name = "Voice"
+
     def __init__(
         self,
         hass: HomeAssistant,
@@ -72,7 +75,6 @@ class HbtnAssistSat(AssistSatelliteEntity):
         self._module: SmartController = module
         self._provider = provider
         self._stream_name: str = module.stream_name
-        self._attr_name = f"Voice {module.name}"
         self._attr_unique_id = f"Mod_{self._module.uid}_assist_sat"
         self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
         self._attr_supported_features = (

@@ -1,7 +1,5 @@
 """Config flow for Habitron integration."""
 
-from __future__ import annotations
-
 import asyncio
 import json
 import logging
@@ -67,7 +65,7 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
 
     # 3. Connection Test
     try:
-        # test_connection ist seit habitron_client 1.0.0 async.
+        # test_connection has been async since habitron_client 1.0.0.
         result, host_name = await test_connection(host_to_test)
     except socket.gaierror as exc:
         raise HostNotFound from exc

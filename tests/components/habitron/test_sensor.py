@@ -1,7 +1,5 @@
 """Tests for the Habitron sensor platform."""
 
-from __future__ import annotations
-
 from unittest.mock import MagicMock
 
 import pytest
@@ -683,7 +681,7 @@ def test_habitron_client_sensor_handle_event_writes_state() -> None:
     assert entity._attr_native_value == 12.5
 
 
-async def test_habitron_client_sensor_async_added_listens_for_bus_event(hass) -> None:
+async def test_habitron_client_sensor_async_added_listens_for_bus_event(hass: HomeAssistant) -> None:
     """async_added_to_hass subscribes to ``habitron_device_update``."""
     mod = MagicMock()
     mod.uid = "MOD-T"
@@ -703,7 +701,7 @@ async def test_habitron_client_sensor_async_added_listens_for_bus_event(hass) ->
     entity.async_on_remove.assert_called()
 
 
-async def test_async_setup_entry_emits_all_sensor_types(hass) -> None:
+async def test_async_setup_entry_emits_all_sensor_types(hass: HomeAssistant) -> None:
     """async_setup_entry creates the broad mix of sensor entities."""
     # SmartHub-level sensors
     mem = MagicMock()
@@ -820,7 +818,7 @@ async def test_async_setup_entry_emits_all_sensor_types(hass) -> None:
         registry = MagicMock()
         registry.async_get_entity_id = MagicMock(return_value="sensor.fake")
         mock_get.return_value = registry
-        await async_setup_entry(hass, entry, lambda es: added.extend(es))
+        await async_setup_entry(hass, entry, added.extend)
 
     assert any(isinstance(e, PercSensor) for e in added)
     assert any(isinstance(e, TemperatureDSensor) for e in added)
@@ -835,7 +833,7 @@ async def test_async_setup_entry_emits_all_sensor_types(hass) -> None:
     assert any(isinstance(e, HabitronClientSensor) for e in added)
 
 
-async def test_async_setup_entry_analog_area_assignment_external(hass) -> None:
+async def test_async_setup_entry_analog_area_assignment_external(hass: HomeAssistant) -> None:
     """An analog input with a non-default area gets the area_id assigned."""
     ain = MagicMock()
     ain.name = "AIn 1"
@@ -879,7 +877,7 @@ async def test_async_setup_entry_analog_area_assignment_external(hass) -> None:
     registry.async_update_entity.assert_called_with("sensor.fake", area_id="area_5_id")
 
 
-async def test_async_setup_entry_analog_area_overflow_falls_back(hass) -> None:
+async def test_async_setup_entry_analog_area_overflow_falls_back(hass: HomeAssistant) -> None:
     """An out-of-range analog area is clamped to the default."""
     ain = MagicMock()
     ain.name = "AIn 1"

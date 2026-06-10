@@ -1,14 +1,12 @@
 """Platform for notification integration."""
 
-from __future__ import annotations
-
 import logging
 
 # Import the device class from the component that you want to support
 from homeassistant.components.notify import NotifyEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
@@ -23,7 +21,7 @@ PARALLEL_UPDATES = 1
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: HabitronConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add event entities for Habitron system."""
     hbtn_rt = entry.runtime_data.router
@@ -42,13 +40,15 @@ async def async_setup_entry(
 class HbtnMessage(NotifyEntity):
     """Representation of habitron notification."""
 
+    _attr_has_entity_name = True
+    _attr_name = "Messages"
+
     def __init__(self, module: HbtnModule, idx: int) -> None:
         """Initialize an HbtnEvent, pass coordinator to CoordinatorEntity."""
         super().__init__()
         self.idx = idx
         self._module = module
         self.messages = module.messages
-        self._attr_name = f"{module.name} messages"
         self._attr_unique_id = f"Mod_{self._module.uid}_msg"
 
     @property
@@ -81,6 +81,8 @@ class HbtnMessage(NotifyEntity):
 
 class HbtnGSMMessage(NotifyEntity):
     """Representation of habitron notification."""
+
+    _attr_has_entity_name = True
 
     def __init__(self, module: HbtnModule, gsm_number: IfDescriptor, idx: int) -> None:
         """Initialize an HbtnEvent, pass coordinator to CoordinatorEntity."""

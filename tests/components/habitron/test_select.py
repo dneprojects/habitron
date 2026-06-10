@@ -1,7 +1,5 @@
 """Tests for the Habitron select platform."""
 
-from __future__ import annotations
-
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -22,6 +20,7 @@ from custom_components.habitron.select import (
 from custom_components.habitron.smart_hub import LoggingLevels
 
 
+from homeassistant.core import HomeAssistant
 async def test_select_setup(setup_integration: MockConfigEntry) -> None:
     """The select platform sets up cleanly against an empty router."""
     assert setup_integration.runtime_data is not None
@@ -297,7 +296,7 @@ def test_hbtn_mode_handle_coordinator_update_unknown_value_warns_and_skips() -> 
     rt.logger.warning.assert_called()
 
 
-async def test_select_async_setup_entry_creates_entities(hass) -> None:
+async def test_select_async_setup_entry_creates_entities(hass: HomeAssistant) -> None:
     """async_setup_entry adds 3 entities per Smart Controller + 3 router-level."""
     rt = _make_router(mode_value=32)
     mod_a = _make_module()
@@ -320,7 +319,7 @@ async def test_select_async_setup_entry_creates_entities(hass) -> None:
     entry.runtime_data.router = rt
 
     added: list = []
-    await async_setup_entry(hass, entry, lambda es: added.extend(es))
+    await async_setup_entry(hass, entry, added.extend)
     # 2 SC modules × 3 entities + 3 router-level + 1 logging = 10
     assert len(added) == 10
     assert any(isinstance(e, HbtnSelectLoggingLevel) for e in added)
