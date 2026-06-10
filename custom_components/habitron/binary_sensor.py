@@ -13,7 +13,7 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
     DataUpdateCoordinator,
@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: HabitronConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add binary sensors for Habitron inputs."""
     hbtn_rt: HbtnRouter = entry.runtime_data.router
@@ -136,13 +136,13 @@ class InputSwitch(HbtnBinSensor):
 
     def __init__(
         self,
-        inpt: IfDescriptor,
+        inp: IfDescriptor,
         module: HbtnModule,
         coord: DataUpdateCoordinator[None],
         idx: int,
     ) -> None:
         """Initialize an InputSwitch, pass coordinator to CoordinatorEntity."""
-        super().__init__(inpt, module, coord, idx)
+        super().__init__(inp, module, coord, idx)
         self._attr_unique_id: str = f"Mod_{self._module.uid}_in{self._nmbr}"
 
     @callback
@@ -266,7 +266,7 @@ class HbtnState(CoordinatorEntity[DataUpdateCoordinator[None]], BinarySensorEnti
         self._attr_name: str = state.name
         if state.type == TYPE_DIAG:
             self._attr_entity_category = EntityCategory.DIAGNOSTIC
-            self._attr_entity_registry_enabled_default = False  # initally be disabled
+            self._attr_entity_registry_enabled_default = False  # initially be disabled
         if state.type < 0:
             # Entity will not show up
             self._attr_entity_registry_enabled_default = False

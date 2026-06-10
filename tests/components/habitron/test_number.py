@@ -1,7 +1,5 @@
 """Tests for the Habitron number platform."""
 
-from __future__ import annotations
-
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -15,6 +13,7 @@ from custom_components.habitron.number import (
 from .conftest import class_attr
 
 
+from homeassistant.core import HomeAssistant
 async def test_number_setup(setup_integration: MockConfigEntry) -> None:
     """The number platform sets up cleanly against an empty router."""
     assert setup_integration.runtime_data is not None
@@ -151,7 +150,7 @@ def test_analog_output_device_info_and_name_property() -> None:
     assert entity.name == "Analog 1"
 
 
-async def test_async_setup_entry_adds_temperature_and_analog(hass) -> None:
+async def test_async_setup_entry_adds_temperature_and_analog(hass: HomeAssistant) -> None:
     """async_setup_entry emits SetTemperature for setvalues and AnalogOutput."""
     sp = _make_setpoint()
     out = _make_output(type_=8, nmbr=0)
@@ -177,13 +176,13 @@ async def test_async_setup_entry_adds_temperature_and_analog(hass) -> None:
         registry = MagicMock()
         registry.async_get_entity_id = MagicMock(return_value="number.fake")
         mock_get.return_value = registry
-        await async_setup_entry(hass, entry, lambda es: added.extend(es))
+        await async_setup_entry(hass, entry, added.extend)
 
     assert any(isinstance(e, HbtnSetTemperature) for e in added)
     assert any(isinstance(e, HbtnAnalogOutput) for e in added)
 
 
-async def test_async_setup_entry_external_area_assigns_id(hass) -> None:
+async def test_async_setup_entry_external_area_assigns_id(hass: HomeAssistant) -> None:
     """When mod_output.area is not the module's area_member the area_id is assigned."""
     out = _make_output(type_=8, nmbr=0)
     out.area = 5

@@ -1,7 +1,5 @@
 """Constants used by the Habitron test suite."""
 
-from __future__ import annotations
-
 from typing import Final
 
 MOCK_HOST: Final = "192.168.1.50"

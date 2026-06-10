@@ -364,8 +364,8 @@ class HbtnRouter:
 
     def get_area_id(self, area_slugid: str) -> int:
         """Return area id for given slug id."""
-        for area_id in self.areas:
-            if self.areas[area_id].get_name_id() == area_slugid:
+        for area_id, area in self.areas.items():
+            if area.get_name_id() == area_slugid:
                 return area_id
         return 0
 

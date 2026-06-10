@@ -4,8 +4,6 @@ Smoke test + per-class translation_key check; extend with button-press
 service tests using ``hass.services.async_call("button", "press", ...)``.
 """
 
-from __future__ import annotations
-
 from unittest.mock import AsyncMock, MagicMock
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -29,6 +27,7 @@ from custom_components.habitron.button import (
 from .conftest import class_attr
 
 
+from homeassistant.core import HomeAssistant
 async def test_button_setup(setup_integration: MockConfigEntry) -> None:
     """The platform sets up cleanly against an empty router."""
     assert setup_integration.runtime_data is not None
@@ -358,7 +357,7 @@ async def test_speech_button_press_skips_when_no_active_ws() -> None:
     await btn.async_press()  # should log without raising
 
 
-async def test_async_setup_entry_emits_button_set(hass) -> None:
+async def test_async_setup_entry_emits_button_set(hass: HomeAssistant) -> None:
     """async_setup_entry adds dir, vis, counter, speech, restart and hub buttons."""
     dir_cmd = MagicMock()
     dir_cmd.nmbr = 1
@@ -406,7 +405,7 @@ async def test_async_setup_entry_emits_button_set(hass) -> None:
     entry.runtime_data.router = router
 
     added: list = []
-    await async_setup_entry(hass, entry, lambda es: added.extend(es))
+    await async_setup_entry(hass, entry, added.extend)
     assert any(isinstance(e, DirCmdButton) for e in added)
     assert any(isinstance(e, VisCmdButton) for e in added)
     assert any(isinstance(e, CountUpButton) for e in added)

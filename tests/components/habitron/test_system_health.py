@@ -1,7 +1,5 @@
 """Tests for the Habitron system_health info."""
 
-from __future__ import annotations
-
 from unittest.mock import MagicMock
 
 from homeassistant.core import HomeAssistant

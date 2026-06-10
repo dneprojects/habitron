@@ -1,8 +1,8 @@
 """Tests for the Habitron module-layer classes."""
 
-from __future__ import annotations
-
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from custom_components.habitron.const import ModuleDescriptor
 from custom_components.habitron.module import (
@@ -498,7 +498,9 @@ def test_smart_sensor_update_runs_against_full_status() -> None:
 # ---------- initialize() with mocked HA registries ----------
 
 
-async def test_module_initialize_runs_device_registration(monkeypatch) -> None:
+async def test_module_initialize_runs_device_registration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """``initialize`` walks the device + area registration flow."""
     from unittest.mock import patch  # noqa: PLC0415
 
@@ -580,7 +582,9 @@ def test_get_cover_index_returns_minus_one_for_normal_output() -> None:
     assert mod.get_cover_index(1) == -1
 
 
-def test_extract_status_logs_when_module_present(caplog) -> None:
+def test_extract_status_logs_when_module_present(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     """When the marker byte matches, extract_status returns a non-empty slice."""
     from custom_components.habitron.const import MStatIdx  # noqa: PLC0415
 

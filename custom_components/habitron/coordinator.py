@@ -13,7 +13,7 @@ from homeassistant.helpers.update_coordinator import (
     UpdateFailed,
 )
 
-from .const import SCAN_INTERVAL
+from .const import DOMAIN, SCAN_INTERVAL
 
 if TYPE_CHECKING:
     from .communicate import HbtnComm
@@ -84,8 +84,13 @@ class HbtnCoordinator(DataUpdateCoordinator[None]):
             async with asyncio.timeout(20):
                 await self.comm.async_system_update()
         except TimeoutError as err:
-            raise UpdateFailed("Timeout fetching system status from SmartHub") from err
+            raise UpdateFailed(
+                translation_domain=DOMAIN,
+                translation_key="update_timeout",
+            ) from err
         except (OSError, ConnectionError) as err:
             raise UpdateFailed(
-                f"Network error fetching status from SmartHub: {err}"
+                translation_domain=DOMAIN,
+                translation_key="update_network_error",
+                translation_placeholders={"error": str(err)},
             ) from err

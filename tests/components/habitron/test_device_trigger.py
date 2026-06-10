@@ -1,7 +1,5 @@
 """Tests for the Habitron device triggers."""
 
-from __future__ import annotations
-
 from unittest.mock import AsyncMock, MagicMock
 
 from homeassistant.core import Context, HomeAssistant

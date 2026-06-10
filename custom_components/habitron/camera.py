@@ -1,13 +1,11 @@
 """Camera platform for Habitron integration in Home Assistant."""
 
-from __future__ import annotations
-
 import logging
 from typing import Any
 
-from homeassistant.components.camera import Camera, CameraEntityFeature
+from homeassistant.components.camera import Camera, CameraEntityFeature, WebRTCSendMessage
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from webrtc_models import RTCIceCandidateInit
 
 from .const import DOMAIN
@@ -25,7 +23,7 @@ _LOGGER = logging.getLogger(__name__)
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: HabitronConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up Habitron cameras from a config entry."""
     smhub: SmartHub = entry.runtime_data
@@ -57,6 +55,7 @@ async def async_setup_entry(
 class HbtnCam(Camera):
     """Habitron Camera entity (the phone publishes media; HA just negotiates)."""
 
+    _attr_has_entity_name = True
     _attr_supported_features = CameraEntityFeature.STREAM | CameraEntityFeature.ON_OFF
     _attr_frontend_stream_type = "webrtc"
     _attr_is_on = True
@@ -73,7 +72,7 @@ class HbtnCam(Camera):
         self._stream_name = module.stream_name
         self.idx: int = idx
         self._module: HbtnModule = module
-        self._attr_name = f"HbtnCam {idx + 1} ({module.name})"
+        self._attr_name = f"HbtnCam {idx + 1}"
         self._attr_unique_id = f"Mod_{self._module.uid}_camera"
         self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
         self.hass = hass
@@ -94,15 +93,7 @@ class HbtnCam(Camera):
         _LOGGER.debug(
             "Requesting still image from provider for stream: %s", self._stream_name
         )
-        try:
-            return await self._provider.async_take_snapshot(
-                stream_name=self._stream_name
-            )
-        except Exception as e:
-            _LOGGER.warning(
-                "Failed to get snapshot for camera '%s': %s", self._stream_name, e
-            )
-            return None
+        return await self._provider.async_take_snapshot(stream_name=self._stream_name)
 
     async def async_turn_on(self) -> None:
         """Turn on the camera."""
@@ -117,7 +108,7 @@ class HbtnCam(Camera):
         _LOGGER.info("Camera turned off: %s", self._attr_name)
 
     async def async_handle_async_webrtc_offer(
-        self, offer_sdp: str, session_id: str, send_message: Any
+        self, offer_sdp: str, session_id: str, send_message: WebRTCSendMessage
     ) -> None:
         """Handle the WebRTC offer coming from the HA frontend."""
         if not self._attr_is_on:

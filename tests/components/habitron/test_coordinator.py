@@ -1,7 +1,5 @@
 """Tests for the Habitron coordinator."""
 
-from __future__ import annotations
-
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -37,8 +35,9 @@ async def test_coordinator_timeout_raises_update_failed(
     comm = _make_comm(hass)
     comm.async_system_update.side_effect = TimeoutError("hub silent")
     coord = HbtnCoordinator(hass, MagicMock(), comm)
-    with pytest.raises(UpdateFailed, match="Timeout"):
+    with pytest.raises(UpdateFailed) as exc_info:
         await coord._async_update_data()
+    assert exc_info.value.translation_key == "update_timeout"
 
 
 async def test_coordinator_always_update(hass: HomeAssistant) -> None:
@@ -70,5 +69,6 @@ async def test_coordinator_network_error_raises_update_failed(
     comm = _make_comm(hass)
     comm.async_system_update.side_effect = OSError("dns down")
     coord = HbtnCoordinator(hass, MagicMock(), comm)
-    with pytest.raises(UpdateFailed, match="Network error"):
+    with pytest.raises(UpdateFailed) as exc_info:
         await coord._async_update_data()
+    assert exc_info.value.translation_key == "update_network_error"

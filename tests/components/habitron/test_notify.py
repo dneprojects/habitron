@@ -1,7 +1,5 @@
 """Tests for the Habitron notify platform."""
 
-from __future__ import annotations
-
 from unittest.mock import AsyncMock, MagicMock
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -13,6 +11,7 @@ from custom_components.habitron.notify import (
 )
 
 
+from homeassistant.core import HomeAssistant
 async def test_notify_setup(setup_integration: MockConfigEntry) -> None:
     """The notify platform sets up cleanly against an empty router."""
     assert setup_integration.runtime_data is not None
@@ -112,7 +111,7 @@ def test_gsm_message_device_info_links_module() -> None:
     assert ("habitron", "MOD-1") in entity.device_info["identifiers"]
 
 
-async def test_async_setup_entry_emits_message_for_smart_controllers(hass) -> None:
+async def test_async_setup_entry_emits_message_for_smart_controllers(hass: HomeAssistant) -> None:
     """async_setup_entry emits HbtnMessage for typ b"\\x01\\x02" modules."""
     msg = MagicMock()
     msg.name = "Welcome"
@@ -131,11 +130,11 @@ async def test_async_setup_entry_emits_message_for_smart_controllers(hass) -> No
     entry.runtime_data.router = router
 
     added: list = []
-    await async_setup_entry(hass, entry, lambda es: added.extend(es))
+    await async_setup_entry(hass, entry, added.extend)
     assert any(isinstance(e, HbtnMessage) for e in added)
 
 
-async def test_async_setup_entry_emits_gsm_message_for_gsm_module(hass) -> None:
+async def test_async_setup_entry_emits_gsm_message_for_gsm_module(hass: HomeAssistant) -> None:
     """async_setup_entry emits one HbtnGSMMessage per SMS number."""
     msg = MagicMock()
     msg.name = "Welcome"
@@ -157,11 +156,11 @@ async def test_async_setup_entry_emits_gsm_message_for_gsm_module(hass) -> None:
     entry.runtime_data.router = router
 
     added: list = []
-    await async_setup_entry(hass, entry, lambda es: added.extend(es))
+    await async_setup_entry(hass, entry, added.extend)
     assert any(isinstance(e, HbtnGSMMessage) for e in added)
 
 
-async def test_async_setup_entry_skips_other_modules(hass) -> None:
+async def test_async_setup_entry_skips_other_modules(hass: HomeAssistant) -> None:
     """A module with an unrecognised typ does not emit any entity."""
     mod = MagicMock()
     mod.uid = "MOD-X"
@@ -175,5 +174,5 @@ async def test_async_setup_entry_skips_other_modules(hass) -> None:
     entry.runtime_data.router = router
 
     added: list = []
-    await async_setup_entry(hass, entry, lambda es: added.extend(es))
+    await async_setup_entry(hass, entry, added.extend)
     assert added == []

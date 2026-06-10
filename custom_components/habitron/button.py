@@ -1,13 +1,11 @@
 """Platform for button integration."""
 
-from __future__ import annotations
-
 from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import _LOGGER
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
@@ -21,7 +19,7 @@ PARALLEL_UPDATES = 1
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: HabitronConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add button for passed config_entry in HA."""
     hbtn_rt: HbtnRouter = entry.runtime_data.router

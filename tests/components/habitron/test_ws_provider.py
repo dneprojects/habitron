@@ -6,8 +6,6 @@ and snapshot flow. The websocket-command handlers and the voice
 pipeline are exercised in their own dedicated test modules.
 """
 
-from __future__ import annotations
-
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -308,7 +306,7 @@ async def test_async_handle_webrtc_offer_drains_pending_candidates() -> None:
     async def _resolve():
         for _ in range(10):
             if "sess-1" in provider.webrtc_futures:
-                provider.webrtc_futures["sess-1"].set_result("ans")
+                provider.webrtc_futures["sess-1"].set_result("answer-sdp")
                 return
             await asyncio.sleep(0.001)
 

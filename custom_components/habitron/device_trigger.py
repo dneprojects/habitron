@@ -1,7 +1,5 @@
 """Provide device triggers for Habitron integration."""
 
-from __future__ import annotations
-
 from typing import Any
 
 import voluptuous as vol
@@ -74,7 +72,7 @@ async def async_attach_trigger(
 
     # Use native state event listener to catch all fast changes
     @callback
-    async def filter_event_type_action(
+    def filter_event_type_action(
         event: Event[EventStateChangedData],
     ) -> None:
         """Filter the state change by event_type attribute."""
@@ -108,7 +106,7 @@ async def async_attach_trigger(
                 trigger_payload["alias"] = trigger_data["alias"]
 
             variables = {"trigger": trigger_payload}
-            await action(variables, context=event.context)
+            hass.async_create_task(action(variables, context=event.context))
 
     # Attach the state trigger using our filter callback directly on the event bus
     return async_track_state_change_event(hass, [entity_id], filter_event_type_action)

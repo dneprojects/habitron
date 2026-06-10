@@ -1,12 +1,11 @@
 """Pytest fixtures for the Habitron integration."""
 
-from __future__ import annotations
-
 from collections.abc import Generator
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -164,7 +163,7 @@ def mock_coordinator_refresh() -> Generator[AsyncMock]:
 
 
 @pytest.fixture
-async def setup_homeassistant(hass: Any) -> None:
+async def setup_homeassistant(hass: HomeAssistant) -> None:
     """Load the ``homeassistant`` core component before every test.
 
     ``conversation`` (a transitive dependency via ``assist_pipeline``)
@@ -178,7 +177,7 @@ async def setup_homeassistant(hass: Any) -> None:
 
 @pytest.fixture
 async def setup_integration(
-    hass: Any,
+    hass: HomeAssistant,
     setup_homeassistant: None,
     mock_config_entry: MockConfigEntry,
     mock_habitron_client: MagicMock,

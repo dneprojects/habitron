@@ -1,10 +1,9 @@
 """Tests for the Habitron light platform."""
 
-from __future__ import annotations
-
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.components.light import ColorMode
+from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.light import (
@@ -325,13 +324,13 @@ def test_color_led_negative_type_disabled_by_default() -> None:
 
 def test_color_led_icons_for_corner_numbers() -> None:
     """Each LED number gets its corner-specific MDI icon."""
-    for nmbr, expected in [
+    for nmbr, expected in (
         (0, "mdi:square-outline"),
         (1, "mdi:arrow-top-left-bold-box-outline"),
         (2, "mdi:arrow-top-right-bold-box-outline"),
         (3, "mdi:arrow-bottom-left-bold-box-outline"),
         (4, "mdi:arrow-bottom-right-bold-box-outline"),
-    ]:
+    ):
         cled = _make_cled_descriptor(nmbr=nmbr)
         mod = _make_module()
         coord = MagicMock()
@@ -403,7 +402,7 @@ async def test_color_led_turn_on_without_kwargs_uses_defaults() -> None:
     mod.comm.async_set_rgbval.assert_awaited()
 
 
-async def test_async_setup_entry_emits_dimmed_output_and_color_led(hass) -> None:
+async def test_async_setup_entry_emits_dimmed_output_and_color_led(hass: HomeAssistant) -> None:
     """async_setup_entry creates DimmedOutputPush + ColorLed for relevant modules."""
     dim_out = _make_output(type_=2, nmbr=10)
     dim_out.area = 0
@@ -435,13 +434,13 @@ async def test_async_setup_entry_emits_dimmed_output_and_color_led(hass) -> None
         registry = MagicMock()
         registry.async_get_entity_id = MagicMock(return_value="light.fake")
         mock_get.return_value = registry
-        await async_setup_entry(hass, entry, lambda es: added.extend(es))
+        await async_setup_entry(hass, entry, added.extend)
 
     assert any(isinstance(e, DimmedOutputPush) for e in added)
     assert any(isinstance(e, ColorLed) for e in added)
 
 
-async def test_async_setup_entry_assigns_external_area(hass) -> None:
+async def test_async_setup_entry_assigns_external_area(hass: HomeAssistant) -> None:
     """When dimmer area > module area_member the area_id is set."""
     dim_out = _make_output(type_=2, nmbr=10)
     dim_out.area = 5
@@ -472,7 +471,7 @@ async def test_async_setup_entry_assigns_external_area(hass) -> None:
     registry.async_update_entity.assert_called_with("light.fake", area_id="area_5_id")
 
 
-async def test_async_setup_entry_area_overflow_falls_back_to_zero(hass) -> None:
+async def test_async_setup_entry_area_overflow_falls_back_to_zero(hass: HomeAssistant) -> None:
     """An out-of-range dimmer area is clamped to zero."""
     dim_out = _make_output(type_=2, nmbr=10)
     dim_out.area = 99

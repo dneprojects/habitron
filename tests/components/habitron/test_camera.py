@@ -1,7 +1,5 @@
 """Tests for the Habitron camera platform."""
 
-from __future__ import annotations
-
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -10,6 +8,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.habitron.camera import HbtnCam, async_setup_entry
 
 
+from homeassistant.core import HomeAssistant
 async def test_camera_setup(setup_integration: MockConfigEntry) -> None:
     """The camera platform sets up cleanly against an empty router."""
     assert setup_integration.runtime_data is not None
@@ -39,7 +38,8 @@ def test_hbtn_cam_unique_id_and_device_info() -> None:
     cam = HbtnCam(hass, mod, 0, _make_provider())
     assert cam.unique_id == "Mod_MOD-T_camera"
     assert ("habitron", "MOD-T") in cam._attr_device_info["identifiers"]
-    assert cam.name == "HbtnCam 1 (Touch 1)"
+    assert cam.name == "HbtnCam 1"
+    assert cam.has_entity_name is True
 
 
 async def test_hbtn_cam_stream_source_returns_habitron_uri() -> None:
@@ -73,15 +73,15 @@ async def test_hbtn_cam_async_camera_image_returns_none_when_off() -> None:
     provider.async_take_snapshot.assert_not_awaited()
 
 
-async def test_hbtn_cam_async_camera_image_logs_on_provider_error() -> None:
-    """Provider failures are caught and reported as None."""
+async def test_hbtn_cam_async_camera_image_propagates_provider_error() -> None:
+    """Provider failures propagate so HA can surface them to the user."""
     hass = MagicMock()
     mod = _make_touch_module()
     provider = _make_provider()
     provider.async_take_snapshot = AsyncMock(side_effect=RuntimeError("boom"))
     cam = HbtnCam(hass, mod, 0, provider)
-    img = await cam.async_camera_image()
-    assert img is None
+    with pytest.raises(RuntimeError, match="boom"):
+        await cam.async_camera_image()
 
 
 async def test_hbtn_cam_async_turn_on_sets_state() -> None:
@@ -163,7 +163,7 @@ async def test_hbtn_cam_async_on_webrtc_candidate_skips_when_no_provider() -> No
     await cam.async_on_webrtc_candidate("sess-1", MagicMock())  # no raise
 
 
-async def test_async_setup_entry_adds_camera_for_touch_module(hass) -> None:
+async def test_async_setup_entry_adds_camera_for_touch_module(hass: HomeAssistant) -> None:
     """async_setup_entry adds one HbtnCam per Smart Controller Touch."""
     touch = _make_touch_module()
     other = MagicMock()
@@ -176,12 +176,12 @@ async def test_async_setup_entry_adds_camera_for_touch_module(hass) -> None:
     entry.runtime_data = smhub
 
     added: list = []
-    await async_setup_entry(hass, entry, lambda es: added.extend(es))
+    await async_setup_entry(hass, entry, added.extend)
     assert len(added) == 1
     assert isinstance(added[0], HbtnCam)
 
 
-async def test_async_setup_entry_short_circuits_without_provider(hass) -> None:
+async def test_async_setup_entry_short_circuits_without_provider(hass: HomeAssistant) -> None:
     """Without a WebRTC provider, async_setup_entry logs and returns."""
     touch = _make_touch_module()
     smhub = MagicMock()
@@ -192,11 +192,11 @@ async def test_async_setup_entry_short_circuits_without_provider(hass) -> None:
     entry.runtime_data = smhub
 
     added: list = []
-    await async_setup_entry(hass, entry, lambda es: added.extend(es))
+    await async_setup_entry(hass, entry, added.extend)
     assert added == []
 
 
-async def test_async_setup_entry_logs_when_no_touch_modules(hass) -> None:
+async def test_async_setup_entry_logs_when_no_touch_modules(hass: HomeAssistant) -> None:
     """When no Touch modules are present, no entities are added."""
     other = MagicMock()
     other.mod_type = "Smart Output"
@@ -208,5 +208,5 @@ async def test_async_setup_entry_logs_when_no_touch_modules(hass) -> None:
     entry.runtime_data = smhub
 
     added: list = []
-    await async_setup_entry(hass, entry, lambda es: added.extend(es))
+    await async_setup_entry(hass, entry, added.extend)
     assert added == []

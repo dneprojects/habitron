@@ -1,7 +1,5 @@
 """Setup / unload / migration tests for the Habitron integration."""
 
-from __future__ import annotations
-
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.config_entries import ConfigEntryState

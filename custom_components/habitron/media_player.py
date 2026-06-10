@@ -20,7 +20,7 @@ from homeassistant.components.media_player import (  # type: ignore[attr-defined
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.restore_state import RestoreEntity
 
@@ -59,7 +59,7 @@ class QueueItem:
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: HabitronConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up the Habitron media player entities."""
     smhub: SmartHub = entry.runtime_data
@@ -88,6 +88,8 @@ async def async_setup_entry(
 class HbtnMediaPlayer(MediaPlayerEntity, RestoreEntity):
     """Representation of a Habitron client as a media player."""
 
+    _attr_has_entity_name = True
+    _attr_name = "Player"
     _attr_should_poll = False
     _attr_translation_key = "habitron_speaker"
 
@@ -104,7 +106,6 @@ class HbtnMediaPlayer(MediaPlayerEntity, RestoreEntity):
             module.name.lower().replace(" ", "_") + f"_{module.raddr}"
         )
         self._hass = hass
-        self._attr_name = f"Player {module.name}"
         self._attr_unique_id = f"Mod_{self._module.uid}_mediaplayer"
         self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
         self._attr_state = MediaPlayerState.OFF
@@ -240,20 +241,15 @@ class HbtnMediaPlayer(MediaPlayerEntity, RestoreEntity):
         # Prevent concurrent play_media calls
         async with self._play_request_lock:
             # Resolve URL and metadata
-            try:
-                media_url = await self._process_media_id(media_id)
-                if not media_url:
-                    _LOGGER.error("[%s] Could not resolve media_id", self.entity_id)
-                    return
-
-                metadata = await self._extract_metadata(media_id, kwargs)
-                metadata["track_mode"] = self._track_mode
-
-                item = QueueItem(media_id, media_type, media_url, metadata)
-
-            except Exception as e:
-                _LOGGER.error("[%s] Error processing media_id: %s", self.entity_id, e)
+            media_url = await self._process_media_id(media_id)
+            if not media_url:
+                _LOGGER.error("[%s] Could not resolve media_id", self.entity_id)
                 return
+
+            metadata = await self._extract_metadata(media_id, kwargs)
+            metadata["track_mode"] = self._track_mode
+
+            item = QueueItem(media_id, media_type, media_url, metadata)
 
             # Manage queue (based on MA enum)
             play_now = False
@@ -473,7 +469,9 @@ class HbtnMediaPlayer(MediaPlayerEntity, RestoreEntity):
         await self._send_item_to_client(self._current_item)
 
     async def async_browse_media(
-        self, media_content_type: str | None = None, media_content_id: str | None = None
+        self,
+        media_content_type: MediaType | str | None = None,
+        media_content_id: str | None = None,
     ) -> BrowseMedia:
         """Implement the websocket media browsing helper."""
         # Use Home Assistant's media_source helper to browse for audio content.
@@ -729,7 +727,7 @@ class HbtnMediaPlayer(MediaPlayerEntity, RestoreEntity):
 
     async def async_get_browse_image(
         self,
-        media_content_type: str,
+        media_content_type: MediaType | str,
         media_content_id: str,
         media_image_id: str | None = None,
     ) -> tuple[bytes | None, str | None]:

@@ -1,10 +1,9 @@
 """Tests for the Habitron climate platform."""
 
-from __future__ import annotations
-
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.components.climate import HVACAction, HVACMode
+from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.climate import HbtnClimate, async_setup_entry
@@ -310,7 +309,7 @@ def test_climate_update_local_state_second_unit_uses_sensor_2() -> None:
     assert climate._target_temperature == 22.0  # setvalues[1]
 
 
-async def test_climate_async_setup_entry_creates_first_and_second(hass) -> None:
+async def test_climate_async_setup_entry_creates_first_and_second(hass: HomeAssistant) -> None:
     """async_setup_entry creates 1st climate + 2nd when typ[0] == 1."""
     mod = _make_climate_module()
     mod.mod_type = "Smart Controller XL"
@@ -324,12 +323,12 @@ async def test_climate_async_setup_entry_creates_first_and_second(hass) -> None:
     entry.runtime_data.router = router
 
     added: list = []
-    await async_setup_entry(hass, entry, lambda es: added.extend(es))
+    await async_setup_entry(hass, entry, added.extend)
     assert len(added) == 2
     entry.async_on_unload.assert_called()
 
 
-async def test_climate_async_setup_entry_smart_sensor_path(hass) -> None:
+async def test_climate_async_setup_entry_smart_sensor_path(hass: HomeAssistant) -> None:
     """``Smart Sensor`` mod_type also triggers a climate entity."""
     mod = _make_climate_module()
     mod.mod_type = "Smart Sensor"
@@ -342,11 +341,11 @@ async def test_climate_async_setup_entry_smart_sensor_path(hass) -> None:
     entry.runtime_data.router = router
 
     added: list = []
-    await async_setup_entry(hass, entry, lambda es: added.extend(es))
+    await async_setup_entry(hass, entry, added.extend)
     assert len(added) == 1
 
 
-async def test_climate_async_setup_entry_skips_non_matching_module(hass) -> None:
+async def test_climate_async_setup_entry_skips_non_matching_module(hass: HomeAssistant) -> None:
     """A module that is neither Smart Controller nor Smart Sensor is skipped."""
     mod = _make_climate_module()
     mod.mod_type = "Smart Output"
@@ -358,11 +357,11 @@ async def test_climate_async_setup_entry_skips_non_matching_module(hass) -> None
     entry.runtime_data.router = router
 
     added: list = []
-    await async_setup_entry(hass, entry, lambda es: added.extend(es))
+    await async_setup_entry(hass, entry, added.extend)
     assert added == []
 
 
-async def test_climate_async_setup_entry_dual_mode_enable_logic_enables(hass) -> None:
+async def test_climate_async_setup_entry_dual_mode_enable_logic_enables(hass: HomeAssistant) -> None:
     """The dual-mode listener enables the disabled second-climate entity."""
     mod = _make_climate_module()
     mod.mod_type = "Smart Controller"
@@ -399,7 +398,7 @@ async def test_climate_async_setup_entry_dual_mode_enable_logic_enables(hass) ->
     registry.async_update_entity.assert_called_with("climate.dual", disabled_by=None)
 
 
-async def test_climate_async_setup_entry_single_mode_disables(hass) -> None:
+async def test_climate_async_setup_entry_single_mode_disables(hass: HomeAssistant) -> None:
     """The dual-mode listener disables the enabled second-climate entity."""
     mod = _make_climate_module()
     mod.mod_type = "Smart Controller"

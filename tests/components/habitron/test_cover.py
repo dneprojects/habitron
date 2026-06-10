@@ -1,11 +1,10 @@
 """Tests for the Habitron cover platform."""
 
-from __future__ import annotations
-
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from homeassistant.components.cover import CoverDeviceClass
+from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.cover import HbtnBlind, HbtnShutter, async_setup_entry
@@ -543,7 +542,7 @@ def test_blind_handle_coordinator_update_moving_down_schedules_stop() -> None:
     assert blind._moving == -1
 
 
-async def test_async_setup_entry_builds_shutter_and_blind(hass) -> None:
+async def test_async_setup_entry_builds_shutter_and_blind(hass: HomeAssistant) -> None:
     """async_setup_entry emits one Shutter + one Blind based on cover types."""
     cov_shutter = MagicMock()
     cov_shutter.nmbr = 0
@@ -584,14 +583,14 @@ async def test_async_setup_entry_builds_shutter_and_blind(hass) -> None:
         registry = MagicMock()
         registry.async_get_entity_id = MagicMock(return_value="cover.fake")
         mock_get.return_value = registry
-        await async_setup_entry(hass, entry, lambda es: added.extend(es))
+        await async_setup_entry(hass, entry, added.extend)
 
     assert any(isinstance(e, HbtnShutter) for e in added)
     assert any(isinstance(e, HbtnBlind) for e in added)
     registry.async_update_entity.assert_called()
 
 
-async def test_async_setup_entry_assigns_external_area(hass) -> None:
+async def test_async_setup_entry_assigns_external_area(hass: HomeAssistant) -> None:
     """A cover area that differs from area_member writes the area_id."""
     cov = _make_cover_descriptor()
     cov.area = 1
@@ -623,7 +622,7 @@ async def test_async_setup_entry_assigns_external_area(hass) -> None:
     registry.async_update_entity.assert_called_with("cover.fake", area_id="area_1_id")
 
 
-async def test_async_setup_entry_area_overflow_falls_back_to_zero(hass) -> None:
+async def test_async_setup_entry_area_overflow_falls_back_to_zero(hass: HomeAssistant) -> None:
     """An out-of-range area index is clamped to zero (default)."""
     cov = _make_cover_descriptor()
     cov.area = 99  # > len(areas)

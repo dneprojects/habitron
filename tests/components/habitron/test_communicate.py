@@ -1,7 +1,6 @@
 """Tests for the Habitron communicate (HbtnComm) layer."""
 
-from __future__ import annotations
-
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -506,7 +505,7 @@ async def test_async_power_cycle_channel_down_and_up_with_sleep() -> None:
 # ---------- save_* file persisters ----------
 
 
-async def test_save_router_status_writes_file(tmp_path) -> None:
+async def test_save_router_status_writes_file(tmp_path: Path) -> None:
     """save_router_status writes a Router_1.rstat file via save_config_data."""
     comm = _make_comm()
     comm.async_get_router_status = AsyncMock(return_value=b"\x01\x02")
@@ -561,7 +560,7 @@ async def test_save_smr_file_writes_byte_separated_string() -> None:
     assert args[1] == "7;8;"
 
 
-async def test_save_config_data_writes_to_disk(tmp_path) -> None:
+async def test_save_config_data_writes_to_disk(tmp_path: Path) -> None:
     """save_config_data creates the data directory and writes the payload."""
     comm = _make_comm()
 

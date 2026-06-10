@@ -1,9 +1,8 @@
 """Tests for the Habitron media_player platform."""
 
-from __future__ import annotations
-
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.media_player import (
@@ -15,6 +14,7 @@ from custom_components.habitron.media_player import (
 from .conftest import class_attr
 
 
+from homeassistant.core import HomeAssistant
 async def test_media_player_setup(setup_integration: MockConfigEntry) -> None:
     """The media_player platform sets up cleanly against an empty router."""
     assert setup_integration.runtime_data is not None
@@ -287,8 +287,8 @@ async def test_async_play_media_unresolvable_id_logs_and_returns() -> None:
     assert player._queue == []
 
 
-async def test_async_play_media_resolver_exception_logged_and_returned() -> None:
-    """An exception during resolution is caught + logged."""
+async def test_async_play_media_resolver_exception_propagates() -> None:
+    """An exception during resolution propagates so HA can report it."""
     from homeassistant.components.media_player import (
         MediaPlayerEnqueue,  # noqa: PLC0415
     )
@@ -296,7 +296,10 @@ async def test_async_play_media_resolver_exception_logged_and_returned() -> None
     player = _make_player()
     player._process_media_id = AsyncMock(side_effect=RuntimeError("boom"))
     player.async_write_ha_state = MagicMock()
-    await player.async_play_media("music", "bad-id", enqueue=MediaPlayerEnqueue.REPLACE)
+    with pytest.raises(RuntimeError, match="boom"):
+        await player.async_play_media(
+            "music", "bad-id", enqueue=MediaPlayerEnqueue.REPLACE
+        )
 
 
 # ---------- Internal queue flow + metadata polling ----------
@@ -921,7 +924,7 @@ def test_update_from_client_handles_attribute_exception() -> None:
 # ---------- async_setup_entry ----------
 
 
-async def test_async_setup_entry_adds_player_for_touch_module(hass) -> None:
+async def test_async_setup_entry_adds_player_for_touch_module(hass: HomeAssistant) -> None:
     """async_setup_entry adds one HbtnMediaPlayer per Smart Controller Touch."""
     touch = _make_touch_module()
     other = MagicMock()
@@ -934,13 +937,13 @@ async def test_async_setup_entry_adds_player_for_touch_module(hass) -> None:
     entry.runtime_data = smhub
 
     added: list = []
-    await async_setup_entry(hass, entry, lambda es: added.extend(es))
+    await async_setup_entry(hass, entry, added.extend)
     assert len(added) == 1
     assert isinstance(added[0], HbtnMediaPlayer)
     assert touch.media_player is added[0]
 
 
-async def test_async_setup_entry_short_circuits_without_provider(hass) -> None:
+async def test_async_setup_entry_short_circuits_without_provider(hass: HomeAssistant) -> None:
     """Without a WS provider, async_setup_entry logs and returns."""
     touch = _make_touch_module()
     smhub = MagicMock()
@@ -950,5 +953,5 @@ async def test_async_setup_entry_short_circuits_without_provider(hass) -> None:
     entry.runtime_data = smhub
 
     added: list = []
-    await async_setup_entry(hass, entry, lambda es: added.extend(es))
+    await async_setup_entry(hass, entry, added.extend)
     assert added == []
