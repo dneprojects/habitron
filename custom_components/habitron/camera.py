@@ -8,6 +8,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from webrtc_models import RTCIceCandidateInit
 
+from ._helpers import hbtn_device_info
 from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
 from .module import HbtnModule
@@ -74,7 +75,7 @@ class HbtnCam(Camera):
         self._module: HbtnModule = module
         self._attr_name = f"HbtnCam {idx + 1}"
         self._attr_unique_id = f"Mod_{self._module.uid}_camera"
-        self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
+        self._attr_device_info = hbtn_device_info(self._module.uid)
         self.hass = hass
         self._provider = provider
 

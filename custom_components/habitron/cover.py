@@ -19,6 +19,7 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
 )
 
+from ._helpers import async_assign_entity_area, hbtn_device_info
 from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
 from .interfaces import AreaDescriptor, CovDescriptor
@@ -62,21 +63,14 @@ async def async_setup_entry(
     for hbt_module in hbtn_rt.modules:
         for mod_cover in hbt_module.covers:
             if mod_cover.nmbr >= 0:
-                entity_entry = registry.async_get_entity_id(
-                    "cover", DOMAIN, f"Mod_{hbt_module.uid}_cover{mod_cover.nmbr}"
+                async_assign_entity_area(
+                    registry,
+                    domain="cover",
+                    unique_id=f"Mod_{hbt_module.uid}_cover{mod_cover.nmbr}",
+                    area_index=mod_cover.area,
+                    area_member=hbt_module.area_member,
+                    area_names=area_names,
                 )
-                if entity_entry:
-                    area_index = mod_cover.area
-                    if area_index > len(area_names) - 1:
-                        area_index = 0
-                    if area_index in [0, hbt_module.area_member]:
-                        registry.async_update_entity(
-                            entity_entry, area_id=None
-                        )  # default
-                    else:
-                        registry.async_update_entity(
-                            entity_entry, area_id=area_names[area_index].get_name_id()
-                        )
 
 
 # This entire class could be written to extend a base class to ensure common attributes
@@ -127,7 +121,7 @@ class HbtnShutter(CoordinatorEntity[DataUpdateCoordinator[None]], CoverEntity):
         self.stop_delay: int = module.comm.router.cover_autostop_del
         self._stop_task: asyncio.Task[None] | None = None
         self._attr_unique_id: str | None = f"Mod_{self._module.uid}_cover{cover.nmbr}"
-        self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
+        self._attr_device_info = hbtn_device_info(self._module.uid)
 
     async def async_added_to_hass(self) -> None:
         """Run when this Entity has been added to HA."""

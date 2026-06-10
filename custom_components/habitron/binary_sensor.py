@@ -19,6 +19,7 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
 )
 
+from ._helpers import hbtn_device_info
 from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
 from .interfaces import TYPE_DIAG, AreaDescriptor, IfDescriptor, StateDescriptor
@@ -115,7 +116,7 @@ class HbtnBinSensor(CoordinatorEntity[DataUpdateCoordinator[None]], BinarySensor
     @property
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
+        return hbtn_device_info(self._module.uid)
 
     @property
     def name(self) -> str:
@@ -277,8 +278,8 @@ class HbtnState(CoordinatorEntity[DataUpdateCoordinator[None]], BinarySensorEnti
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
         if isinstance(self._module.id, int):
-            return {"identifiers": {(DOMAIN, self._module.uid)}}  # router
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
+            return hbtn_device_info(self._module.uid)  # router
+        return hbtn_device_info(self._module.uid)
 
     @property
     def name(self) -> str:
@@ -320,7 +321,7 @@ class ListeningStatusSensor(BinarySensorEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
+        return hbtn_device_info(self._module.uid)
 
     # This method allows us to update the state from outside
     def set_listening_state(self, is_listening: bool) -> None:

@@ -186,96 +186,9 @@ class HbtnModule:
                 break
             line_len = int(resp[5]) + 5
             line = resp[0:line_len]
-            event_code = int(line[2])
-            if event_code == 235:  # Beschriftung
-                text = line[8:-1].decode("iso8859-1").strip()
-                arg_code = int(line[3])
-                if int(line[0]) == 252:
-                    # Finger ids
-                    self.ids.append(IfDescriptor(text, arg_code, 0, 0))
-                elif int(line[0]) == 253:
-                    # Description of commands
-                    self.dir_commands.append(CmdDescriptor(text, arg_code))
-                elif int(line[0]) == 254:
-                    if self.type == "Smart GSM":
-                        if int(line[4]) == 1:
-                            self.gsm_numbers.append(CmdDescriptor(text, arg_code))
-                    else:
-                        # Description of messages
-                        self.messages.append(CmdDescriptor(text, arg_code))
-                elif int(line[0]) == 255:
-                    try:
-                        if self.type == "Smart GSM":
-                            if int(line[4]) == 1:  # only german entries
-                                self.messages.append(CmdDescriptor(text, arg_code))
-                        elif arg_code in range(10, 18):
-                            # Description of module buttons
-                            self.inputs[arg_code - 10] = IfDescriptor(
-                                text, arg_code - 10, 1, 0
-                            )
-                        elif arg_code in range(101, 109):
-                            # Description of module buttons, long press
-                            pass
-                        elif arg_code in range(18, 26):
-                            # Description of module LEDs
-                            if self.mod_type == "Smart Controller Mini":
-                                self.cleds[arg_code - 17].name = text
-                            else:
-                                self.leds[arg_code - 17].name = text
-                        elif arg_code in range(40, 50):
-                            # Description of  Inputs
-                            if self.mod_type == "Smart Controller Mini":
-                                if arg_code in range(44, 48):
-                                    self.inputs[arg_code - 42] = IfDescriptor(
-                                        text, arg_code - 42, 1, 0, line[1]
-                                    )
-                            else:
-                                self.inputs[arg_code - 32] = IfDescriptor(
-                                    text, arg_code - 32, 1, 0, line[1]
-                                )
-                        elif arg_code in range(50, 52):
-                            # Description of  Inputs
-                            if self.mod_type[:16] == "Smart Controller":
-                                self.analogins[arg_code - 50].name = text
-                                self.analogins[arg_code - 50].area = line[1]
-                        elif arg_code in range(110, 120):
-                            # Description of logic units
-                            for lgc in self.logic:
-                                if lgc.nmbr == arg_code - 109:
-                                    lgc.name = text
-                                    break
-                        elif arg_code in range(120, 136):
-                            # Description of flags
-                            self.flags.append(
-                                StateDescriptor(
-                                    text, len(self.flags), arg_code - 119, 0, False
-                                )
-                            )
-                        elif arg_code == 136:
-                            # Description of module area
-                            self.area_member = line[1]
-                        elif arg_code in range(140, 173):
-                            # Description of vis commands (max 32)
-                            self.vis_commands.append(
-                                CmdDescriptor(
-                                    text[2:], ord(text[1]) * 256 + ord(text[0])
-                                )
-                            )
-                        elif self.mod_type[0:9] == "Smart Out":
-                            # Description of outputs in Out modules
-                            self.outputs[arg_code - 60] = IfDescriptor(
-                                text, arg_code - 60, 1, 0, line[1]
-                            )
-                        else:
-                            # Description of outputs
-                            self.outputs[arg_code - 60].name = text
-                            self.outputs[arg_code - 60].area = line[1]
-                    except Exception as err_msg:
-                        self.logger.warning(
-                            "Error processing line '%s': %s", line, err_msg
-                        )
-
-            resp = resp[line_len : len(resp)]  # Strip processed line
+            if int(line[2]) == 235:  # Beschriftung
+                self._process_label_line(line)
+            resp = resp[line_len:]  # Strip processed line
         if self.typ[0] == 1:
             self.outputs[15].type = 8  # analog output
             if self.outputs[15].name.strip() == "":
@@ -336,6 +249,120 @@ class HbtnModule:
             else:
                 self.outputs[3].type = 2
         return True
+
+    def _process_label_line(self, line: bytes) -> None:
+        """Dispatch a single ``Beschriftung`` (label) line to its target."""
+        text = line[8:-1].decode("iso8859-1").strip()
+        arg_code = int(line[3])
+        line_type = int(line[0])
+        if line_type == 252:
+            # Finger ids
+            self.ids.append(IfDescriptor(text, arg_code, 0, 0))
+        elif line_type == 253:
+            # Description of commands
+            self.dir_commands.append(CmdDescriptor(text, arg_code))
+        elif line_type == 254:
+            self._process_message_label(text, arg_code, line)
+        elif line_type == 255:
+            self._process_descriptor_label(text, arg_code, line)
+
+    def _process_message_label(self, text: str, arg_code: int, line: bytes) -> None:
+        """Handle line[0]==254 (message description)."""
+        if self.type == "Smart GSM":
+            if int(line[4]) == 1:
+                self.gsm_numbers.append(CmdDescriptor(text, arg_code))
+        else:
+            # Description of messages
+            self.messages.append(CmdDescriptor(text, arg_code))
+
+    def _process_descriptor_label(
+        self, text: str, arg_code: int, line: bytes
+    ) -> None:
+        """Handle line[0]==255 (interface descriptor) with flat dispatch."""
+        try:
+            if self.type == "Smart GSM" and int(line[4]) == 1:
+                # only german entries
+                self.messages.append(CmdDescriptor(text, arg_code))
+            elif arg_code in range(10, 18):
+                # Description of module buttons
+                self.inputs[arg_code - 10] = IfDescriptor(
+                    text, arg_code - 10, 1, 0
+                )
+            elif arg_code in range(101, 109):
+                # Description of module buttons, long press
+                pass
+            elif arg_code in range(18, 26):
+                self._set_led_label(arg_code, text)
+            elif arg_code in range(40, 50):
+                self._set_input_label(arg_code, text, line)
+            elif arg_code in range(50, 52):
+                self._set_analog_input_label(arg_code, text, line)
+            elif arg_code in range(110, 120):
+                self._set_logic_label(arg_code, text)
+            elif arg_code in range(120, 136):
+                # Description of flags
+                self.flags.append(
+                    StateDescriptor(
+                        text, len(self.flags), arg_code - 119, 0, False
+                    )
+                )
+            elif arg_code == 136:
+                # Description of module area
+                self.area_member = line[1]
+            elif arg_code in range(140, 173):
+                # Description of vis commands (max 32)
+                self.vis_commands.append(
+                    CmdDescriptor(
+                        text[2:], ord(text[1]) * 256 + ord(text[0])
+                    )
+                )
+            elif self.mod_type[0:9] == "Smart Out":
+                # Description of outputs in Out modules
+                self.outputs[arg_code - 60] = IfDescriptor(
+                    text, arg_code - 60, 1, 0, line[1]
+                )
+            else:
+                # Description of outputs
+                self.outputs[arg_code - 60].name = text
+                self.outputs[arg_code - 60].area = line[1]
+        except Exception as err_msg:  # noqa: BLE001
+            self.logger.warning(
+                "Error processing line '%s': %s", line, err_msg
+            )
+
+    def _set_led_label(self, arg_code: int, text: str) -> None:
+        """arg_code in 18..26: LED / colored-LED name."""
+        if self.mod_type == "Smart Controller Mini":
+            self.cleds[arg_code - 17].name = text
+        else:
+            self.leds[arg_code - 17].name = text
+
+    def _set_input_label(self, arg_code: int, text: str, line: bytes) -> None:
+        """arg_code in 40..50: input button labels."""
+        if self.mod_type == "Smart Controller Mini":
+            if arg_code in range(44, 48):
+                self.inputs[arg_code - 42] = IfDescriptor(
+                    text, arg_code - 42, 1, 0, line[1]
+                )
+        else:
+            self.inputs[arg_code - 32] = IfDescriptor(
+                text, arg_code - 32, 1, 0, line[1]
+            )
+
+    def _set_analog_input_label(
+        self, arg_code: int, text: str, line: bytes
+    ) -> None:
+        """arg_code in 50..52: analog-input labels (Smart Controller only)."""
+        if self.mod_type[:16] == "Smart Controller":
+            self.analogins[arg_code - 50].name = text
+            self.analogins[arg_code - 50].area = line[1]
+
+    def _set_logic_label(self, arg_code: int, text: str) -> None:
+        """arg_code in 110..120: name the matching logic unit."""
+        for lgc in self.logic:
+            if lgc.nmbr == arg_code - 109:
+                lgc.name = text
+                break
 
     async def get_settings(self) -> bool:
         """Get settings of Habitron module."""

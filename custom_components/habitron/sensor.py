@@ -31,6 +31,7 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
 )
 
+from ._helpers import async_assign_entity_area, hbtn_device_info
 from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
 from .interfaces import TYPE_DIAG, AreaDescriptor, IfDescriptor, LgcDescriptor
@@ -207,9 +208,19 @@ async def async_setup_entry(
                 new_devices.append(
                     EKeySensorId(hbt_module, mod_sensor, hbtn_cord, len(new_devices))
                 )
+                new_devices.append(
+                    EKeyUserNameSensor(
+                        hbt_module, mod_sensor.nmbr, hbtn_cord, len(new_devices)
+                    )
+                )
             elif mod_sensor.name == "Finger":
                 new_devices.append(
                     EKeySensorFngr(hbt_module, mod_sensor, hbtn_cord, len(new_devices))
+                )
+                new_devices.append(
+                    EKeyFingerNameSensor(
+                        hbt_module, mod_sensor.nmbr, hbtn_cord, len(new_devices)
+                    )
                 )
         for mod_logic in hbt_module.logic:
             if mod_logic.type > 0:
@@ -257,22 +268,14 @@ async def async_setup_entry(
         if hbt_module.typ in [b"\x01\x03", b"\x0b\x1f"]:
             for ain in hbt_module.analogins:
                 if ain.type == 3:  # analog input
-                    entity_entry = registry.async_get_entity_id(
-                        "sensor", DOMAIN, f"Mod_{hbt_module.uid}_adin{ain.nmbr}"
+                    async_assign_entity_area(
+                        registry,
+                        domain="sensor",
+                        unique_id=f"Mod_{hbt_module.uid}_adin{ain.nmbr}",
+                        area_index=ain.area,
+                        area_member=hbt_module.area_member,
+                        area_names=area_names,
                     )
-                    if entity_entry:
-                        area_index = ain.area
-                        if area_index > len(area_names) - 1:
-                            area_index = 0
-                        if area_index in [0, hbt_module.area_member]:
-                            registry.async_update_entity(
-                                entity_entry, area_id=None
-                            )  # default
-                        else:
-                            registry.async_update_entity(
-                                entity_entry,
-                                area_id=area_names[area_index].get_name_id(),
-                            )
 
 
 class HbtnSensor(CoordinatorEntity[DataUpdateCoordinator[None]], SensorEntity):
@@ -302,7 +305,7 @@ class HbtnSensor(CoordinatorEntity[DataUpdateCoordinator[None]], SensorEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
+        return hbtn_device_info(self._module.uid)
 
     @property
     def name(self) -> str | None:
@@ -572,7 +575,7 @@ class HbtnDiagSensor(CoordinatorEntity[DataUpdateCoordinator[None]], SensorEntit
     @property
     def device_info(self) -> DeviceInfo | None:
         """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
+        return hbtn_device_info(self._module.uid)
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -800,7 +803,7 @@ class HabitronClientSensor(SensorEntity):
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
         # Attach to the specific Module device, not the Hub
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
+        return hbtn_device_info(self._module.uid)
 
     async def async_added_to_hass(self) -> None:
         """Register callbacks when entity is added."""
@@ -826,3 +829,122 @@ class HabitronClientSensor(SensorEntity):
         if self._json_key in payload:
             self._attr_native_value = payload[self._json_key]
             self.async_write_ha_state()
+
+
+class EKeyUserNameSensor(CoordinatorEntity[DataUpdateCoordinator[None]], SensorEntity):
+    """Resolve a Fanekey ``Identifier`` value to the matching user's name."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "ekey_user_name"
+
+    def __init__(
+        self,
+        module: HbtnModule,
+        nmbr: int,
+        coord: DataUpdateCoordinator[None],
+        idx: int,
+    ) -> None:
+        """Initialize the user-name sensor."""
+        super().__init__(coord, context=idx)
+        self.idx = idx
+        self._module = module
+        self._nmbr = nmbr
+        self._attr_unique_id = f"Mod_{self._module.uid}_ekey_ident"
+        self._attr_device_info = hbtn_device_info(self._module.uid)
+        self._attr_native_value = "None"
+
+    async def async_added_to_hass(self) -> None:
+        """Subscribe to the underlying sensor's push updates."""
+        await super().async_added_to_hass()
+        self._module.sensors[self._nmbr].register_callback(
+            self._handle_coordinator_update
+        )
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Unsubscribe from the underlying sensor's push updates."""
+        self._module.sensors[self._nmbr].remove_callback(
+            self._handle_coordinator_update
+        )
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Translate the raw identifier value into a user name string."""
+        id_val = int(self._module.sensors[self._nmbr].value)
+        if id_val == 0:
+            self._attr_native_value = "None"
+        elif id_val == 255:
+            self._attr_native_value = "Error"
+        elif (id_val - 1) in range(len(self._module.ids)):
+            self._attr_native_value = self._module.ids[id_val - 1].name
+        elif (abs(id_val) - 1) in range(len(self._module.ids)):
+            self._attr_native_value = (
+                self._module.ids[abs(id_val) - 1].name + "-disabled"
+            )
+        else:
+            self._attr_native_value = "Unknown"
+        self.async_write_ha_state()
+
+
+class EKeyFingerNameSensor(
+    CoordinatorEntity[DataUpdateCoordinator[None]], SensorEntity
+):
+    """Resolve a Fanekey ``Finger`` value to the matching finger name."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "ekey_finger_name"
+
+    _FINGER_NAMES: tuple[str, ...] = (
+        "Kleiner Finger links",
+        "Ringfinger links",
+        "Mittelfinger links",
+        "Zeigefinger links",
+        "Daumen links",
+        "Daumen rechts",
+        "Zeigefinger rechts",
+        "Mittelfinger rechts",
+        "Ringfinger rechts",
+        "Kleiner Finger rechts",
+    )
+
+    def __init__(
+        self,
+        module: HbtnModule,
+        nmbr: int,
+        coord: DataUpdateCoordinator[None],
+        idx: int,
+    ) -> None:
+        """Initialize the finger-name sensor."""
+        super().__init__(coord, context=idx)
+        self.idx = idx
+        self._module = module
+        self._nmbr = nmbr
+        self._attr_unique_id = f"Mod_{self._module.uid}_ekey_fngr_ident"
+        self._attr_device_info = hbtn_device_info(self._module.uid)
+        self._attr_native_value = "None"
+
+    async def async_added_to_hass(self) -> None:
+        """Subscribe to the underlying sensor's push updates."""
+        await super().async_added_to_hass()
+        self._module.sensors[self._nmbr].register_callback(
+            self._handle_coordinator_update
+        )
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Unsubscribe from the underlying sensor's push updates."""
+        self._module.sensors[self._nmbr].remove_callback(
+            self._handle_coordinator_update
+        )
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Translate the raw finger value into a finger-name string."""
+        id_val = int(self._module.sensors[self._nmbr].value)
+        if id_val == 0:
+            self._attr_native_value = "None"
+        elif id_val == 255:
+            self._attr_native_value = "Error"
+        elif id_val in range(1, 11):
+            self._attr_native_value = self._FINGER_NAMES[id_val - 1]
+        else:
+            self._attr_native_value = "Unknown"
+        self.async_write_ha_state()

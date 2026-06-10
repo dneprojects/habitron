@@ -118,6 +118,12 @@
       "ekey_finger": {
         "name": "Finger value"
       },
+      "ekey_user_name": {
+        "name": "Identifier name"
+      },
+      "ekey_finger_name": {
+        "name": "Finger name"
+      },
       "wind": {
         "name": "Wind"
       },
@@ -139,15 +145,7 @@
         "name": "Climate controller"
       }
     },
-    "text": {
-      "ekey_user": {
-        "name": "Identifier name"
-      },
-      "ekey_finger": {
-        "name": "Finger name"
-      }
-    },
-    "select": {
+"select": {
       "habitron_mode": {
         "state": {
           "on": "On",

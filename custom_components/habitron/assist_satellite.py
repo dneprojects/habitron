@@ -18,6 +18,7 @@ from homeassistant.components.assist_satellite.entity import AssistSatelliteStat
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
+from ._helpers import hbtn_device_info
 from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
 from .module import SmartController
@@ -76,7 +77,7 @@ class HbtnAssistSat(AssistSatelliteEntity):
         self._provider = provider
         self._stream_name: str = module.stream_name
         self._attr_unique_id = f"Mod_{self._module.uid}_assist_sat"
-        self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
+        self._attr_device_info = hbtn_device_info(self._module.uid)
         self._attr_supported_features = (
             AssistSatelliteEntityFeature.ANNOUNCE
             | AssistSatelliteEntityFeature.START_CONVERSATION

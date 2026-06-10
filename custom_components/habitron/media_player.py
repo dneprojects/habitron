@@ -24,6 +24,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.restore_state import RestoreEntity
 
+from ._helpers import hbtn_device_info
 from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
 from .module import SmartController
@@ -107,7 +108,7 @@ class HbtnMediaPlayer(MediaPlayerEntity, RestoreEntity):
         )
         self._hass = hass
         self._attr_unique_id = f"Mod_{self._module.uid}_mediaplayer"
-        self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
+        self._attr_device_info = hbtn_device_info(self._module.uid)
         self._attr_state = MediaPlayerState.OFF
 
         self._queue: list[QueueItem] = []

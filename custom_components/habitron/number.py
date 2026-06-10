@@ -10,6 +10,7 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
 )
 
+from ._helpers import async_assign_entity_area, hbtn_device_info
 from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
 from .interfaces import AreaDescriptor, IfDescriptor
@@ -51,19 +52,14 @@ async def async_setup_entry(
     for hbt_module in hbtn_rt.modules:
         for mod_output in hbt_module.outputs:
             if abs(mod_output.type) == 8:  # analog output
-                entity_entry = registry.async_get_entity_id(
-                    "number", DOMAIN, f"Mod_{hbt_module.uid}_out{mod_output.nmbr}"
+                async_assign_entity_area(
+                    registry,
+                    domain="number",
+                    unique_id=f"Mod_{hbt_module.uid}_out{mod_output.nmbr}",
+                    area_index=mod_output.area,
+                    area_member=hbt_module.area_member,
+                    area_names=area_names,
                 )
-                if entity_entry:
-                    area_index = mod_output.area
-                    if area_index in [0, hbt_module.area_member]:
-                        registry.async_update_entity(
-                            entity_entry, area_id=None
-                        )  # default
-                    else:
-                        registry.async_update_entity(
-                            entity_entry, area_id=area_names[area_index].get_name_id()
-                        )
 
 
 class HbtnSetTemperature(CoordinatorEntity[DataUpdateCoordinator[None]], NumberEntity):
@@ -96,7 +92,7 @@ class HbtnSetTemperature(CoordinatorEntity[DataUpdateCoordinator[None]], NumberE
     @property
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
+        return hbtn_device_info(self._module.uid)
 
     @property
     def name(self) -> str | None:
@@ -156,12 +152,12 @@ class HbtnAnalogOutput(CoordinatorEntity[DataUpdateCoordinator[None]], NumberEnt
         if output.type < 0:
             # Entity will not show up
             self._attr_entity_registry_enabled_default = False
-        self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
+        self._attr_device_info = hbtn_device_info(self._module.uid)
 
     @property
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
+        return hbtn_device_info(self._module.uid)
 
     @property
     def name(self) -> str | None:

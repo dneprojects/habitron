@@ -12,6 +12,7 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
 )
 
+from ._helpers import hbtn_device_info
 from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
 from .interfaces import IfDescriptor
@@ -111,8 +112,8 @@ class HbtnMode(CoordinatorEntity[DataUpdateCoordinator[None]], SelectEntity):
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
         if isinstance(self._module, HbtnRouter):
-            return {"identifiers": {(DOMAIN, self.hbtnr.uid)}}
-        return {"identifiers": {(DOMAIN, self._module.uid)}}
+            return hbtn_device_info(self.hbtnr.uid)
+        return hbtn_device_info(self._module.uid)
 
     @property
     def name(self) -> str | None:
@@ -391,7 +392,7 @@ class HbtnSelectLoggingLevel(
     @property
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._smhub.uid)}}
+        return hbtn_device_info(self._smhub.uid)
 
     @property
     def name(self) -> str | None:

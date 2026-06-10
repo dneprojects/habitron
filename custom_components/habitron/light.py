@@ -16,6 +16,7 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
 )
 
+from ._helpers import async_assign_entity_area, hbtn_device_info
 from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
 from .interfaces import AreaDescriptor, CLedDescriptor, IfDescriptor
@@ -69,21 +70,14 @@ async def async_setup_entry(
     for hbt_module in hbtn_rt.modules:
         for mod_output in hbt_module.outputs:
             if mod_output.type == 2:  # dimmer
-                entity_entry = registry.async_get_entity_id(
-                    "light", DOMAIN, f"Mod_{hbt_module.uid}_out{mod_output.nmbr}"
+                async_assign_entity_area(
+                    registry,
+                    domain="light",
+                    unique_id=f"Mod_{hbt_module.uid}_out{mod_output.nmbr}",
+                    area_index=mod_output.area,
+                    area_member=hbt_module.area_member,
+                    area_names=area_names,
                 )
-                if entity_entry:
-                    area_index = mod_output.area
-                    if area_index > len(area_names) - 1:
-                        area_index = 0
-                    if area_index in [0, hbt_module.area_member]:
-                        registry.async_update_entity(
-                            entity_entry, area_id=None
-                        )  # default
-                    else:
-                        registry.async_update_entity(
-                            entity_entry, area_id=area_names[area_index].get_name_id()
-                        )
 
 
 class SwitchedLight(CoordinatorEntity[DataUpdateCoordinator[None]], LightEntity):
@@ -115,7 +109,7 @@ class SwitchedLight(CoordinatorEntity[DataUpdateCoordinator[None]], LightEntity)
         self._brightness: int = 255
         self._out_offs = 0  # Dimm 1 = Out 1 + offs
         self._attr_unique_id: str | None = f"Mod_{self._module.uid}_out{output.nmbr}"
-        self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
+        self._attr_device_info = hbtn_device_info(self._module.uid)
 
     @property
     def is_on(self) -> bool:
@@ -284,7 +278,7 @@ class ColorLed(CoordinatorEntity[DataUpdateCoordinator[None]], LightEntity):
         self._org_color: tuple[int, int, int] = (50, 50, 50)
         self._hs_color: tuple[float, float] = (0.0, 0.0)
         self._attr_unique_id: str | None = f"Mod_{self._module.uid}_rgbled{led.nmbr}"
-        self._attr_device_info = {"identifiers": {(DOMAIN, self._module.uid)}}
+        self._attr_device_info = hbtn_device_info(self._module.uid)
         if led.type < 0:
             # Entity will not show up
             self._attr_entity_registry_enabled_default = False
