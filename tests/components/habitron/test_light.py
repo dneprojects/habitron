@@ -402,7 +402,9 @@ async def test_color_led_turn_on_without_kwargs_uses_defaults() -> None:
     mod.comm.async_set_rgbval.assert_awaited()
 
 
-async def test_async_setup_entry_emits_dimmed_output_and_color_led(hass: HomeAssistant) -> None:
+async def test_async_setup_entry_emits_dimmed_output_and_color_led(
+    hass: HomeAssistant,
+) -> None:
     """async_setup_entry creates DimmedOutputPush + ColorLed for relevant modules."""
     dim_out = _make_output(type_=2, nmbr=10)
     dim_out.area = 0
@@ -471,7 +473,9 @@ async def test_async_setup_entry_assigns_external_area(hass: HomeAssistant) -> N
     registry.async_update_entity.assert_called_with("light.fake", area_id="area_5_id")
 
 
-async def test_async_setup_entry_area_overflow_falls_back_to_zero(hass: HomeAssistant) -> None:
+async def test_async_setup_entry_area_overflow_falls_back_to_zero(
+    hass: HomeAssistant,
+) -> None:
     """An out-of-range dimmer area is clamped to zero."""
     dim_out = _make_output(type_=2, nmbr=10)
     dim_out.area = 99

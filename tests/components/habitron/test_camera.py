@@ -3,12 +3,12 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.camera import HbtnCam, async_setup_entry
 
 
-from homeassistant.core import HomeAssistant
 async def test_camera_setup(setup_integration: MockConfigEntry) -> None:
     """The camera platform sets up cleanly against an empty router."""
     assert setup_integration.runtime_data is not None
@@ -163,7 +163,9 @@ async def test_hbtn_cam_async_on_webrtc_candidate_skips_when_no_provider() -> No
     await cam.async_on_webrtc_candidate("sess-1", MagicMock())  # no raise
 
 
-async def test_async_setup_entry_adds_camera_for_touch_module(hass: HomeAssistant) -> None:
+async def test_async_setup_entry_adds_camera_for_touch_module(
+    hass: HomeAssistant,
+) -> None:
     """async_setup_entry adds one HbtnCam per Smart Controller Touch."""
     touch = _make_touch_module()
     other = MagicMock()
@@ -181,7 +183,9 @@ async def test_async_setup_entry_adds_camera_for_touch_module(hass: HomeAssistan
     assert isinstance(added[0], HbtnCam)
 
 
-async def test_async_setup_entry_short_circuits_without_provider(hass: HomeAssistant) -> None:
+async def test_async_setup_entry_short_circuits_without_provider(
+    hass: HomeAssistant,
+) -> None:
     """Without a WebRTC provider, async_setup_entry logs and returns."""
     touch = _make_touch_module()
     smhub = MagicMock()
@@ -196,7 +200,9 @@ async def test_async_setup_entry_short_circuits_without_provider(hass: HomeAssis
     assert added == []
 
 
-async def test_async_setup_entry_logs_when_no_touch_modules(hass: HomeAssistant) -> None:
+async def test_async_setup_entry_logs_when_no_touch_modules(
+    hass: HomeAssistant,
+) -> None:
     """When no Touch modules are present, no entities are added."""
     other = MagicMock()
     other.mod_type = "Smart Output"

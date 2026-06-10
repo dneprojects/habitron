@@ -6,6 +6,7 @@ service tests using ``hass.services.async_call("button", "press", ...)``.
 
 from unittest.mock import AsyncMock, MagicMock
 
+from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.button import (
@@ -27,7 +28,6 @@ from custom_components.habitron.button import (
 from .conftest import class_attr
 
 
-from homeassistant.core import HomeAssistant
 async def test_button_setup(setup_integration: MockConfigEntry) -> None:
     """The platform sets up cleanly against an empty router."""
     assert setup_integration.runtime_data is not None

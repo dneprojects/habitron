@@ -309,7 +309,9 @@ def test_climate_update_local_state_second_unit_uses_sensor_2() -> None:
     assert climate._target_temperature == 22.0  # setvalues[1]
 
 
-async def test_climate_async_setup_entry_creates_first_and_second(hass: HomeAssistant) -> None:
+async def test_climate_async_setup_entry_creates_first_and_second(
+    hass: HomeAssistant,
+) -> None:
     """async_setup_entry creates 1st climate + 2nd when typ[0] == 1."""
     mod = _make_climate_module()
     mod.mod_type = "Smart Controller XL"
@@ -345,7 +347,9 @@ async def test_climate_async_setup_entry_smart_sensor_path(hass: HomeAssistant) 
     assert len(added) == 1
 
 
-async def test_climate_async_setup_entry_skips_non_matching_module(hass: HomeAssistant) -> None:
+async def test_climate_async_setup_entry_skips_non_matching_module(
+    hass: HomeAssistant,
+) -> None:
     """A module that is neither Smart Controller nor Smart Sensor is skipped."""
     mod = _make_climate_module()
     mod.mod_type = "Smart Output"
@@ -361,7 +365,9 @@ async def test_climate_async_setup_entry_skips_non_matching_module(hass: HomeAss
     assert added == []
 
 
-async def test_climate_async_setup_entry_dual_mode_enable_logic_enables(hass: HomeAssistant) -> None:
+async def test_climate_async_setup_entry_dual_mode_enable_logic_enables(
+    hass: HomeAssistant,
+) -> None:
     """The dual-mode listener enables the disabled second-climate entity."""
     mod = _make_climate_module()
     mod.mod_type = "Smart Controller"
@@ -398,7 +404,9 @@ async def test_climate_async_setup_entry_dual_mode_enable_logic_enables(hass: Ho
     registry.async_update_entity.assert_called_with("climate.dual", disabled_by=None)
 
 
-async def test_climate_async_setup_entry_single_mode_disables(hass: HomeAssistant) -> None:
+async def test_climate_async_setup_entry_single_mode_disables(
+    hass: HomeAssistant,
+) -> None:
     """The dual-mode listener disables the enabled second-climate entity."""
     mod = _make_climate_module()
     mod.mod_type = "Smart Controller"

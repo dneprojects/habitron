@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.module import HbtnModule
@@ -20,7 +21,6 @@ from custom_components.habitron.select import (
 from custom_components.habitron.smart_hub import LoggingLevels
 
 
-from homeassistant.core import HomeAssistant
 async def test_select_setup(setup_integration: MockConfigEntry) -> None:
     """The select platform sets up cleanly against an empty router."""
     assert setup_integration.runtime_data is not None
