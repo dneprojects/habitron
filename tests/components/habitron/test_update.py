@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.router import HbtnRouter
@@ -16,7 +17,6 @@ from custom_components.habitron.update import (
 from .conftest import class_attr
 
 
-from homeassistant.core import HomeAssistant
 async def test_update_setup(setup_integration: MockConfigEntry) -> None:
     """The update platform sets up cleanly against an empty router."""
     assert setup_integration.runtime_data is not None
@@ -87,7 +87,9 @@ def _make_router_with_smhub() -> MagicMock:
 # ---------- async_setup_entry ----------
 
 
-async def test_async_setup_entry_emits_router_module_and_touch_app(hass: HomeAssistant) -> None:
+async def test_async_setup_entry_emits_router_module_and_touch_app(
+    hass: HomeAssistant,
+) -> None:
     """async_setup_entry adds router + module + SCTouchAppUpdate for Touch."""
     touch = _make_module(typ=b"\x01\x04")
     other = _make_module(uid="MOD-2", typ=b"\x01\x03")

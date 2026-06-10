@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.number import (
@@ -13,7 +14,6 @@ from custom_components.habitron.number import (
 from .conftest import class_attr
 
 
-from homeassistant.core import HomeAssistant
 async def test_number_setup(setup_integration: MockConfigEntry) -> None:
     """The number platform sets up cleanly against an empty router."""
     assert setup_integration.runtime_data is not None
@@ -150,7 +150,9 @@ def test_analog_output_device_info_and_name_property() -> None:
     assert entity.name == "Analog 1"
 
 
-async def test_async_setup_entry_adds_temperature_and_analog(hass: HomeAssistant) -> None:
+async def test_async_setup_entry_adds_temperature_and_analog(
+    hass: HomeAssistant,
+) -> None:
     """async_setup_entry emits SetTemperature for setvalues and AnalogOutput."""
     sp = _make_setpoint()
     out = _make_output(type_=8, nmbr=0)

@@ -681,7 +681,9 @@ def test_habitron_client_sensor_handle_event_writes_state() -> None:
     assert entity._attr_native_value == 12.5
 
 
-async def test_habitron_client_sensor_async_added_listens_for_bus_event(hass: HomeAssistant) -> None:
+async def test_habitron_client_sensor_async_added_listens_for_bus_event(
+    hass: HomeAssistant,
+) -> None:
     """async_added_to_hass subscribes to ``habitron_device_update``."""
     mod = MagicMock()
     mod.uid = "MOD-T"
@@ -833,7 +835,9 @@ async def test_async_setup_entry_emits_all_sensor_types(hass: HomeAssistant) -> 
     assert any(isinstance(e, HabitronClientSensor) for e in added)
 
 
-async def test_async_setup_entry_analog_area_assignment_external(hass: HomeAssistant) -> None:
+async def test_async_setup_entry_analog_area_assignment_external(
+    hass: HomeAssistant,
+) -> None:
     """An analog input with a non-default area gets the area_id assigned."""
     ain = MagicMock()
     ain.name = "AIn 1"
@@ -877,7 +881,9 @@ async def test_async_setup_entry_analog_area_assignment_external(hass: HomeAssis
     registry.async_update_entity.assert_called_with("sensor.fake", area_id="area_5_id")
 
 
-async def test_async_setup_entry_analog_area_overflow_falls_back(hass: HomeAssistant) -> None:
+async def test_async_setup_entry_analog_area_overflow_falls_back(
+    hass: HomeAssistant,
+) -> None:
     """An out-of-range analog area is clamped to the default."""
     ain = MagicMock()
     ain.name = "AIn 1"

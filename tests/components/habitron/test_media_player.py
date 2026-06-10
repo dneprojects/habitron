@@ -3,6 +3,7 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.media_player import (
@@ -14,7 +15,6 @@ from custom_components.habitron.media_player import (
 from .conftest import class_attr
 
 
-from homeassistant.core import HomeAssistant
 async def test_media_player_setup(setup_integration: MockConfigEntry) -> None:
     """The media_player platform sets up cleanly against an empty router."""
     assert setup_integration.runtime_data is not None
@@ -924,7 +924,9 @@ def test_update_from_client_handles_attribute_exception() -> None:
 # ---------- async_setup_entry ----------
 
 
-async def test_async_setup_entry_adds_player_for_touch_module(hass: HomeAssistant) -> None:
+async def test_async_setup_entry_adds_player_for_touch_module(
+    hass: HomeAssistant,
+) -> None:
     """async_setup_entry adds one HbtnMediaPlayer per Smart Controller Touch."""
     touch = _make_touch_module()
     other = MagicMock()
@@ -943,7 +945,9 @@ async def test_async_setup_entry_adds_player_for_touch_module(hass: HomeAssistan
     assert touch.media_player is added[0]
 
 
-async def test_async_setup_entry_short_circuits_without_provider(hass: HomeAssistant) -> None:
+async def test_async_setup_entry_short_circuits_without_provider(
+    hass: HomeAssistant,
+) -> None:
     """Without a WS provider, async_setup_entry logs and returns."""
     touch = _make_touch_module()
     smhub = MagicMock()

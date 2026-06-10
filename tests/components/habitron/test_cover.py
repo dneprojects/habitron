@@ -622,7 +622,9 @@ async def test_async_setup_entry_assigns_external_area(hass: HomeAssistant) -> N
     registry.async_update_entity.assert_called_with("cover.fake", area_id="area_1_id")
 
 
-async def test_async_setup_entry_area_overflow_falls_back_to_zero(hass: HomeAssistant) -> None:
+async def test_async_setup_entry_area_overflow_falls_back_to_zero(
+    hass: HomeAssistant,
+) -> None:
     """An out-of-range area index is clamped to zero (default)."""
     cov = _make_cover_descriptor()
     cov.area = 99  # > len(areas)

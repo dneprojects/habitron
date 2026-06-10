@@ -6,6 +6,7 @@ Extend with per-entity state-transition tests and snapshot-based UI tests.
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.binary_sensor import (
@@ -24,7 +25,6 @@ from custom_components.habitron.interfaces import TYPE_DIAG
 from .conftest import class_attr
 
 
-from homeassistant.core import HomeAssistant
 async def test_binary_sensor_setup(setup_integration: MockConfigEntry) -> None:
     """The platform sets up cleanly against an empty router."""
     assert setup_integration.runtime_data is not None
@@ -394,7 +394,9 @@ async def test_async_setup_entry_creates_all_entity_types(hass: HomeAssistant) -
     assert mod.vce_stat is not None
 
 
-async def test_async_setup_entry_assigns_area_when_input_area_differs(hass: HomeAssistant) -> None:
+async def test_async_setup_entry_assigns_area_when_input_area_differs(
+    hass: HomeAssistant,
+) -> None:
     """A switch with area != module.area_member gets an area_id assigned."""
     inp = MagicMock()
     inp.nmbr = 0
