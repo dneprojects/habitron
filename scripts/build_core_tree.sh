@@ -47,8 +47,26 @@ rm -rf "$DST_INTEGRATION" "$DST_TESTS"
 echo "==> Copying integration source"
 cp -r "$SRC_INTEGRATION" "$DST_INTEGRATION"
 
+echo "==> Stripping HACS-only artefacts from core integration tree"
+# Files that exist because HACS ships integrations as standalone repos
+# (LICENSE, README, .gitattributes) or that belong to the HACS-side
+# user-data layout (data/, firmware/, logos/, www/). Core integrations
+# are documented at home-assistant.io and never ship runtime assets
+# or brand assets in-tree.
+rm -rf \
+    "$DST_INTEGRATION/.gitattributes" \
+    "$DST_INTEGRATION/LICENSE" \
+    "$DST_INTEGRATION/README.md" \
+    "$DST_INTEGRATION/data" \
+    "$DST_INTEGRATION/firmware" \
+    "$DST_INTEGRATION/logos" \
+    "$DST_INTEGRATION/www"
+
 echo "==> Copying tests"
 cp -r "$SRC_TESTS" "$DST_TESTS"
+
+# Drop any leftover __pycache__ that may have been copied along.
+find "$DST_INTEGRATION" "$DST_TESTS" -type d -name __pycache__ -exec rm -rf {} +
 
 echo "==> Rewriting integration imports"
 # Match both 'from custom_components.habitron...' and
