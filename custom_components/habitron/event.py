@@ -10,7 +10,6 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from ._helpers import async_assign_entity_area, hbtn_device_info
-from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
 
 # Import the device class from the component that you want to support

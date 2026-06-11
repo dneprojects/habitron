@@ -56,9 +56,7 @@ def async_assign_entity_area(
     if area_index not in area_names:
         area_index = 0
     target_area = (
-        None
-        if area_index in (0, area_member)
-        else area_names[area_index].get_name_id()
+        None if area_index in (0, area_member) else area_names[area_index].get_name_id()
     )
     registry.async_update_entity(entity_entry, area_id=target_area)
     if not propagate_to_hidden_duplicates:

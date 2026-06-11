@@ -19,7 +19,6 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from ._helpers import hbtn_device_info
-from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
 from .module import SmartController
 from .smart_hub import SmartHub

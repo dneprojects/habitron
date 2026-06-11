@@ -9,7 +9,6 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from ._helpers import hbtn_device_info
-from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
 from .interfaces import IfDescriptor
 from .module import HbtnModule

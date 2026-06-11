@@ -1,6 +1,5 @@
 """Platform for switch integration."""
 
-import logging
 from typing import Any
 
 from homeassistant.components.switch import SwitchDeviceClass, SwitchEntity
@@ -15,7 +14,6 @@ from homeassistant.helpers.update_coordinator import (
 )
 
 from ._helpers import async_assign_entity_area, hbtn_device_info
-from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
 from .interfaces import AreaDescriptor, IfDescriptor, StateDescriptor
 from .module import HbtnModule

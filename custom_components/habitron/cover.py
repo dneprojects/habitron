@@ -20,7 +20,6 @@ from homeassistant.helpers.update_coordinator import (
 )
 
 from ._helpers import async_assign_entity_area, hbtn_device_info
-from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
 from .interfaces import AreaDescriptor, CovDescriptor
 from .module import HbtnModule

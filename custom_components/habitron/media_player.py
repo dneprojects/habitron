@@ -25,7 +25,6 @@ from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.restore_state import RestoreEntity
 
 from ._helpers import hbtn_device_info
-from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
 from .module import SmartController
 

@@ -1,15 +1,17 @@
 """Camera platform for Habitron integration in Home Assistant."""
 
 import logging
-from typing import Any
 
-from homeassistant.components.camera import Camera, CameraEntityFeature, WebRTCSendMessage
+from homeassistant.components.camera import (  # type: ignore[attr-defined]
+    Camera,
+    CameraEntityFeature,
+    WebRTCSendMessage,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from webrtc_models import RTCIceCandidateInit
 
 from ._helpers import hbtn_device_info
-from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
 from .module import HbtnModule
 from .router import HbtnRouter
