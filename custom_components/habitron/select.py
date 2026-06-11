@@ -13,7 +13,6 @@ from homeassistant.helpers.update_coordinator import (
 )
 
 from ._helpers import hbtn_device_info
-from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
 from .interfaces import IfDescriptor
 from .module import HbtnModule

@@ -275,9 +275,7 @@ class HbtnModule:
             # Description of messages
             self.messages.append(CmdDescriptor(text, arg_code))
 
-    def _process_descriptor_label(
-        self, text: str, arg_code: int, line: bytes
-    ) -> None:
+    def _process_descriptor_label(self, text: str, arg_code: int, line: bytes) -> None:
         """Handle line[0]==255 (interface descriptor) with flat dispatch."""
         try:
             if self.type == "Smart GSM" and int(line[4]) == 1:
@@ -285,9 +283,7 @@ class HbtnModule:
                 self.messages.append(CmdDescriptor(text, arg_code))
             elif arg_code in range(10, 18):
                 # Description of module buttons
-                self.inputs[arg_code - 10] = IfDescriptor(
-                    text, arg_code - 10, 1, 0
-                )
+                self.inputs[arg_code - 10] = IfDescriptor(text, arg_code - 10, 1, 0)
             elif arg_code in range(101, 109):
                 # Description of module buttons, long press
                 pass
@@ -302,9 +298,7 @@ class HbtnModule:
             elif arg_code in range(120, 136):
                 # Description of flags
                 self.flags.append(
-                    StateDescriptor(
-                        text, len(self.flags), arg_code - 119, 0, False
-                    )
+                    StateDescriptor(text, len(self.flags), arg_code - 119, 0, False)
                 )
             elif arg_code == 136:
                 # Description of module area
@@ -312,9 +306,7 @@ class HbtnModule:
             elif arg_code in range(140, 173):
                 # Description of vis commands (max 32)
                 self.vis_commands.append(
-                    CmdDescriptor(
-                        text[2:], ord(text[1]) * 256 + ord(text[0])
-                    )
+                    CmdDescriptor(text[2:], ord(text[1]) * 256 + ord(text[0]))
                 )
             elif self.mod_type[0:9] == "Smart Out":
                 # Description of outputs in Out modules
@@ -325,10 +317,8 @@ class HbtnModule:
                 # Description of outputs
                 self.outputs[arg_code - 60].name = text
                 self.outputs[arg_code - 60].area = line[1]
-        except Exception as err_msg:  # noqa: BLE001
-            self.logger.warning(
-                "Error processing line '%s': %s", line, err_msg
-            )
+        except Exception as err_msg:
+            self.logger.warning("Error processing line '%s': %s", line, err_msg)
 
     def _set_led_label(self, arg_code: int, text: str) -> None:
         """arg_code in 18..26: LED / colored-LED name."""
@@ -349,9 +339,7 @@ class HbtnModule:
                 text, arg_code - 32, 1, 0, line[1]
             )
 
-    def _set_analog_input_label(
-        self, arg_code: int, text: str, line: bytes
-    ) -> None:
+    def _set_analog_input_label(self, arg_code: int, text: str, line: bytes) -> None:
         """arg_code in 50..52: analog-input labels (Smart Controller only)."""
         if self.mod_type[:16] == "Smart Controller":
             self.analogins[arg_code - 50].name = text
