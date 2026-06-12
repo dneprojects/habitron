@@ -1,5 +1,12 @@
 # Latest changes
 
+## v2.9.0
+
+Restores free-text notify messages to modules; requires habitron_client 1.0.4.
+
+### New feature
+- `notify.<module>` sends arbitrary free text to a module's display.
+
 ## v2.8.0
 
 Bug-fix and Home-Assistant-Core readiness release; upgrades to habitron_client 1.0.3.
