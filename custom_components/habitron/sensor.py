@@ -848,7 +848,7 @@ class EKeyUserNameSensor(CoordinatorEntity[DataUpdateCoordinator[None]], SensorE
         self.idx = idx
         self._module = module
         self._nmbr = nmbr
-        self._attr_unique_id = f"Mod_{self._module.uid}_ekey_ident"
+        self._attr_unique_id = f"Mod_{self._module.uid}_ekey_ident_name"
         self._attr_device_info = hbtn_device_info(self._module.uid)
         self._attr_native_value = "None"
 
