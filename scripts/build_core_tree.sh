@@ -130,6 +130,20 @@ grep -rl 'pytest_homeassistant_custom_component' "$DST_TESTS" 2>/dev/null \
         -e 's|pytest_homeassistant_custom_component\.common|tests.common|g' \
         -e 's|from pytest_homeassistant_custom_component |from tests.common |g'
 
+# The import rewrites above change import paths, which breaks isort
+# ordering for the core layout. Re-run ruff (with the core repo's own
+# config) so the generated tree is lint-clean exactly as core CI expects.
+if command -v ruff >/dev/null 2>&1; then
+    echo "==> ruff --fix + format on the generated tree (core config)"
+    (
+        cd "$CORE_REPO"
+        ruff check --fix --quiet \
+            homeassistant/components/habitron tests/components/habitron || true
+        ruff format --quiet \
+            homeassistant/components/habitron tests/components/habitron || true
+    )
+fi
+
 echo
 echo "Generated core-tree at:"
 echo "  $DST_INTEGRATION"

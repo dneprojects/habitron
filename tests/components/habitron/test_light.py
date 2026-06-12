@@ -259,7 +259,7 @@ async def test_switched_light_push_remove_callback() -> None:
 
 
 def test_dimmed_output_brightness_property() -> None:
-    """brightness returns the cached _brightness value."""
+    """Brightness returns the cached _brightness value."""
     out = _make_output(nmbr=10)
     mod = _make_dimmer_module()
     coord = MagicMock()

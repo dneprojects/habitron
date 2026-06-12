@@ -1,10 +1,16 @@
 """Tests for the Habitron module-layer classes."""
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from custom_components.habitron.const import ModuleDescriptor
+from custom_components.habitron.const import ModuleDescriptor, MSetIdx, MStatIdx
+from custom_components.habitron.interfaces import (
+    CovDescriptor,
+    IfDescriptor,
+    LgcDescriptor,
+    StateDescriptor,
+)
 from custom_components.habitron.module import (
     HbtnModule,
     SmartController,
@@ -94,7 +100,6 @@ def test_module_area_uses_router_area_name() -> None:
 
 def test_module_get_cover_index_paired_outputs() -> None:
     """``get_cover_index`` walks the outputs to map a pair to a cover."""
-    from custom_components.habitron.interfaces import IfDescriptor
 
     desc = _make_descriptor()
     mod = HbtnModule(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
@@ -118,7 +123,6 @@ def test_module_set_default_names_assigns_indexed_names() -> None:
     """``set_default_names`` fills empty names with a base + index pattern."""
     desc = _make_descriptor()
     mod = HbtnModule(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
-    from custom_components.habitron.interfaces import IfDescriptor
 
     items = [
         IfDescriptor("", 0, 0, 0),
@@ -502,7 +506,6 @@ async def test_module_initialize_runs_device_registration(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """``initialize`` walks the device + area registration flow."""
-    from unittest.mock import patch
 
     desc = _make_descriptor(mtype=b"\x01\x03", name="SC")
     comm = _make_comm()
@@ -558,7 +561,6 @@ async def test_module_initialize_runs_device_registration(
 
 def test_get_cover_index_returns_paired_index_when_type_marker_present() -> None:
     """An output flagged as ``type == -10`` reports the paired cover index."""
-    from custom_components.habitron.interfaces import IfDescriptor
 
     desc = _make_descriptor()
     mod = HbtnModule(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
@@ -574,7 +576,6 @@ def test_get_cover_index_returns_paired_index_when_type_marker_present() -> None
 
 def test_get_cover_index_returns_minus_one_for_normal_output() -> None:
     """A normal (non-cover) output returns ``-1`` as a sentinel."""
-    from custom_components.habitron.interfaces import IfDescriptor
 
     desc = _make_descriptor()
     mod = HbtnModule(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
@@ -586,7 +587,6 @@ def test_extract_status_logs_when_module_present(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """When the marker byte matches, extract_status returns a non-empty slice."""
-    from custom_components.habitron.const import MStatIdx
 
     desc = _make_descriptor()
     mod = HbtnModule(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
@@ -603,8 +603,6 @@ def test_extract_status_logs_when_module_present(
 
 def test_smart_controller_update_writes_cover_positions_when_present() -> None:
     """A cover with nmbr >= 0 has its position pulled from the status block."""
-    from custom_components.habitron.const import MStatIdx
-    from custom_components.habitron.interfaces import CovDescriptor
 
     desc = _make_descriptor(mtype=b"\x01\x03", name="SC LE2")
     sc = SmartController(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
@@ -621,8 +619,6 @@ def test_smart_controller_update_writes_cover_positions_when_present() -> None:
 
 def test_smart_controller_update_with_flag_active_sets_value() -> None:
     """A flag with the matching bit set in FLAG_LOC ends up with value 1."""
-    from custom_components.habitron.const import MStatIdx
-    from custom_components.habitron.interfaces import StateDescriptor
 
     desc = _make_descriptor(mtype=b"\x01\x03", name="SC LE2")
     sc = SmartController(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
@@ -636,8 +632,6 @@ def test_smart_controller_update_with_flag_active_sets_value() -> None:
 
 def test_smart_controller_mini_update_flag_bit_set() -> None:
     """SCMini.update writes flags when the matching bit is set."""
-    from custom_components.habitron.const import MStatIdx
-    from custom_components.habitron.interfaces import StateDescriptor
 
     desc = _make_descriptor(mtype=b"\x32\x01", name="Mini")
     mini = SmartControllerMini(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
@@ -651,8 +645,6 @@ def test_smart_controller_mini_update_flag_bit_set() -> None:
 
 def test_smart_output_update_walks_cover_when_attached() -> None:
     """SmartOutput.update reads positions for covers with nmbr>=0."""
-    from custom_components.habitron.const import MStatIdx
-    from custom_components.habitron.interfaces import CovDescriptor
 
     desc = _make_descriptor(mtype=b"\x0a\x01", name="Out 8/R")
     out = SmartOutput(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
@@ -668,7 +660,6 @@ def test_smart_output_update_walks_cover_when_attached() -> None:
 
 def test_smart_dimm_update_renames_inputs_to_din_pattern() -> None:
     """SmartDimm.__init__ renames any pre-existing inputs to ``DIn<n>``."""
-    from custom_components.habitron.interfaces import IfDescriptor
 
     desc = _make_descriptor(mtype=b"\x0a\x14", name="Dimm 1")
     # Provide an input list before constructing so the loop has work.
@@ -687,8 +678,6 @@ def test_smart_dimm_update_renames_inputs_to_din_pattern() -> None:
 
 def test_smart_io2_update_walks_cover_when_attached() -> None:
     """SmartIO2.update reads cover position when one is attached."""
-    from custom_components.habitron.const import MStatIdx
-    from custom_components.habitron.interfaces import CovDescriptor
 
     desc = _make_descriptor(mtype=b"\x0a\x1e", name="IO 2")
     io = SmartIO2(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
@@ -704,7 +693,6 @@ def test_smart_io2_update_walks_cover_when_attached() -> None:
 
 def test_smart_input_typ_1f_seeds_analogins_and_update_walks_them() -> None:
     """When typ[1] == 0x1F SmartInput populates analogins which update() walks."""
-    from custom_components.habitron.const import MStatIdx
 
     desc = _make_descriptor(mtype=b"\x0b\x1f", name="In 16/24V")
     inp = SmartInput(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
@@ -728,7 +716,6 @@ def test_smart_input_typ_1f_seeds_analogins_and_update_walks_them() -> None:
 
 async def test_smart_detect_initialize_runs_device_registration() -> None:
     """SmartDetect.initialize registers the device via dr.async_get."""
-    from unittest.mock import patch
 
     desc = _make_descriptor(mtype=b"\x50\x64", name="Detect")
     comm = _make_comm()
@@ -754,7 +741,6 @@ async def test_smart_detect_initialize_runs_device_registration() -> None:
 
 async def test_smart_nature_initialize_runs_device_registration() -> None:
     """SmartNature.initialize registers the device via dr.async_get."""
-    from unittest.mock import patch
 
     desc = _make_descriptor(mtype=b"\x14\x01", name="Nature")
     comm = _make_comm()
@@ -780,7 +766,6 @@ async def test_smart_nature_initialize_runs_device_registration() -> None:
 
 def test_smart_nature_update_negative_temperature_branch() -> None:
     """Temperatures > 32767 are decoded as a sign-magnitude negative value."""
-    from custom_components.habitron.const import MStatIdx
 
     desc = _make_descriptor(mtype=b"\x14\x01", name="Nature")
     nat = SmartNature(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
@@ -795,7 +780,6 @@ def test_smart_nature_update_negative_temperature_branch() -> None:
 
 def test_smart_sensor_update_negative_temperature_branch() -> None:
     """SmartSensor.update also decodes negative temperature values."""
-    from custom_components.habitron.const import MStatIdx
 
     desc = _make_descriptor(mtype=b"\x32\x28", name="Sensor")
     s = SmartSensor(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
@@ -809,7 +793,6 @@ def test_smart_sensor_update_negative_temperature_branch() -> None:
 
 def test_smart_ekey_update_disabled_user_branch() -> None:
     """A finger value > 10 negates the user id and subtracts 128 from the finger."""
-    from custom_components.habitron.const import MStatIdx
 
     desc = _make_descriptor(mtype=b"\x1e\x01", name="ekey")
     ek = SmartEKey(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
@@ -836,7 +819,7 @@ async def test_get_names_returns_false_when_response_empty() -> None:
 
 async def test_get_names_returns_false_when_no_lines_remain() -> None:
     """A reply with the header but zero remaining bytes returns False."""
-    desc = _make_descriptor()
+    desc = _make_descriptor()  # noqa: F841
     comm = _make_comm()
     # For non-SmartController types the header is 7 bytes, so a 7-byte
     # response after stripping yields an empty payload.
@@ -860,7 +843,6 @@ async def test_get_settings_returns_false_when_response_empty() -> None:
 
 async def test_get_settings_parses_version_strings_and_climate_fields() -> None:
     """A real-shape reply lands in hw/sw_version + climate_settings + ctl12."""
-    from custom_components.habitron.const import MSetIdx
 
     desc = _make_descriptor(mtype=b"\x01\x03", name="SC LE2")
     comm = _make_comm()
@@ -885,7 +867,6 @@ async def test_get_settings_parses_version_strings_and_climate_fields() -> None:
 
 async def test_get_settings_marks_shutter_outputs_when_flag_set() -> None:
     """A SHUTTER_STAT bit forces the matching outputs into cover mode."""
-    from custom_components.habitron.const import MSetIdx
 
     desc = _make_descriptor(mtype=b"\x01\x03", name="SC LE2")
     comm = _make_comm()
@@ -909,7 +890,6 @@ async def test_get_settings_marks_shutter_outputs_when_flag_set() -> None:
 
 def test_module_update_discovers_counters_in_status_block() -> None:
     """When the status carries counter markers (5), update() seeds them."""
-    from custom_components.habitron.const import MStatIdx
 
     desc = _make_descriptor()
     mod = HbtnModule(desc, MagicMock(), MagicMock(), "HUB-1", _make_comm())
@@ -1062,8 +1042,7 @@ async def test_get_names_outputs_for_smart_out_module() -> None:
 
 
 async def test_get_settings_marks_analog_inputs_for_smart_input_typ_1f() -> None:
-    """A SmartInput with typ \\x0b\\x1f and AD_STATE bits marks analogins."""
-    from custom_components.habitron.const import MSetIdx
+    """A SmartInput with typ \\x0b\\x1f and AD_STATE bits marks analogins."""  # noqa: D301
 
     desc = _make_descriptor(mtype=b"\x0b\x1f", name="In 16/24V")
     comm = _make_comm()
@@ -1082,7 +1061,6 @@ async def test_get_settings_marks_analog_inputs_for_smart_input_typ_1f() -> None
 
 async def test_get_settings_marks_inputs_as_switch_when_inp_state_bit_set() -> None:
     """A bit set in INP_STATE doubles the input.type (1 → 2 = switch)."""
-    from custom_components.habitron.const import MSetIdx
 
     desc = _make_descriptor(mtype=b"\x01\x03", name="SC LE2")
     comm = _make_comm()
@@ -1124,7 +1102,6 @@ async def test_get_names_smart_dimm_initializes_dimmer_list() -> None:
 
 async def test_get_names_logic_name_matches_logic_descriptor() -> None:
     """arg_code 110..119 walks self.logic to find a matching descriptor by nmbr."""
-    from custom_components.habitron.interfaces import LgcDescriptor
 
     desc = _make_descriptor(mtype=b"\x0b\x1e", name="In 8/24V")
     comm = _make_comm()

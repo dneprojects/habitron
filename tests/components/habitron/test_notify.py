@@ -60,7 +60,7 @@ async def test_message_send_unknown_message_sends_free_text() -> None:
 def _make_gsm_module() -> MagicMock:
     """Build a module stub with messages + a single GSM number."""
     mod = _make_message_module()
-    return mod
+    return mod  # noqa: RET504
 
 
 def test_gsm_message_unique_id_includes_sms_number() -> None:
@@ -116,7 +116,7 @@ def test_gsm_message_device_info_links_module() -> None:
 async def test_async_setup_entry_emits_message_for_smart_controllers(
     hass: HomeAssistant,
 ) -> None:
-    """async_setup_entry emits HbtnMessage for typ b"\\x01\\x02" modules."""
+    """async_setup_entry emits HbtnMessage for typ b"\\x01\\x02" modules."""  # noqa: D301
     msg = MagicMock()
     msg.name = "Welcome"
     msg.nmbr = 42

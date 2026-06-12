@@ -25,7 +25,7 @@ def class_attr(cls: type, name: str) -> Any:
     return getattr(instance, name)
 
 
-from .const import (
+from .const import (  # noqa: E402
     MOCK_CONFIG_DATA,
     MOCK_CONFIG_OPTIONS,
     MOCK_HOST,

@@ -20,6 +20,7 @@ from custom_components.habitron.binary_sensor import (
     async_setup_entry,
 )
 from custom_components.habitron.interfaces import TYPE_DIAG
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 
 from .conftest import class_attr
@@ -115,7 +116,7 @@ def test_hbtn_bin_sensor_device_info() -> None:
 
 
 def test_hbtn_bin_sensor_name_property() -> None:
-    """name property surfaces the cached _attr_name."""
+    """Name property surfaces the cached _attr_name."""
     inp = _make_input(name="My Switch")
     mod = _make_module()
     coord = MagicMock()
@@ -224,7 +225,6 @@ def test_hbtn_state_diag_disabled_default() -> None:
     mod.uid = "MOD-1"
     coord = MagicMock()
     entity = HbtnState(state, mod, coord, 0)
-    from homeassistant.const import EntityCategory
 
     assert entity._attr_entity_category == EntityCategory.DIAGNOSTIC
     assert entity._attr_entity_registry_enabled_default is False

@@ -13,6 +13,7 @@ from custom_components.habitron.update import (
     async_setup_entry,
 )
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 
 from .conftest import class_attr
 
@@ -373,7 +374,6 @@ async def test_sc_touch_async_install_sends_ws_payload() -> None:
 
 async def test_sc_touch_async_install_raises_without_version() -> None:
     """Calling install before a latest version is known raises HomeAssistantError."""
-    from homeassistant.exceptions import HomeAssistantError
 
     rt = _make_router_with_smhub()
     app = _make_app(rt=rt)
@@ -384,7 +384,6 @@ async def test_sc_touch_async_install_raises_without_version() -> None:
 
 async def test_sc_touch_async_install_raises_when_client_not_connected() -> None:
     """No connected client → HomeAssistantError before any file work happens."""
-    from homeassistant.exceptions import HomeAssistantError
 
     rt = _make_router_with_smhub()
     app = _make_app(rt=rt)
@@ -398,7 +397,6 @@ async def test_sc_touch_async_install_raises_when_client_not_connected() -> None
 
 async def test_sc_touch_async_install_raises_when_hash_fails() -> None:
     """A hash helper that returns (None, None) raises HomeAssistantError."""
-    from homeassistant.exceptions import HomeAssistantError
 
     rt = _make_router_with_smhub()
     app = _make_app(rt=rt)
@@ -473,7 +471,7 @@ async def test_hbtn_module_update_install_resets_flag_even_on_failure() -> None:
     entity.async_write_ha_state = MagicMock()
     entity.async_update = AsyncMock()
     entity._module.comm.update_firmware = AsyncMock(side_effect=RuntimeError("boom"))
-    with patch("custom_components.habitron.update.sleep", new=AsyncMock()):
+    with patch("custom_components.habitron.update.sleep", new=AsyncMock()):  # noqa: SIM117
         with pytest.raises(RuntimeError):
             await entity.async_install(version="x", backup=False)
     assert entity.flash_in_progress is False

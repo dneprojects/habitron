@@ -1,11 +1,25 @@
 """Tests for the Habitron config flow."""
 
+import asyncio
+import json
+import socket
 from unittest.mock import MagicMock, patch
 
 from habitron_client import HabitronTimeoutError
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.habitron.config_flow import (
+    DISCOVERY_MESSAGE,
+    DISCOVERY_PORT,
+    KEY_HOST,
+    ConfigFlow,
+    HostNotFound,
+    InvalidHost,
+    UDPDiscoveryProtocol,
+    _get_local_ip,
+    validate_input,
+)
 from custom_components.habitron.const import DOMAIN
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
@@ -283,7 +297,6 @@ async def test_options_flow(
 
 async def test_get_local_ip_falls_back_on_exception(hass: HomeAssistant) -> None:
     """``_get_local_ip`` returns 127.0.0.1 when the network helper raises."""
-    from custom_components.habitron.config_flow import _get_local_ip
 
     with patch(
         "custom_components.habitron.config_flow.network.async_get_source_ip",
@@ -297,7 +310,6 @@ async def test_validate_input_local_loopback_rewrites_host(
     mock_habitron_client: MagicMock,
 ) -> None:
     """A host equal to the local IP is rewritten to the literal ``local``."""
-    from custom_components.habitron.config_flow import KEY_HOST, validate_input
 
     data = {KEY_HOST: "192.168.1.10", "websock_token": ""}
     info = await validate_input(hass, data)
@@ -307,34 +319,24 @@ async def test_validate_input_local_loopback_rewrites_host(
 
 async def test_validate_input_invalid_host_too_short(hass: HomeAssistant) -> None:
     """A host string shorter than 4 chars raises ``InvalidHost``."""
-    from custom_components.habitron.config_flow import (
-        KEY_HOST,
-        InvalidHost,
-        validate_input,
-    )
 
-    with patch(
-        "custom_components.habitron.config_flow._get_local_ip",
-        return_value="10.0.0.5",
+    with (
+        patch(
+            "custom_components.habitron.config_flow._get_local_ip",
+            return_value="10.0.0.5",
+        ),
+        pytest.raises(InvalidHost),
     ):
-        with pytest.raises(InvalidHost):
-            await validate_input(
-                hass,
-                {KEY_HOST: "abc", "websock_token": ""},
-            )
+        await validate_input(
+            hass,
+            {KEY_HOST: "abc", "websock_token": ""},
+        )
 
 
 async def test_validate_input_host_not_found_for_dns_failure(
     hass: HomeAssistant,
 ) -> None:
     """A socket.gaierror surfaces as ``HostNotFound``."""
-    import socket
-
-    from custom_components.habitron.config_flow import (
-        KEY_HOST,
-        HostNotFound,
-        validate_input,
-    )
 
     with (
         patch(
@@ -345,12 +347,12 @@ async def test_validate_input_host_not_found_for_dns_failure(
             "custom_components.habitron.config_flow.test_connection",
             side_effect=socket.gaierror("dns fail"),
         ),
+        pytest.raises(HostNotFound),
     ):
-        with pytest.raises(HostNotFound):
-            await validate_input(
-                hass,
-                {KEY_HOST: MOCK_HOST, "websock_token": ""},
-            )
+        await validate_input(
+            hass,
+            {KEY_HOST: MOCK_HOST, "websock_token": ""},
+        )
 
 
 # ---------- UDPDiscoveryProtocol unit tests ----------
@@ -358,13 +360,6 @@ async def test_validate_input_host_not_found_for_dns_failure(
 
 def test_udp_discovery_protocol_connection_made_sends_broadcast() -> None:
     """``connection_made`` enables broadcast and sends the discovery packet."""
-    import asyncio
-
-    from custom_components.habitron.config_flow import (
-        DISCOVERY_MESSAGE,
-        DISCOVERY_PORT,
-        UDPDiscoveryProtocol,
-    )
 
     proto = UDPDiscoveryProtocol()
     transport = MagicMock(spec=asyncio.DatagramTransport)
@@ -380,9 +375,6 @@ def test_udp_discovery_protocol_connection_made_sends_broadcast() -> None:
 
 def test_udp_discovery_protocol_connection_made_no_socket() -> None:
     """``connection_made`` is robust against a missing socket info."""
-    import asyncio
-
-    from custom_components.habitron.config_flow import UDPDiscoveryProtocol
 
     proto = UDPDiscoveryProtocol()
     transport = MagicMock(spec=asyncio.DatagramTransport)
@@ -393,9 +385,6 @@ def test_udp_discovery_protocol_connection_made_no_socket() -> None:
 
 def test_udp_discovery_protocol_datagram_collects_unique_devices() -> None:
     """``datagram_received`` collects host/ip pairs and dedupes by ip."""
-    import json
-
-    from custom_components.habitron.config_flow import UDPDiscoveryProtocol
 
     proto = UDPDiscoveryProtocol()
     payload = json.dumps({"host": "hub1", "ip": "10.0.0.1"}).encode()
@@ -406,7 +395,6 @@ def test_udp_discovery_protocol_datagram_collects_unique_devices() -> None:
 
 def test_udp_discovery_protocol_datagram_swallows_bad_payload() -> None:
     """Non-JSON datagrams are ignored without raising."""
-    from custom_components.habitron.config_flow import UDPDiscoveryProtocol
 
     proto = UDPDiscoveryProtocol()
     proto.datagram_received(b"\xff\xfe garbage", ("10.0.0.1", 7777))
@@ -415,7 +403,6 @@ def test_udp_discovery_protocol_datagram_swallows_bad_payload() -> None:
 
 def test_udp_discovery_protocol_error_received_logs() -> None:
     """``error_received`` accepts a generic error without raising."""
-    from custom_components.habitron.config_flow import UDPDiscoveryProtocol
 
     proto = UDPDiscoveryProtocol()
     proto.error_received(RuntimeError("oops"))
@@ -427,7 +414,6 @@ def test_udp_discovery_protocol_error_received_logs() -> None:
 
 async def test_is_device_already_configured_host_match(hass: HomeAssistant) -> None:
     """A pre-existing entry whose host matches reports as configured."""
-    from custom_components.habitron.config_flow import ConfigFlow
 
     MockConfigEntry(
         domain=DOMAIN,
@@ -444,7 +430,6 @@ async def test_is_device_already_configured_host_match(hass: HomeAssistant) -> N
 
 async def test_is_device_already_configured_ip_match(hass: HomeAssistant) -> None:
     """A pre-existing entry whose host equals the IP reports as configured."""
-    from custom_components.habitron.config_flow import ConfigFlow
 
     MockConfigEntry(
         domain=DOMAIN,
@@ -463,7 +448,6 @@ async def test_is_device_already_configured_ip_match(hass: HomeAssistant) -> Non
 
 async def test_discover_habitron_handles_oserror(hass: HomeAssistant) -> None:
     """A datagram-endpoint failure makes ``_discover_habitron`` return []."""
-    from custom_components.habitron.config_flow import ConfigFlow
 
     flow = ConfigFlow()
     flow.hass = hass
@@ -481,7 +465,6 @@ async def test_discover_habitron_handles_oserror(hass: HomeAssistant) -> None:
 
 async def test_discover_habitron_returns_found_devices(hass: HomeAssistant) -> None:
     """A successful discovery returns whatever the protocol collected."""
-    from custom_components.habitron.config_flow import ConfigFlow
 
     flow = ConfigFlow()
     flow.hass = hass
@@ -616,7 +599,6 @@ async def test_user_flow_host_not_found_via_validate_input(
     mock_habitron_client: MagicMock,
 ) -> None:
     """A HostNotFound raised from validate_input maps to ``host_not_found``."""
-    from custom_components.habitron.config_flow import HostNotFound
 
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
@@ -656,7 +638,6 @@ async def test_reconfigure_flow_host_not_found_via_validate_input(
     mock_habitron_client: MagicMock,
 ) -> None:
     """The reconfigure flow maps HostNotFound to ``host_not_found``."""
-    from custom_components.habitron.config_flow import HostNotFound
 
     entry = MockConfigEntry(
         domain=DOMAIN,

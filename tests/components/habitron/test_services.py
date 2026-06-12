@@ -19,6 +19,7 @@ from custom_components.habitron.services import (
     SERVICE_SC_SYSTEM_COMMAND,
     SERVICE_UPDATE_ENTITY,
     _primary_hub,
+    async_setup_services,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
@@ -461,7 +462,6 @@ async def test_sc_system_command_raises_when_no_hubs_loaded(
     We register the services manually since there is no SmartHub entry to
     drive ``async_setup_entry``.
     """
-    from custom_components.habitron.services import async_setup_services
 
     async_setup_services(hass)
     with pytest.raises(ServiceValidationError) as err:

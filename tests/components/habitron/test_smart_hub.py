@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from custom_components.habitron.smart_hub import LoggingLevels, SmartHub
+from custom_components.habitron.system_health import async_register, system_health_info
 
 from .const import MOCK_HOST
 
@@ -56,7 +57,7 @@ def smart_hub_stub() -> SmartHub:
         config.entry_id = "entry-id"
         config.data = {"websock_token": "tok"}
         hub = SmartHub(hass, config)
-    return hub
+    return hub  # noqa: RET504
 
 
 def test_smhub_init_sets_placeholder_uid_and_owns_router(
@@ -246,10 +247,6 @@ async def test_reboot_forwards_to_comm(smart_hub_stub: SmartHub) -> None:
 
 def test_async_register_forwards_system_health_info() -> None:
     """``async_register`` wires ``system_health_info`` into the registration helper."""
-    from custom_components.habitron.system_health import (
-        async_register,
-        system_health_info,
-    )
 
     hass = MagicMock()
     register = MagicMock()

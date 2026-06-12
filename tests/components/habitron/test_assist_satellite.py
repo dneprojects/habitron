@@ -5,6 +5,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.assist_satellite import HbtnAssistSat, async_setup_entry
+from custom_components.habitron.module import SmartController
+from homeassistant.components.assist_pipeline.pipeline import PipelineEventType
+from homeassistant.components.assist_satellite.entity import AssistSatelliteState
 from homeassistant.core import HomeAssistant
 
 
@@ -14,7 +17,6 @@ async def test_assist_satellite_setup(setup_integration: MockConfigEntry) -> Non
 
 
 def _make_touch_module(uid: str = "MOD-T") -> MagicMock:
-    from custom_components.habitron.module import SmartController
 
     mod = MagicMock(spec=SmartController)
     mod.uid = uid
@@ -53,7 +55,6 @@ def test_assist_sat_init_seeds_attrs() -> None:
 
 def test_set_listening_processing_responding_idle_callbacks() -> None:
     """Each state-setter callback flips the entity's state."""
-    from homeassistant.components.assist_satellite.entity import AssistSatelliteState
 
     sat = _make_sat()
     sat._set_state = MagicMock()
@@ -150,7 +151,6 @@ def _make_pipeline_event(event_type: object, data: dict | None = None) -> MagicM
 
 def test_on_pipeline_event_intent_start_sets_processing() -> None:
     """INTENT_START events flip the entity into PROCESSING state."""
-    from homeassistant.components.assist_pipeline.pipeline import PipelineEventType
 
     sat = _make_sat()
     sat.set_processing = MagicMock()
@@ -160,7 +160,6 @@ def test_on_pipeline_event_intent_start_sets_processing() -> None:
 
 def test_on_pipeline_event_tts_start_sets_responding() -> None:
     """TTS_START events flip the entity into RESPONDING + clear not_recognized."""
-    from homeassistant.components.assist_pipeline.pipeline import PipelineEventType
 
     sat = _make_sat()
     sat._not_recognized = True
@@ -172,7 +171,6 @@ def test_on_pipeline_event_tts_start_sets_responding() -> None:
 
 def test_on_pipeline_event_run_end_logs_only() -> None:
     """RUN_END events just log; the entity state isn't touched."""
-    from homeassistant.components.assist_pipeline.pipeline import PipelineEventType
 
     sat = _make_sat()
     sat.set_idle = MagicMock()
@@ -182,7 +180,6 @@ def test_on_pipeline_event_run_end_logs_only() -> None:
 
 def test_on_pipeline_event_error_no_text_recognized_first_time() -> None:
     """An stt-no-text-recognized error toggles _not_recognized + triggers retry."""
-    from homeassistant.components.assist_pipeline.pipeline import PipelineEventType
 
     sat = _make_sat()
     sat._not_recognized = False
@@ -199,7 +196,6 @@ def test_on_pipeline_event_error_no_text_recognized_first_time() -> None:
 
 def test_on_pipeline_event_error_no_text_recognized_second_time() -> None:
     """A second stt-no-text-recognized triggers the respond_no_text_recognized path."""
-    from homeassistant.components.assist_pipeline.pipeline import PipelineEventType
 
     sat = _make_sat()
     sat._not_recognized = True
@@ -216,7 +212,6 @@ def test_on_pipeline_event_error_no_text_recognized_second_time() -> None:
 
 def test_on_pipeline_event_generic_error_sets_idle() -> None:
     """Any other ERROR (non-text-recognized) flips the entity to IDLE."""
-    from homeassistant.components.assist_pipeline.pipeline import PipelineEventType
 
     sat = _make_sat()
     sat._not_recognized = True
@@ -230,7 +225,6 @@ def test_on_pipeline_event_generic_error_sets_idle() -> None:
 
 def test_on_pipeline_event_error_without_data_sets_idle() -> None:
     """An ERROR without a data payload falls into the generic ``set_idle`` branch."""
-    from homeassistant.components.assist_pipeline.pipeline import PipelineEventType
 
     sat = _make_sat()
     sat.set_idle = MagicMock()

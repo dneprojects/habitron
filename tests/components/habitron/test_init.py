@@ -4,10 +4,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.habitron import (
+    async_remove_config_entry_device,
+    async_unload_entry,
+)
 from custom_components.habitron.const import DOMAIN
 from custom_components.habitron.services import SERVICE_HUB_RESTART
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 
 
 async def test_setup_entry(
@@ -103,8 +108,6 @@ async def test_async_remove_config_entry_device(
     setup_integration: MockConfigEntry,
 ) -> None:
     """A device matching the hub UID cannot be removed standalone."""
-    from custom_components.habitron import async_remove_config_entry_device
-    from homeassistant.helpers import device_registry as dr
 
     entry = setup_integration
     smhub = entry.runtime_data
@@ -168,7 +171,6 @@ async def test_unload_entry_returns_false_when_platform_unload_fails(
     setup_integration: MockConfigEntry,
 ) -> None:
     """A failing platform-unload propagates as False without touching state."""
-    from custom_components.habitron import async_unload_entry
 
     with patch.object(
         hass.config_entries,
@@ -189,7 +191,6 @@ async def test_setup_entry_removes_stale_device(
     mock_coordinator_refresh: AsyncMock,
 ) -> None:
     """``_async_cleanup_stale_devices`` removes registry entries for gone modules."""
-    from homeassistant.helpers import device_registry as dr
 
     mock_config_entry.add_to_hass(hass)
     dev_reg = dr.async_get(hass)
