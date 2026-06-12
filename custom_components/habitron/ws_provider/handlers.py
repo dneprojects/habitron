@@ -148,16 +148,9 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
             satellite_id = satellite.entity_id
             if satellite.registry_entry:
                 device_id = satellite.registry_entry.device_id
-            # Get pipeline and voice settings from entity options (if configured)
-            if satellite.registry_entry and satellite.registry_entry.options:
-                if isinstance(
-                    p := satellite.registry_entry.options.get("pipeline"), str
-                ):
-                    pipeline_id = p
-                if isinstance(
-                    v := satellite.registry_entry.options.get("tts_voice"), str
-                ):
-                    tts_voice = v
+            # pipeline_id/tts_voice stay None: Home Assistant resolves the
+            # voice pipeline (STT/TTS engines and voice) centrally via the
+            # preferred Assist pipeline.
 
             _LOGGER.debug(
                 "Found satellite '%s' (device: %s, entity: %s), using pipeline: %s, voice: %s",
