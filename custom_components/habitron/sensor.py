@@ -694,11 +694,11 @@ class PercSensor(HbtnSensor):
         super().__init__(cast("HbtnModule", module), perctg, coord, idx)
         self.type = perctg.type
         self._attr_unique_id = f"Mod_{self._module.uid}_perc{perctg.nmbr}"
-        if self._attr_name[:6].lower() == "memory":  # type: ignore
+        if self._attr_name[:6].lower() == "memory":  # type: ignore[index]
             self._attr_icon = "mdi:memory"
-        elif self._attr_name[:4].lower() == "disk":  # type: ignore
+        elif self._attr_name[:4].lower() == "disk":  # type: ignore[index]
             self._attr_icon = "mdi:harddisk"
-        elif self._attr_name.lower() == "cpu load":  # type: ignore
+        elif self._attr_name.lower() == "cpu load":  # type: ignore[union-attr]
             self._attr_icon = "mdi:timer-alert-outline"
         else:
             self._attr_icon = "mdi:percent-circle-outline"
@@ -735,7 +735,7 @@ class FrequencySensor(HbtnSensor):
         """Initialize the sensor."""
         super().__init__(cast("HbtnModule", module), freq, coord, idx)
         self.type = freq.type
-        if self._attr_name.lower() == "cpu frequency":  # type: ignore
+        if self._attr_name.lower() == "cpu frequency":  # type: ignore[union-attr]
             self._attr_icon = "mdi:clock-fast"
         else:
             self._attr_icon = "mdi:sine-wave"
