@@ -206,19 +206,32 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
             unique_id = f"habitron_{host_str}"
 
-        # Migrate any pre-existing host-based entry to the new stable id
-        # so SSDP rediscovery does not create a duplicate side-by-side.
-        legacy_id = f"habitron_{host_str}"
-        if unique_id != legacy_id:
-            for entry in self.hass.config_entries.async_entries(DOMAIN):
-                if entry.unique_id == legacy_id:
+        await self.async_set_unique_id(unique_id)
+        self._abort_if_unique_id_configured(updates={KEY_HOST: host_str})
+
+        # The unique_id did not match an existing entry. The same SmartHub
+        # may already be configured under a host-based fallback id — the
+        # manual step falls back to ``habitron_<host>`` when no serial is
+        # available, while SSDP yields a stable UDN/serial. Match on the
+        # host/IP so we adopt the stable id and abort instead of offering a
+        # duplicate of the hub the user already added.
+        candidate_hosts: set[str | None] = {
+            host_str,
+            self._discovered_device.get("ip"),
+        }
+        try:
+            candidate_hosts.add(
+                await self.hass.async_add_executor_job(socket.gethostbyname, host_str)
+            )
+        except OSError:
+            pass
+        for entry in self._async_current_entries(include_ignore=False):
+            if entry.data.get(KEY_HOST) in candidate_hosts:
+                if entry.unique_id != unique_id:
                     self.hass.config_entries.async_update_entry(
                         entry, unique_id=unique_id
                     )
-                    break
-
-        await self.async_set_unique_id(unique_id)
-        self._abort_if_unique_id_configured(updates={KEY_HOST: host_str})
+                return self.async_abort(reason="already_configured")
 
         self.context["title_placeholders"] = {"name": host_str}
         return await self.async_step_discovery_confirm()
