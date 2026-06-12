@@ -39,6 +39,27 @@ check_clean_tree() {
     fi
 }
 
+# HA dev starts with --skip-pip (see .vscode/launch.json), so it never
+# installs custom-component requirements itself. Read them straight from
+# the HACS manifest and ensure they are present in the active venv.
+# Idempotent: pip is a no-op when the pins are already satisfied.
+ensure_requirements() {
+    local reqs
+    reqs=$(python3 -c '
+import json, sys
+with open(sys.argv[1]) as f:
+    print("\n".join(json.load(f).get("requirements", [])))
+' "$HACS_SRC/manifest.json")
+    if [ -z "$reqs" ]; then
+        return 0
+    fi
+    echo "Ensuring runtime requirements from manifest:"
+    echo "$reqs" | sed 's/^/  /'
+    if ! echo "$reqs" | pip install -q -r /dev/stdin; then
+        color_err "WARNING: failed to install one or more requirements; HA may fail to load habitron."
+    fi
+}
+
 print_status() {
     cd "$CORE_DIR"
     local branch
@@ -67,6 +88,8 @@ cmd_hacs() {
     git -C "$CORE_DIR" checkout "$HACS_BRANCH"
     mkdir -p "$(dirname "$SYMLINK")"
     ln -sfn "$HACS_SRC" "$SYMLINK"
+    echo
+    ensure_requirements
     echo
     color_ok "=== Habitron now in HACS mode ==="
     print_status
