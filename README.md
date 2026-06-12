@@ -64,7 +64,6 @@ The integration covers every Habitron entity domain Home Assistant offers, excep
 - **media_player**: SC Touch audio playback queue with TTS resolution, group seek, history and volume control
 - **assist_satellite**: SC Touch microphone as an HA Assist satellite (STT, pipeline routing, TTS playback)
 - **camera**: SC Touch front camera over WebRTC
-- **text**: ekey identifier / finger name as a writable text entity
 - **update**: per-module firmware update entity plus SC Touch APK update
 
 ## Use cases
@@ -121,7 +120,7 @@ The integration combines **push** and **polling**:
 - **Heartbeat polling**: every 10 s the coordinator calls `comm.async_system_update()`, which pulls the compact system status from the SmartHub. This serves as a liveness probe — entities flip to *unavailable* when the heartbeat fails (timeout, network error, refused connection).
 - **Push-only paths** (e.g. SC Touch state) bypass the coordinator and use direct callbacks; the heartbeat still drives availability.
 
-Long-running services (firmware updates, status backups) are routed through `hass.async_add_executor_job`, so the asyncio event loop is never blocked by the synchronous `habitron_client` library calls.
+The `habitron_client` library is fully asynchronous: every bus call is a direct `await`, and the SmartHub connection is a single persistent TCP socket opened at setup and reused for every poll cycle. The only remaining `hass.async_add_executor_job` offloads cover local blocking work — resolving the host's own IP, creating the backup data directory, and reading/hashing firmware files — so the asyncio event loop is never blocked.
 
 ## Services
 
@@ -211,7 +210,7 @@ script:
 
 - **One SmartHub per network** is supported per HACS install. Multiple SmartHubs work fine, but cross-Hub services (`update_entity` / `sc_system_command`) currently use device-registry / `hub_uid` lookups; explicit per-call target selectors will arrive with the multi-hub services follow-up.
 - **Habitron module discovery is configuration-time**, not bus-side hot-plug. New modules need to be registered in the SmartHub's web UI; afterwards a reload of the integration picks them up. Stale modules are removed from HA's device registry automatically on the next setup pass.
-- **The upstream `habitron_client` library is synchronous.** Every call is routed through `hass.async_add_executor_job` so the asyncio loop is never blocked, but heavy operations (firmware push, full SMC backup) take seconds and run on the executor thread pool.
+- **Heavy operations take seconds.** Even with the fully async `habitron_client` library, firmware pushes and full SMC backups involve large device round-trips plus local file hashing (the latter offloaded to the executor). They run to completion in the background, but a single call can take several seconds.
 - **WebRTC and Voice handlers register WebSocket commands globally**. After the last SmartHub is removed those handlers stay registered for the lifetime of the HA process. The provider itself is unregistered on unload, so no stream is double-served.
 - **No re-authentication flow**. The optional WebSocket token can be edited via the Reconfigure flow, but the SmartHub does not push auth-fail states back into HA.
 
