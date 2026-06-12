@@ -1,16 +1,17 @@
 """Config flow for Habitron integration."""
 
 import asyncio
+import contextlib
 import json
 import logging
 import socket
 from typing import Any
 from urllib.parse import urlparse
 
-import voluptuous as vol
-
 # pylint:disable=unused-import
 from habitron_client import test_connection
+import voluptuous as vol
+
 from homeassistant import config_entries, exceptions
 from homeassistant.components import network
 from homeassistant.core import HomeAssistant, callback
@@ -37,7 +38,7 @@ async def _get_local_ip(hass: HomeAssistant) -> str:
     """Get the local IP address using HA network utilities."""
     try:
         return await network.async_get_source_ip(hass, target_ip="8.8.8.8")
-    except Exception:  # pylint: disable=broad-except
+    except Exception:  # noqa: BLE001
         return "127.0.0.1"
 
 
@@ -110,7 +111,7 @@ class UDPDiscoveryProtocol(asyncio.DatagramProtocol):
             if "host" in resp and "ip" in resp:
                 if not any(d.get("ip") == resp["ip"] for d in self.found_devices):
                     self.found_devices.append(resp)
-        except Exception:  # pylint: disable=broad-except  # noqa: S110
+        except Exception:  # noqa: BLE001
             # Malformed discovery responses are routine — best to ignore the
             # individual packet and keep listening for the rest.
             pass
@@ -219,12 +220,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             host_str,
             self._discovered_device.get("ip"),
         }
-        try:
+        with contextlib.suppress(OSError):
             candidate_hosts.add(
                 await self.hass.async_add_executor_job(socket.gethostbyname, host_str)
             )
-        except OSError:
-            pass
         for entry in self._async_current_entries(include_ignore=False):
             if entry.data.get(KEY_HOST) in candidate_hosts:
                 if entry.unique_id != unique_id:
@@ -251,7 +250,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             try:
                 info = await validate_input(self.hass, data)
                 return self.async_create_entry(title=info["title"], data=data)
-            except Exception:  # pylint: disable=broad-except
+            except Exception:  # noqa: BLE001
                 return self.async_abort(reason="unknown")
 
         self._set_confirm_only()

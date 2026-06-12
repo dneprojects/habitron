@@ -1,7 +1,5 @@
 """Communicate class for Habitron system integration."""
 
-from __future__ import annotations
-
 import asyncio
 import ipaddress
 import logging
@@ -17,6 +15,7 @@ from habitron_client import (
     get_host_ip,
     get_own_ip,
 )
+
 from homeassistant.components import network
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -522,7 +521,7 @@ class HbtnComm:
         """Send device registry id to module."""
         await self.client.send_devregid(mod_nmbr, devreg_id)
 
-    async def update_entity(
+    async def update_entity(  # noqa: C901
         self,
         hub_id: str,
         mod_id: int,
@@ -560,7 +559,7 @@ class HbtnComm:
             return
         try:
             module = self.router.get_module(mod_id)
-        except Exception as err_msg:
+        except Exception as err_msg:  # noqa: BLE001
             self.logger.warning(
                 "Error handling habitron event %s with arg1 %s of module %s: %s",
                 evnt,
@@ -649,7 +648,7 @@ class HbtnComm:
                 elif evnt == HaEvents.CNT_VAL:
                     module.logic[arg1].value = arg2
                     await module.logic[arg1].handle_upd_event()
-            except Exception as err_msg:
+            except Exception as err_msg:  # noqa: BLE001
                 self.logger.warning(
                     "Error handling habitron event %s with arg1 %s of module %s: %s",
                     evnt,

@@ -1,7 +1,5 @@
 """Platform for sensor integration."""
 
-from __future__ import annotations
-
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
@@ -42,7 +40,7 @@ if TYPE_CHECKING:
 PARALLEL_UPDATES = 1
 
 
-async def async_setup_entry(
+async def async_setup_entry(  # noqa: C901
     hass: HomeAssistant,
     entry: HabitronConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,

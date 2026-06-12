@@ -54,7 +54,7 @@ async def async_get_config_entry_diagnostics(
         "hub": {
             "uid": smhub.uid,
             "version": smhub.smhub_version,
-            "type": smhub._type,
+            "type": smhub._type,  # noqa: SLF001
             "host": smhub.host,
             "addon_slug": smhub.addon_slug,
             "online": smhub.online,
@@ -64,7 +64,7 @@ async def async_get_config_entry_diagnostics(
             "id": router.id,
             "name": router.name,
             "version": router.version,
-            "sys_ok": router._sys_ok,
+            "sys_ok": router._sys_ok,  # noqa: SLF001
             "module_count": len(router.modules),
             "area_count": len(router.areas),
             "max_group": router.max_group,
@@ -103,7 +103,7 @@ async def async_get_device_diagnostics(
 
     target: dict[str, Any] | None = None
     if target_uid == smhub.uid:
-        target = {"kind": "hub", "summary": {"uid": smhub.uid, "name": smhub._name}}
+        target = {"kind": "hub", "summary": {"uid": smhub.uid, "name": smhub._name}}  # noqa: SLF001
     elif target_uid == router.uid:
         target = {"kind": "router", "summary": {"uid": router.uid, "name": router.name}}
     else:

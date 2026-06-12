@@ -8,9 +8,9 @@ of the AXML spec is implemented.
 Format reference: AOSP ``frameworks/base/include/androidfw/ResourceTypes.h``.
 """
 
+from pathlib import Path
 import struct
 import zipfile
-from pathlib import Path
 
 _RES_XML_TYPE = 0x0003
 _CHUNK_STRING_POOL = 0x0001

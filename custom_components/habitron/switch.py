@@ -59,20 +59,16 @@ async def async_setup_entry(
                     new_devices.append(
                         SwitchedLed(mod_led, hbt_module, hbtn_cord, len(new_devices))
                     )
-        flg_idx = 0
-        for mod_flg in hbt_module.flags:
+        for flg_idx, mod_flg in enumerate(hbt_module.flags):
             new_devices.append(HbtnFlagPush(mod_flg, hbt_module, hbtn_cord, flg_idx))
-            flg_idx += 1
 
         if hbt_module.mod_type.startswith("Smart Controller"):
             new_devices.append(ClimateCtlSwitch(hbt_module))
 
         if hbt_module.mod_type == "Smart Controller Touch":
             new_devices.append(MicrophoneSwitch(hbt_module))
-    flg_idx = 0
-    for rt_flg in hbtn_rt.flags:
+    for flg_idx, rt_flg in enumerate(hbtn_rt.flags):
         new_devices.append(HbtnFlagPush(rt_flg, hbtn_rt, hbtn_cord, flg_idx))
-        flg_idx += 1
 
     if new_devices:
         async_add_entities(new_devices)

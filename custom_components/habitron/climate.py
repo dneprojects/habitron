@@ -3,7 +3,7 @@
 import logging
 from typing import Any
 
-from homeassistant.components.climate import (  # type: ignore[attr-defined]
+from homeassistant.components.climate import (
     ClimateEntity,
     ClimateEntityFeature,
     HVACAction,

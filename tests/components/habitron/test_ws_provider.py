@@ -430,19 +430,19 @@ async def test_async_take_snapshot_raises_on_timeout() -> None:
 # ---------- Stream lookup helper ----------
 
 
-def test_get_stream_or_send_error_returns_matching_stream_name() -> None:
+def testget_stream_or_send_error_returns_matching_stream_name() -> None:
     """When the connection matches an entry the stream name is returned."""
     provider = _make_provider()
     conn = MagicMock()
     provider.active_ws_connections["touch_1"] = conn
-    assert provider._get_stream_or_send_error(conn, {"id": 5}) == "touch_1"
+    assert provider.get_stream_or_send_error(conn, {"id": 5}) == "touch_1"
 
 
-def test_get_stream_or_send_error_sends_error_for_unknown_connection() -> None:
+def testget_stream_or_send_error_sends_error_for_unknown_connection() -> None:
     """An unknown connection sends an "unregistered" error back to the client."""
     provider = _make_provider()
     conn = MagicMock()
-    result = provider._get_stream_or_send_error(
+    result = provider.get_stream_or_send_error(
         conn, {"id": 5, "type": "habitron/whatever"}
     )
     assert result is None

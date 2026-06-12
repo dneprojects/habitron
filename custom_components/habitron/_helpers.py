@@ -9,8 +9,6 @@
   entity uses to link itself to the matching module device.
 """
 
-from __future__ import annotations
-
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 

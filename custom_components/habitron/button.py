@@ -27,10 +27,12 @@ async def async_setup_entry(
     new_devices: list[ButtonEntity] = []
 
     for hbt_module in hbtn_rt.modules:
-        for dir_cmd in hbt_module.dir_commands:
-            new_devices.append(DirCmdButton(dir_cmd, hbt_module))
-        for vis_cmd in hbt_module.vis_commands:
-            new_devices.append(VisCmdButton(vis_cmd, hbt_module))
+        new_devices.extend(
+            DirCmdButton(dir_cmd, hbt_module) for dir_cmd in hbt_module.dir_commands
+        )
+        new_devices.extend(
+            VisCmdButton(vis_cmd, hbt_module) for vis_cmd in hbt_module.vis_commands
+        )
         for mod_logic in hbt_module.logic:
             if mod_logic.type == 5:
                 new_devices.append(CountUpButton(mod_logic, hbt_module))
@@ -42,8 +44,9 @@ async def async_setup_entry(
             new_devices.append(SpeechButton(hbt_module))
         new_devices.append(RestartButton(hbt_module))
     # Add router commands as buttons
-    for coll_cmd in hbtn_rt.coll_commands:
-        new_devices.append(CollCmdButton(coll_cmd, hbtn_rt))
+    new_devices.extend(
+        CollCmdButton(coll_cmd, hbtn_rt) for coll_cmd in hbtn_rt.coll_commands
+    )
     new_devices.append(RestartButton(hbtn_rt))
     new_devices.append(RestartFwdTableButton(hbtn_rt))
     new_devices.append(RestartAllButton(hbtn_rt))

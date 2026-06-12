@@ -1,15 +1,12 @@
 """Habitron router class."""
 
-from __future__ import annotations
-
-import logging
 from enum import Enum
+import logging
 from typing import TYPE_CHECKING
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers import device_registry as dr, issue_registry as ir
 
 from .const import DOMAIN, FALSE_VAL, TRUE_VAL, ModuleDescriptor, MStatIdx, RoutIdx
 from .coordinator import HbtnCoordinator
@@ -22,38 +19,16 @@ from .interfaces import (
 )
 from .module import (
     HbtnModule,
-)
-from .module import (
     SmartController as hbtscm,
-)
-from .module import (
     SmartControllerMini as hbtscmm,
-)
-from .module import (
     SmartDetect as hbtsdm,
-)
-from .module import (
     SmartDimm as hbtdimm,
-)
-from .module import (
     SmartEKey as hbtkey,
-)
-from .module import (
     SmartGSM as hbtgsm,
-)
-from .module import (
     SmartInput as hbtinm,
-)
-from .module import (
     SmartIO2 as hbtio2,
-)
-from .module import (
     SmartNature as hbtsnm,
-)
-from .module import (
     SmartOutput as hbtoutm,
-)
-from .module import (
     SmartSensor as hbtsens,
 )
 
@@ -357,7 +332,10 @@ class HbtnRouter:
                 self.cover_autostop_del = entry_no
             else:
                 self.logger.warning(
-                    f"Unexpected description, code: {line[1]} {line[2]} {line[3]}"
+                    "Unexpected description, code: %s %s %s",
+                    line[1],
+                    line[2],
+                    line[3],
                 )
 
             resp = resp[line_len:]
@@ -412,7 +390,7 @@ class HbtnRouter:
         # 2. Get Router status
         self.status = await self.comm.async_get_router_status()
         if len(self.status) < RoutIdx.MIRROR_STARTED:
-            self.logger.warning(f"Router status too short, length: {len(self.status)}")
+            self.logger.warning("Router status too short, length: %s", len(self.status))
             return
 
         # 3. Parse Router values

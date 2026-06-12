@@ -6,13 +6,11 @@ the resulting TTS audio back to the client. Extracted from the provider
 module so the audio / TTS plumbing lives in its own file.
 """
 
-from __future__ import annotations
-
 import asyncio
 import base64
+from collections.abc import AsyncIterator
 import logging
 import struct
-from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING
 
 from homeassistant.components import tts
@@ -29,9 +27,7 @@ from homeassistant.components.stt import (
     AudioSampleRates,
     SpeechMetadata,
 )
-from homeassistant.components.websocket_api import (  # type: ignore[attr-defined]
-    ActiveConnection,
-)
+from homeassistant.components.websocket_api import ActiveConnection
 from homeassistant.core import Context, callback
 
 if TYPE_CHECKING:
