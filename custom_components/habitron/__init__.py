@@ -1,6 +1,7 @@
 """The Habitron integration."""
 
 from habitron_client import HabitronTimeoutError
+
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
@@ -55,7 +56,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: HabitronConfigEntry) -> 
         async_setup_services(hass)
 
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-        return True
 
     except (TimeoutError, HabitronTimeoutError) as ex:
         raise ConfigEntryNotReady(
@@ -78,6 +78,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: HabitronConfigEntry) -> 
             translation_key="connect_error",
             translation_placeholders={"error": str(ex)},
         ) from ex
+    else:
+        return True
 
 
 async def async_remove_config_entry_device(

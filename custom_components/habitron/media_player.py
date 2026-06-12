@@ -1,16 +1,15 @@
 """Media Player platform for Habitron integration."""
 
-from __future__ import annotations
-
 import asyncio
-import logging
 from collections.abc import Callable
 from datetime import timedelta
+import logging
 from typing import TYPE_CHECKING, Any
 
 from aiohttp import ClientError, ClientSession
+
 from homeassistant.components import media_source
-from homeassistant.components.media_player import (  # type: ignore[attr-defined]
+from homeassistant.components.media_player import (
     BrowseMedia,
     MediaPlayerEnqueue,
     MediaPlayerEntity,
@@ -391,7 +390,7 @@ class HbtnMediaPlayer(MediaPlayerEntity, RestoreEntity):
                     artwork_url,
                 )
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 _LOGGER.warning(
                     "[%s] Failed to fetch rich metadata via media_source browse: %s",
                     self.entity_id,
@@ -489,35 +488,32 @@ class HbtnMediaPlayer(MediaPlayerEntity, RestoreEntity):
         # If it's a media-source URL (file, radio, or TTS),
         # let Home Assistant resolve it.
         if media_id.startswith("media-source://"):
-            try:
-                _LOGGER.debug(
-                    "[%s] Resolving media_source URL: %s", self.entity_id, media_id
-                )
+            _LOGGER.debug(
+                "[%s] Resolving media_source URL: %s", self.entity_id, media_id
+            )
 
-                # This single function can resolve BOTH TTS and regular media files.
+            # This single function can resolve BOTH TTS and regular media files.
+            try:
                 resolved_media = await media_source.async_resolve_media(
                     self.hass, media_id, self.entity_id
                 )
-
-                url = resolved_media.url
-                _LOGGER.info(
-                    "[%s] Resolved media_source URL to: %s", self.entity_id, url
-                )
-
-                # Make it an absolute URL if it's relative
-                # (e.g., /api/tts_proxy/... -> http://<ha_ip>:8123/api/tts_proxy/...)
-                if url.startswith("/"):
-                    return f"{self.hass.config.internal_url}{url}"
-
-                # If it's already absolute (e.g., from a radio stream), return as is.
-                return url
-
             except Exception:
                 _LOGGER.exception(
                     "Error while resolving media_source URL '%s'",
                     media_id,
                 )
                 return ""
+
+            url = resolved_media.url
+            _LOGGER.info("[%s] Resolved media_source URL to: %s", self.entity_id, url)
+
+            # Make it an absolute URL if it's relative
+            # (e.g., /api/tts_proxy/... -> http://<ha_ip>:8123/api/tts_proxy/...)
+            if url.startswith("/"):
+                return f"{self.hass.config.internal_url}{url}"
+
+            # If it's already absolute (e.g., from a radio stream), return as is.
+            return url
 
         # If it's not a media-source URL (e.g., a direct http:// URL),
         # return it as is.
@@ -778,7 +774,7 @@ class HbtnMediaPlayer(MediaPlayerEntity, RestoreEntity):
                     self._attr_media_artist = attributes.get("media_artist")
                     self._attr_media_image_url = attributes.get("entity_picture")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             _LOGGER.error("Error updating attributes from client: %s", e)
 
         self.async_write_ha_state()

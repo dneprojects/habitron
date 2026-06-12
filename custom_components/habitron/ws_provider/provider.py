@@ -7,16 +7,14 @@ the WebSocket command handlers in ``handlers``; both are wired in via
 ``async_register_websocket_handlers`` below to keep this module readable.
 """
 
-from __future__ import annotations
-
 import asyncio
+from collections.abc import Callable
 import logging
 import re
-import uuid
-from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
+import uuid
 
-from homeassistant.components.camera import (  # type: ignore[attr-defined]
+from homeassistant.components.camera import (
     Camera,
     CameraWebRTCProvider,
     RTCIceCandidateInit,
@@ -26,9 +24,7 @@ from homeassistant.components.camera import (  # type: ignore[attr-defined]
     WebRTCSendMessage,
     async_register_webrtc_provider,
 )
-from homeassistant.components.websocket_api import (  # type: ignore[attr-defined]
-    ActiveConnection,
-)
+from homeassistant.components.websocket_api import ActiveConnection
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 
@@ -297,11 +293,11 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
         # ``provider`` and ``handlers``: the handlers module needs the
         # provider for type hints and the voice pipeline imports come
         # back here for the helper protocol.
-        from .handlers import register_handlers
+        from .handlers import register_handlers  # noqa: PLC0415
 
         register_handlers(self)
 
-    def _get_stream_or_send_error(
+    def get_stream_or_send_error(
         self, connection: ActiveConnection, msg: dict[str, Any]
     ) -> str | None:
         """Look up the stream name for a connection or send an error to it."""

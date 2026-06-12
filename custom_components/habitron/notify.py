@@ -29,7 +29,7 @@ async def async_setup_entry(
     for hbt_module in hbtn_rt.modules:
         if hbt_module.typ in [b"\x01\x02", b"\x01\x03", b"\x32\x01"]:
             new_devices.append(HbtnMessage(hbt_module, len(new_devices)))
-        if hbt_module.typ in [b"\x1e\x03"]:
+        if hbt_module.typ == b"\x1e\x03":
             for sms in hbt_module.gsm_numbers:
                 new_devices.append(HbtnGSMMessage(hbt_module, sms, len(new_devices)))
 

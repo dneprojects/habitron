@@ -1,10 +1,12 @@
 """Platform for update integration."""
 
+from asyncio import sleep
 import hashlib
 import logging
-from asyncio import sleep
 from pathlib import Path
 from typing import Any
+
+from packaging.version import parse as parse_version
 
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.components.update import (
@@ -20,7 +22,6 @@ from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
     DataUpdateCoordinator,
 )
-from packaging.version import parse as parse_version
 
 from ._axml import read_apk_version_name
 from ._helpers import hbtn_device_info
@@ -116,7 +117,7 @@ class SCTouchAppUpdate(UpdateEntity):
         )
         try:
             await self._hass.http.async_register_static_paths([path_config])
-        except Exception:
+        except Exception:  # noqa: BLE001
             # Already registered (second Touch panel, entry reload, …).
             _LOGGER.debug(
                 "Static path %s already registered for %s",
@@ -399,7 +400,7 @@ class HbtnModuleUpdate(CoordinatorEntity[DataUpdateCoordinator[None]], UpdateEnt
                         self._attr_latest_version,
                     )
                 self.async_write_ha_state()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             _LOGGER.error(
                 "Error checking firmware version for module %s: %s",
                 self._module.name,

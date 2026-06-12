@@ -218,7 +218,7 @@ class HbtnShutter(CoordinatorEntity[DataUpdateCoordinator[None]], CoverEntity):
             _LOGGER.error(
                 "Timeout occurred while trying to stop cover %s", self._attr_name
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             # Log any other unexpected exception without period
             _LOGGER.error(
                 "Unexpected error stopping cover %s: %s", self._attr_name, exc

@@ -138,7 +138,7 @@ class HbtnMode(CoordinatorEntity[DataUpdateCoordinator[None]], SelectEntity):
             return
         self._value = self._mode & self._mask
         if self._value not in [c.value for c in self._enum]:
-            self.hbtnr.logger.warning(f"Could not find {self._value} in mode enum")
+            self.hbtnr.logger.warning("Could not find %s in mode enum", self._value)
             return
         self._current_option = self._enum(self._value).name
         self.async_write_ha_state()

@@ -1051,7 +1051,7 @@ async def test_report_state_without_matching_module_just_fires() -> None:
     ],
 )
 async def test_all_handlers_send_error_for_unknown_client(command: str) -> None:
-    """Every handler that calls ``_get_stream_or_send_error`` errors out for unknown clients."""
+    """Every handler that calls ``get_stream_or_send_error`` errors out for unknown clients."""
     provider = _make_provider()
     handlers = _registered_handlers(provider)
     conn = _make_connection()

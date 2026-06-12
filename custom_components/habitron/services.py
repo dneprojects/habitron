@@ -1,12 +1,11 @@
 """Service registration for the Habitron integration."""
 
-from __future__ import annotations
-
-import logging
 from collections.abc import Callable, Coroutine
+import logging
 from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
+
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import device_registry as dr

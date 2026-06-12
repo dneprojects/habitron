@@ -1,17 +1,12 @@
 """Habitron integration using DataUpdateCoordinator."""
 
-from __future__ import annotations
-
 import asyncio
 import logging
 from typing import TYPE_CHECKING
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.update_coordinator import (
-    DataUpdateCoordinator,
-    UpdateFailed,
-)
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import DOMAIN, SCAN_INTERVAL
 
@@ -62,7 +57,7 @@ class HbtnCoordinator(DataUpdateCoordinator[None]):
             always_update=True,
         )
         self.comm = hbtn_comm
-        self.config = hbtn_comm._config
+        self.config = hbtn_comm._config  # noqa: SLF001
         self.rtr_id = 1
         self.previous_devices: set[str] = set()
 

@@ -25,7 +25,7 @@ class IfDescriptor:
         iname: str,
         inmbr: int,
         itype: int,
-        ivalue: float,
+        ivalue: Any,
         iarea: int = 0,
     ) -> None:
         """Initialize interface."""

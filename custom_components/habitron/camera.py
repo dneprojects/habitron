@@ -2,14 +2,15 @@
 
 import logging
 
-from homeassistant.components.camera import (  # type: ignore[attr-defined]
+from webrtc_models import RTCIceCandidateInit
+
+from homeassistant.components.camera import (
     Camera,
     CameraEntityFeature,
     WebRTCSendMessage,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
-from webrtc_models import RTCIceCandidateInit
 
 from ._helpers import hbtn_device_info
 from .coordinator import HabitronConfigEntry

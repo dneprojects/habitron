@@ -1,15 +1,12 @@
 """Module modules."""
 
-from __future__ import annotations
-
 import logging
 import math
 from typing import TYPE_CHECKING
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import area_registry as ar
-from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import area_registry as ar, device_registry as dr
 from homeassistant.helpers.config_validation import slugify
 
 from .binary_sensor import ListeningStatusSensor
@@ -317,7 +314,7 @@ class HbtnModule:
                 # Description of outputs
                 self.outputs[arg_code - 60].name = text
                 self.outputs[arg_code - 60].area = line[1]
-        except Exception as err_msg:
+        except Exception as err_msg:  # noqa: BLE001
             self.logger.warning("Error processing line '%s': %s", line, err_msg)
 
     def _set_led_label(self, arg_code: int, text: str) -> None:

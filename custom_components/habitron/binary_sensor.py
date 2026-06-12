@@ -1,7 +1,5 @@
 """Platform for switch integration."""
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
 # Import the device class from the component that you want to support
