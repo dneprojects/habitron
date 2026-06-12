@@ -2,8 +2,6 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from homeassistant.components.light import ColorMode
-from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.light import (
@@ -14,6 +12,8 @@ from custom_components.habitron.light import (
     SwitchedLightPush,
     async_setup_entry,
 )
+from homeassistant.components.light import ColorMode
+from homeassistant.core import HomeAssistant
 
 from .conftest import class_attr
 

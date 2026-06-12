@@ -2,13 +2,12 @@
 
 from unittest.mock import AsyncMock, MagicMock
 
-from homeassistant.core import Context, HomeAssistant
-from homeassistant.helpers import entity_registry as er
-
 from custom_components.habitron.device_trigger import (
     async_attach_trigger,
     async_get_triggers,
 )
+from homeassistant.core import Context, HomeAssistant
+from homeassistant.helpers import entity_registry as er
 
 
 async def test_get_triggers_no_event_entities(
@@ -31,7 +30,7 @@ async def test_get_triggers_filters_inactive_and_finger(
     # Register a fake event entity for an existing device id.
     entry = setup_integration
     smhub = entry.runtime_data
-    from homeassistant.helpers import device_registry as dr  # noqa: PLC0415
+    from homeassistant.helpers import device_registry as dr
 
     dev_reg = dr.async_get(hass)
     device = dev_reg.async_get_or_create(

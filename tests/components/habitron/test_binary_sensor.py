@@ -6,7 +6,6 @@ Extend with per-entity state-transition tests and snapshot-based UI tests.
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.binary_sensor import (
@@ -21,6 +20,7 @@ from custom_components.habitron.binary_sensor import (
     async_setup_entry,
 )
 from custom_components.habitron.interfaces import TYPE_DIAG
+from homeassistant.core import HomeAssistant
 
 from .conftest import class_attr
 
@@ -224,7 +224,7 @@ def test_hbtn_state_diag_disabled_default() -> None:
     mod.uid = "MOD-1"
     coord = MagicMock()
     entity = HbtnState(state, mod, coord, 0)
-    from homeassistant.const import EntityCategory  # noqa: PLC0415
+    from homeassistant.const import EntityCategory
 
     assert entity._attr_entity_category == EntityCategory.DIAGNOSTIC
     assert entity._attr_entity_registry_enabled_default is False

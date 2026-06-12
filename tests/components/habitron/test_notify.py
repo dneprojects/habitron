@@ -2,7 +2,6 @@
 
 from unittest.mock import AsyncMock, MagicMock
 
-from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.notify import (
@@ -10,6 +9,7 @@ from custom_components.habitron.notify import (
     HbtnMessage,
     async_setup_entry,
 )
+from homeassistant.core import HomeAssistant
 
 
 async def test_notify_setup(setup_integration: MockConfigEntry) -> None:

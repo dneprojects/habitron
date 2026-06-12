@@ -292,7 +292,7 @@ async def test_voice_pipeline_start_seeds_voice_pipelines_entry() -> None:
     # Swallow the spawned ``run_voice_pipeline`` coroutine — the handler
     # tests verify only that the call happens; the pipeline itself has
     # its own dedicated test module.
-    def _swallow_coroutine(coro, name=None):  # noqa: ARG001
+    def _swallow_coroutine(coro, name=None):
         coro.close()
         return MagicMock()
 
@@ -335,7 +335,7 @@ async def test_voice_pipeline_start_falls_back_without_satellite() -> None:
     # Swallow the spawned ``run_voice_pipeline`` coroutine — the handler
     # tests verify only that the call happens; the pipeline itself has
     # its own dedicated test module.
-    def _swallow_coroutine(coro, name=None):  # noqa: ARG001
+    def _swallow_coroutine(coro, name=None):
         coro.close()
         return MagicMock()
 
@@ -364,7 +364,7 @@ async def test_voice_pipeline_start_with_satellite_no_registry_entry() -> None:
     # Swallow the spawned ``run_voice_pipeline`` coroutine — the handler
     # tests verify only that the call happens; the pipeline itself has
     # its own dedicated test module.
-    def _swallow_coroutine(coro, name=None):  # noqa: ARG001
+    def _swallow_coroutine(coro, name=None):
         coro.close()
         return MagicMock()
 
@@ -397,7 +397,7 @@ async def test_voice_pipeline_start_with_non_string_pipeline_option() -> None:
     # Swallow the spawned ``run_voice_pipeline`` coroutine — the handler
     # tests verify only that the call happens; the pipeline itself has
     # its own dedicated test module.
-    def _swallow_coroutine(coro, name=None):  # noqa: ARG001
+    def _swallow_coroutine(coro, name=None):
         coro.close()
         return MagicMock()
 

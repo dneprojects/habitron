@@ -15,9 +15,9 @@ def _make_comm(host: str = "192.168.1.50") -> object:
     individual tests can ``await`` bus-method calls without opening a real
     socket. ``async_setup`` is bypassed: ``_client`` is wired up directly.
     """
-    from habitron_client import HabitronClient  # noqa: PLC0415
+    from habitron_client import HabitronClient
 
-    from custom_components.habitron.communicate import HbtnComm  # noqa: PLC0415
+    from custom_components.habitron.communicate import HbtnComm
 
     hass = MagicMock()
     hass.data = {"integrations": {"habitron": MagicMock(manifest={"version": "9.9.9"})}}
@@ -212,7 +212,7 @@ async def test_get_smhub_info_populates_fields_from_client_payload() -> None:
 
 async def test_get_smhub_info_non_addon_clears_slugname() -> None:
     """Without SUPERVISOR_TOKEN, ``is_addon`` is False and slugname is blank."""
-    import os  # noqa: PLC0415
+    import os
 
     comm = _make_comm()
     payload = {
@@ -231,7 +231,7 @@ async def test_get_smhub_info_non_addon_clears_slugname() -> None:
 
 async def test_get_smhub_info_timeout_reraises() -> None:
     """A HabitronTimeoutError is re-raised so the caller knows the hub is silent."""
-    from habitron_client import HabitronTimeoutError  # noqa: PLC0415
+    from habitron_client import HabitronTimeoutError
 
     comm = _make_comm()
     comm._client.get_smhub_info = AsyncMock(side_effect=HabitronTimeoutError("silent"))

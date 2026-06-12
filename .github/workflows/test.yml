@@ -38,8 +38,12 @@ jobs:
       - name: ruff format --check
         run: python -m ruff format --check .
 
-      - name: mypy --strict
-        run: python -m mypy --strict custom_components/habitron
+      - name: mypy
+        # Strictness comes from mypy.ini (strict = True). We do NOT pass
+        # --strict on the CLI because it would override the deliberate
+        # implicit_reexport relaxation (HA re-exports public API without
+        # always listing it in __all__).
+        run: python -m mypy custom_components/habitron
 
       - name: pytest --cov
         run: python -m pytest --cov --cov-report=term

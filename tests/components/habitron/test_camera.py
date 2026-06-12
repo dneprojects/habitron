@@ -3,10 +3,10 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.camera import HbtnCam, async_setup_entry
+from homeassistant.core import HomeAssistant
 
 
 async def test_camera_setup(setup_integration: MockConfigEntry) -> None:

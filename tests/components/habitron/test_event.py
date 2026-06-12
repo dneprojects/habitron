@@ -3,7 +3,6 @@
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
-from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.event import (
@@ -13,6 +12,7 @@ from custom_components.habitron.event import (
     InputPressed,
     async_setup_entry,
 )
+from homeassistant.core import HomeAssistant
 
 
 async def test_event_setup(setup_integration: MockConfigEntry) -> None:
@@ -259,7 +259,7 @@ async def test_async_added_to_hass_registers_callback() -> None:
 
 def _patch_base_async_added(mock: AsyncMock):
     """Patch EventEntity.async_added_to_hass to avoid needing self.hass."""
-    from unittest.mock import patch  # noqa: PLC0415
+    from unittest.mock import patch
 
     return patch(
         "homeassistant.components.event.EventEntity.async_added_to_hass",
@@ -315,7 +315,7 @@ async def test_async_setup_entry_iterates_modules(hass: HomeAssistant) -> None:
         added.extend(entities)
 
     # Make sure the registry call inside async_setup_entry sees an entry id.
-    from unittest.mock import patch  # noqa: PLC0415
+    from unittest.mock import patch
 
     with patch(
         "custom_components.habitron.event.er.async_get",
@@ -357,7 +357,7 @@ async def test_async_setup_entry_with_area_member_skips_area_update(
 
     added: list = []
 
-    from unittest.mock import patch  # noqa: PLC0415
+    from unittest.mock import patch
 
     with patch(
         "custom_components.habitron.event.er.async_get",
@@ -397,7 +397,7 @@ async def test_async_setup_entry_external_area_assigns_area_id(
     entry = MagicMock()
     entry.runtime_data.router = router
 
-    from unittest.mock import patch  # noqa: PLC0415
+    from unittest.mock import patch
 
     with patch(
         "custom_components.habitron.event.er.async_get",
@@ -434,7 +434,7 @@ async def test_async_setup_entry_skips_missing_registry_entry(
     entry = MagicMock()
     entry.runtime_data.router = router
 
-    from unittest.mock import patch  # noqa: PLC0415
+    from unittest.mock import patch
 
     with patch(
         "custom_components.habitron.event.er.async_get",

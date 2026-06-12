@@ -159,7 +159,7 @@ async def test_run_voice_pipeline_catches_generic_exception() -> None:
 
 async def test_run_voice_pipeline_forwards_event_to_satellite() -> None:
     """A pipeline event is forwarded to the satellite's on_pipeline_event."""
-    from homeassistant.components.assist_pipeline import (  # noqa: PLC0415
+    from homeassistant.components.assist_pipeline import (
         PipelineEvent,
         PipelineEventType,
     )
@@ -185,7 +185,7 @@ async def test_run_voice_pipeline_forwards_event_to_satellite() -> None:
 
 async def test_run_voice_pipeline_event_callback_logs_when_no_satellite() -> None:
     """If the satellite is missing at event time, the callback just logs."""
-    from homeassistant.components.assist_pipeline import (  # noqa: PLC0415
+    from homeassistant.components.assist_pipeline import (
         PipelineEvent,
         PipelineEventType,
     )
@@ -206,7 +206,7 @@ async def test_run_voice_pipeline_event_callback_logs_when_no_satellite() -> Non
 
 async def test_run_voice_pipeline_tts_end_streams_audio_to_client() -> None:
     """A TTS_END event spawns ``_stream_tts_to_client`` which streams chunks."""
-    from homeassistant.components.assist_pipeline import (  # noqa: PLC0415
+    from homeassistant.components.assist_pipeline import (
         PipelineEvent,
         PipelineEventType,
     )
@@ -269,7 +269,7 @@ async def test_run_voice_pipeline_tts_end_streams_audio_to_client() -> None:
 
 async def test_run_voice_pipeline_tts_end_handles_missing_stream() -> None:
     """A TTS_END whose token has no matching stream logs an error + continues."""
-    from homeassistant.components.assist_pipeline import (  # noqa: PLC0415
+    from homeassistant.components.assist_pipeline import (
         PipelineEvent,
         PipelineEventType,
     )
@@ -308,7 +308,7 @@ async def test_run_voice_pipeline_tts_end_handles_missing_stream() -> None:
 
 async def test_run_voice_pipeline_tts_streaming_exception_is_logged() -> None:
     """An exception while streaming TTS is caught + logged inside the helper."""
-    from homeassistant.components.assist_pipeline import (  # noqa: PLC0415
+    from homeassistant.components.assist_pipeline import (
         PipelineEvent,
         PipelineEventType,
     )
@@ -318,7 +318,7 @@ async def test_run_voice_pipeline_tts_streaming_exception_is_logged() -> None:
     class _FailStream:
         async def async_stream_result(self):
             raise RuntimeError("stream broke")
-            yield b""  # noqa: B901
+            yield b""
 
     spawned: list = []
     provider.hass.async_create_task = MagicMock(
@@ -351,7 +351,7 @@ async def test_run_voice_pipeline_waits_for_playback_finished_when_tts_streamed(
     None
 ):
     """When TTS was streamed the pipeline awaits the playback_finished event."""
-    from homeassistant.components.assist_pipeline import (  # noqa: PLC0415
+    from homeassistant.components.assist_pipeline import (
         PipelineEvent,
         PipelineEventType,
     )
@@ -419,7 +419,7 @@ async def test_run_voice_pipeline_waits_for_playback_finished_when_tts_streamed(
 
 async def test_run_voice_pipeline_handles_playback_finished_timeout() -> None:
     """A playback_finished wait that times out is logged + pipeline continues."""
-    from homeassistant.components.assist_pipeline import (  # noqa: PLC0415
+    from homeassistant.components.assist_pipeline import (
         PipelineEvent,
         PipelineEventType,
     )

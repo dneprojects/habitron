@@ -2,7 +2,6 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.module import HbtnModule
@@ -16,6 +15,7 @@ from custom_components.habitron.switch import (
     SwitchedOutputPush,
     async_setup_entry,
 )
+from homeassistant.core import HomeAssistant
 
 from .conftest import class_attr
 
@@ -124,7 +124,7 @@ def _make_led_module() -> MagicMock:
 
 async def test_switched_led_turn_on_calls_comm() -> None:
     """SwitchedLed.async_turn_on forwards to ``comm.async_set_led_outp``."""
-    from custom_components.habitron.switch import SwitchedLed  # noqa: PLC0415
+    from custom_components.habitron.switch import SwitchedLed
 
     led = _make_led_descriptor(nmbr=1)
     mod = _make_led_module()
@@ -381,7 +381,7 @@ async def test_habitron_flag_turn_off_module_path() -> None:
 
 async def test_habitron_flag_turn_on_router_path() -> None:
     """For an HbtnRouter target, async_turn_on uses ``router.id`` as address."""
-    from custom_components.habitron.router import HbtnRouter  # noqa: PLC0415
+    from custom_components.habitron.router import HbtnRouter
 
     flag = _make_flag_descriptor(nmbr=3)
     rt = HbtnRouter.__new__(HbtnRouter)
@@ -397,7 +397,7 @@ async def test_habitron_flag_turn_on_router_path() -> None:
 
 async def test_habitron_flag_turn_off_router_path() -> None:
     """For an HbtnRouter target, async_turn_off uses ``router.id`` as address."""
-    from custom_components.habitron.router import HbtnRouter  # noqa: PLC0415
+    from custom_components.habitron.router import HbtnRouter
 
     flag = _make_flag_descriptor(nmbr=3)
     rt = HbtnRouter.__new__(HbtnRouter)

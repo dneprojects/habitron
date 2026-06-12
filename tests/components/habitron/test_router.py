@@ -99,7 +99,7 @@ def test_get_module_by_addr_and_uid_and_stream() -> None:
 
 def test_get_area_id_matches_by_slug() -> None:
     """get_area_id returns the area key whose slugified name matches."""
-    from custom_components.habitron.interfaces import AreaDescriptor  # noqa: PLC0415
+    from custom_components.habitron.interfaces import AreaDescriptor
 
     rt = _make_router()
     rt.areas[3] = AreaDescriptor("Living Room", 3)
@@ -109,7 +109,7 @@ def test_get_area_id_matches_by_slug() -> None:
 
 def test_unit_not_exists_walks_descriptor_list() -> None:
     """unit_not_exists is True only when no matching name exists."""
-    from custom_components.habitron.interfaces import IfDescriptor  # noqa: PLC0415
+    from custom_components.habitron.interfaces import IfDescriptor
 
     rt = _make_router()
     units = [IfDescriptor("A", 0, 1, 0), IfDescriptor("B", 1, 1, 0)]
@@ -351,7 +351,7 @@ async def test_get_descriptions_breaks_on_overlong_header() -> None:
 
 async def test_update_system_status_writes_flag_values() -> None:
     """When the router has flags, the FLAG_GLOB byte drives flag.value updates."""
-    from custom_components.habitron.interfaces import StateDescriptor  # noqa: PLC0415
+    from custom_components.habitron.interfaces import StateDescriptor
 
     rt = _make_router()
     rt.flags = [StateDescriptor("flg", 0, 1, 1, False)]
@@ -635,7 +635,7 @@ async def test_initialize_registers_device_and_seeds_module_instances() -> None:
     # 11 module instances created
     assert len(rt.modules) == 11
     # The right subclasses ended up in the list (sample check)
-    from custom_components.habitron.module import (  # noqa: PLC0415
+    from custom_components.habitron.module import (
         SmartController,
         SmartControllerMini,
         SmartDetect,

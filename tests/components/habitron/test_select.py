@@ -2,7 +2,6 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.module import HbtnModule
@@ -19,6 +18,7 @@ from custom_components.habitron.select import (
     async_setup_entry,
 )
 from custom_components.habitron.smart_hub import LoggingLevels
+from homeassistant.core import HomeAssistant
 
 
 async def test_select_setup(setup_integration: MockConfigEntry) -> None:

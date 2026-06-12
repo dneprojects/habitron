@@ -3,11 +3,11 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from custom_components.habitron.const import SCAN_INTERVAL
 from custom_components.habitron.coordinator import HbtnCoordinator
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.update_coordinator import UpdateFailed
 
 
 def _make_comm(hass: HomeAssistant) -> MagicMock:

@@ -6,7 +6,6 @@ service tests using ``hass.services.async_call("button", "press", ...)``.
 
 from unittest.mock import AsyncMock, MagicMock
 
-from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.button import (
@@ -24,6 +23,7 @@ from custom_components.habitron.button import (
     VisCmdButton,
     async_setup_entry,
 )
+from homeassistant.core import HomeAssistant
 
 from .conftest import class_attr
 
@@ -370,7 +370,7 @@ async def test_async_setup_entry_emits_button_set(hass: HomeAssistant) -> None:
     counter.nmbr = 0
     counter.name = "Cnt"
 
-    from custom_components.habitron.module import SmartController  # noqa: PLC0415
+    from custom_components.habitron.module import SmartController
 
     mod = MagicMock()
     mod.__class__ = SmartController  # so isinstance() narrows correctly
