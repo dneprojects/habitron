@@ -31,7 +31,9 @@ async def system_health_info(hass: HomeAssistant) -> dict[str, Any]:
         entry.runtime_data for entry in hass.config_entries.async_loaded_entries(DOMAIN)
     ]
     return {
-        "hbtn_version": hass.data["integrations"]["habitron"].manifest["version"],
+        "hbtn_version": hass.data["integrations"]["habitron"].manifest.get(
+            "version", "0.0.0"
+        ),
         "hub_count": len(hubs),
         "router_status": _aggregate_router_status(hubs),
         "module_count": sum(len(hub.router.modules) for hub in hubs),

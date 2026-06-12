@@ -88,9 +88,11 @@ class HbtnComm:
         self.slugname: str = ""
         self.info: dict[str, str] = {}
         self.grp_modes: dict[int, int] = {}
-        self._hbtn_version: str = self._hass.data["integrations"]["habitron"].manifest[
-            "version"
-        ]
+        # ``version`` is a HACS-only manifest field; core strips it, so fall
+        # back to a sentinel to keep entry setup working in both layouts.
+        self._hbtn_version: str = self._hass.data["integrations"][
+            "habitron"
+        ].manifest.get("version", "0.0.0")
 
     @property
     def client(self) -> HabitronClient:
