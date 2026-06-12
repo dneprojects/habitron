@@ -475,6 +475,10 @@ class HbtnComm:
         """Send message to module."""
         await self.client.send_message(self._convert_mod_id(mod_id), msg_id)
 
+    async def send_message_text(self, mod_id: int, text: str) -> None:
+        """Show a free-text message on a module (empty text clears it)."""
+        await self.client.send_message_text(self._convert_mod_id(mod_id), text)
+
     async def send_sms(self, mod_id: int, msg_id: int, ct_id: int) -> None:
         """Send sms message to module."""
         await self.client.send_sms(self._convert_mod_id(mod_id), msg_id, ct_id)

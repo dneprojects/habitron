@@ -57,26 +57,17 @@ class HbtnMessage(NotifyEntity):
         return hbtn_device_info(self._module.uid)
 
     async def async_send_message(self, message: str, title: str | None = None) -> None:
-        """Send a message.
+        """Send a message to the module display.
 
-        The bus protocol addresses messages by their stored numeric id; free-
-        text payloads are not supported by habitron_client 1.0.0. When the
-        message text does not match a known entry, log and skip.
+        If the text matches a stored message name, trigger that stored
+        message by its numeric id; otherwise show the text as free text
+        (habitron_client 1.0.4+). An empty message clears the display.
         """
-        msg_id = None
         for msg in self.messages:
             if message.replace(" ", "") == msg.name.replace(" ", ""):
-                msg_id = msg.nmbr
-                break
-        if msg_id is None:
-            _LOGGER.warning(
-                "Cannot send free-text message via HbtnMessage: %r is not a"
-                " known stored message on module %s",
-                message,
-                self._module.uid,
-            )
-            return
-        await self._module.comm.send_message(self._module.mod_addr, msg_id)
+                await self._module.comm.send_message(self._module.mod_addr, msg.nmbr)
+                return
+        await self._module.comm.send_message_text(self._module.mod_addr, message)
 
 
 class HbtnGSMMessage(NotifyEntity):

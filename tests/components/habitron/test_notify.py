@@ -27,6 +27,7 @@ def _make_message_module() -> MagicMock:
     msg.nmbr = 42
     mod.messages = [msg]
     mod.comm.send_message = AsyncMock()
+    mod.comm.send_message_text = AsyncMock()
     mod.comm.send_sms = AsyncMock()
     return mod
 
@@ -47,12 +48,13 @@ async def test_message_send_known_message_uses_message_number() -> None:
     mod.comm.send_message.assert_awaited_with(105, 42)
 
 
-async def test_message_send_unknown_message_logs_and_skips() -> None:
-    """An unknown message no longer sends — the lib only accepts stored ids."""
+async def test_message_send_unknown_message_sends_free_text() -> None:
+    """An unknown message is sent as free text (habitron_client 1.0.4+)."""
     mod = _make_message_module()
     entity = HbtnMessage(mod, 0)
     await entity.async_send_message(message="freeform text")
     mod.comm.send_message.assert_not_awaited()
+    mod.comm.send_message_text.assert_awaited_with(105, "freeform text")
 
 
 def _make_gsm_module() -> MagicMock:
