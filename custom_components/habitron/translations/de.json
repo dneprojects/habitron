@@ -2,7 +2,9 @@
   "config": {
     "abort": {
       "already_configured": "[%key:common::config_flow::abort::already_configured_device%]",
-      "reconfigure_successful": "[%key:common::config_flow::abort::reconfigure_successful%]"
+      "no_host_in_ssdp": "Das erkannte Gerät hat keine Host-Adresse gemeldet.",
+      "reconfigure_successful": "[%key:common::config_flow::abort::reconfigure_successful%]",
+      "unknown": "[%key:common::config_flow::error::unknown%]"
     },
     "error": {
       "cannot_connect": "Keine Verbindung zum SmartHub",
@@ -15,12 +17,20 @@
           "habitron_host": "Host-Name oder IP des SmartHub",
           "websock_token": "Token zur Websocket-Authentifizierung"
         },
+        "data_description": {
+          "habitron_host": "DNS-Name oder IPv4-Adresse des SmartHub. \"local\" verwenden, wenn Home Assistant auf dem SmartCenter selbst läuft.",
+          "websock_token": "Optionales Long-Lived-Access-Token, nur nötig, wenn SC Touch und Assist auf einer entfernten Home-Assistant-Instanz laufen."
+        },
         "title": "Einstellungen zur Kommunikation"
       },
       "reconfigure": {
         "data": {
           "habitron_host": "[%key:component::habitron::config::step::user::data::habitron_host%]",
           "websock_token": "[%key:component::habitron::config::step::user::data::websock_token%]"
+        },
+        "data_description": {
+          "habitron_host": "[%key:component::habitron::config::step::user::data_description::habitron_host%]",
+          "websock_token": "[%key:component::habitron::config::step::user::data_description::websock_token%]"
         },
         "title": "SmartHub-Verbindung neu konfigurieren"
       }
@@ -41,6 +51,11 @@
           "habitron_host": "Host-Name oder IP des SmartHub",
           "updates_enabled": "Zyklische Updates ausführen",
           "websock_token": "Token zur Websocket-Authentifizierung"
+        },
+        "data_description": {
+          "habitron_host": "[%key:component::habitron::config::step::user::data_description::habitron_host%]",
+          "updates_enabled": "Aktiviert den periodischen Heartbeat, der den SmartHub abfragt und Entitäten verfügbar hält.",
+          "websock_token": "[%key:component::habitron::config::step::user::data_description::websock_token%]"
         },
         "title": "Einstellungen zur Kommunikation"
       }
@@ -145,7 +160,7 @@
         "name": "Klimaregler"
       }
     },
-"select": {
+    "select": {
       "habitron_mode": {
         "state": {
           "on": "Aktiv",
