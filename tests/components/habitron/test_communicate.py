@@ -1,10 +1,13 @@
 """Tests for the Habitron communicate (HbtnComm) layer."""
 
+import os
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from habitron_client import HabitronClient, HabitronTimeoutError
 import pytest
 
+from custom_components.habitron.communicate import HbtnComm
 from custom_components.habitron.const import HaEvents
 
 
@@ -15,9 +18,6 @@ def _make_comm(host: str = "192.168.1.50") -> object:
     individual tests can ``await`` bus-method calls without opening a real
     socket. ``async_setup`` is bypassed: ``_client`` is wired up directly.
     """
-    from habitron_client import HabitronClient
-
-    from custom_components.habitron.communicate import HbtnComm
 
     hass = MagicMock()
     hass.data = {"integrations": {"habitron": MagicMock(manifest={"version": "9.9.9"})}}
@@ -212,7 +212,6 @@ async def test_get_smhub_info_populates_fields_from_client_payload() -> None:
 
 async def test_get_smhub_info_non_addon_clears_slugname() -> None:
     """Without SUPERVISOR_TOKEN, ``is_addon`` is False and slugname is blank."""
-    import os
 
     comm = _make_comm()
     payload = {
@@ -231,7 +230,6 @@ async def test_get_smhub_info_non_addon_clears_slugname() -> None:
 
 async def test_get_smhub_info_timeout_reraises() -> None:
     """A HabitronTimeoutError is re-raised so the caller knows the hub is silent."""
-    from habitron_client import HabitronTimeoutError
 
     comm = _make_comm()
     comm._client.get_smhub_info = AsyncMock(side_effect=HabitronTimeoutError("silent"))
@@ -337,14 +335,14 @@ async def test_send_network_info_encodes_token_and_mac() -> None:
 
 
 async def test_async_set_daytime_mode_day_path() -> None:
-    """mode 1 maps to 0x42 and dispatches set_group_mode."""
+    """Mode 1 maps to 0x42 and dispatches set_group_mode."""
     comm = _make_comm("10.0.0.1")
     await comm.async_set_daytime_mode(1, 1)
     comm._client.set_group_mode.assert_awaited_with(1, 0x42)
 
 
 async def test_async_set_daytime_mode_night_path() -> None:
-    """mode 2 maps to 0x43."""
+    """Mode 2 maps to 0x43."""
     comm = _make_comm("10.0.0.1")
     await comm.async_set_daytime_mode(1, 2)
     comm._client.set_group_mode.assert_awaited_with(1, 0x43)

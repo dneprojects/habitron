@@ -23,6 +23,7 @@ from custom_components.habitron.button import (
     VisCmdButton,
     async_setup_entry,
 )
+from custom_components.habitron.module import SmartController
 from homeassistant.core import HomeAssistant
 
 from .conftest import class_attr
@@ -369,8 +370,6 @@ async def test_async_setup_entry_emits_button_set(hass: HomeAssistant) -> None:
     counter.type = 5
     counter.nmbr = 0
     counter.name = "Cnt"
-
-    from custom_components.habitron.module import SmartController
 
     mod = MagicMock()
     mod.__class__ = SmartController  # so isinstance() narrows correctly

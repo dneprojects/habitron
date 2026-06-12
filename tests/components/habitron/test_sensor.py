@@ -184,7 +184,7 @@ async def test_sensor_platform_setup(hass: HomeAssistant, setup_integration) -> 
 # ---------- Additional tests for non-described sensor classes ----------
 
 
-from custom_components.habitron.sensor import (
+from custom_components.habitron.sensor import (  # noqa: E402
     AnalogSensor,
     EKeySensorFngr,
     EKeySensorId,
@@ -396,10 +396,10 @@ def test_frequency_sensor_diag_branch() -> None:
 
 # ---------- Tests covering async_added/async_will_remove + setup_entry ----------
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch  # noqa: E402
 
-from custom_components.habitron.module import SmartController
-from custom_components.habitron.sensor import (
+from custom_components.habitron.module import SmartController  # noqa: E402
+from custom_components.habitron.sensor import (  # noqa: E402
     HabitronClientSensor,
     LogicSensorPush,
     async_setup_entry,

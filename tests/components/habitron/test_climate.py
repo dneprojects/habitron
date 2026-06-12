@@ -6,6 +6,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.climate import HbtnClimate, async_setup_entry
 from homeassistant.components.climate import HVACAction, HVACMode
+from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
 
 
@@ -60,7 +61,6 @@ def test_climate_second_unit_has_distinct_unique_id() -> None:
 
 def test_climate_attr_temperature_unit_is_celsius() -> None:
     """Habitron reports temperatures in Celsius."""
-    from homeassistant.const import UnitOfTemperature
 
     mod = _make_climate_module()
     coord = MagicMock()

@@ -89,7 +89,7 @@ def test_hbtn_mode_name_options_state_property() -> None:
 
 
 def test_hbtn_mode_state_returns_none_when_unknown() -> None:
-    """state returns None when current_option is not in options."""
+    """State returns None when current_option is not in options."""
     rt = _make_router()
     coord = MagicMock()
     entity = HbtnSelectDaytimeMode(0, rt, coord, 0)
@@ -98,7 +98,7 @@ def test_hbtn_mode_state_returns_none_when_unknown() -> None:
 
 
 def test_hbtn_mode_state_returns_none_when_current_option_none() -> None:
-    """state returns None when current_option is None."""
+    """State returns None when current_option is None."""
     rt = _make_router()
     coord = MagicMock()
     entity = HbtnSelectDaytimeMode(0, rt, coord, 0)
@@ -320,7 +320,7 @@ async def test_select_async_setup_entry_creates_entities(hass: HomeAssistant) ->
 
     added: list = []
     await async_setup_entry(hass, entry, added.extend)
-    # 2 SC modules × 3 entities + 3 router-level + 1 logging = 10
+    # 2 SC modules × 3 entities + 3 router-level + 1 logging = 10  # noqa: RUF003
     assert len(added) == 10
     assert any(isinstance(e, HbtnSelectLoggingLevel) for e in added)
 
@@ -480,7 +480,7 @@ def test_hbtn_select_logging_level_name_options_state() -> None:
 
 
 def test_hbtn_select_logging_level_state_returns_none_when_unknown() -> None:
-    """state returns None when current_option is not in the enum names."""
+    """State returns None when current_option is not in the enum names."""
     smhub = MagicMock()
     smhub.uid = "HUB-1"
     level = _make_log_level()

@@ -1,6 +1,7 @@
 """Tests for the in-tree AXML reader."""
 
 from pathlib import Path
+import zipfile
 
 import pytest
 
@@ -45,7 +46,6 @@ def test_read_apk_version_name_zip_without_manifest_returns_none(
     tmp_path: Path,
 ) -> None:
     """A ZIP that lacks AndroidManifest.xml yields ``None``."""
-    import zipfile
 
     bogus = tmp_path / "empty.apk"
     with zipfile.ZipFile(bogus, "w") as zf:
@@ -57,7 +57,6 @@ def test_read_apk_version_name_corrupted_manifest_returns_none(
     tmp_path: Path,
 ) -> None:
     """A manifest that isn't valid AXML yields ``None``, not an exception."""
-    import zipfile
 
     bogus = tmp_path / "bad_manifest.apk"
     with zipfile.ZipFile(bogus, "w") as zf:
