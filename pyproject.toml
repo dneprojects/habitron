@@ -204,10 +204,21 @@ split-on-trailing-comma = false
 "tests/**" = ["PTH"]
 # AXML format parsing constants.
 "custom_components/habitron/_axml.py" = ["PLR2004"]
-# Tests stay lax on a few stylistic rules.
+# Tests stay lax on rules that don't add value in a test suite.
 "tests/**/*.py" = [
     "S101",     # asserts are fine in tests
+    "SLF001",   # tests legitimately inspect private members
+    "PLC0415",  # imports inside test bodies are common
+    "PERF",     # micro-perf rules don't matter in tests
+    "TID251",   # relative imports resolve to tests.* (the ban targets prod code)
     "TID252",   # relative imports within the test package
+    "D",        # docstring rules relaxed for tests
+    "F841",     # anchoring values in unused locals aids readability
+    "PT",       # flake8-pytest-style nuances
+    "RET504",   # explicit assign-before-return reads clearer in tests
+    "SIM117",   # nested with-statements are fine in tests
+    "RUF003",   # ambiguous unicode in comments
+    "ARG",      # unused fixture/mock arguments
     "E402",     # module-level import not at top — conftest does setup first
 ]
 

@@ -3,7 +3,6 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.media_player import (
@@ -11,6 +10,7 @@ from custom_components.habitron.media_player import (
     QueueItem,
     async_setup_entry,
 )
+from homeassistant.core import HomeAssistant
 
 from .conftest import class_attr
 
@@ -30,7 +30,7 @@ def test_translation_key() -> None:
 
 def _make_touch_module(uid: str = "MOD-T") -> MagicMock:
     """A SmartController-Touch-like mock for media-player wiring."""
-    from custom_components.habitron.module import SmartController  # noqa: PLC0415
+    from custom_components.habitron.module import SmartController
 
     mod = MagicMock(spec=SmartController)
     mod.uid = uid
@@ -85,9 +85,7 @@ def test_player_init_seeds_stream_name_and_state() -> None:
 
 def test_supported_features_includes_skip_in_multi_mode() -> None:
     """``supported_features`` adds NEXT/PREVIOUS_TRACK when in multi-track mode."""
-    from homeassistant.components.media_player import (  # noqa: PLC0415
-        MediaPlayerEntityFeature,
-    )
+    from homeassistant.components.media_player import MediaPlayerEntityFeature
 
     player = _make_player()
     base = int(player.supported_features)
@@ -185,9 +183,7 @@ def _enable_play_media(player: HbtnMediaPlayer) -> None:
 
 async def test_async_play_media_replace_mode_clears_queue_and_plays() -> None:
     """REPLACE clears the queue and triggers immediate playback."""
-    from homeassistant.components.media_player import (
-        MediaPlayerEnqueue,  # noqa: PLC0415
-    )
+    from homeassistant.components.media_player import MediaPlayerEnqueue
 
     player = _make_player()
     _enable_play_media(player)
@@ -200,7 +196,7 @@ async def test_async_play_media_replace_mode_clears_queue_and_plays() -> None:
 
 async def test_async_play_media_replace_mode_moves_current_to_history() -> None:
     """REPLACE with a current item pushes it to history before playback."""
-    from homeassistant.components.media_player import (  # noqa: PLC0415
+    from homeassistant.components.media_player import (
         MediaPlayerEnqueue,
         MediaPlayerState,
     )
@@ -221,7 +217,7 @@ async def test_async_play_media_replace_mode_moves_current_to_history() -> None:
 
 async def test_async_play_media_add_mode_appends_to_queue() -> None:
     """ADD appends to the queue without forcing playback."""
-    from homeassistant.components.media_player import (  # noqa: PLC0415
+    from homeassistant.components.media_player import (
         MediaPlayerEnqueue,
         MediaPlayerState,
     )
@@ -238,7 +234,7 @@ async def test_async_play_media_add_mode_appends_to_queue() -> None:
 
 async def test_async_play_media_next_mode_inserts_at_top() -> None:
     """NEXT inserts the item at position 0 of the queue."""
-    from homeassistant.components.media_player import (  # noqa: PLC0415
+    from homeassistant.components.media_player import (
         MediaPlayerEnqueue,
         MediaPlayerState,
     )
@@ -255,7 +251,7 @@ async def test_async_play_media_next_mode_inserts_at_top() -> None:
 
 async def test_async_play_media_play_mode_inserts_and_forces_play() -> None:
     """PLAY inserts at top + always plays now."""
-    from homeassistant.components.media_player import (  # noqa: PLC0415
+    from homeassistant.components.media_player import (
         MediaPlayerEnqueue,
         MediaPlayerState,
     )
@@ -274,9 +270,7 @@ async def test_async_play_media_play_mode_inserts_and_forces_play() -> None:
 
 async def test_async_play_media_unresolvable_id_logs_and_returns() -> None:
     """A blank resolved URL aborts the play_media flow."""
-    from homeassistant.components.media_player import (
-        MediaPlayerEnqueue,  # noqa: PLC0415
-    )
+    from homeassistant.components.media_player import MediaPlayerEnqueue
 
     player = _make_player()
     player._process_media_id = AsyncMock(return_value="")
@@ -289,9 +283,7 @@ async def test_async_play_media_unresolvable_id_logs_and_returns() -> None:
 
 async def test_async_play_media_resolver_exception_propagates() -> None:
     """An exception during resolution propagates so HA can report it."""
-    from homeassistant.components.media_player import (
-        MediaPlayerEnqueue,  # noqa: PLC0415
-    )
+    from homeassistant.components.media_player import MediaPlayerEnqueue
 
     player = _make_player()
     player._process_media_id = AsyncMock(side_effect=RuntimeError("boom"))
@@ -318,7 +310,7 @@ async def test_play_next_item_drains_queue() -> None:
 
 async def test_play_next_item_empty_queue_sets_idle() -> None:
     """Empty queue → state goes IDLE and current_item is cleared."""
-    from homeassistant.components.media_player import MediaPlayerState  # noqa: PLC0415
+    from homeassistant.components.media_player import MediaPlayerState
 
     player = _make_player()
     player._current_item = QueueItem("id", "music", "url", {})
@@ -332,7 +324,7 @@ async def test_play_next_item_empty_queue_sets_idle() -> None:
 
 async def test_send_item_to_client_writes_payload() -> None:
     """_send_item_to_client emits the habitron/play_media WS payload."""
-    from homeassistant.components.media_player import MediaPlayerState  # noqa: PLC0415
+    from homeassistant.components.media_player import MediaPlayerState
 
     player = _make_player()
     player.async_write_ha_state = MagicMock()
@@ -358,7 +350,7 @@ async def test_poll_ma_metadata_stops_when_not_playing() -> None:
 
 async def test_poll_ma_metadata_skips_when_no_proxy() -> None:
     """A missing MA proxy short-circuits the polling helper."""
-    from homeassistant.components.media_player import MediaPlayerState  # noqa: PLC0415
+    from homeassistant.components.media_player import MediaPlayerState
 
     player = _make_player()
     player._attr_state = MediaPlayerState.PLAYING
@@ -369,7 +361,7 @@ async def test_poll_ma_metadata_skips_when_no_proxy() -> None:
 
 async def test_poll_ma_metadata_skips_when_state_missing() -> None:
     """A proxy whose hass.states.get returns None short-circuits."""
-    from homeassistant.components.media_player import MediaPlayerState  # noqa: PLC0415
+    from homeassistant.components.media_player import MediaPlayerState
 
     player = _make_player()
     player._attr_state = MediaPlayerState.PLAYING
@@ -380,7 +372,7 @@ async def test_poll_ma_metadata_skips_when_state_missing() -> None:
 
 async def test_poll_ma_metadata_sends_update_payload() -> None:
     """When a proxy state is present the metadata payload is sent."""
-    from homeassistant.components.media_player import MediaPlayerState  # noqa: PLC0415
+    from homeassistant.components.media_player import MediaPlayerState
 
     player = _make_player()
     player._attr_state = MediaPlayerState.PLAYING
@@ -565,7 +557,7 @@ async def test_process_media_id_proxy_method() -> None:
 
 async def test_async_media_play_sends_play_message() -> None:
     """async_media_play emits habitron/play + flips state to PLAYING."""
-    from homeassistant.components.media_player import MediaPlayerState  # noqa: PLC0415
+    from homeassistant.components.media_player import MediaPlayerState
 
     player = _make_player()
     player.async_write_ha_state = MagicMock()
@@ -576,7 +568,7 @@ async def test_async_media_play_sends_play_message() -> None:
 
 async def test_async_media_pause_sends_pause_message() -> None:
     """async_media_pause emits habitron/pause + flips state to PAUSED."""
-    from homeassistant.components.media_player import MediaPlayerState  # noqa: PLC0415
+    from homeassistant.components.media_player import MediaPlayerState
 
     player = _make_player()
     player.async_write_ha_state = MagicMock()
@@ -586,7 +578,7 @@ async def test_async_media_pause_sends_pause_message() -> None:
 
 async def test_async_media_stop_clears_queue_and_goes_idle() -> None:
     """async_media_stop clears state and goes IDLE (unless force_client_stop)."""
-    from homeassistant.components.media_player import MediaPlayerState  # noqa: PLC0415
+    from homeassistant.components.media_player import MediaPlayerState
 
     player = _make_player()
     player.async_write_ha_state = MagicMock()
@@ -598,7 +590,7 @@ async def test_async_media_stop_clears_queue_and_goes_idle() -> None:
 
 async def test_async_media_stop_force_keeps_state() -> None:
     """``force_client_stop=True`` keeps the current state unchanged."""
-    from homeassistant.components.media_player import MediaPlayerState  # noqa: PLC0415
+    from homeassistant.components.media_player import MediaPlayerState
 
     player = _make_player()
     player._attr_state = MediaPlayerState.PLAYING
@@ -759,7 +751,7 @@ async def test_async_mute_volume_unmute_restores_pre_mute() -> None:
 
 async def test_async_turn_on_changes_state_from_off_to_idle() -> None:
     """Turn on switches state to IDLE when previously OFF."""
-    from homeassistant.components.media_player import MediaPlayerState  # noqa: PLC0415
+    from homeassistant.components.media_player import MediaPlayerState
 
     player = _make_player()
     player.async_write_ha_state = MagicMock()
@@ -769,7 +761,7 @@ async def test_async_turn_on_changes_state_from_off_to_idle() -> None:
 
 async def test_async_turn_on_keeps_state_when_already_on() -> None:
     """When the player is already on (e.g., PLAYING), turn_on keeps the state."""
-    from homeassistant.components.media_player import MediaPlayerState  # noqa: PLC0415
+    from homeassistant.components.media_player import MediaPlayerState
 
     player = _make_player()
     player._attr_state = MediaPlayerState.PLAYING
@@ -780,7 +772,7 @@ async def test_async_turn_on_keeps_state_when_already_on() -> None:
 
 async def test_async_turn_off_clears_queue_and_state() -> None:
     """Turn off clears queue/history and switches state to OFF."""
-    from homeassistant.components.media_player import MediaPlayerState  # noqa: PLC0415
+    from homeassistant.components.media_player import MediaPlayerState
 
     player = _make_player()
     player._queue.append(QueueItem("a", "music", "u", {}))
@@ -829,7 +821,7 @@ async def test_async_fetch_image_non_200_returns_none() -> None:
 
 async def test_async_fetch_image_client_error_returns_none() -> None:
     """A ClientError during fetch returns (None, None)."""
-    from aiohttp import ClientError  # noqa: PLC0415
+    from aiohttp import ClientError
 
     player = _make_player()
     session = MagicMock()
@@ -864,7 +856,7 @@ async def test_async_get_browse_image_delegates_to_fetch_image() -> None:
 
 def test_update_from_client_known_state() -> None:
     """A valid lowercase state string maps to the matching MediaPlayerState."""
-    from homeassistant.components.media_player import MediaPlayerState  # noqa: PLC0415
+    from homeassistant.components.media_player import MediaPlayerState
 
     player = _make_player()
     player.async_write_ha_state = MagicMock()
@@ -874,7 +866,7 @@ def test_update_from_client_known_state() -> None:
 
 def test_update_from_client_error_state_maps_to_idle() -> None:
     """A client ``error`` state degrades to IDLE."""
-    from homeassistant.components.media_player import MediaPlayerState  # noqa: PLC0415
+    from homeassistant.components.media_player import MediaPlayerState
 
     player = _make_player()
     player.async_write_ha_state = MagicMock()
@@ -884,7 +876,7 @@ def test_update_from_client_error_state_maps_to_idle() -> None:
 
 def test_update_from_client_unknown_state_maps_to_idle() -> None:
     """An unknown state string also degrades to IDLE."""
-    from homeassistant.components.media_player import MediaPlayerState  # noqa: PLC0415
+    from homeassistant.components.media_player import MediaPlayerState
 
     player = _make_player()
     player.async_write_ha_state = MagicMock()

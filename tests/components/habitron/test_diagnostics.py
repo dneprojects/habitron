@@ -3,8 +3,6 @@
 from datetime import timedelta
 from unittest.mock import MagicMock
 
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.const import DOMAIN
@@ -12,6 +10,8 @@ from custom_components.habitron.diagnostics import (
     async_get_config_entry_diagnostics,
     async_get_device_diagnostics,
 )
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 
 from .const import MOCK_HWTYPE, MOCK_NAME, MOCK_UID, MOCK_VERSION
 

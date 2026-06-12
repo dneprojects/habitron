@@ -2,7 +2,6 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.number import (
@@ -10,6 +9,7 @@ from custom_components.habitron.number import (
     HbtnSetTemperature,
     async_setup_entry,
 )
+from homeassistant.core import HomeAssistant
 
 from .conftest import class_attr
 

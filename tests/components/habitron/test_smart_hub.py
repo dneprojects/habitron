@@ -246,7 +246,7 @@ async def test_reboot_forwards_to_comm(smart_hub_stub: SmartHub) -> None:
 
 def test_async_register_forwards_system_health_info() -> None:
     """``async_register`` wires ``system_health_info`` into the registration helper."""
-    from custom_components.habitron.system_health import (  # noqa: PLC0415
+    from custom_components.habitron.system_health import (
         async_register,
         system_health_info,
     )

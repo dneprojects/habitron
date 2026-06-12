@@ -207,7 +207,7 @@ def _make_camera_with_stream(source: str | None = "habitron://touch_1") -> Magic
 
 async def test_async_handle_webrtc_offer_raises_when_stream_source_missing() -> None:
     """A camera without a stream source raises HomeAssistantError."""
-    from homeassistant.exceptions import HomeAssistantError  # noqa: PLC0415
+    from homeassistant.exceptions import HomeAssistantError
 
     provider = _make_provider()
     camera = _make_camera_with_stream(source=None)
@@ -220,7 +220,7 @@ async def test_async_handle_webrtc_offer_raises_when_stream_source_missing() -> 
 
 async def test_async_handle_webrtc_offer_sends_empty_answer_when_no_client() -> None:
     """No active client → an empty WebRTCAnswer is sent and the flow returns."""
-    from homeassistant.components.camera import WebRTCAnswer  # noqa: PLC0415
+    from homeassistant.components.camera import WebRTCAnswer
 
     provider = _make_provider()
     camera = _make_camera_with_stream()
@@ -235,7 +235,7 @@ async def test_async_handle_webrtc_offer_sends_empty_answer_when_no_client() -> 
 
 async def test_async_handle_webrtc_offer_negotiates_successfully() -> None:
     """A successful offer/answer roundtrip ends with a WebRTCAnswer for HA."""
-    from homeassistant.components.camera import WebRTCAnswer  # noqa: PLC0415
+    from homeassistant.components.camera import WebRTCAnswer
 
     provider = _make_provider()
     conn = MagicMock()
@@ -267,7 +267,7 @@ async def test_async_handle_webrtc_offer_negotiates_successfully() -> None:
 
 async def test_async_handle_webrtc_offer_timeout_sends_error() -> None:
     """When the client does not answer in time a WebRTCError is sent."""
-    from homeassistant.components.camera import WebRTCError  # noqa: PLC0415
+    from homeassistant.components.camera import WebRTCError
 
     provider = _make_provider()
     provider.active_ws_connections["touch_1"] = MagicMock()
@@ -321,8 +321,8 @@ async def test_async_handle_webrtc_offer_drains_pending_candidates() -> None:
 
 async def test_async_handle_webrtc_offer_wraps_inner_exception() -> None:
     """Any other exception during negotiation is wrapped in HomeAssistantError."""
-    from homeassistant.components.camera import WebRTCError  # noqa: PLC0415
-    from homeassistant.exceptions import HomeAssistantError  # noqa: PLC0415
+    from homeassistant.components.camera import WebRTCError
+    from homeassistant.exceptions import HomeAssistantError
 
     provider = _make_provider()
     provider.active_ws_connections["touch_1"] = MagicMock()
@@ -396,7 +396,7 @@ async def test_async_take_snapshot_returns_decoded_bytes() -> None:
 
 async def test_async_take_snapshot_raises_when_no_client() -> None:
     """No active client → ``async_take_snapshot`` raises HomeAssistantError."""
-    from homeassistant.exceptions import HomeAssistantError  # noqa: PLC0415
+    from homeassistant.exceptions import HomeAssistantError
 
     provider = _make_provider()
     with pytest.raises(HomeAssistantError):
@@ -405,7 +405,7 @@ async def test_async_take_snapshot_raises_when_no_client() -> None:
 
 async def test_async_take_snapshot_raises_on_timeout() -> None:
     """A timeout while waiting for the client raises HomeAssistantError."""
-    from homeassistant.exceptions import HomeAssistantError  # noqa: PLC0415
+    from homeassistant.exceptions import HomeAssistantError
 
     provider = _make_provider()
     provider.active_ws_connections["touch_1"] = MagicMock()

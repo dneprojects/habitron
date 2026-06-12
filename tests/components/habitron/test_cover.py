@@ -3,11 +3,11 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from homeassistant.components.cover import CoverDeviceClass
-from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.cover import HbtnBlind, HbtnShutter, async_setup_entry
+from homeassistant.components.cover import CoverDeviceClass
+from homeassistant.core import HomeAssistant
 
 from .conftest import class_attr
 

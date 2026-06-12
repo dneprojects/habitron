@@ -4,7 +4,6 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.router import HbtnRouter
@@ -13,6 +12,7 @@ from custom_components.habitron.update import (
     SCTouchAppUpdate,
     async_setup_entry,
 )
+from homeassistant.core import HomeAssistant
 
 from .conftest import class_attr
 
@@ -373,7 +373,7 @@ async def test_sc_touch_async_install_sends_ws_payload() -> None:
 
 async def test_sc_touch_async_install_raises_without_version() -> None:
     """Calling install before a latest version is known raises HomeAssistantError."""
-    from homeassistant.exceptions import HomeAssistantError  # noqa: PLC0415
+    from homeassistant.exceptions import HomeAssistantError
 
     rt = _make_router_with_smhub()
     app = _make_app(rt=rt)
@@ -384,7 +384,7 @@ async def test_sc_touch_async_install_raises_without_version() -> None:
 
 async def test_sc_touch_async_install_raises_when_client_not_connected() -> None:
     """No connected client → HomeAssistantError before any file work happens."""
-    from homeassistant.exceptions import HomeAssistantError  # noqa: PLC0415
+    from homeassistant.exceptions import HomeAssistantError
 
     rt = _make_router_with_smhub()
     app = _make_app(rt=rt)
@@ -398,7 +398,7 @@ async def test_sc_touch_async_install_raises_when_client_not_connected() -> None
 
 async def test_sc_touch_async_install_raises_when_hash_fails() -> None:
     """A hash helper that returns (None, None) raises HomeAssistantError."""
-    from homeassistant.exceptions import HomeAssistantError  # noqa: PLC0415
+    from homeassistant.exceptions import HomeAssistantError
 
     rt = _make_router_with_smhub()
     app = _make_app(rt=rt)

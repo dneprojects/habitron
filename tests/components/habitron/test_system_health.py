@@ -2,9 +2,8 @@
 
 from unittest.mock import MagicMock
 
-from homeassistant.core import HomeAssistant
-
 from custom_components.habitron.system_health import system_health_info
+from homeassistant.core import HomeAssistant
 
 
 def _patch_integration_manifest(hass: HomeAssistant, version: str) -> None:

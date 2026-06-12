@@ -3,9 +3,6 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ServiceValidationError
-from homeassistant.helpers import device_registry as dr
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.const import DOMAIN
@@ -23,6 +20,9 @@ from custom_components.habitron.services import (
     SERVICE_UPDATE_ENTITY,
     _primary_hub,
 )
+from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
+from homeassistant.helpers import device_registry as dr
 
 ALL_SERVICE_NAMES = (
     SERVICE_HUB_RESTART,
@@ -461,9 +461,7 @@ async def test_sc_system_command_raises_when_no_hubs_loaded(
     We register the services manually since there is no SmartHub entry to
     drive ``async_setup_entry``.
     """
-    from custom_components.habitron.services import (
-        async_setup_services,  # noqa: PLC0415
-    )
+    from custom_components.habitron.services import async_setup_services
 
     async_setup_services(hass)
     with pytest.raises(ServiceValidationError) as err:
