@@ -1,5 +1,13 @@
 # Latest changes
 
+## v2.10.0
+
+### New feature
+- Each display module (incl. Smart Touch) gets a `text` entity — set its value to show free text on the module display, empty clears it.
+
+### Breaking
+- The per-module display notify entity (`notify.<module>_messages`) is replaced by that `text` entity; GSM/SMS notify is unchanged.
+
 ## v2.9.0
 
 Restores free-text notify messages to modules; requires habitron_client 1.0.4.

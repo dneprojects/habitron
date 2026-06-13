@@ -60,7 +60,8 @@ The integration covers every Habitron entity domain Home Assistant offers, excep
 - **select**: per-group daytime / alarm / group-mode, log-level
 - **climate**: per Smart Controller climate group, target-temperature + system-OK readback
 - **button**: hub-restart, hub-reboot, module-reset, restart forward table, reset-all-modules, restart-hub, reboot-hub, count up/down, power-cycle router channels, voice-input trigger, collective / direct / visualisation commands
-- **notify**: per-module text messages and per-GSM-number SMS targets
+- **text**: per-module display — set free text on the module screen (incl. Smart Touch); empty clears it
+- **notify**: per-GSM-number SMS targets
 - **media_player**: SC Touch audio playback queue with TTS resolution, group seek, history and volume control
 - **assist_satellite**: SC Touch microphone as an HA Assist satellite (STT, pipeline routing, TTS playback)
 - **camera**: SC Touch front camera over WebRTC
