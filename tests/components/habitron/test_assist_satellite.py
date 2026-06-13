@@ -6,8 +6,13 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.assist_satellite import HbtnAssistSat, async_setup_entry
 from custom_components.habitron.module import SmartController
-from homeassistant.components.assist_pipeline.pipeline import PipelineEventType
-from homeassistant.components.assist_satellite.entity import AssistSatelliteState
+from homeassistant.components.assist_pipeline import PipelineEventType
+
+# AssistSatelliteState is only exposed on the .entity module, mirroring the
+# integration source's own import.
+from homeassistant.components.assist_satellite.entity import (  # pylint: disable=home-assistant-component-root-import
+    AssistSatelliteState,
+)
 from homeassistant.core import HomeAssistant
 
 
@@ -35,7 +40,7 @@ def _make_provider() -> MagicMock:
     return p
 
 
-def _make_sat(hass: object | None = None) -> HbtnAssistSat:
+def _make_sat(hass: HomeAssistant | None = None) -> HbtnAssistSat:
     """Construct an HbtnAssistSat with all dependencies stubbed."""
     fake_hass = hass if hass is not None else MagicMock()
     sat = HbtnAssistSat(fake_hass, _make_touch_module(), _make_provider())
@@ -251,7 +256,7 @@ async def test_async_setup_entry_creates_satellite_per_touch_module(
     entry.runtime_data = smhub
 
     added: list = []
-    await async_setup_entry(hass, entry, added.extend)
+    await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
     assert len(added) == 1
     assert isinstance(added[0], HbtnAssistSat)
     assert provider.assist_satellites["touch_1_5"] is added[0]
@@ -270,5 +275,5 @@ async def test_async_setup_entry_short_circuits_without_provider(
     entry.runtime_data = smhub
 
     added: list = []
-    await async_setup_entry(hass, entry, added.extend)
+    await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
     assert added == []

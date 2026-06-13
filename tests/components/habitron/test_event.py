@@ -321,7 +321,7 @@ async def test_async_setup_entry_iterates_modules(hass: HomeAssistant) -> None:
         registry = MagicMock()
         registry.async_get_entity_id = MagicMock(return_value="event.fake")
         mock_get.return_value = registry
-        await async_setup_entry(hass, entry, _add)
+        await async_setup_entry(hass, entry, _add)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
 
     assert any(isinstance(e, InputPressed) for e in added)
     assert any(isinstance(e, FingerDetected) for e in added)
@@ -361,7 +361,7 @@ async def test_async_setup_entry_with_area_member_skips_area_update(
         registry = MagicMock()
         registry.async_get_entity_id = MagicMock(return_value="event.fake")
         mock_get.return_value = registry
-        await async_setup_entry(hass, entry, added.extend)
+        await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
 
     # default-area path called async_update_entity with area_id=None
     registry.async_update_entity.assert_called_with("event.fake", area_id=None)
@@ -399,7 +399,7 @@ async def test_async_setup_entry_external_area_assigns_area_id(
         registry = MagicMock()
         registry.async_get_entity_id = MagicMock(return_value="event.fake")
         mock_get.return_value = registry
-        await async_setup_entry(hass, entry, lambda es: None)
+        await async_setup_entry(hass, entry, lambda es: None)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
 
     registry.async_update_entity.assert_called_with("event.fake", area_id="area_2_id")
 
@@ -434,6 +434,6 @@ async def test_async_setup_entry_skips_missing_registry_entry(
         registry = MagicMock()
         registry.async_get_entity_id = MagicMock(return_value=None)
         mock_get.return_value = registry
-        await async_setup_entry(hass, entry, lambda es: None)
+        await async_setup_entry(hass, entry, lambda es: None)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
 
     registry.async_update_entity.assert_not_called()

@@ -178,7 +178,7 @@ async def test_async_setup_entry_adds_temperature_and_analog(
         registry = MagicMock()
         registry.async_get_entity_id = MagicMock(return_value="number.fake")
         mock_get.return_value = registry
-        await async_setup_entry(hass, entry, added.extend)
+        await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
 
     assert any(isinstance(e, HbtnSetTemperature) for e in added)
     assert any(isinstance(e, HbtnAnalogOutput) for e in added)
@@ -209,6 +209,6 @@ async def test_async_setup_entry_external_area_assigns_id(hass: HomeAssistant) -
         registry = MagicMock()
         registry.async_get_entity_id = MagicMock(return_value="number.fake")
         mock_get.return_value = registry
-        await async_setup_entry(hass, entry, lambda es: None)
+        await async_setup_entry(hass, entry, lambda es: None)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
 
     registry.async_update_entity.assert_called_with("number.fake", area_id="area_5_id")

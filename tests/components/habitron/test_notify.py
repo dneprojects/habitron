@@ -134,7 +134,7 @@ async def test_async_setup_entry_emits_message_for_smart_controllers(
     entry.runtime_data.router = router
 
     added: list = []
-    await async_setup_entry(hass, entry, added.extend)
+    await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
     assert any(isinstance(e, HbtnMessage) for e in added)
 
 
@@ -162,7 +162,7 @@ async def test_async_setup_entry_emits_gsm_message_for_gsm_module(
     entry.runtime_data.router = router
 
     added: list = []
-    await async_setup_entry(hass, entry, added.extend)
+    await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
     assert any(isinstance(e, HbtnGSMMessage) for e in added)
 
 
@@ -180,5 +180,5 @@ async def test_async_setup_entry_skips_other_modules(hass: HomeAssistant) -> Non
     entry.runtime_data.router = router
 
     added: list = []
-    await async_setup_entry(hass, entry, added.extend)
+    await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
     assert added == []

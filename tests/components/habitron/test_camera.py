@@ -178,7 +178,7 @@ async def test_async_setup_entry_adds_camera_for_touch_module(
     entry.runtime_data = smhub
 
     added: list = []
-    await async_setup_entry(hass, entry, added.extend)
+    await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
     assert len(added) == 1
     assert isinstance(added[0], HbtnCam)
 
@@ -196,7 +196,7 @@ async def test_async_setup_entry_short_circuits_without_provider(
     entry.runtime_data = smhub
 
     added: list = []
-    await async_setup_entry(hass, entry, added.extend)
+    await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
     assert added == []
 
 
@@ -214,5 +214,5 @@ async def test_async_setup_entry_logs_when_no_touch_modules(
     entry.runtime_data = smhub
 
     added: list = []
-    await async_setup_entry(hass, entry, added.extend)
+    await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
     assert added == []

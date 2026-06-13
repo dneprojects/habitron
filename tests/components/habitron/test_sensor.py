@@ -820,7 +820,7 @@ async def test_async_setup_entry_emits_all_sensor_types(hass: HomeAssistant) -> 
         registry = MagicMock()
         registry.async_get_entity_id = MagicMock(return_value="sensor.fake")
         mock_get.return_value = registry
-        await async_setup_entry(hass, entry, added.extend)
+        await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
 
     assert any(isinstance(e, PercSensor) for e in added)
     assert any(isinstance(e, TemperatureDSensor) for e in added)
@@ -876,7 +876,7 @@ async def test_async_setup_entry_analog_area_assignment_external(
         registry = MagicMock()
         registry.async_get_entity_id = MagicMock(return_value="sensor.fake")
         mock_get.return_value = registry
-        await async_setup_entry(hass, entry, lambda es: None)
+        await async_setup_entry(hass, entry, lambda es: None)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
 
     registry.async_update_entity.assert_called_with("sensor.fake", area_id="area_5_id")
 
@@ -920,6 +920,6 @@ async def test_async_setup_entry_analog_area_overflow_falls_back(
         registry = MagicMock()
         registry.async_get_entity_id = MagicMock(return_value="sensor.fake")
         mock_get.return_value = registry
-        await async_setup_entry(hass, entry, lambda es: None)
+        await async_setup_entry(hass, entry, lambda es: None)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
 
     registry.async_update_entity.assert_called_with("sensor.fake", area_id=None)

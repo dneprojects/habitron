@@ -325,7 +325,7 @@ async def test_climate_async_setup_entry_creates_first_and_second(
     entry.runtime_data.router = router
 
     added: list = []
-    await async_setup_entry(hass, entry, added.extend)
+    await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
     assert len(added) == 2
     entry.async_on_unload.assert_called()
 
@@ -343,7 +343,7 @@ async def test_climate_async_setup_entry_smart_sensor_path(hass: HomeAssistant) 
     entry.runtime_data.router = router
 
     added: list = []
-    await async_setup_entry(hass, entry, added.extend)
+    await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
     assert len(added) == 1
 
 
@@ -361,7 +361,7 @@ async def test_climate_async_setup_entry_skips_non_matching_module(
     entry.runtime_data.router = router
 
     added: list = []
-    await async_setup_entry(hass, entry, added.extend)
+    await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
     assert added == []
 
 
@@ -386,7 +386,7 @@ async def test_climate_async_setup_entry_dual_mode_enable_logic_enables(
         listener_holder.append(cb) or (lambda: None)
     )
 
-    await async_setup_entry(hass, entry, lambda es: None)
+    await async_setup_entry(hass, entry, lambda es: None)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
     assert listener_holder, "Expected a coordinator listener to be registered"
 
     # Patch registry → simulate disabled entry
@@ -425,7 +425,7 @@ async def test_climate_async_setup_entry_single_mode_disables(
         listener_holder.append(cb) or (lambda: None)
     )
 
-    await async_setup_entry(hass, entry, lambda es: None)
+    await async_setup_entry(hass, entry, lambda es: None)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
 
     registry = MagicMock()
     entry_reg = MagicMock()

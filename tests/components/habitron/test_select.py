@@ -319,7 +319,7 @@ async def test_select_async_setup_entry_creates_entities(hass: HomeAssistant) ->
     entry.runtime_data.router = rt
 
     added: list = []
-    await async_setup_entry(hass, entry, added.extend)
+    await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
     # 2 SC modules × 3 entities + 3 router-level + 1 logging = 10  # noqa: RUF003
     assert len(added) == 10
     assert any(isinstance(e, HbtnSelectLoggingLevel) for e in added)
