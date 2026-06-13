@@ -209,6 +209,11 @@
           }
         }
       }
+    },
+    "text": {
+      "message": {
+        "name": "Meldung"
+      }
     }
   },
   "services": {
