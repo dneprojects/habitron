@@ -299,7 +299,7 @@ async def test_run_voice_pipeline_tts_streaming_exception_is_logged() -> None:
     class _FailStream:
         async def async_stream_result(self):
             raise RuntimeError("stream broke")
-            yield b""
+            yield b""  # pylint: disable=unreachable
 
     spawned: list = []
     provider.hass.async_create_task = MagicMock(

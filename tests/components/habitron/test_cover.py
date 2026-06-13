@@ -583,7 +583,7 @@ async def test_async_setup_entry_builds_shutter_and_blind(hass: HomeAssistant) -
         registry = MagicMock()
         registry.async_get_entity_id = MagicMock(return_value="cover.fake")
         mock_get.return_value = registry
-        await async_setup_entry(hass, entry, added.extend)
+        await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
 
     assert any(isinstance(e, HbtnShutter) for e in added)
     assert any(isinstance(e, HbtnBlind) for e in added)
@@ -617,7 +617,7 @@ async def test_async_setup_entry_assigns_external_area(hass: HomeAssistant) -> N
         registry = MagicMock()
         registry.async_get_entity_id = MagicMock(return_value="cover.fake")
         mock_get.return_value = registry
-        await async_setup_entry(hass, entry, lambda es: None)
+        await async_setup_entry(hass, entry, lambda es: None)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
 
     registry.async_update_entity.assert_called_with("cover.fake", area_id="area_1_id")
 
@@ -649,6 +649,6 @@ async def test_async_setup_entry_area_overflow_falls_back_to_zero(
         registry = MagicMock()
         registry.async_get_entity_id = MagicMock(return_value="cover.fake")
         mock_get.return_value = registry
-        await async_setup_entry(hass, entry, lambda es: None)
+        await async_setup_entry(hass, entry, lambda es: None)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
 
     registry.async_update_entity.assert_called_with("cover.fake", area_id=None)

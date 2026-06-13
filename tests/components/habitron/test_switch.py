@@ -571,7 +571,7 @@ async def test_async_setup_entry_emits_switch_and_led_and_flag(
         reg_entry.hidden = False
         registry.async_get.return_value = reg_entry
         mock_get.return_value = registry
-        await async_setup_entry(hass, entry, added.extend)
+        await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
 
     assert any(isinstance(e, SwitchedOutputPush) for e in added)
     assert any(isinstance(e, SwitchedLed) for e in added)
@@ -617,7 +617,7 @@ async def test_async_setup_entry_skips_cled_zero_for_rgb(hass: HomeAssistant) ->
         registry = MagicMock()
         registry.async_get_entity_id = MagicMock(return_value=None)
         mock_get.return_value = registry
-        await async_setup_entry(hass, entry, added.extend)
+        await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
 
     # Only one LED added (the red), not the white one
     leds = [e for e in added if isinstance(e, SwitchedLed)]
@@ -657,7 +657,7 @@ async def test_async_setup_entry_logs_warning_when_entity_not_found(
         registry = MagicMock()
         registry.async_get_entity_id = MagicMock(return_value=None)
         mock_get.return_value = registry
-        await async_setup_entry(hass, entry, lambda es: None)
+        await async_setup_entry(hass, entry, lambda es: None)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
 
 
 async def test_async_setup_entry_external_area_with_hidden_entity_alias(
@@ -708,7 +708,7 @@ async def test_async_setup_entry_external_area_with_hidden_entity_alias(
             "custom_components.habitron.switch.er.async_entries_for_device",
             return_value=[alias_entry],
         ):
-            await async_setup_entry(hass, entry, lambda es: None)
+            await async_setup_entry(hass, entry, lambda es: None)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
 
     # The alias entity must have been moved into the area too.
     registry.async_update_entity.assert_any_call("switch.alias", area_id="area_5_id")
@@ -750,7 +750,7 @@ async def test_async_setup_entry_area_overflow_falls_back_to_zero(
         reg_entry.hidden = False
         registry.async_get.return_value = reg_entry
         mock_get.return_value = registry
-        await async_setup_entry(hass, entry, lambda es: None)
+        await async_setup_entry(hass, entry, lambda es: None)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
 
     registry.async_update_entity.assert_called_with("switch.fake", area_id=None)
 
@@ -800,7 +800,7 @@ async def test_async_setup_entry_external_area_for_hidden_alias_zero_area(
             "custom_components.habitron.switch.er.async_entries_for_device",
             return_value=[alias_entry],
         ):
-            await async_setup_entry(hass, entry, lambda es: None)
+            await async_setup_entry(hass, entry, lambda es: None)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
 
     registry.async_update_entity.assert_any_call("switch.alias", area_id=None)
 
@@ -837,6 +837,6 @@ async def test_async_setup_entry_skips_non_standard_outputs(
         registry = MagicMock()
         registry.async_get_entity_id = MagicMock(return_value="switch.fake")
         mock_get.return_value = registry
-        await async_setup_entry(hass, entry, lambda es: None)
+        await async_setup_entry(hass, entry, lambda es: None)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
     # No update happened (the loop hit the else branch)
     registry.async_update_entity.assert_not_called()

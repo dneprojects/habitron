@@ -404,7 +404,7 @@ async def test_async_setup_entry_emits_button_set(hass: HomeAssistant) -> None:
     entry.runtime_data.router = router
 
     added: list = []
-    await async_setup_entry(hass, entry, added.extend)
+    await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
     assert any(isinstance(e, DirCmdButton) for e in added)
     assert any(isinstance(e, VisCmdButton) for e in added)
     assert any(isinstance(e, CountUpButton) for e in added)

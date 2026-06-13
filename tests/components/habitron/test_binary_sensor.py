@@ -384,7 +384,7 @@ async def test_async_setup_entry_creates_all_entity_types(hass: HomeAssistant) -
         registry = MagicMock()
         registry.async_get_entity_id = MagicMock(return_value="binary_sensor.fake")
         mock_get.return_value = registry
-        await async_setup_entry(hass, entry, added.extend)
+        await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
 
     assert any(isinstance(e, InputSwitchPush) for e in added)
     assert any(isinstance(e, MotionSensorPush) for e in added)
@@ -427,7 +427,7 @@ async def test_async_setup_entry_assigns_area_when_input_area_differs(
         registry = MagicMock()
         registry.async_get_entity_id = MagicMock(return_value="binary_sensor.fake")
         mock_get.return_value = registry
-        await async_setup_entry(hass, entry, lambda es: None)
+        await async_setup_entry(hass, entry, lambda es: None)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
 
     registry.async_update_entity.assert_called_with(
         "binary_sensor.fake", area_id="area_5_id"

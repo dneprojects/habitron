@@ -105,7 +105,7 @@ async def test_async_setup_entry_emits_router_module_and_touch_app(
     entry.runtime_data.router = rt
 
     added: list = []
-    await async_setup_entry(hass, entry, added.extend)
+    await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
 
     # 1 router + 2 modules + 1 SCTouchAppUpdate for the Touch
     assert len(added) == 4
@@ -121,7 +121,7 @@ async def test_async_setup_entry_skips_apk_for_non_touch(hass: HomeAssistant) ->
     entry.runtime_data.router = rt
 
     added: list = []
-    await async_setup_entry(hass, entry, added.extend)
+    await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
     # router + module = 2; no SCTouchAppUpdate
     assert sum(isinstance(e, SCTouchAppUpdate) for e in added) == 0
 

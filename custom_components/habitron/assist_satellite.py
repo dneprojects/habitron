@@ -3,10 +3,7 @@
 import asyncio
 import logging
 
-from homeassistant.components.assist_pipeline.pipeline import (
-    PipelineEvent,
-    PipelineEventType,
-)
+from homeassistant.components.assist_pipeline import PipelineEvent, PipelineEventType
 from homeassistant.components.assist_satellite import (
     AssistSatelliteAnnouncement,
     AssistSatelliteConfiguration,
@@ -14,7 +11,9 @@ from homeassistant.components.assist_satellite import (
     AssistSatelliteEntityFeature,
     AssistSatelliteWakeWord,
 )
-from homeassistant.components.assist_satellite.entity import AssistSatelliteState
+from homeassistant.components.assist_satellite.entity import (  # pylint: disable=home-assistant-component-root-import
+    AssistSatelliteState,
+)
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
