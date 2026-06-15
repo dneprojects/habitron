@@ -58,7 +58,7 @@ async def test_config_entry_diagnostics(
 
     assert info["router"]["module_count"] == 1
     assert info["coordinator"]["update_interval_seconds"] == 5
-    assert info["coordinator"]["always_update"] is True
+    assert info["coordinator"]["always_update"] is False
 
     assert len(info["modules"]) == 1
     assert info["modules"][0]["uid"] == "MOD-1"
