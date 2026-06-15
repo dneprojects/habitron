@@ -34,6 +34,21 @@ PARALLEL_UPDATES = 1
 
 _LOGGER = logging.getLogger(__name__)
 
+
+class _RoundRobin:
+    """Shared rotating counter so only one firmware entity polls per cycle.
+
+    All ``HbtnModuleUpdate`` entities of one router share an instance. Each
+    poll cycle the lead entity (index 0) advances ``tick`` once; every entity
+    only performs its bus read when ``tick % total == its index``. This turns
+    the per-cycle burst of N serial firmware reads into one read per cycle.
+    """
+
+    def __init__(self, total: int) -> None:
+        """Initialize with the number of participating entities."""
+        self.tick = -1
+        self.total = total
+
 # URL prefix under which we expose the firmware directory via HA's
 # static-path serving. The Touch panel app downloads APKs from there
 # directly — no copy into ``<config>/www/`` necessary.
@@ -63,6 +78,11 @@ async def async_setup_entry(
             new_devices.append(SCTouchAppUpdate(hbt_module, hbtn_rt))
 
     if new_devices:
+        # Wire up round-robin firmware polling across the module update entities.
+        fw_entities = [d for d in new_devices if isinstance(d, HbtnModuleUpdate)]
+        round_robin = _RoundRobin(len(fw_entities))
+        for index, fw_entity in enumerate(fw_entities):
+            fw_entity.set_round_robin(round_robin, index)
         async_add_entities(new_devices)
 
 
@@ -340,6 +360,14 @@ class HbtnModuleUpdate(CoordinatorEntity[DataUpdateCoordinator[bytes]], UpdateEn
         self._module: HbtnModule | HbtnRouter = module
         self._attr_unique_id = f"Mod_{self._module.uid}_update"
         self.flash_in_progress = False
+        self._round_robin: _RoundRobin | None = None
+        self._round_robin_index = 0
+        self._initialized = False
+
+    def set_round_robin(self, round_robin: _RoundRobin, index: int) -> None:
+        """Join the shared round-robin firmware polling rotation."""
+        self._round_robin = round_robin
+        self._round_robin_index = index
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -376,7 +404,26 @@ class HbtnModuleUpdate(CoordinatorEntity[DataUpdateCoordinator[bytes]], UpdateEn
         await self.async_update()
 
     async def async_update(self) -> None:
-        """Update version data from bus."""
+        """Poll firmware version, round-robin so one module reads per cycle.
+
+        The first refresh after the entity is added always reads (so the
+        version shows up immediately). Subsequent periodic polls only read on
+        the entity's turn, turning the per-cycle burst of N serial bus reads
+        into a single read per cycle.
+        """
+        if not self._initialized:
+            self._initialized = True
+        elif self._round_robin is not None:
+            if self._round_robin_index == 0:
+                self._round_robin.tick += 1
+            if self._round_robin.tick % self._round_robin.total != (
+                self._round_robin_index
+            ):
+                return
+        await self._read_firmware()
+
+    async def _read_firmware(self) -> None:
+        """Read installed/latest firmware version from the bus."""
         try:
             if isinstance(self._module, HbtnRouter):
                 await self._module.get_definitions()

@@ -10,6 +10,7 @@ from custom_components.habitron.router import HbtnRouter
 from custom_components.habitron.update import (
     HbtnModuleUpdate,
     SCTouchAppUpdate,
+    _RoundRobin,
     async_setup_entry,
 )
 from homeassistant.core import HomeAssistant
@@ -526,3 +527,27 @@ async def test_hbtn_module_update_async_update_single_line_response() -> None:
     await entity.async_update()
     # _attr_latest_version unset (no attribute) — not written
     entity.async_write_ha_state.assert_not_called()
+
+
+async def test_hbtn_module_update_round_robin_polls_one_per_cycle() -> None:
+    """Only one firmware entity reads the bus per poll cycle (round-robin)."""
+    round_robin = _RoundRobin(3)
+    entities = [_make_module_update() for _ in range(3)]
+    for index, entity in enumerate(entities):
+        entity.set_round_robin(round_robin, index)
+        entity._read_firmware = AsyncMock()
+        entity._initialized = True  # skip the immediate first-read path
+
+    for expected in ([1, 0, 0], [1, 1, 0], [1, 1, 1]):
+        for entity in entities:
+            await entity.async_update()
+        assert [e._read_firmware.await_count for e in entities] == expected
+
+
+async def test_hbtn_module_update_first_poll_always_reads() -> None:
+    """The first poll after add reads immediately, even out of turn."""
+    entity = _make_module_update()
+    entity.set_round_robin(_RoundRobin(3), 2)  # not the lead, not turn 0
+    entity._read_firmware = AsyncMock()
+    await entity.async_update()
+    entity._read_firmware.assert_awaited_once()
