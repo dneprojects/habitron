@@ -210,11 +210,7 @@ class HbtnComm:
             is_addon=self.is_addon,
             version=self._hbtn_version,
         )
-        self.logger.warning(
-            "Sent network info to hub (ip and token) - ip: %s - token: %s",
-            self._network_ip,
-            tok,
-        )
+        self.logger.debug("Sent network info to hub - ip: %s", self._network_ip)
 
     async def reinit_hub(self, mode: int) -> bytes:
         """Restart event server on hub."""
