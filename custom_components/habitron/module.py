@@ -286,6 +286,10 @@ class HbtnModule:
                 pass
             elif arg_code in range(18, 26):
                 self._set_led_label(arg_code, text)
+            elif arg_code in range(26, 30):
+                # Four colored corner LEDs of the Smart Controller Touch;
+                # cleds[0] is the ambient LED, cleds[1..4] the corners.
+                self.cleds[arg_code - 25].name = text
             elif arg_code in range(40, 50):
                 self._set_input_label(arg_code, text, line)
             elif arg_code in range(50, 52):
@@ -312,8 +316,14 @@ class HbtnModule:
                 )
             else:
                 # Description of outputs
-                self.outputs[arg_code - 60].name = text
-                self.outputs[arg_code - 60].area = line[1]
+                out_idx = arg_code - 60
+                if 0 <= out_idx < len(self.outputs):
+                    self.outputs[out_idx].name = text
+                    self.outputs[out_idx].area = line[1]
+                else:
+                    self.logger.debug(
+                        "Ignoring label with unmapped arg_code %s: %s", arg_code, text
+                    )
         except Exception as err_msg:  # noqa: BLE001
             self.logger.warning("Error processing line '%s': %s", line, err_msg)
 
