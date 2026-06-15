@@ -1,5 +1,10 @@
 # Latest changes
 
+## v2.10.2
+
+### Fixed
+- Transient bus timeouts are handled cleanly instead of logging an error traceback.
+
 ## v2.10.1
 
 ### Fixed
