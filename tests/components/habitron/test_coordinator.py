@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock
 
+from habitron_client import HabitronConnectionError, HabitronTimeoutError
 import pytest
 
 from custom_components.habitron.const import SCAN_INTERVAL
@@ -78,6 +79,30 @@ async def test_coordinator_network_error_raises_update_failed(
     assert exc_info.value.translation_key == "update_network_error"
 
 
+async def test_coordinator_library_timeout_raises_update_failed(
+    hass: HomeAssistant,
+) -> None:
+    """A HabitronTimeoutError from the client maps to ``update_timeout``."""
+    comm = _make_comm(hass)
+    comm.async_system_update.side_effect = HabitronTimeoutError("no response")
+    coord = HbtnCoordinator(hass, MagicMock(), comm)
+    with pytest.raises(UpdateFailed) as exc_info:
+        await coord._async_update_data()
+    assert exc_info.value.translation_key == "update_timeout"
+
+
+async def test_coordinator_library_error_raises_update_failed(
+    hass: HomeAssistant,
+) -> None:
+    """Any other HabitronError maps to ``update_network_error``."""
+    comm = _make_comm(hass)
+    comm.async_system_update.side_effect = HabitronConnectionError("bus down")
+    coord = HbtnCoordinator(hass, MagicMock(), comm)
+    with pytest.raises(UpdateFailed) as exc_info:
+        await coord._async_update_data()
+    assert exc_info.value.translation_key == "update_network_error"
+
+
 # ---------- HbtnFirmwareCoordinator ----------
 
 
@@ -134,5 +159,13 @@ async def test_fw_coordinator_read_error_is_swallowed(hass: HomeAssistant) -> No
     """A bus error during a firmware read does not fail the refresh."""
     comm = _make_fw_comm()
     comm.handle_firmware = AsyncMock(side_effect=OSError("bus"))
+    coord = HbtnFirmwareCoordinator(hass, MagicMock(), comm)
+    assert await coord._async_update_data() == {}  # no raise
+
+
+async def test_fw_coordinator_library_error_is_swallowed(hass: HomeAssistant) -> None:
+    """A client timeout during a firmware read does not fail the refresh."""
+    comm = _make_fw_comm()
+    comm.handle_firmware = AsyncMock(side_effect=HabitronTimeoutError("no response"))
     coord = HbtnFirmwareCoordinator(hass, MagicMock(), comm)
     assert await coord._async_update_data() == {}  # no raise
