@@ -49,6 +49,7 @@ class _RoundRobin:
         self.tick = -1
         self.total = total
 
+
 # URL prefix under which we expose the firmware directory via HA's
 # static-path serving. The Touch panel app downloads APKs from there
 # directly — no copy into ``<config>/www/`` necessary.
@@ -214,17 +215,11 @@ class SCTouchAppUpdate(UpdateEntity):
         legacy_path = base_path / "custom_components" / DOMAIN / "firmware"
         if new_path.is_dir() or not legacy_path.is_dir():
             self.firmware_dir = new_path
-        else:
-            if str(legacy_path) not in _LEGACY_FIRMWARE_WARNED:
-                _LEGACY_FIRMWARE_WARNED.add(str(legacy_path))
-                _LOGGER.warning(
-                    "Reading firmware from legacy location %s; move it to %s — "
-                    "the legacy path will not exist in a Home Assistant Core "
-                    "install of this integration",
-                    legacy_path,
-                    new_path,
-                )
-            self.firmware_dir = legacy_path
+            return
+        self.firmware_dir = legacy_path
+        if str(legacy_path) not in _LEGACY_FIRMWARE_WARNED:
+            _LEGACY_FIRMWARE_WARNED.add(str(legacy_path))
+            _LOGGER.warning("Legacy firmware %s, move to %s", legacy_path, new_path)
 
     async def async_update(self) -> None:
         """Fetch latest state."""
@@ -443,19 +438,13 @@ class HbtnModuleUpdate(CoordinatorEntity[DataUpdateCoordinator[bytes]], UpdateEn
             versions = resp.decode("iso8859-1").split("\n")
             if len(versions) == 2:
                 previous_latest = self._attr_latest_version
-                self._attr_installed_version = versions[0]
-                self._attr_latest_version = versions[1]
-                if self._attr_latest_version not in {
-                    self._attr_installed_version,
-                    previous_latest,
-                }:
-                    # Log once when a new update appears; the UI already shows it.
-                    _LOGGER.info(
-                        "Firmware update available for module %s: %s -> %s",
-                        self._module.name,
-                        self._attr_installed_version,
-                        self._attr_latest_version,
-                    )
+                installed, latest = versions[0], versions[1]
+                self._attr_installed_version = installed
+                self._attr_latest_version = latest
+                name = self._module.name
+                # Log once when a new update appears; the UI already shows it.
+                if latest not in {installed, previous_latest}:
+                    _LOGGER.info("Firmware %s: %s -> %s", name, installed, latest)
                 self.async_write_ha_state()
         except Exception as e:  # noqa: BLE001
             _LOGGER.error(
