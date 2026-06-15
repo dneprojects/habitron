@@ -354,9 +354,6 @@
     "no_hub_loaded": {
       "message": "Habitron-Service aufgerufen, aber kein SmartHub geladen."
     },
-    "hub_not_found": {
-      "message": "Kein Habitron-SmartHub passt zum Host {hub_id}."
-    },
     "websocket_provider_missing": {
       "message": "WebSocket-Provider auf dem SmartHub nicht initialisiert."
     },

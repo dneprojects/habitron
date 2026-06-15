@@ -169,11 +169,10 @@ async def _async_update_entity(call: ServiceCall) -> None:
                 hub_id, mod_id, evnt, arg1, arg2, arg3, arg4, arg5
             )
             return
-    raise ServiceValidationError(
-        translation_domain=DOMAIN,
-        translation_key="hub_not_found",
-        translation_placeholders={"hub_id": str(hub_id)},
-    )
+    # No loaded hub owns this address yet. This is normally a brief startup
+    # race (the hub posts an event before its host is resolved); the next poll
+    # reconciles state, so drop the event quietly instead of raising an error.
+    _LOGGER.debug("No loaded SmartHub matches host %s; ignoring event", hub_id)
 
 
 async def _async_dispatch_sc_command_for_device(

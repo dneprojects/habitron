@@ -266,28 +266,28 @@ async def test_primary_hub_logs_warning_on_multiple_hubs(
     assert any("singleton service" in rec.message for rec in caplog.records)
 
 
-async def test_update_entity_raises_when_hub_not_found(
+async def test_update_entity_ignores_unknown_host(
     hass: HomeAssistant,
     setup_integration: MockConfigEntry,
 ) -> None:
-    """``update_entity`` raises ``hub_not_found`` when no host matches."""
+    """``update_entity`` drops the event quietly when no host matches."""
     hub = setup_integration.runtime_data
     hub.host = "192.168.1.50"
-    with pytest.raises(ServiceValidationError) as err:
-        await hass.services.async_call(
-            DOMAIN,
-            SERVICE_UPDATE_ENTITY,
-            {
-                "hub_uid": "no-such-host",
-                "rtr_nmbr": 1,
-                "mod_nmbr": 10,
-                "evnt_type": 1,
-                "evnt_arg1": 0,
-                "evnt_arg2": 0,
-            },
-            blocking=True,
-        )
-    assert err.value.translation_key == "hub_not_found"
+    hub.comm.update_entity = AsyncMock()
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_UPDATE_ENTITY,
+        {
+            "hub_uid": "no-such-host",
+            "rtr_nmbr": 1,
+            "mod_nmbr": 10,
+            "evnt_type": 1,
+            "evnt_arg1": 0,
+            "evnt_arg2": 0,
+        },
+        blocking=True,
+    )
+    hub.comm.update_entity.assert_not_awaited()
 
 
 async def test_sc_system_command_accepts_string_device(
