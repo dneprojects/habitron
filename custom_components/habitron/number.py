@@ -61,7 +61,7 @@ async def async_setup_entry(
                 )
 
 
-class HbtnSetTemperature(CoordinatorEntity[DataUpdateCoordinator[None]], NumberEntity):
+class HbtnSetTemperature(CoordinatorEntity[DataUpdateCoordinator[bytes]], NumberEntity):
     """Representation of a input number."""
 
     _attr_has_entity_name = True
@@ -75,7 +75,7 @@ class HbtnSetTemperature(CoordinatorEntity[DataUpdateCoordinator[None]], NumberE
         self,
         setval: IfDescriptor,
         module: HbtnModule,
-        coord: DataUpdateCoordinator[None],
+        coord: DataUpdateCoordinator[bytes],
         idx: int,
     ) -> None:
         """Initialize a Habitron set value, pass coordinator to CoordinatorEntity."""
@@ -117,7 +117,7 @@ class HbtnSetTemperature(CoordinatorEntity[DataUpdateCoordinator[None]], NumberE
         await self.coordinator.async_request_refresh()
 
 
-class HbtnAnalogOutput(CoordinatorEntity[DataUpdateCoordinator[None]], NumberEntity):
+class HbtnAnalogOutput(CoordinatorEntity[DataUpdateCoordinator[bytes]], NumberEntity):
     """Representation of an analog output number."""
 
     _attr_has_entity_name = True
@@ -132,7 +132,7 @@ class HbtnAnalogOutput(CoordinatorEntity[DataUpdateCoordinator[None]], NumberEnt
         self,
         output: IfDescriptor,
         module: HbtnModule,
-        coord: DataUpdateCoordinator[None],
+        coord: DataUpdateCoordinator[bytes],
         idx: int,
     ) -> None:
         """Initialize a Habitron analog value, pass coordinator to CoordinatorEntity."""

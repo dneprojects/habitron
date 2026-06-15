@@ -275,7 +275,7 @@ async def async_setup_entry(  # noqa: C901
                     )
 
 
-class HbtnSensor(CoordinatorEntity[DataUpdateCoordinator[None]], SensorEntity):
+class HbtnSensor(CoordinatorEntity[DataUpdateCoordinator[bytes]], SensorEntity):
     """Base representation of a Habitron sensor."""
 
     _attr_has_entity_name = True
@@ -285,7 +285,7 @@ class HbtnSensor(CoordinatorEntity[DataUpdateCoordinator[None]], SensorEntity):
         self,
         module: HbtnModule,
         sensor: IfDescriptor,
-        coord: DataUpdateCoordinator[None],
+        coord: DataUpdateCoordinator[bytes],
         idx: int,
     ) -> None:
         """Initialize a Habitron sensor, pass coordinator to CoordinatorEntity."""
@@ -421,7 +421,7 @@ class AnalogSensor(HbtnSensor):
         self,
         module: HbtnModule,
         sensor: IfDescriptor,
-        coord: DataUpdateCoordinator[None],
+        coord: DataUpdateCoordinator[bytes],
         idx: int,
     ) -> None:
         """Initialize the sensor."""
@@ -463,7 +463,7 @@ class TemperatureSensor(HbtnSensor):
         self,
         module: HbtnModule,
         sensor: IfDescriptor,
-        coord: DataUpdateCoordinator[None],
+        coord: DataUpdateCoordinator[bytes],
         idx: int,
     ) -> None:
         """Initialize the sensor."""
@@ -483,7 +483,7 @@ class EKeySensorId(HbtnSensor):
         self,
         module: HbtnModule,
         sensor: IfDescriptor,
-        coord: DataUpdateCoordinator[None],
+        coord: DataUpdateCoordinator[bytes],
         idx: int,
     ) -> None:
         """Initialize the sensor."""
@@ -518,7 +518,7 @@ class EKeySensorFngr(HbtnSensor):
         self,
         module: HbtnModule,
         sensor: IfDescriptor,
-        coord: DataUpdateCoordinator[None],
+        coord: DataUpdateCoordinator[bytes],
         idx: int,
     ) -> None:
         """Initialize the sensor."""
@@ -544,7 +544,7 @@ class EKeySensorFngr(HbtnSensor):
         self.sensor.remove_callback(self._handle_coordinator_update)
 
 
-class HbtnDiagSensor(CoordinatorEntity[DataUpdateCoordinator[None]], SensorEntity):
+class HbtnDiagSensor(CoordinatorEntity[DataUpdateCoordinator[bytes]], SensorEntity):
     """Base representation of a Habitron sensor."""
 
     _attr_state_class = SensorStateClass.MEASUREMENT
@@ -553,7 +553,7 @@ class HbtnDiagSensor(CoordinatorEntity[DataUpdateCoordinator[None]], SensorEntit
         self,
         module: HbtnModule,
         diag: IfDescriptor,
-        coord: DataUpdateCoordinator[None],
+        coord: DataUpdateCoordinator[bytes],
         idx: int,
     ) -> None:
         """Initialize a Habitron sensor, pass coordinator to CoordinatorEntity."""
@@ -592,7 +592,7 @@ class TemperatureDSensor(HbtnDiagSensor):
         self,
         module: HbtnModule,
         diag: IfDescriptor,
-        coord: DataUpdateCoordinator[None],
+        coord: DataUpdateCoordinator[bytes],
         idx: int,
     ) -> None:
         """Initialize the sensor."""
@@ -610,7 +610,7 @@ class StatusSensor(HbtnDiagSensor):
         self,
         module: HbtnModule,
         diag: IfDescriptor,
-        coord: DataUpdateCoordinator[None],
+        coord: DataUpdateCoordinator[bytes],
         idx: int,
     ) -> None:
         """Initialize the sensor."""
@@ -639,7 +639,7 @@ class LogicSensor(HbtnSensor):
         self,
         module: HbtnModule,
         logic: LgcDescriptor,
-        coord: DataUpdateCoordinator[None],
+        coord: DataUpdateCoordinator[bytes],
         idx: int,
     ) -> None:
         """Initialize the sensor."""
@@ -685,7 +685,7 @@ class PercSensor(HbtnSensor):
         self,
         module: SmartHub,
         perctg: IfDescriptor,
-        coord: DataUpdateCoordinator[None],
+        coord: DataUpdateCoordinator[bytes],
         idx: int,
     ) -> None:
         """Initialize the sensor."""
@@ -727,7 +727,7 @@ class FrequencySensor(HbtnSensor):
         self,
         module: SmartHub,
         freq: IfDescriptor,
-        coord: DataUpdateCoordinator[None],
+        coord: DataUpdateCoordinator[bytes],
         idx: int,
     ) -> None:
         """Initialize the sensor."""
@@ -828,7 +828,7 @@ class HabitronClientSensor(SensorEntity):
             self.async_write_ha_state()
 
 
-class EKeyUserNameSensor(CoordinatorEntity[DataUpdateCoordinator[None]], SensorEntity):
+class EKeyUserNameSensor(CoordinatorEntity[DataUpdateCoordinator[bytes]], SensorEntity):
     """Resolve a Fanekey ``Identifier`` value to the matching user's name."""
 
     _attr_has_entity_name = True
@@ -838,7 +838,7 @@ class EKeyUserNameSensor(CoordinatorEntity[DataUpdateCoordinator[None]], SensorE
         self,
         module: HbtnModule,
         nmbr: int,
-        coord: DataUpdateCoordinator[None],
+        coord: DataUpdateCoordinator[bytes],
         idx: int,
     ) -> None:
         """Initialize the user-name sensor."""
@@ -883,7 +883,7 @@ class EKeyUserNameSensor(CoordinatorEntity[DataUpdateCoordinator[None]], SensorE
 
 
 class EKeyFingerNameSensor(
-    CoordinatorEntity[DataUpdateCoordinator[None]], SensorEntity
+    CoordinatorEntity[DataUpdateCoordinator[bytes]], SensorEntity
 ):
     """Resolve a Fanekey ``Finger`` value to the matching finger name."""
 
@@ -907,7 +907,7 @@ class EKeyFingerNameSensor(
         self,
         module: HbtnModule,
         nmbr: int,
-        coord: DataUpdateCoordinator[None],
+        coord: DataUpdateCoordinator[bytes],
         idx: int,
     ) -> None:
         """Initialize the finger-name sensor."""

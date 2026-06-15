@@ -38,7 +38,7 @@ async def async_setup_entry(
 ) -> None:
     """Add covers for passed config_entry in HA."""
     hbtn_rt: HbtnRouter = entry.runtime_data.router
-    hbtn_cord: DataUpdateCoordinator[None] = hbtn_rt.coord
+    hbtn_cord: DataUpdateCoordinator[bytes] = hbtn_rt.coord
 
     new_devices: list[CoverEntity] = []
     for hbt_module in hbtn_rt.modules:
@@ -75,7 +75,7 @@ async def async_setup_entry(
 # This entire class could be written to extend a base class to ensure common attributes
 # are kept identical/in sync. It's broken apart here between the Cover and Sensors to
 # be explicit about what is returned, and the comments outline where the overlap is.
-class HbtnShutter(CoordinatorEntity[DataUpdateCoordinator[None]], CoverEntity):
+class HbtnShutter(CoordinatorEntity[DataUpdateCoordinator[bytes]], CoverEntity):
     """Representation of a shutter cover."""
 
     _attr_has_entity_name = True
@@ -92,7 +92,7 @@ class HbtnShutter(CoordinatorEntity[DataUpdateCoordinator[None]], CoverEntity):
         self,
         cover: CovDescriptor,
         module: HbtnModule,
-        coord: DataUpdateCoordinator[None],
+        coord: DataUpdateCoordinator[bytes],
         idx: int,
     ) -> None:
         """Initialize an HbtnShutter, pass coordinator to CoordinatorEntity."""
@@ -296,7 +296,7 @@ class HbtnBlind(HbtnShutter):
         self,
         cover: CovDescriptor,
         module: HbtnModule,
-        coord: DataUpdateCoordinator[None],
+        coord: DataUpdateCoordinator[bytes],
         idx: int,
     ) -> None:
         """Initialize an HbtnShutterTilt."""

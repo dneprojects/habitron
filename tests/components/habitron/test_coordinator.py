@@ -15,16 +15,16 @@ def _make_comm(hass: HomeAssistant) -> MagicMock:
     comm = MagicMock()
     comm._config = MagicMock()
     comm.update_suspended = False
-    comm.async_system_update = AsyncMock(return_value=None)
+    comm.async_system_update = AsyncMock(return_value=b"compact-status")
     return comm
 
 
 async def test_coordinator_normal_update(hass: HomeAssistant) -> None:
-    """``_async_update_data`` returns None and forwards to comm."""
+    """``_async_update_data`` returns the compact status and forwards to comm."""
     comm = _make_comm(hass)
     coord = HbtnCoordinator(hass, MagicMock(), comm)
     result = await coord._async_update_data()
-    assert result is None
+    assert result == b"compact-status"
     comm.async_system_update.assert_awaited_once()
 
 
@@ -40,11 +40,11 @@ async def test_coordinator_timeout_raises_update_failed(
     assert exc_info.value.translation_key == "update_timeout"
 
 
-async def test_coordinator_always_update(hass: HomeAssistant) -> None:
-    """``always_update`` is True so the heartbeat fans out on every tick."""
+async def test_coordinator_change_detection(hass: HomeAssistant) -> None:
+    """``always_update`` is False so the heartbeat only fans out on changes."""
     comm = _make_comm(hass)
     coord = HbtnCoordinator(hass, MagicMock(), comm)
-    assert coord.always_update is True
+    assert coord.always_update is False
 
 
 async def test_coordinator_uses_fixed_scan_interval(hass: HomeAssistant) -> None:

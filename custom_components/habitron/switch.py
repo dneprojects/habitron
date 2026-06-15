@@ -92,7 +92,7 @@ async def async_setup_entry(
                 )
 
 
-class SwitchedOutput(CoordinatorEntity[DataUpdateCoordinator[None]], SwitchEntity):
+class SwitchedOutput(CoordinatorEntity[DataUpdateCoordinator[bytes]], SwitchEntity):
     """Representation of habitron output as switch entities."""
 
     _attr_has_entity_name = True
@@ -101,7 +101,7 @@ class SwitchedOutput(CoordinatorEntity[DataUpdateCoordinator[None]], SwitchEntit
         self,
         output: IfDescriptor,
         module: HbtnModule,
-        coord: DataUpdateCoordinator[None],
+        coord: DataUpdateCoordinator[bytes],
         idx: int,
     ) -> None:
         """Initialize an HbtnSwitch, pass coordinator to CoordinatorEntity."""
@@ -163,7 +163,7 @@ class SwitchedOutputPush(SwitchedOutput):
         self._output.remove_callback(self.async_write_ha_state)
 
 
-class SwitchedLed(CoordinatorEntity[DataUpdateCoordinator[None]], SwitchEntity):
+class SwitchedLed(CoordinatorEntity[DataUpdateCoordinator[bytes]], SwitchEntity):
     """Module switch background LEDs."""
 
     _attr_device_class = SwitchDeviceClass.SWITCH
@@ -173,7 +173,7 @@ class SwitchedLed(CoordinatorEntity[DataUpdateCoordinator[None]], SwitchEntity):
         self,
         led: IfDescriptor,
         module: HbtnModule,
-        coord: DataUpdateCoordinator[None],
+        coord: DataUpdateCoordinator[bytes],
         idx: int,
     ) -> None:
         """Initialize an HbtnLED, pass coordinator to CoordinatorEntity."""
@@ -236,7 +236,7 @@ class SwitchedLed(CoordinatorEntity[DataUpdateCoordinator[None]], SwitchEntity):
         self._state = False
 
 
-class HbtnFlag(CoordinatorEntity[DataUpdateCoordinator[None]], SwitchEntity):
+class HbtnFlag(CoordinatorEntity[DataUpdateCoordinator[bytes]], SwitchEntity):
     """Module switch local flag."""
 
     _attr_device_class = SwitchDeviceClass.SWITCH
@@ -247,7 +247,7 @@ class HbtnFlag(CoordinatorEntity[DataUpdateCoordinator[None]], SwitchEntity):
         self,
         flag: StateDescriptor,
         module: HbtnRouter | HbtnModule,
-        coord: DataUpdateCoordinator[None],
+        coord: DataUpdateCoordinator[bytes],
         idx: int,
     ) -> None:
         """Initialize an HbtnFlag, pass coordinator to CoordinatorEntity."""
@@ -361,14 +361,14 @@ class MicrophoneSwitch(SwitchEntity):
         self._state = False
 
 
-class ClimateCtlSwitch(CoordinatorEntity[DataUpdateCoordinator[None]], SwitchEntity):
+class ClimateCtlSwitch(CoordinatorEntity[DataUpdateCoordinator[bytes]], SwitchEntity):
     """Representation of a button to trigger a speech command."""
 
     _attr_has_entity_name = True
     _attr_translation_key = "climate_ctl"
 
     def __init__(
-        self, module: HbtnModule, coord: DataUpdateCoordinator[None], idx: int = 0
+        self, module: HbtnModule, coord: DataUpdateCoordinator[bytes], idx: int = 0
     ) -> None:
         """Initialize the climate control switch, pass coordinator to base."""
         super().__init__(coord, context=idx)

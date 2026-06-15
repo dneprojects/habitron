@@ -389,41 +389,46 @@ async def test_send_devreg_ids_walks_and_dispatches_modules() -> None:
 
 
 async def test_async_system_update_short_circuits_when_suspended() -> None:
-    """update_suspended skips the entire update path."""
+    """update_suspended skips the entire update path and returns last status."""
     comm = _make_comm()
     comm.update_suspended = True
     comm.get_compact_status = AsyncMock()
-    await comm.async_system_update()
+    result = await comm.async_system_update()
     comm.get_compact_status.assert_not_called()
+    assert result == b""  # initial last status
 
 
 async def test_async_system_update_returns_when_empty_status() -> None:
-    """An empty compact status (unchanged crc) returns without dispatching."""
+    """An empty compact status returns the last status without dispatching."""
     comm = _make_comm()
     comm.get_compact_status = AsyncMock(return_value=b"")
     comm.smhub.router.update_system_status = AsyncMock()
-    await comm.async_system_update()
+    result = await comm.async_system_update()
     comm.smhub.router.update_system_status.assert_not_called()
+    assert result == b""
 
 
 async def test_async_system_update_logs_when_status_too_short() -> None:
-    """A status shorter than 10 bytes logs a warning and returns."""
+    """A status shorter than 10 bytes logs a warning and returns last status."""
     comm = _make_comm()
     comm.get_compact_status = AsyncMock(return_value=b"\x00\x01")
     comm.smhub.router.update_system_status = AsyncMock()
     comm.logger = MagicMock()
-    await comm.async_system_update()
+    result = await comm.async_system_update()
     comm.logger.warning.assert_called()
     comm.smhub.router.update_system_status.assert_not_called()
+    assert result == b""
 
 
 async def test_async_system_update_distributes_normal_status() -> None:
-    """A valid compact status is forwarded to router.update_system_status."""
+    """A valid compact status is forwarded and returned as the change key."""
     comm = _make_comm()
     comm.get_compact_status = AsyncMock(return_value=b"\x00" * 32)
     comm.smhub.router.update_system_status = AsyncMock()
-    await comm.async_system_update()
+    result = await comm.async_system_update()
     comm.smhub.router.update_system_status.assert_awaited()
+    assert result == b"\x00" * 32
+    assert comm._last_status == b"\x00" * 32
 
 
 # ---------- get_compact_status / get_module_status crc dedupe ----------

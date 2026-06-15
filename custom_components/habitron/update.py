@@ -313,7 +313,7 @@ class SCTouchAppUpdate(UpdateEntity):
         return f"Latest APK version: {self._attr_latest_version}"
 
 
-class HbtnModuleUpdate(CoordinatorEntity[DataUpdateCoordinator[None]], UpdateEntity):
+class HbtnModuleUpdate(CoordinatorEntity[DataUpdateCoordinator[bytes]], UpdateEntity):
     """Module firmware update entity."""
 
     _attr_device_class = UpdateDeviceClass.FIRMWARE
@@ -331,7 +331,7 @@ class HbtnModuleUpdate(CoordinatorEntity[DataUpdateCoordinator[None]], UpdateEnt
     def __init__(
         self,
         module: HbtnModule | HbtnRouter,
-        coord: DataUpdateCoordinator[None],
+        coord: DataUpdateCoordinator[bytes],
         idx: int,
     ) -> None:
         """Initialize entity."""
