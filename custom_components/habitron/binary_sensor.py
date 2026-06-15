@@ -300,7 +300,6 @@ class ListeningStatusSensor(BinarySensorEntity):
     """Representation of the speech satellite status."""
 
     _attr_has_entity_name = True
-    _attr_should_poll = True
     _attr_name: str = "Listening Status"
     _attr_device_class = BinarySensorDeviceClass.SOUND
     _attr_translation_key = "listening_status"
