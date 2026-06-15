@@ -14,40 +14,22 @@ from homeassistant.components.update import (
     UpdateEntity,
     UpdateEntityFeature,
 )
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
-from homeassistant.helpers.update_coordinator import (
-    CoordinatorEntity,
-    DataUpdateCoordinator,
-)
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from ._axml import read_apk_version_name
 from ._helpers import hbtn_device_info
 from .const import DOMAIN
-from .coordinator import HabitronConfigEntry
+from .coordinator import HabitronConfigEntry, HbtnFirmwareCoordinator
 from .module import HbtnModule
 from .router import HbtnRouter
 
 PARALLEL_UPDATES = 1
 
 _LOGGER = logging.getLogger(__name__)
-
-
-class _RoundRobin:
-    """Shared rotating counter so only one firmware entity polls per cycle.
-
-    All ``HbtnModuleUpdate`` entities of one router share an instance. Each
-    poll cycle the lead entity (index 0) advances ``tick`` once; every entity
-    only performs its bus read when ``tick % total == its index``. This turns
-    the per-cycle burst of N serial firmware reads into one read per cycle.
-    """
-
-    def __init__(self, total: int) -> None:
-        """Initialize with the number of participating entities."""
-        self.tick = -1
-        self.total = total
 
 
 # URL prefix under which we expose the firmware directory via HA's
@@ -66,15 +48,15 @@ async def async_setup_entry(
 ) -> None:
     """Add update entities for Habitron system."""
     hbtn_rt: HbtnRouter = entry.runtime_data.router
-    hbtn_cord = hbtn_rt.coord
+    fw_coord = HbtnFirmwareCoordinator(hass, entry, hbtn_rt.comm)
 
     new_devices: list[UpdateEntity] = []
     # Add router update entity
-    new_devices.append(HbtnModuleUpdate(hbtn_rt, hbtn_cord, len(new_devices)))
+    new_devices.append(HbtnModuleUpdate(hbtn_rt, fw_coord, len(new_devices)))
 
     for hbt_module in hbtn_rt.modules:
         # Add standard firmware update entity
-        new_devices.append(HbtnModuleUpdate(hbt_module, hbtn_cord, len(new_devices)))
+        new_devices.append(HbtnModuleUpdate(hbt_module, fw_coord, len(new_devices)))
 
         # Check for Smart Controller Touch type
         if hbt_module.typ == b"\x01\x04":
@@ -82,11 +64,9 @@ async def async_setup_entry(
             new_devices.append(SCTouchAppUpdate(hbt_module, hbtn_rt))
 
     if new_devices:
-        # Wire up round-robin firmware polling across the module update entities.
-        fw_entities = [d for d in new_devices if isinstance(d, HbtnModuleUpdate)]
-        round_robin = _RoundRobin(len(fw_entities))
-        for index, fw_entity in enumerate(fw_entities):
-            fw_entity.set_round_robin(round_robin, index)
+        # Prime firmware versions with one read before the entities go live.
+        # Firmware is non-critical, so a failed read must not abort setup.
+        await fw_coord.async_refresh()
         async_add_entities(new_devices)
 
 
@@ -333,7 +313,7 @@ class SCTouchAppUpdate(UpdateEntity):
         return f"Latest APK version: {self._attr_latest_version}"
 
 
-class HbtnModuleUpdate(CoordinatorEntity[DataUpdateCoordinator[bytes]], UpdateEntity):
+class HbtnModuleUpdate(CoordinatorEntity[HbtnFirmwareCoordinator], UpdateEntity):
     """Module firmware update entity."""
 
     _attr_device_class = UpdateDeviceClass.FIRMWARE
@@ -342,16 +322,14 @@ class HbtnModuleUpdate(CoordinatorEntity[DataUpdateCoordinator[bytes]], UpdateEn
     _attr_supported_features = (
         UpdateEntityFeature.INSTALL | UpdateEntityFeature.PROGRESS
     )
-    # CoordinatorEntity normally turns off polling, but this entity does
-    # not consume coordinator.data — it queries firmware versions via its
-    # own ``async_update`` against the bus. Keep periodic polling so a
-    # firmware bumped on the device shows up without an HA reload.
-    _attr_should_poll = True
+    # should_poll stays off (CoordinatorEntity default): firmware versions are
+    # read by HbtnFirmwareCoordinator round-robin; this entity only reflects the
+    # result for its module, written into coordinator.data keyed by uid.
 
     def __init__(
         self,
         module: HbtnModule | HbtnRouter,
-        coord: DataUpdateCoordinator[bytes],
+        coord: HbtnFirmwareCoordinator,
         idx: int,
     ) -> None:
         """Initialize entity."""
@@ -360,14 +338,10 @@ class HbtnModuleUpdate(CoordinatorEntity[DataUpdateCoordinator[bytes]], UpdateEn
         self._module: HbtnModule | HbtnRouter = module
         self._attr_unique_id = f"Mod_{self._module.uid}_update"
         self.flash_in_progress = False
-        self._round_robin: _RoundRobin | None = None
-        self._round_robin_index = 0
-        self._initialized = False
-
-    def set_round_robin(self, round_robin: _RoundRobin, index: int) -> None:
-        """Join the shared round-robin firmware polling rotation."""
-        self._round_robin = round_robin
-        self._round_robin_index = index
+        # Installed version is known from setup; latest fills in once polled.
+        self._attr_installed_version = getattr(module, "sw_version", None) or getattr(
+            module, "version", None
+        )
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -396,59 +370,28 @@ class HbtnModuleUpdate(CoordinatorEntity[DataUpdateCoordinator[bytes]], UpdateEn
                 self._module.sw_version = version or ""
         finally:
             self.flash_in_progress = False
-            await self.async_update()
+            if version:
+                self._attr_installed_version = version
+                self._attr_latest_version = version
+            self.async_write_ha_state()
 
     async def async_added_to_hass(self) -> None:
-        """Initialize state."""
+        """Reflect any firmware version already polled by the coordinator."""
         await super().async_added_to_hass()
-        await self.async_update()
+        self._handle_coordinator_update()
 
-    async def async_update(self) -> None:
-        """Poll firmware version, round-robin so one module reads per cycle.
-
-        The first refresh after the entity is added always reads (so the
-        version shows up immediately). Subsequent periodic polls only read on
-        the entity's turn, turning the per-cycle burst of N serial bus reads
-        into a single read per cycle.
-        """
-        if not self._initialized:
-            self._initialized = True
-        elif self._round_robin is not None:
-            if self._round_robin_index == 0:
-                self._round_robin.tick += 1
-            if self._round_robin.tick % self._round_robin.total != (
-                self._round_robin_index
-            ):
-                return
-        await self._read_firmware()
-
-    async def _read_firmware(self) -> None:
-        """Read installed/latest firmware version from the bus."""
-        try:
-            if isinstance(self._module, HbtnRouter):
-                await self._module.get_definitions()
-                self._attr_installed_version = self._module.version
-                resp = await self._module.comm.handle_firmware(0)
-            else:
-                self._attr_installed_version = self._module.sw_version
-                resp = await self._module.comm.handle_firmware(self._module.raddr)
-            if len(resp) == 0:
-                _LOGGER.warning("No response for firmware version check, crc error")
-                return
-            versions = resp.decode("iso8859-1").split("\n")
-            if len(versions) == 2:
-                previous_latest = self._attr_latest_version
-                installed, latest = versions[0], versions[1]
-                self._attr_installed_version = installed
-                self._attr_latest_version = latest
-                name = self._module.name
-                # Log once when a new update appears; the UI already shows it.
-                if latest not in {installed, previous_latest}:
-                    _LOGGER.info("Firmware %s: %s -> %s", name, installed, latest)
-                self.async_write_ha_state()
-        except Exception as e:  # noqa: BLE001
-            _LOGGER.error(
-                "Error checking firmware version for module %s: %s",
-                self._module.name,
-                e,
-            )
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Reflect the firmware versions read for this module by the coordinator."""
+        versions = self.coordinator.data.get(self._module.uid)
+        if versions is None:
+            return
+        installed, latest = versions
+        if (installed, latest) == (
+            self._attr_installed_version,
+            self._attr_latest_version,
+        ):
+            return
+        self._attr_installed_version = installed
+        self._attr_latest_version = latest
+        self.async_write_ha_state()

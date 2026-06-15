@@ -10,7 +10,6 @@ from custom_components.habitron.router import HbtnRouter
 from custom_components.habitron.update import (
     HbtnModuleUpdate,
     SCTouchAppUpdate,
-    _RoundRobin,
     async_setup_entry,
 )
 from homeassistant.core import HomeAssistant
@@ -24,9 +23,9 @@ async def test_update_setup(setup_integration: MockConfigEntry) -> None:
     assert setup_integration.runtime_data is not None
 
 
-def test_module_update_polls_for_firmware() -> None:
-    """HbtnModuleUpdate keeps _attr_should_poll=True (firmware not via coord)."""
-    assert class_attr(HbtnModuleUpdate, "_attr_should_poll") is True
+def test_module_update_does_not_poll() -> None:
+    """HbtnModuleUpdate relies on the firmware coordinator, not platform polling."""
+    assert _make_module_update().should_poll is False
 
 
 def test_sc_touch_app_update_polls() -> None:
@@ -97,7 +96,6 @@ async def test_async_setup_entry_emits_router_module_and_touch_app(
     other = _make_module(uid="MOD-2", typ=b"\x01\x03")
     rt = MagicMock()
     rt.modules = [touch, other]
-    rt.coord = MagicMock()
     rt.hass = hass
     rt.smhub.addon_slug = ""
     rt.uid = "ROUTER-1"
@@ -106,7 +104,9 @@ async def test_async_setup_entry_emits_router_module_and_touch_app(
     entry.runtime_data.router = rt
 
     added: list = []
-    await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
+    with patch("custom_components.habitron.update.HbtnFirmwareCoordinator") as fw_cls:
+        fw_cls.return_value.async_refresh = AsyncMock()
+        await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
 
     # 1 router + 2 modules + 1 SCTouchAppUpdate for the Touch
     assert len(added) == 4
@@ -117,12 +117,13 @@ async def test_async_setup_entry_skips_apk_for_non_touch(hass: HomeAssistant) ->
     """A module that isn't a Smart Controller Touch does not get an APK entity."""
     rt = MagicMock()
     rt.modules = [_make_module(typ=b"\x01\x03")]
-    rt.coord = MagicMock()
     entry = MagicMock()
     entry.runtime_data.router = rt
 
     added: list = []
-    await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
+    with patch("custom_components.habitron.update.HbtnFirmwareCoordinator") as fw_cls:
+        fw_cls.return_value.async_refresh = AsyncMock()
+        await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
     # router + module = 2; no SCTouchAppUpdate
     assert sum(isinstance(e, SCTouchAppUpdate) for e in added) == 0
 
@@ -412,10 +413,13 @@ async def test_sc_touch_async_install_raises_when_hash_fails() -> None:
 # ---------- HbtnModuleUpdate ----------
 
 
-def _make_module_update(mod: MagicMock | None = None) -> HbtnModuleUpdate:
-    """Build an HbtnModuleUpdate around a stub module / coordinator."""
+def _make_module_update(
+    mod: MagicMock | None = None, data: dict | None = None
+) -> HbtnModuleUpdate:
+    """Build an HbtnModuleUpdate around a stub module / firmware coordinator."""
     coord = MagicMock()
     coord.last_update_success = True
+    coord.data = data if data is not None else {}
     mod = mod if mod is not None else _make_module()
     return HbtnModuleUpdate(mod, coord, 0)
 
@@ -429,28 +433,34 @@ def test_hbtn_module_update_device_info_and_progress() -> None:
     assert entity.in_progress is True
 
 
-async def test_hbtn_module_update_async_added_to_hass_runs_update() -> None:
-    """async_added_to_hass calls into async_update to seed the version state."""
-    entity = _make_module_update()
-    entity.async_update = AsyncMock()
+def test_hbtn_module_update_seeds_installed_version_from_module() -> None:
+    """The installed version is taken from the module at construction time."""
+    assert _make_module_update().installed_version == "1.0.0"
+
+
+async def test_hbtn_module_update_async_added_to_hass_reflects_data() -> None:
+    """async_added_to_hass reflects firmware versions already in coordinator.data."""
+    entity = _make_module_update(data={"MOD-1": ("1.0.0", "2.0.0")})
+    entity.async_write_ha_state = MagicMock()
     with patch(
         "homeassistant.helpers.update_coordinator."
         "CoordinatorEntity.async_added_to_hass",
         new=AsyncMock(),
     ):
         await entity.async_added_to_hass()
-    entity.async_update.assert_awaited()
+    assert entity.installed_version == "1.0.0"
+    assert entity.latest_version == "2.0.0"
 
 
 async def test_hbtn_module_update_install_for_module() -> None:
     """Module install routes through ``comm.update_firmware(addr, raddr)``."""
     entity = _make_module_update()
     entity.async_write_ha_state = MagicMock()
-    entity.async_update = AsyncMock()
     with patch("custom_components.habitron.update.sleep", new=AsyncMock()):
         await entity.async_install(version="9.9.9", backup=False)
     entity._module.comm.update_firmware.assert_awaited_with(105)
     assert entity._module.sw_version == "9.9.9"
+    assert entity.installed_version == "9.9.9"
     assert entity.flash_in_progress is False
 
 
@@ -459,7 +469,6 @@ async def test_hbtn_module_update_install_for_router() -> None:
     rt = _make_router_module()
     entity = _make_module_update(mod=rt)
     entity.async_write_ha_state = MagicMock()
-    entity.async_update = AsyncMock()
     with patch("custom_components.habitron.update.sleep", new=AsyncMock()):
         await entity.async_install(version="9.9.9", backup=False)
     rt.comm.update_firmware.assert_awaited_with(rt.id)
@@ -470,7 +479,6 @@ async def test_hbtn_module_update_install_resets_flag_even_on_failure() -> None:
     """A bus exception still resets ``flash_in_progress`` via finally."""
     entity = _make_module_update()
     entity.async_write_ha_state = MagicMock()
-    entity.async_update = AsyncMock()
     entity._module.comm.update_firmware = AsyncMock(side_effect=RuntimeError("boom"))
     with patch("custom_components.habitron.update.sleep", new=AsyncMock()):  # noqa: SIM117
         with pytest.raises(RuntimeError):
@@ -478,76 +486,29 @@ async def test_hbtn_module_update_install_resets_flag_even_on_failure() -> None:
     assert entity.flash_in_progress is False
 
 
-async def test_hbtn_module_update_async_update_parses_versions() -> None:
-    """A two-line firmware response sets installed + latest version."""
-    entity = _make_module_update()
+async def test_hbtn_module_update_reflects_coordinator_data() -> None:
+    """_handle_coordinator_update copies the polled versions onto the entity."""
+    entity = _make_module_update(data={"MOD-1": ("1.0.0", "2.0.0")})
     entity.async_write_ha_state = MagicMock()
-    entity._module.comm.handle_firmware = AsyncMock(return_value=b"1.0.0\n2.0.0")
-    await entity.async_update()
-    assert entity._attr_installed_version == "1.0.0"
-    assert entity._attr_latest_version == "2.0.0"
+    entity._handle_coordinator_update()
+    assert entity.installed_version == "1.0.0"
+    assert entity.latest_version == "2.0.0"
+    entity.async_write_ha_state.assert_called_once()
 
 
-async def test_hbtn_module_update_async_update_router_branch_calls_get_definitions() -> (
-    None
-):
-    """For a router target, async_update first reloads its definitions."""
-    rt = _make_router_module()
-    entity = _make_module_update(mod=rt)
+async def test_hbtn_module_update_no_data_keeps_state() -> None:
+    """Without a firmware entry yet, the callback writes nothing."""
+    entity = _make_module_update(data={})
     entity.async_write_ha_state = MagicMock()
-    rt.comm.handle_firmware = AsyncMock(return_value=b"1.0.0\n2.0.0")
-    await entity.async_update()
-    rt.get_definitions.assert_awaited()
-    assert entity._attr_latest_version == "2.0.0"
-
-
-async def test_hbtn_module_update_async_update_empty_response_warns() -> None:
-    """An empty firmware response logs a CRC warning and returns."""
-    entity = _make_module_update()
-    entity.async_write_ha_state = MagicMock()
-    entity._module.comm.handle_firmware = AsyncMock(return_value=b"")
-    await entity.async_update()
+    entity._handle_coordinator_update()
     entity.async_write_ha_state.assert_not_called()
 
 
-async def test_hbtn_module_update_async_update_handles_exception() -> None:
-    """A bus exception in async_update is caught and logged."""
-    entity = _make_module_update()
-    entity._module.comm.handle_firmware = AsyncMock(side_effect=RuntimeError("boom"))
-    # Should not raise
-    await entity.async_update()
-
-
-async def test_hbtn_module_update_async_update_single_line_response() -> None:
-    """A single-line response leaves attr_latest_version untouched."""
-    entity = _make_module_update()
+async def test_hbtn_module_update_unchanged_data_skips_write() -> None:
+    """Unchanged versions do not trigger a redundant state write."""
+    entity = _make_module_update(data={"MOD-1": ("1.0.0", "2.0.0")})
     entity.async_write_ha_state = MagicMock()
-    entity._module.comm.handle_firmware = AsyncMock(return_value=b"only-one-line")
-    # async_update parses two lines via "\n".split — single line yields len 1
-    await entity.async_update()
-    # _attr_latest_version unset (no attribute) — not written
+    entity._handle_coordinator_update()  # first apply writes
+    entity.async_write_ha_state.reset_mock()
+    entity._handle_coordinator_update()  # unchanged, no write
     entity.async_write_ha_state.assert_not_called()
-
-
-async def test_hbtn_module_update_round_robin_polls_one_per_cycle() -> None:
-    """Only one firmware entity reads the bus per poll cycle (round-robin)."""
-    round_robin = _RoundRobin(3)
-    entities = [_make_module_update() for _ in range(3)]
-    for index, entity in enumerate(entities):
-        entity.set_round_robin(round_robin, index)
-        entity._read_firmware = AsyncMock()
-        entity._initialized = True  # skip the immediate first-read path
-
-    for expected in ([1, 0, 0], [1, 1, 0], [1, 1, 1]):
-        for entity in entities:
-            await entity.async_update()
-        assert [e._read_firmware.await_count for e in entities] == expected
-
-
-async def test_hbtn_module_update_first_poll_always_reads() -> None:
-    """The first poll after add reads immediately, even out of turn."""
-    entity = _make_module_update()
-    entity.set_round_robin(_RoundRobin(3), 2)  # not the lead, not turn 0
-    entity._read_firmware = AsyncMock()
-    await entity.async_update()
-    entity._read_firmware.assert_awaited_once()

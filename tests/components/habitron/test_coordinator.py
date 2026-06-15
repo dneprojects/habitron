@@ -5,7 +5,11 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from custom_components.habitron.const import SCAN_INTERVAL
-from custom_components.habitron.coordinator import HbtnCoordinator
+from custom_components.habitron.coordinator import (
+    FW_POLL_INTERVAL,
+    HbtnCoordinator,
+    HbtnFirmwareCoordinator,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
@@ -72,3 +76,63 @@ async def test_coordinator_network_error_raises_update_failed(
     with pytest.raises(UpdateFailed) as exc_info:
         await coord._async_update_data()
     assert exc_info.value.translation_key == "update_network_error"
+
+
+# ---------- HbtnFirmwareCoordinator ----------
+
+
+def _make_fw_comm(resp: bytes = b"1.0.0\n2.0.0") -> MagicMock:
+    """Stub comm with a router + one module, both reachable via handle_firmware."""
+    comm = MagicMock()
+    router = MagicMock()
+    router.uid = "ROUTER-1"
+    router.name = "Router"
+    router.raddr = 0
+    mod = MagicMock()
+    mod.uid = "MOD-1"
+    mod.name = "Mod 1"
+    mod.raddr = 5
+    router.modules = [mod]
+    comm.router = router
+    comm.handle_firmware = AsyncMock(return_value=resp)
+    return comm
+
+
+async def test_fw_coordinator_uses_slow_interval(hass: HomeAssistant) -> None:
+    """The firmware coordinator runs on the dedicated FW_POLL_INTERVAL."""
+    coord = HbtnFirmwareCoordinator(hass, MagicMock(), _make_fw_comm())
+    assert coord.update_interval == FW_POLL_INTERVAL
+
+
+async def test_fw_coordinator_reads_one_target_per_cycle(hass: HomeAssistant) -> None:
+    """Each refresh reads a single target and records its versions."""
+    comm = _make_fw_comm()
+    coord = HbtnFirmwareCoordinator(hass, MagicMock(), comm)
+    data = await coord._async_update_data()
+    assert data == {"ROUTER-1": ("1.0.0", "2.0.0")}
+    comm.handle_firmware.assert_awaited_once_with(0)
+
+
+async def test_fw_coordinator_round_robin_wraps(hass: HomeAssistant) -> None:
+    """Successive refreshes rotate router -> module -> router."""
+    comm = _make_fw_comm()
+    coord = HbtnFirmwareCoordinator(hass, MagicMock(), comm)
+    await coord._async_update_data()
+    await coord._async_update_data()
+    await coord._async_update_data()
+    assert [c.args[0] for c in comm.handle_firmware.await_args_list] == [0, 5, 0]
+    assert coord.data["MOD-1"] == ("1.0.0", "2.0.0")
+
+
+async def test_fw_coordinator_empty_response_keeps_data(hass: HomeAssistant) -> None:
+    """An empty (crc-unchanged) response records nothing for that target."""
+    coord = HbtnFirmwareCoordinator(hass, MagicMock(), _make_fw_comm(resp=b""))
+    assert await coord._async_update_data() == {}
+
+
+async def test_fw_coordinator_read_error_is_swallowed(hass: HomeAssistant) -> None:
+    """A bus error during a firmware read does not fail the refresh."""
+    comm = _make_fw_comm()
+    comm.handle_firmware = AsyncMock(side_effect=OSError("bus"))
+    coord = HbtnFirmwareCoordinator(hass, MagicMock(), comm)
+    assert await coord._async_update_data() == {}  # no raise
