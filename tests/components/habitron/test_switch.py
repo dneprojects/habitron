@@ -188,7 +188,7 @@ def test_climate_ctl_switch_initial_state_from_climate_ctl12() -> None:
     mod = _make_module()
     mod.climate_ctl12 = 2
     mod.comm.async_set_climate_mode = AsyncMock()
-    entity = ClimateCtlSwitch(mod)
+    entity = ClimateCtlSwitch(mod, MagicMock())
     assert entity.is_on is True
     mod.climate_ctl12 = 0
     assert entity.is_on is False
@@ -199,7 +199,7 @@ async def test_climate_ctl_switch_turn_on_sets_module_state() -> None:
     mod = _make_module()
     mod.climate_ctl12 = 0
     mod.comm.async_set_climate_mode = AsyncMock()
-    entity = ClimateCtlSwitch(mod)
+    entity = ClimateCtlSwitch(mod, MagicMock())
     await entity.async_turn_on()
     assert mod.climate_ctl12 == 2
 
@@ -209,7 +209,7 @@ async def test_climate_ctl_switch_turn_off_sets_module_state() -> None:
     mod = _make_module()
     mod.climate_ctl12 = 2
     mod.comm.async_set_climate_mode = AsyncMock()
-    entity = ClimateCtlSwitch(mod)
+    entity = ClimateCtlSwitch(mod, MagicMock())
     await entity.async_turn_off()
     assert mod.climate_ctl12 == 1
 
@@ -504,7 +504,7 @@ def test_climate_ctl_switch_handle_coordinator_update() -> None:
     """ClimateCtlSwitch._handle_coordinator_update rereads module.climate_ctl12."""
     mod = _make_module()
     mod.climate_ctl12 = 2
-    entity = ClimateCtlSwitch(mod)
+    entity = ClimateCtlSwitch(mod, MagicMock())
     entity.async_write_ha_state = MagicMock()
     mod.climate_ctl12 = 1
     entity._handle_coordinator_update()
@@ -515,7 +515,7 @@ def test_climate_ctl_switch_device_info() -> None:
     """ClimateCtlSwitch.device_info uses the module uid."""
     mod = _make_module()
     mod.climate_ctl12 = 2
-    entity = ClimateCtlSwitch(mod)
+    entity = ClimateCtlSwitch(mod, MagicMock())
     assert ("habitron", "MOD-1") in entity.device_info["identifiers"]
 
 

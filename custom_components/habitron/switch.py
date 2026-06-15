@@ -63,7 +63,9 @@ async def async_setup_entry(
             new_devices.append(HbtnFlagPush(mod_flg, hbt_module, hbtn_cord, flg_idx))
 
         if hbt_module.mod_type.startswith("Smart Controller"):
-            new_devices.append(ClimateCtlSwitch(hbt_module))
+            new_devices.append(
+                ClimateCtlSwitch(hbt_module, hbtn_cord, len(new_devices))
+            )
 
         if hbt_module.mod_type == "Smart Controller Touch":
             new_devices.append(MicrophoneSwitch(hbt_module))
@@ -359,15 +361,17 @@ class MicrophoneSwitch(SwitchEntity):
         self._state = False
 
 
-class ClimateCtlSwitch(SwitchEntity):
+class ClimateCtlSwitch(CoordinatorEntity[DataUpdateCoordinator[None]], SwitchEntity):
     """Representation of a button to trigger a speech command."""
 
     _attr_has_entity_name = True
-    _attr_should_poll = True
     _attr_translation_key = "climate_ctl"
 
-    def __init__(self, module: HbtnModule) -> None:
-        """Initialize a switch for the microphone."""
+    def __init__(
+        self, module: HbtnModule, coord: DataUpdateCoordinator[None], idx: int = 0
+    ) -> None:
+        """Initialize the climate control switch, pass coordinator to base."""
+        super().__init__(coord, context=idx)
         self._name = "Climate Controller 2"
         self._module = module
         self._attr_unique_id = f"Mod_{self._module.uid}_{self._name}"
