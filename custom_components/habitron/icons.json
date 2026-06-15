@@ -94,6 +94,9 @@
       },
       "time_out": {
         "default": "mdi:timer-alert-outline"
+      },
+      "airquality": {
+        "default": "mdi:air-filter"
       }
     },
     "switch": {

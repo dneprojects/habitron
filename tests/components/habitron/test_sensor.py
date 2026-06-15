@@ -72,7 +72,8 @@ def test_wind_description_carries_translation_key() -> None:
         (HUMIDITY_DESCRIPTION, SensorDeviceClass.HUMIDITY),
         (ILLUMINANCE_DESCRIPTION, SensorDeviceClass.ILLUMINANCE),
         (WIND_DESCRIPTION, SensorDeviceClass.WIND_SPEED),
-        (AIRQUALITY_DESCRIPTION, SensorDeviceClass.AQI),
+        # Air quality is a percentage index, not the standard AQI; no device class.
+        (AIRQUALITY_DESCRIPTION, None),
         (CURRENT_DESCRIPTION, SensorDeviceClass.CURRENT),
         (VOLTAGE_DESCRIPTION, SensorDeviceClass.VOLTAGE),
     ],
