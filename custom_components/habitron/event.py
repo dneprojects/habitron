@@ -136,10 +136,11 @@ class InputPressed(HbtnEvent):
     @callback
     def _async_handle_event(self, event: str, *args: Any) -> None:
         """Handle event."""
-        # Call standard trigger for the event entity
+        # The bus emits an "inactive" reset after a press; it is a state reset,
+        # not a button event, so ignore anything outside the declared types.
+        if event not in self.event_types:
+            return
         self._trigger_event(event, {"extra_data": 123})
-
-        # Update the state of the entity
         self.async_write_ha_state()
 
 
@@ -168,6 +169,9 @@ class FingerDetected(HbtnEvent):
     @callback
     def _async_handle_event(self, event: str, user: int, finger: int) -> None:
         """Handle event."""
+        # Ignore the "inactive" reset emitted after a finger read.
+        if event not in self.event_types:
+            return
         if finger > 10:
             # user disabled
             user = user * (-1)
