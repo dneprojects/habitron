@@ -83,6 +83,7 @@ class HbtnComm:
         self.crc: int = 0
         self._rtr: HbtnRouter
         self.update_suspended: bool = False
+        self._last_status: bytes = b""  # last compact status, for change detection
         self.is_addon: bool = True  # will be set in get_smhub_info()
         self.slugname: str = ""
         self.info: dict[str, str] = {}
@@ -294,20 +295,29 @@ class HbtnComm:
         """Start mirror on specified router."""
         await self.client.stop_mirror()
 
-    async def async_system_update(self) -> None:
-        """Trigger update of Habitron states, must poll all routers."""
+    async def async_system_update(self) -> bytes:
+        """Trigger update of Habitron states, must poll all routers.
+
+        Returns the compact system status bytes. The coordinator uses the
+        returned value as its change-detection key (``always_update=False``):
+        if the bus status is unchanged, no entity fan-out happens that tick.
+        On a suspended/empty/too-short read the previous status is returned so
+        the tick counts as "unchanged".
+        """
         if self.update_suspended:
             # disable update to avoid conflict with SmartConfig or other communication
-            return
+            return self._last_status
         sys_status = await self.get_compact_status()
         if sys_status == b"":
-            return
+            return self._last_status
         if len(sys_status) < 10:
             self.logger.warning(
                 "Received compact system status too short, length: %s", len(sys_status)
             )
-            return
+            return self._last_status
         await self.router.update_system_status(sys_status)
+        self._last_status = sys_status
+        return sys_status
 
     async def async_set_group_mode(self, grp_no: int, new_mode: int) -> None:
         """Set mode for given group."""

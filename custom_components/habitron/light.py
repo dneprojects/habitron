@@ -79,7 +79,7 @@ async def async_setup_entry(
                 )
 
 
-class SwitchedLight(CoordinatorEntity[DataUpdateCoordinator[None]], LightEntity):
+class SwitchedLight(CoordinatorEntity[DataUpdateCoordinator[bytes]], LightEntity):
     """Representation of habitron light entities."""
 
     _attr_has_entity_name = True
@@ -90,7 +90,7 @@ class SwitchedLight(CoordinatorEntity[DataUpdateCoordinator[None]], LightEntity)
         self,
         output: IfDescriptor,
         module: HbtnModule,
-        coord: DataUpdateCoordinator[None],
+        coord: DataUpdateCoordinator[bytes],
         idx: int,
     ) -> None:
         """Initialize an HbtnLight, pass coordinator to CoordinatorEntity."""
@@ -146,7 +146,7 @@ class DimmedOutput(SwitchedLight):
         self,
         output: IfDescriptor,
         module: HbtnModule,
-        coord: DataUpdateCoordinator[None],
+        coord: DataUpdateCoordinator[bytes],
         idx: int,
     ) -> None:
         """Initialize a dimmable Habitron Light."""
@@ -212,7 +212,7 @@ class DimmedOutputPush(SwitchedLightPush):
         self,
         output: IfDescriptor,
         module: HbtnModule,
-        coord: DataUpdateCoordinator[None],
+        coord: DataUpdateCoordinator[bytes],
         idx: int,
     ) -> None:
         """Initialize a dimmable Habitron Light."""
@@ -247,7 +247,7 @@ class DimmedOutputPush(SwitchedLightPush):
         )
 
 
-class ColorLed(CoordinatorEntity[DataUpdateCoordinator[None]], LightEntity):
+class ColorLed(CoordinatorEntity[DataUpdateCoordinator[bytes]], LightEntity):
     """Representation of habitron light entities."""
 
     _attr_has_entity_name = True
@@ -258,7 +258,7 @@ class ColorLed(CoordinatorEntity[DataUpdateCoordinator[None]], LightEntity):
         self,
         led: CLedDescriptor,
         module: HbtnModule,
-        coord: DataUpdateCoordinator[None],
+        coord: DataUpdateCoordinator[bytes],
         idx: int,
     ) -> None:
         """Initialize an HbtnLight, pass coordinator to CoordinatorEntity."""

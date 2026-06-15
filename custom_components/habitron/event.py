@@ -87,7 +87,7 @@ class HbtnEvent(EventEntity):
         self,
         event_if: IfDescriptor,
         module: HbtnModule,
-        coord: DataUpdateCoordinator[None],
+        coord: DataUpdateCoordinator[bytes],
         idx: int,
     ) -> None:
         """Initialize an HbtnEvent, pass coordinator to CoordinatorEntity."""
@@ -154,7 +154,7 @@ class FingerDetected(HbtnEvent):
         self,
         event_if: IfDescriptor,
         module: HbtnModule,
-        coord: DataUpdateCoordinator[None],
+        coord: DataUpdateCoordinator[bytes],
         idx: int,
     ) -> None:
         """Initialize FingerDetected and setup extra attributes."""
@@ -193,7 +193,7 @@ class EkeyUserEvent(HbtnEvent):
         self,
         event_if: IfDescriptor,
         module: HbtnModule,
-        coord: DataUpdateCoordinator[None],
+        coord: DataUpdateCoordinator[bytes],
         idx: int,
         u_id: int,
         u_name: str,

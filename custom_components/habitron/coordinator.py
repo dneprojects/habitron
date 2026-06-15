@@ -26,19 +26,18 @@ platform files.
 _LOGGER = logging.getLogger(__name__)
 
 
-class HbtnCoordinator(DataUpdateCoordinator[None]):
+class HbtnCoordinator(DataUpdateCoordinator[bytes]):
     """Habitron data update coordinator.
 
-    The coordinator does not cache its own payload: ``async_system_update``
-    writes the bus status directly into the module/input/output objects,
-    and the entities read from those object attributes via their
-    ``_handle_coordinator_update`` callbacks. The coordinator therefore
-    acts as a heartbeat that fans out update events on each tick.
+    ``async_system_update`` writes the bus status directly into the
+    module/input/output objects, and the entities read from those object
+    attributes via their ``_handle_coordinator_update`` callbacks. The
+    coordinator acts as a heartbeat that fans out update events.
 
-    Because of this ``always_update=True`` is required: with
-    ``always_update=False`` the change-detection would compare
-    ``None == None`` between ticks and never propagate the heartbeat,
-    leaving entities frozen at their initial values.
+    ``async_system_update`` returns the raw compact-status bytes, which serve
+    as the change-detection key. With ``always_update=False`` the coordinator
+    only fans out to the entities when the bus status actually changed between
+    ticks, avoiding a needless write of every entity on every tick.
     """
 
     def __init__(
@@ -54,7 +53,7 @@ class HbtnCoordinator(DataUpdateCoordinator[None]):
             name="Habitron updates",
             config_entry=entry,
             update_interval=SCAN_INTERVAL,
-            always_update=True,
+            always_update=False,
         )
         self.comm = hbtn_comm
         self.config = hbtn_comm._config  # noqa: SLF001
@@ -65,19 +64,19 @@ class HbtnCoordinator(DataUpdateCoordinator[None]):
         """Run a first fetch during ``async_config_entry_first_refresh``."""
         await self._async_update_data()
 
-    async def _async_update_data(self) -> None:
+    async def _async_update_data(self) -> bytes:
         """Fetch the current Habitron status.
 
-        The returned value is unused; ``async_system_update`` writes
-        directly into module/input/output objects. Connection-level
-        failures (timeouts, network errors, refused connections) are
-        converted to ``UpdateFailed`` so the coordinator flips
-        ``last_update_success`` to False and every ``CoordinatorEntity``
-        is automatically marked unavailable in the frontend.
+        Returns the compact-status bytes used for change detection;
+        ``async_system_update`` also writes directly into the
+        module/input/output objects. Connection-level failures (timeouts,
+        network errors, refused connections) are converted to ``UpdateFailed``
+        so the coordinator flips ``last_update_success`` to False and every
+        ``CoordinatorEntity`` is automatically marked unavailable.
         """
         try:
             async with asyncio.timeout(20):
-                await self.comm.async_system_update()
+                return await self.comm.async_system_update()
         except TimeoutError as err:
             raise UpdateFailed(
                 translation_domain=DOMAIN,

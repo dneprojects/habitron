@@ -29,7 +29,7 @@ async def async_setup_entry(
 ) -> None:
     """Add input_select for passed config_entry in HA."""
     hbtn_rt: HbtnRouter = entry.runtime_data.router
-    hbtn_cord: DataUpdateCoordinator[None] = hbtn_rt.coord
+    hbtn_cord: DataUpdateCoordinator[bytes] = hbtn_rt.coord
     smhub = entry.runtime_data
 
     new_devices: list[SelectEntity] = []
@@ -72,7 +72,7 @@ async def async_setup_entry(
         async_add_entities(new_devices)
 
 
-class HbtnMode(CoordinatorEntity[DataUpdateCoordinator[None]], SelectEntity):
+class HbtnMode(CoordinatorEntity[DataUpdateCoordinator[bytes]], SelectEntity):
     """Representation of a input select for Habitron modes."""
 
     _attr_has_entity_name = True
@@ -81,7 +81,7 @@ class HbtnMode(CoordinatorEntity[DataUpdateCoordinator[None]], SelectEntity):
         self,
         module: int | HbtnModule,
         hbtnr: HbtnRouter,
-        coord: DataUpdateCoordinator[None],
+        coord: DataUpdateCoordinator[bytes],
         idx: int,
     ) -> None:
         """Initialize a Habitron mode, pass coordinator to CoordinatorEntity."""
@@ -161,7 +161,7 @@ class HbtnSelectDaytimeMode(HbtnMode):
         self,
         module: int | HbtnModule,
         hbtnr: HbtnRouter,
-        coord: DataUpdateCoordinator[None],
+        coord: DataUpdateCoordinator[bytes],
         idx: int,
     ) -> None:
         """Initialize daytime mode selector."""
@@ -206,7 +206,7 @@ class HbtnSelectAlarmMode(HbtnMode):
         self,
         module: int | HbtnModule,
         hbtnr: HbtnRouter,
-        coord: DataUpdateCoordinator[None],
+        coord: DataUpdateCoordinator[bytes],
         idx: int,
     ) -> None:
         """Initialize alarm mode selector."""
@@ -238,7 +238,7 @@ class HbtnSelectGroupMode(HbtnMode):
         self,
         module: int | HbtnModule,
         hbtnr: HbtnRouter,
-        coord: DataUpdateCoordinator[None],
+        coord: DataUpdateCoordinator[bytes],
         idx: int,
     ) -> None:
         """Initialize group mode selector."""
@@ -355,7 +355,7 @@ class HbtnSelectGroupModePush(HbtnSelectGroupMode):
 
 
 class HbtnSelectLoggingLevel(
-    CoordinatorEntity[DataUpdateCoordinator[None]], SelectEntity
+    CoordinatorEntity[DataUpdateCoordinator[bytes]], SelectEntity
 ):
     """Logging level object."""
 
@@ -365,7 +365,7 @@ class HbtnSelectLoggingLevel(
         self,
         smhub: SmartHub,
         level: IfDescriptor,
-        coord: DataUpdateCoordinator[None],
+        coord: DataUpdateCoordinator[bytes],
         idx: int,
     ) -> None:
         """Initialize a Habitron mode, pass coordinator to CoordinatorEntity."""
