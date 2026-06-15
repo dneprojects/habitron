@@ -5,6 +5,8 @@ from datetime import timedelta
 import logging
 from typing import TYPE_CHECKING
 
+from habitron_client import HabitronError, HabitronTimeoutError
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -84,12 +86,12 @@ class HbtnCoordinator(DataUpdateCoordinator[bytes]):
         try:
             async with asyncio.timeout(20):
                 return await self.comm.async_system_update()
-        except TimeoutError as err:
+        except (TimeoutError, HabitronTimeoutError) as err:
             raise UpdateFailed(
                 translation_domain=DOMAIN,
                 translation_key="update_timeout",
             ) from err
-        except (OSError, ConnectionError) as err:
+        except (OSError, ConnectionError, HabitronError) as err:
             raise UpdateFailed(
                 translation_domain=DOMAIN,
                 translation_key="update_network_error",
@@ -142,7 +144,7 @@ class HbtnFirmwareCoordinator(DataUpdateCoordinator[dict[str, tuple[str, str]]])
         addr = getattr(target, "raddr", 0)
         try:
             resp = await self.comm.handle_firmware(addr)
-        except (OSError, ConnectionError) as err:
+        except (OSError, ConnectionError, HabitronError) as err:
             _LOGGER.debug("Firmware read failed for %s: %s", target.name, err)
             return
         if not resp:
