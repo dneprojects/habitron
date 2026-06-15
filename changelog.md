@@ -1,5 +1,10 @@
 # Latest changes
 
+## v2.10.3
+
+### Fixed
+- Button and finger events no longer log an "invalid event type" warning on release.
+
 ## v2.10.2
 
 ### Fixed
