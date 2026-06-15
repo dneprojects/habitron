@@ -82,27 +82,51 @@ def test_ekey_user_event_constructor_extra_args() -> None:
 
 
 def test_input_pressed_handles_callback_short_press() -> None:
-    """A '1' callback value translates to single_press."""
+    """A single_press event triggers the entity."""
     inp = _make_input()
     mod = _make_module()
     coord = MagicMock()
     entity = InputPressed(inp, mod, coord, 0)
     entity._trigger_event = MagicMock()
     entity.async_write_ha_state = MagicMock()
-    entity._async_handle_event(1)
+    entity._async_handle_event("single_press")
     entity._trigger_event.assert_called()
 
 
 def test_input_pressed_handles_callback_long_press() -> None:
-    """A '2' callback value translates to long_press."""
+    """A long_press event triggers the entity."""
     inp = _make_input()
     mod = _make_module()
     coord = MagicMock()
     entity = InputPressed(inp, mod, coord, 0)
     entity._trigger_event = MagicMock()
     entity.async_write_ha_state = MagicMock()
-    entity._async_handle_event(2)
+    entity._async_handle_event("long_press")
     entity._trigger_event.assert_called()
+
+
+def test_input_pressed_ignores_inactive_reset() -> None:
+    """The bus 'inactive' reset is not a button event and must be ignored."""
+    inp = _make_input()
+    mod = _make_module()
+    coord = MagicMock()
+    entity = InputPressed(inp, mod, coord, 0)
+    entity._trigger_event = MagicMock()
+    entity.async_write_ha_state = MagicMock()
+    entity._async_handle_event("inactive")
+    entity._trigger_event.assert_not_called()
+
+
+def test_finger_detected_ignores_inactive_reset() -> None:
+    """FingerDetected ignores the 'inactive' reset emitted after a read."""
+    finger = _make_input()
+    mod = _make_module()
+    coord = MagicMock()
+    entity = FingerDetected(finger, mod, coord, 0)
+    entity._trigger_event = MagicMock()
+    entity.async_write_ha_state = MagicMock()
+    entity._async_handle_event("inactive", user=0, finger=0)
+    entity._trigger_event.assert_not_called()
 
 
 def test_input_pressed_remove_callback() -> None:
