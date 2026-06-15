@@ -1004,6 +1004,28 @@ async def test_get_names_smart_controller_mini_uses_cled_branch() -> None:
     assert mini.inputs[2].name == "In 3"
 
 
+async def test_get_names_touch_corner_leds() -> None:
+    """A Smart Controller Touch names its four colored corner LEDs (cleds 1..4)."""
+    desc = _make_descriptor(mtype=b"\x01\x04", name="SC Touch")
+    comm = _make_comm()
+    sc = SmartController(desc, MagicMock(), MagicMock(), "HUB-1", comm)
+
+    lines = [
+        _build_name_line(255, 0, 26, b"Top left"),
+        _build_name_line(255, 0, 27, b"Top right"),
+        _build_name_line(255, 0, 28, b"Bottom left"),
+        _build_name_line(255, 0, 29, b"Bottom right"),
+    ]
+    payload = _build_get_names_response(lines)
+    comm.async_get_module_definitions = AsyncMock(return_value=payload)
+
+    assert await sc.get_names() is True
+    assert sc.cleds[1].name == "Top left"
+    assert sc.cleds[2].name == "Top right"
+    assert sc.cleds[3].name == "Bottom left"
+    assert sc.cleds[4].name == "Bottom right"
+
+
 async def test_get_names_smart_gsm_messages_branch() -> None:
     """A Smart-GSM reply with sub_code 254 routes via the GSM-language branch."""
     desc = _make_descriptor(mtype=b"\x1e\x03", name="GSM")
