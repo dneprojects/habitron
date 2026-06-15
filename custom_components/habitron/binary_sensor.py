@@ -85,7 +85,9 @@ async def async_setup_entry(
                     )
 
 
-class HbtnBinSensor(CoordinatorEntity[DataUpdateCoordinator[bytes]], BinarySensorEntity):
+class HbtnBinSensor(
+    CoordinatorEntity[DataUpdateCoordinator[bytes]], BinarySensorEntity
+):
     """Representation of habitron switch input entities."""
 
     _attr_has_entity_name = True
