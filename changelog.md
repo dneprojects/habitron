@@ -1,5 +1,15 @@
 # Latest changes
 
+## v2.10.1
+
+### Fixed
+- Air-quality sensor no longer triggers an invalid AQI device-class warning.
+- Smart Touch corner LED labels are parsed correctly.
+
+### Internal
+- Logging messages improved.
+- Firmware polling spread across heartbeats; coordinator fans out only on bus changes.
+
 ## v2.10.0
 
 ### New feature
