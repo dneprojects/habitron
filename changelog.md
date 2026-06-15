@@ -3,12 +3,14 @@
 ## v2.10.1
 
 ### Fixed
-- Air-quality sensor no longer triggers an invalid AQI device-class warning.
+- Air-quality sensor no longer logs an invalid AQI device-class warning.
 - Smart Touch corner LED labels are parsed correctly.
+- No spurious error when the hub posts an event during startup.
 
 ### Internal
-- Logging messages improved.
-- Firmware polling spread across heartbeats; coordinator fans out only on bus changes.
+- Firmware versions polled by a dedicated round-robin coordinator, off the entity poll path.
+- Less log noise (firmware/assist/network-info downgraded; auth token no longer logged).
+- Entities update only when the bus status actually changes.
 
 ## v2.10.0
 
