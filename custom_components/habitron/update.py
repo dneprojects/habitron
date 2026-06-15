@@ -54,6 +54,9 @@ class _RoundRobin:
 # directly — no copy into ``<config>/www/`` necessary.
 _FIRMWARE_URL_PREFIX = "/habitron-firmware"
 
+# Legacy firmware paths already warned about, so the nudge is logged only once.
+_LEGACY_FIRMWARE_WARNED: set[str] = set()
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -212,13 +215,15 @@ class SCTouchAppUpdate(UpdateEntity):
         if new_path.is_dir() or not legacy_path.is_dir():
             self.firmware_dir = new_path
         else:
-            _LOGGER.warning(
-                "Reading firmware from legacy location %s; move it to %s — "
-                "the legacy path will not exist in a Home Assistant Core "
-                "install of this integration",
-                legacy_path,
-                new_path,
-            )
+            if str(legacy_path) not in _LEGACY_FIRMWARE_WARNED:
+                _LEGACY_FIRMWARE_WARNED.add(str(legacy_path))
+                _LOGGER.warning(
+                    "Reading firmware from legacy location %s; move it to %s — "
+                    "the legacy path will not exist in a Home Assistant Core "
+                    "install of this integration",
+                    legacy_path,
+                    new_path,
+                )
             self.firmware_dir = legacy_path
 
     async def async_update(self) -> None:
@@ -437,10 +442,15 @@ class HbtnModuleUpdate(CoordinatorEntity[DataUpdateCoordinator[bytes]], UpdateEn
                 return
             versions = resp.decode("iso8859-1").split("\n")
             if len(versions) == 2:
-                self._attr_latest_version = versions[1]
+                previous_latest = self._attr_latest_version
                 self._attr_installed_version = versions[0]
-                if self._attr_latest_version != self._attr_installed_version:
-                    _LOGGER.warning(
+                self._attr_latest_version = versions[1]
+                if self._attr_latest_version not in {
+                    self._attr_installed_version,
+                    previous_latest,
+                }:
+                    # Log once when a new update appears; the UI already shows it.
+                    _LOGGER.info(
                         "Firmware update available for module %s: %s -> %s",
                         self._module.name,
                         self._attr_installed_version,
