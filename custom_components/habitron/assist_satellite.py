@@ -92,29 +92,25 @@ class HbtnAssistSat(AssistSatelliteEntity):
     @callback
     def set_listening(self) -> None:
         """Set the state to listening."""
-        _LOGGER.warning("HbtnAssistSat: set_listening called for %s", self._stream_name)
+        _LOGGER.debug("HbtnAssistSat: set_listening called for %s", self._stream_name)
         self._set_state(AssistSatelliteState.LISTENING)
 
     @callback
     def set_processing(self) -> None:
         """Set the state to processing."""
-        _LOGGER.warning(
-            "HbtnAssistSat: set_processing called for %s", self._stream_name
-        )
+        _LOGGER.debug("HbtnAssistSat: set_processing called for %s", self._stream_name)
         self._set_state(AssistSatelliteState.PROCESSING)
 
     @callback
     def set_responding(self) -> None:
         """Set the state to responding."""
-        _LOGGER.warning(
-            "HbtnAssistSat: set_responding called for %s", self._stream_name
-        )
+        _LOGGER.debug("HbtnAssistSat: set_responding called for %s", self._stream_name)
         self._set_state(AssistSatelliteState.RESPONDING)
 
     @callback
     def set_idle(self) -> None:
         """Set the state to idle."""
-        _LOGGER.warning("HbtnAssistSat: set_idle called for %s", self._stream_name)
+        _LOGGER.debug("HbtnAssistSat: set_idle called for %s", self._stream_name)
         self._set_state(AssistSatelliteState.IDLE)
 
     async def async_start_conversation(
