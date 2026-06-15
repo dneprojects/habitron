@@ -37,8 +37,8 @@ _LOGGER = logging.getLogger(__name__)
 # directly — no copy into ``<config>/www/`` necessary.
 _FIRMWARE_URL_PREFIX = "/habitron-firmware"
 
-# Legacy firmware paths already warned about, so the nudge is logged only once.
-_LEGACY_FIRMWARE_WARNED: set[str] = set()
+# Legacy firmware paths already logged, so the migration nudge appears only once.
+_LEGACY_FIRMWARE_LOGGED: set[str] = set()
 
 
 async def async_setup_entry(
@@ -197,9 +197,9 @@ class SCTouchAppUpdate(UpdateEntity):
             self.firmware_dir = new_path
             return
         self.firmware_dir = legacy_path
-        if str(legacy_path) not in _LEGACY_FIRMWARE_WARNED:
-            _LEGACY_FIRMWARE_WARNED.add(str(legacy_path))
-            _LOGGER.warning("Legacy firmware %s, move to %s", legacy_path, new_path)
+        if str(legacy_path) not in _LEGACY_FIRMWARE_LOGGED:
+            _LEGACY_FIRMWARE_LOGGED.add(str(legacy_path))
+            _LOGGER.info("Legacy firmware %s, move to %s", legacy_path, new_path)
 
     async def async_update(self) -> None:
         """Fetch latest state."""
