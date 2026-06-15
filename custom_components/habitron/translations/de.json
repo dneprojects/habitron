@@ -147,6 +147,9 @@
       },
       "time_out": {
         "name": "Timeout"
+      },
+      "airquality": {
+        "name": "Luftqualität"
       }
     },
     "switch": {

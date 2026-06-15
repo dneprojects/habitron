@@ -384,7 +384,7 @@ WIND_DESCRIPTION = HbtnSensorEntityDescription(
 )
 AIRQUALITY_DESCRIPTION = HbtnSensorEntityDescription(
     key="airquality",
-    device_class=SensorDeviceClass.AQI,
+    translation_key="airquality",
     native_unit_of_measurement=PERCENTAGE,
     value_fn=lambda module, idx: module.sensors[idx].value,
 )
