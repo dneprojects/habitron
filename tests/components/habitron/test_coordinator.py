@@ -2,7 +2,12 @@
 
 from unittest.mock import AsyncMock, MagicMock
 
-from habitron_client import HabitronConnectionError, HabitronTimeoutError
+from habitron_client import (
+    HabitronConnectionError,
+    HabitronTimeoutError,
+    Module,
+    Router,
+)
 import pytest
 
 from custom_components.habitron.const import SCAN_INTERVAL
@@ -109,15 +114,8 @@ async def test_coordinator_library_error_raises_update_failed(
 def _make_fw_comm(resp: bytes = b"1.0.0\n2.0.0") -> MagicMock:
     """Stub comm with a router + one module, both reachable via handle_firmware."""
     comm = MagicMock()
-    router = MagicMock()
-    router.uid = "ROUTER-1"
-    router.name = "Router"
-    router.raddr = 0
-    mod = MagicMock()
-    mod.uid = "MOD-1"
-    mod.name = "Mod 1"
-    mod.raddr = 5
-    router.modules = [mod]
+    router = Router(uid="ROUTER-1", name="Router")
+    router.modules = [Module(uid="MOD-1", addr=105, typ=b"\x01\x02", name="Mod 1")]
     comm.router = router
     comm.handle_firmware = AsyncMock(return_value=resp)
     return comm
