@@ -304,6 +304,8 @@ class HbtnComm:
         if self.update_suspended:
             # disable update to avoid conflict with SmartConfig or other communication
             return self.crc
+        # Refresh the hub-level diagnostics (CPU/memory/...) alongside the bus.
+        await self.smhub.update()
         self.crc = await async_refresh_system(
             self.client, self.router, last_crc=self.crc
         )
