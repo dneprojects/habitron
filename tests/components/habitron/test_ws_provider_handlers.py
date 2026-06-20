@@ -106,7 +106,7 @@ async def test_register_stream_stores_connection_and_runs_disconnect() -> None:
     conn = _make_connection()
 
     mod = MagicMock()
-    provider.rtr.get_module_by_stream = MagicMock(return_value=mod)
+    provider.module_by_stream = MagicMock(return_value=mod)
 
     await handlers["register_stream"](
         provider.hass,
@@ -148,7 +148,7 @@ async def test_register_stream_warns_when_existing_connection_replaced() -> None
     old = _make_connection()
     new = _make_connection()
     provider.active_ws_connections["touch_1"] = old
-    provider.rtr.get_module_by_stream = MagicMock(return_value=None)
+    provider.module_by_stream = MagicMock(return_value=None)
     await handlers["register_stream"](
         provider.hass,
         new,
@@ -167,7 +167,7 @@ async def test_register_stream_disconnect_skips_done_future() -> None:
     provider = _make_provider()
     handlers = _registered_handlers(provider)
     conn = _make_connection()
-    provider.rtr.get_module_by_stream = MagicMock(return_value=None)
+    provider.module_by_stream = MagicMock(return_value=None)
     await handlers["register_stream"](
         provider.hass,
         conn,
@@ -190,7 +190,7 @@ async def test_register_stream_disconnect_skips_done_task() -> None:
     provider = _make_provider()
     handlers = _registered_handlers(provider)
     conn = _make_connection()
-    provider.rtr.get_module_by_stream = MagicMock(return_value=None)
+    provider.module_by_stream = MagicMock(return_value=None)
     await handlers["register_stream"](
         provider.hass,
         conn,
@@ -999,7 +999,7 @@ async def test_report_state_fires_bus_event_and_records_version() -> None:
     conn = _make_connection()
     provider.active_ws_connections["touch_1"] = conn
     mod = MagicMock()
-    provider.rtr.get_module_by_stream = MagicMock(return_value=mod)
+    provider.module_by_stream = MagicMock(return_value=mod)
     await handlers["report_state"](
         provider.hass,
         conn,
@@ -1019,7 +1019,7 @@ async def test_report_state_without_matching_module_just_fires() -> None:
     handlers = _registered_handlers(provider)
     conn = _make_connection()
     provider.active_ws_connections["touch_1"] = conn
-    provider.rtr.get_module_by_stream = MagicMock(return_value=None)
+    provider.module_by_stream = MagicMock(return_value=None)
     await handlers["report_state"](
         provider.hass,
         conn,

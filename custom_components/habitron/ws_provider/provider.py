@@ -14,7 +14,7 @@ import re
 from typing import TYPE_CHECKING, Any
 import uuid
 
-from habitron_client import Module, Router
+from habitron_client import Router, SmartController
 
 from homeassistant.components.camera import (
     Camera,
@@ -71,10 +71,13 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
             async_register_webrtc_provider(self.hass, self)
         )
 
-    def module_by_stream(self, stream_name: str) -> Module | None:
+    def module_by_stream(self, stream_name: str) -> SmartController | None:
         """Return the Smart Controller Touch module for a WebRTC stream name."""
         for module in self.rtr.modules:
-            if module.mod_type != "Smart Controller Touch":
+            if not (
+                isinstance(module, SmartController)
+                and module.mod_type == "Smart Controller Touch"
+            ):
                 continue
             raddr = module.addr - self.rtr.id
             if f"{slugify(module.name)}_{raddr}" == stream_name:
