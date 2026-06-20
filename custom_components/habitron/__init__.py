@@ -41,7 +41,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: HabitronConfigEntry) -> 
         smhub = SmartHub(hass, entry)
         await smhub.async_setup()
         # Central first refresh — done once here instead of per platform.
-        await smhub.router.coord.async_config_entry_first_refresh()
+        await smhub.coordinator.async_config_entry_first_refresh()
 
         provider = HabitronWebRTCProvider(hass, smhub.router)
         smhub.ws_provider = provider

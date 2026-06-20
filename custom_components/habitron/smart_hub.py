@@ -1,18 +1,19 @@
-"""SmartHub class."""
+"""SmartHub class — the integration's thin binding to the habitron_client model."""
 
 from enum import Enum
 from pathlib import Path
+
+from habitron_client import Diagnostic, Router, Sensor, async_build_system
 
 from homeassistant.components.frontend import add_extra_js_url
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import area_registry as ar, device_registry as dr
 
 from .communicate import HbtnComm as hbtn_com
 from .const import DOMAIN
-from .interfaces import IfDescriptor
-from .router import HbtnRouter as hbtr
+from .coordinator import HbtnCoordinator
 from .ws_provider import HabitronWebRTCProvider
 
 
@@ -27,14 +28,21 @@ class LoggingLevels(Enum):
     critical = 5
 
 
+def _area_name(router: Router, area_no: int) -> str:
+    """Return the bus area name for ``area_no`` (or ``House``)."""
+    for area in router.areas:
+        if area.nmbr == area_no:
+            return area.name
+    return "House"
+
+
 class SmartHub:
-    """Habitron SmartHub class."""
+    """Habitron SmartHub: connects, builds the device model, owns the coordinator."""
 
     manufacturer = "Habitron GmbH"
 
     def __init__(self, hass: HomeAssistant, config: ConfigEntry) -> None:
         """Init SmartHub."""
-
         self.hass: HomeAssistant = hass
         self.config: ConfigEntry = config
         self._name: str = config.title
@@ -47,15 +55,18 @@ class SmartHub:
         self._type = "Unknown"
 
         self.online: bool = True
-        self.router = hbtr(self.hass, self.config, self)
+        # Empty model until async_setup builds it from the bus.
+        self.router: Router = Router()
+        self.coordinator: HbtnCoordinator = HbtnCoordinator(hass, config, self.comm)
         self.addon_slug: str = ""
         self.base_url: str = ""
         self.host = self.comm.com_ip
         self._port = self.comm.com_port
 
-        self.sensors: list[IfDescriptor] = []
-        self.diags: list[IfDescriptor] = []
-        self.loglvl: list[IfDescriptor] = []
+        # Hub-level (SmartHub host) diagnostics — separate from the bus model.
+        self.sensors: list[Sensor] = []
+        self.diags: list[Diagnostic] = []
+        self.loglvl: list[Sensor] = []
         self.ws_provider: HabitronWebRTCProvider | None = None
 
     @property
@@ -64,31 +75,25 @@ class SmartHub:
         return self._version
 
     async def async_setup(self) -> None:
-        """Initialize SmartHub instance and register device."""
-
-        # 1. Fetch info from Hub. ``comm.async_setup`` resolves the host and
-        # opens the persistent client connection; ``get_smhub_info`` then
-        # populates ``self.comm.info`` and the mac/version/host fields.
+        """Connect, register the hub device and build the bus model."""
+        # 1. Open the client connection and fetch hub info (mac/version/host).
         await self.comm.async_setup()
         await self.comm.get_smhub_info()
 
-        # 2. Update local variables with real data
         self._mac = self.comm.com_mac
         self.uid = self._mac.replace(":", "")
         self._version = self.comm.com_version
         self._type = self.comm.com_hwtype
         self.host = self.comm.com_ip
         self.addon_slug = self.comm.slugname
-        self.router.b_uid = self.uid
 
         if self.comm.is_addon:
             self.base_url = f"http://{self.host}:8123/{self.addon_slug}/ingress?index="
         else:
             self.base_url = f"http://{self.host}:7780"
-
         conf_url = f"{self.base_url}/hub" if self.host else None
 
-        # 3. Register device in HA with MAC and UID, iconset
+        # 2. Register the hub device.
         device_registry = dr.async_get(self.hass)
         device_registry.async_get_or_create(
             config_entry_id=self.config.entry_id,
@@ -102,8 +107,37 @@ class SmartHub:
             sw_version=self._version,
             hw_version=self._type,
         )
+        self._register_iconset()
 
-        # Habitron iconset
+        # 3. Hub diagnostics (depends on the platform type).
+        if self._type[:12] == "Raspberry Pi":
+            self.diags = [
+                Diagnostic(name="CPU Frequency", nmbr=0, type=10),
+                Diagnostic(name="CPU load", nmbr=1, type=10),
+                Diagnostic(name="CPU Temperature", nmbr=2, type=10),
+            ]
+            self.sensors = [
+                Sensor(name="Memory free", nmbr=0, type=2, value=0),
+                Sensor(name="Disk free", nmbr=1, type=2, value=0),
+            ]
+            self.loglvl = [
+                Sensor(name="Logging level console", nmbr=0, type=2, value=0),
+                Sensor(name="Logging level file", nmbr=1, type=2, value=0),
+            ]
+
+        # 4. Build the bus model (router + modules), register their devices.
+        await self.comm.reinit_hub(0)
+        await self.comm.send_network_info(self.config.data["websock_token"])
+        self.router = await async_build_system(self.comm.client, b_uid=self.uid)
+        self.comm.set_router(self.router)
+        await self._register_bus_devices()
+        await self.comm.reinit_hub(1)
+
+        # 5. First hub-diagnostics update.
+        await self.update()
+
+    def _register_iconset(self) -> None:
+        """Register the Habitron frontend iconset (HACS only, best effort)."""
         files_path = Path(__file__).parent / "logos"
         path_config = StaticPathConfig(
             "/habitronfiles/hbt-icons.js",
@@ -111,55 +145,82 @@ class SmartHub:
             False,
         )
         try:
-            await self.hass.http.async_register_static_paths(
-                [path_config],
+            self.hass.async_create_task(
+                self.hass.http.async_register_static_paths([path_config])
             )
             add_extra_js_url(self.hass, "/habitronfiles/hbt-icons.js")
         except Exception:  # noqa: BLE001
-            # The static-path registration is per-process; on integration
-            # reload, the second call raises but the path is still wired
-            # from the first call. Swallow and continue.
+            # Per-process registration; the second call on reload raises but the
+            # path stays wired from the first. Swallow and continue.
             pass
 
-        # 4. Initialize Diagnostics (Logic depends on self._type)
-        if self._type[:12] == "Raspberry Pi":
-            self.diags.append(IfDescriptor("CPU Frequency", 0, 10, 0))
-            self.diags.append(IfDescriptor("CPU load", 1, 10, 0))
-            self.diags.append(IfDescriptor("CPU Temperature", 2, 10, 0))
-            self.sensors.append(IfDescriptor("Memory free", 0, 2, 0))
-            self.sensors.append(IfDescriptor("Disk free", 1, 2, 0))
-            self.loglvl.append(IfDescriptor("Logging level console", 0, 2, 0))
-            self.loglvl.append(IfDescriptor("Logging level file", 1, 2, 0))
+    async def _register_bus_devices(self) -> None:
+        """Register the router + module devices and push their registry ids."""
+        dev_reg = dr.async_get(self.hass)
+        area_reg = ar.async_get(self.hass)
+        router = self.router
 
-        # 5. Rest of setup
-        await self.comm.reinit_hub(0)
-        await self.comm.send_network_info(self.config.data["websock_token"])
-        await self.router.initialize()
-        await self.comm.reinit_hub(1)
+        dev_reg.async_get_or_create(
+            config_entry_id=self.config.entry_id,
+            configuration_url=f"{self.base_url}/router" if self.host else None,
+            identifiers={(DOMAIN, router.uid)},
+            manufacturer="Habitron GmbH",
+            name=router.name,
+            model="Smart Router",
+            sw_version=router.version,
+            hw_version=router.serial,
+            via_device=(DOMAIN, self.uid),
+        )
+        rt_dev = dev_reg.async_get_device(identifiers={(DOMAIN, router.uid)})
+        if rt_dev is not None:
+            await self.comm.send_devregid(0, rt_dev.id)
 
-        # 6. First data update
-        await self.update()
+        for module in router.modules:
+            raddr = module.addr - router.id
+            area_name = _area_name(router, module.area)
+            dev_reg.async_get_or_create(
+                config_entry_id=self.config.entry_id,
+                configuration_url=(
+                    f"{self.base_url}/module-{raddr}" if self.host else None
+                ),
+                identifiers={(DOMAIN, module.uid)},
+                manufacturer="Habitron GmbH",
+                suggested_area=area_name,
+                name=module.name,
+                model=module.mod_type,
+                sw_version=module.sw_version,
+                hw_version=module.hw_version,
+                via_device=(DOMAIN, router.uid),
+            )
+            dev = dev_reg.async_get_device(identifiers={(DOMAIN, module.uid)})
+            area = area_reg.async_get_or_create(area_name)
+            if dev is not None:
+                await self.comm.send_devregid(raddr, dev.id)
+                dev_reg.async_update_device(dev.id, area_id=area.id)
 
     async def update(self) -> None:
-        """Update in a module specific method. Reads and parses status."""
+        """Refresh the hub-level diagnostics from the SmartHub info query."""
         info = await self.comm.get_smhub_update()
         if not info or not self.diags:
             return
-        self.diags[0].value = float(
-            info["hardware"]["cpu"]["frequency current"].replace("MHz", "")
+        hardware = info["hardware"]
+        software = info["software"]
+        self._set(
+            self.diags[0], float(hardware["cpu"]["frequency current"].rstrip("MHz"))
         )
-        self.diags[1].value = float(info["hardware"]["cpu"]["load"].replace("%", ""))
-        self.diags[2].value = float(
-            info["hardware"]["cpu"]["temperature"].replace("°C", "")
-        )
-        self.sensors[0].value = float(
-            info["hardware"]["memory"]["percent"].replace("%", "")
-        )
-        self.sensors[1].value = float(
-            info["hardware"]["disk"]["percent"].replace("%", "")
-        )
-        self.loglvl[0].value = int(info["software"]["loglevel"]["console"])
-        self.loglvl[1].value = int(info["software"]["loglevel"]["file"])
+        self._set(self.diags[1], float(hardware["cpu"]["load"].rstrip("%")))
+        self._set(self.diags[2], float(hardware["cpu"]["temperature"].rstrip("°C")))
+        self._set(self.sensors[0], float(hardware["memory"]["percent"].rstrip("%")))
+        self._set(self.sensors[1], float(hardware["disk"]["percent"].rstrip("%")))
+        self._set(self.loglvl[0], int(software["loglevel"]["console"]))
+        self._set(self.loglvl[1], int(software["loglevel"]["file"]))
+
+    @staticmethod
+    def _set(member: Diagnostic | Sensor, value: float) -> None:
+        """Set a hub member's value and notify listeners on a change."""
+        if member.value != value:
+            member.value = value
+            member.notify()
 
     async def async_update(self) -> None:
         """Async wrapper retained for callers expecting the old API."""

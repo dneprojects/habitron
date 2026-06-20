@@ -11,6 +11,10 @@ import anyio
 from habitron_client import (
     HabitronClient,
     HabitronTimeoutError,
+    Module,
+    Router,
+    apply_event,
+    async_refresh_system,
     format_block_output,
     get_host_ip,
     get_own_ip,
@@ -20,11 +24,7 @@ from homeassistant.components import network
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from .const import HaEvents
-
 if TYPE_CHECKING:
-    from .module import HbtnModule
-    from .router import HbtnRouter
     from .smart_hub import SmartHub
 
 DATA_FILES_ADDON_DIR = "/addon_configs/"
@@ -81,7 +81,7 @@ class HbtnComm:
         self.logger.info("Got network ip: %s", self._network_ip)
 
         self.crc: int = 0
-        self._rtr: HbtnRouter
+        self._rtr: Router
         self.update_suspended: bool = False
         self._last_status: bytes = b""  # last compact status, for change detection
         self.is_addon: bool = True  # will be set in get_smhub_info()
@@ -108,11 +108,18 @@ class HbtnComm:
         return self._client
 
     @property
-    def router(self) -> HbtnRouter:
-        """Return the router instance."""
+    def router(self) -> Router:
+        """Return the parsed router model."""
         if not hasattr(self, "_rtr"):
             return self.smhub.router
         return self._rtr
+
+    def _module_by_addr(self, mod_addr: int) -> Module | None:
+        """Return the model module with the given full address (or None)."""
+        for module in self.router.modules:
+            if module.addr == mod_addr:
+                return module
+        return None
 
     @property
     def com_ip(self) -> str:
@@ -218,8 +225,8 @@ class HbtnComm:
         self.logger.info("Re-initialized hub with mode %s", mode)
         return resp
 
-    def set_router(self, rtr: HbtnRouter) -> None:
-        """Register the router instance."""
+    def set_router(self, rtr: Router) -> None:
+        """Register the router model instance."""
         self._rtr = rtr
 
     async def get_smhub_version(self) -> bytes:
@@ -260,13 +267,6 @@ class HbtnComm:
         """Get router SMR information."""
         return await self.client.get_smr()
 
-    async def send_devreg_ids(self) -> None:
-        """Send device registry ids to all modules."""
-        for module in self.router.modules:
-            if module.devreg_id != "":
-                await module.send_devregid()
-                self.logger.info("Sent device registry id to module %s", module.name)
-
     async def async_get_router_status(self) -> bytes:
         """Get router status."""
         return await self.client.get_router_status()
@@ -291,29 +291,23 @@ class HbtnComm:
         """Start mirror on specified router."""
         await self.client.stop_mirror()
 
-    async def async_system_update(self) -> bytes:
-        """Trigger update of Habitron states, must poll all routers.
+    async def async_system_update(self) -> int:
+        """Poll the bus and update the model in place via the library.
 
-        Returns the compact system status bytes. The coordinator uses the
-        returned value as its change-detection key (``always_update=False``):
-        if the bus status is unchanged, no entity fan-out happens that tick.
-        On a suspended/empty/too-short read the previous status is returned so
+        Delegates to ``async_refresh_system``, which fetches the compact status,
+        and—on a CRC change—applies the router status and distributes the status
+        to the modules (firing per-member listeners). Returns the status CRC,
+        used by the coordinator as its change-detection key
+        (``always_update=False``). While suspended the last CRC is returned so
         the tick counts as "unchanged".
         """
         if self.update_suspended:
             # disable update to avoid conflict with SmartConfig or other communication
-            return self._last_status
-        sys_status = await self.get_compact_status()
-        if sys_status == b"":
-            return self._last_status
-        if len(sys_status) < 10:
-            self.logger.warning(
-                "Received compact system status too short, length: %s", len(sys_status)
-            )
-            return self._last_status
-        await self.router.update_system_status(sys_status)
-        self._last_status = sys_status
-        return sys_status
+            return self.crc
+        self.crc = await async_refresh_system(
+            self.client, self.router, last_crc=self.crc
+        )
+        return self.crc
 
     async def async_set_group_mode(self, grp_no: int, new_mode: int) -> None:
         """Set mode for given group."""
@@ -341,7 +335,7 @@ class HbtnComm:
 
     async def async_set_led_outp(self, mod_id: int, nmbr: int, val: int) -> None:
         """Translate led nmbr to output nmbr and send on/off command."""
-        mod = self.router.get_module(self._convert_mod_id(mod_id))
+        mod = self._module_by_addr(mod_id)
         if mod is None:
             self.logger.warning("async_set_led_outp: unknown mod_id %s", mod_id)
             return
@@ -531,7 +525,7 @@ class HbtnComm:
         """Send device registry id to module."""
         await self.client.send_devregid(mod_nmbr, devreg_id)
 
-    async def update_entity(  # noqa: C901
+    async def update_entity(
         self,
         hub_id: str,
         mod_id: int,
@@ -542,130 +536,16 @@ class HbtnComm:
         arg4: int = 0,
         arg5: int = 0,
     ) -> None:
-        """Event server handler to receive entity updates."""
-        inp_event_types = ["inactive", "single_press", "long_press", "long_press_end"]
-        module: HbtnModule | None
+        """Event-server handler: feed a SmartHub push event into the model.
+
+        The library's ``apply_event`` updates the matching member and fires its
+        listeners (entities write HA state). Event-only behaviour that needs HA
+        timing — the finger reset pulse, button device triggers — lives in the
+        event platform, which reacts to the member notifications.
+        """
         if self._hostip != hub_id:
             return
-        if mod_id == 0:
-            # router event
-            if evnt == HaEvents.FLAG:
-                for flg in self.router.flags:
-                    if flg.nmbr == arg1:
-                        flg.value = arg2
-                        await flg.handle_upd_event()
-                        break
-                return
-        elif evnt == HaEvents.MODE:
-            self.grp_modes[arg1] = arg2
-            if arg1 == 0:
-                self.router.mode.value = arg2
-                await self.router.mode.handle_upd_event()
-            else:
-                mod_idx = self.router.module_grp.index(arg1)
-                module = self.router.modules[mod_idx]
-                module.mode.value = arg2
-                await module.mode.handle_upd_event()
-            return
-        try:
-            module = self.router.get_module(mod_id)
-        except Exception as err_msg:  # noqa: BLE001
-            self.logger.warning(
-                "Error handling habitron event %s with arg1 %s of module %s: %s",
-                evnt,
-                arg1,
-                mod_id,
-                err_msg,
-            )
-            return
-
-        if module is None:
-            self.logger.error(
-                "Error in update_entity: No module found for mod_id %s", mod_id
-            )
-        else:
-            try:
-                if evnt == HaEvents.BUTTON:
-                    # Button pressed or released
-                    await module.inputs[arg1 - 1].handle_upd_event(
-                        inp_event_types[arg2]
-                    )
-                    if arg2 in [1, 3]:
-                        await module.inputs[arg1 - 1].handle_upd_event(
-                            inp_event_types[0]
-                        )
-                elif evnt == HaEvents.SWITCH:
-                    # Switch input changed
-                    module.inputs[arg1 - 1].value = arg2
-                    await module.inputs[arg1 - 1].handle_upd_event()
-                elif evnt == HaEvents.OUTPUT:
-                    # Output changed
-                    if arg1 > 15:
-                        # LED
-                        if isinstance(module.leds[arg1 - 16].value, list):
-                            module.leds[arg1 - 16].value[0] = arg2
-                        else:
-                            module.leds[arg1 - 16].value = arg2
-                        await module.leds[arg1 - 16].handle_upd_event()
-                    elif (module.typ[0] == 50) & (arg1 > 2):
-                        await module.leds[arg1 - 2 - 1].handle_upd_event()
-                    else:
-                        module.outputs[arg1 - 1].value = arg2
-                        await module.outputs[arg1 - 1].handle_upd_event()
-                        if (c_idx := module.get_cover_index(arg1)) >= 0:
-                            await module.covers[c_idx].handle_upd_event()
-                elif evnt == HaEvents.RGB:
-                    # RGB output changed
-                    idx = arg1
-                    if arg2 == 2:
-                        # RGB value change, arg1 is RGB output nmbr, arg2 is 2 for rgb value change, arg3 is R/G/B index, arg4 is new value
-                        module.cleds[idx].value[0] = 1
-                        module.cleds[idx].value[1] = arg3
-                        module.cleds[idx].value[2] = arg4
-                        module.cleds[idx].value[3] = arg5
-                    else:
-                        module.cleds[idx].value[0] = arg2
-                    await module.cleds[idx].handle_upd_event()
-                elif evnt == HaEvents.FINGER:
-                    # Ekey input detected
-                    if arg2 <= 10:
-                        module.sensors[0].value = arg1
-                    else:
-                        module.sensors[0].value = arg1 * (-1)
-                    await module.sensors[0].handle_upd_event()
-                    await module.fingers[0].handle_upd_event("finger", arg1, arg2)
-                    await asyncio.sleep(0.2)
-                    # set back to 'None'
-                    await module.fingers[0].handle_upd_event("inactive", 0, 0)
-                elif evnt == HaEvents.DIM_VAL:
-                    module.dimmers[arg1].value = arg2
-                    await module.dimmers[arg1].handle_upd_event()
-                elif evnt == HaEvents.COV_VAL:
-                    module.covers[arg1].value = arg2
-                    await module.covers[arg1].handle_upd_event()
-                elif evnt == HaEvents.BLD_VAL:
-                    module.covers[arg1].tilt = arg2
-                    await module.covers[arg1].handle_upd_event()
-                elif evnt == HaEvents.MOVE:
-                    module.sensors[arg1].value = int(arg2 > 0)
-                    await module.sensors[arg1].handle_upd_event()
-                elif evnt == HaEvents.FLAG:
-                    for flg in module.flags:
-                        if flg.nmbr == arg1:
-                            flg.value = arg2
-                            await flg.handle_upd_event()
-                            break
-                elif evnt == HaEvents.CNT_VAL:
-                    module.logic[arg1].value = arg2
-                    await module.logic[arg1].handle_upd_event()
-            except Exception as err_msg:  # noqa: BLE001
-                self.logger.warning(
-                    "Error handling habitron event %s with arg1 %s of module %s: %s",
-                    evnt,
-                    arg1,
-                    mod_id,
-                    err_msg,
-                )
+        apply_event(self.router, mod_id, evnt, arg1, arg2, arg3, arg4, arg5)
 
 
 # End of communicate definition.

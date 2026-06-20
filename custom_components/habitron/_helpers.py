@@ -10,8 +10,6 @@
   module device.
 """
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
 from habitron_client import BusMember, Module
