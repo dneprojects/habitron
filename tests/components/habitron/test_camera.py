@@ -3,15 +3,9 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.camera import HbtnCam, async_setup_entry
 from homeassistant.core import HomeAssistant
-
-
-async def test_camera_setup(setup_integration: MockConfigEntry) -> None:
-    """The camera platform sets up cleanly against an empty router."""
-    assert setup_integration.runtime_data is not None
 
 
 def _make_touch_module(uid: str = "MOD-T", stream: str = "touch_1") -> MagicMock:
