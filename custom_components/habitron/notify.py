@@ -1,8 +1,10 @@
 """Platform for notification integration."""
 
 import logging
+from typing import TYPE_CHECKING
 
-# Import the device class from the component that you want to support
+from habitron_client import HbtnCommand, Module
+
 from homeassistant.components.notify import NotifyEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -10,8 +12,9 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from ._helpers import hbtn_device_info
 from .coordinator import HabitronConfigEntry
-from .interfaces import IfDescriptor
-from .module import HbtnModule
+
+if TYPE_CHECKING:
+    from .communicate import HbtnComm
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -23,28 +26,30 @@ async def async_setup_entry(
     entry: HabitronConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Add event entities for Habitron system."""
-    hbtn_rt = entry.runtime_data.router
+    """Add notification entities for Habitron GSM modules."""
+    smhub = entry.runtime_data
     new_devices: list[NotifyEntity] = []
-    for hbt_module in hbtn_rt.modules:
+    for hbt_module in smhub.router.modules:
         if hbt_module.typ == b"\x1e\x03":
-            for sms in hbt_module.gsm_numbers:
-                new_devices.append(HbtnGSMMessage(hbt_module, sms, len(new_devices)))
+            new_devices.extend(
+                HbtnGSMMessage(hbt_module, sms, smhub.comm)
+                for sms in hbt_module.gsm_numbers
+            )
 
     if new_devices:
         async_add_entities(new_devices)
 
 
 class HbtnGSMMessage(NotifyEntity):
-    """Representation of habitron notification."""
+    """Representation of a Habitron GSM SMS target."""
 
     _attr_has_entity_name = True
 
-    def __init__(self, module: HbtnModule, gsm_number: IfDescriptor, idx: int) -> None:
-        """Initialize an HbtnEvent, pass coordinator to CoordinatorEntity."""
+    def __init__(self, module: Module, gsm_number: HbtnCommand, comm: HbtnComm) -> None:
+        """Initialize a GSM SMS notify entity."""
         super().__init__()
-        self.idx = idx
         self._module = module
+        self._comm = comm
         self.messages = module.messages
         self.sms_id = gsm_number.nmbr
         self.sms_no = gsm_number.name.replace(" ", "").replace("-", "")
@@ -59,9 +64,8 @@ class HbtnGSMMessage(NotifyEntity):
     async def async_send_message(self, message: str, title: str | None = None) -> None:
         """Send an SMS via the GSM module.
 
-        Like ``HbtnMessage`` above, free-text payloads are not supported by
-        habitron_client 1.0.0; only stored message ids reach the bus. Log
-        and skip when the text is not a known entry.
+        Free-text payloads are not supported; only stored message ids reach the
+        bus. Log and skip when the text is not a known stored message.
         """
         msg_id = None
         for msg in self.messages:
@@ -76,4 +80,4 @@ class HbtnGSMMessage(NotifyEntity):
                 self._module.uid,
             )
             return
-        await self._module.comm.send_sms(self._module.mod_addr, msg_id, self.sms_id)
+        await self._comm.send_sms(self._module.addr, msg_id, self.sms_id)

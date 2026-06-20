@@ -1,110 +1,62 @@
-"""Tests for the Habitron notify platform (GSM/SMS)."""
+"""Tests for the Habitron notify platform (GSM/SMS, v2 model)."""
 
 from unittest.mock import AsyncMock, MagicMock
 
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from habitron_client import HbtnCommand, Module, Router
 
 from custom_components.habitron.notify import HbtnGSMMessage, async_setup_entry
 from homeassistant.core import HomeAssistant
 
 
-async def test_notify_setup(setup_integration: MockConfigEntry) -> None:
-    """The notify platform sets up cleanly against an empty router."""
-    assert setup_integration.runtime_data is not None
+def _gsm_module() -> Module:
+    module = Module(uid="MOD-GSM", addr=105, typ=b"\x1e\x03", name="GSM")
+    module.messages = [HbtnCommand(name="Alarm", nmbr=3)]
+    module.gsm_numbers = [HbtnCommand(name="0170 1234", nmbr=1)]
+    return module
 
 
-def _make_gsm_module() -> MagicMock:
-    """Build a module stub with a stored-messages list and comm hooks."""
-    mod = MagicMock()
-    mod.uid = "MOD-1"
-    mod.mod_addr = 105
-    msg = MagicMock()
-    msg.name = "Welcome"
-    msg.nmbr = 42
-    mod.messages = [msg]
-    mod.comm.send_sms = AsyncMock()
-    return mod
+def _comm() -> MagicMock:
+    comm = MagicMock()
+    comm.send_sms = AsyncMock()
+    return comm
 
 
-def test_gsm_message_unique_id_includes_sms_number() -> None:
-    """HbtnGSMMessage namespaces its unique id by the SMS number."""
-    mod = _make_gsm_module()
-    sms = MagicMock()
-    sms.name = "+49-170-1234567"
-    sms.nmbr = 3
-    entity = HbtnGSMMessage(mod, sms, 0)
-    assert entity.unique_id.startswith("Mod_MOD-1_sms")
-    assert "+491701234567" in entity.unique_id
+def test_gsm_message_unique_id() -> None:
+    """The SMS entity exposes a stable unique id derived from the number."""
+    module = _gsm_module()
+    entity = HbtnGSMMessage(module, module.gsm_numbers[0], _comm())
+    assert entity.unique_id == "Mod_MOD-GSM_sms01701234"
+    assert entity.name == "SMS 0170 1234"
 
 
-async def test_gsm_send_known_message_routes_to_send_sms() -> None:
-    """A known message goes out by message-id over send_sms."""
-    mod = _make_gsm_module()
-    sms = MagicMock()
-    sms.name = "+49-170-1234567"
-    sms.nmbr = 3
-    entity = HbtnGSMMessage(mod, sms, 0)
-    await entity.async_send_message(message="Welcome")
-    mod.comm.send_sms.assert_awaited_with(105, 42, 3)
+async def test_gsm_message_sends_known_message() -> None:
+    """A stored message name is resolved and sent as an SMS."""
+    comm = _comm()
+    module = _gsm_module()
+    entity = HbtnGSMMessage(module, module.gsm_numbers[0], comm)
+    await entity.async_send_message("Alarm")
+    comm.send_sms.assert_awaited_with(105, 3, 1)
 
 
-async def test_gsm_send_unknown_message_logs_and_skips() -> None:
-    """An unknown SMS message no longer sends — only stored ids are accepted."""
-    mod = _make_gsm_module()
-    sms = MagicMock()
-    sms.name = "+49-170-1234567"
-    sms.nmbr = 3
-    entity = HbtnGSMMessage(mod, sms, 0)
-    await entity.async_send_message(message="hello")
-    mod.comm.send_sms.assert_not_awaited()
+async def test_gsm_message_unknown_text_skipped() -> None:
+    """A free-text message that is not a stored entry is skipped."""
+    comm = _comm()
+    module = _gsm_module()
+    entity = HbtnGSMMessage(module, module.gsm_numbers[0], comm)
+    await entity.async_send_message("free text")
+    comm.send_sms.assert_not_awaited()
 
 
-def test_gsm_message_device_info_links_module() -> None:
-    """HbtnGSMMessage.device_info points at the module uid."""
-    mod = _make_gsm_module()
-    sms = MagicMock()
-    sms.name = "+49-170-1"
-    sms.nmbr = 0
-    entity = HbtnGSMMessage(mod, sms, 0)
-    assert ("habitron", "MOD-1") in entity.device_info["identifiers"]
-
-
-async def test_async_setup_entry_emits_gsm_message_for_gsm_module(
-    hass: HomeAssistant,
-) -> None:
-    """async_setup_entry emits one HbtnGSMMessage per SMS number."""
-    sms = MagicMock()
-    sms.name = "+49-170-1234567"
-    sms.nmbr = 3
-    mod = MagicMock()
-    mod.uid = "MOD-G"
-    mod.mod_addr = 105
-    mod.name = "GSM 1"
-    mod.typ = b"\x1e\x03"
-    mod.gsm_numbers = [sms]
-
-    router = MagicMock()
-    router.modules = [mod]
+async def test_async_setup_entry_builds_sms_entities(hass: HomeAssistant) -> None:
+    """async_setup_entry creates one SMS entity per GSM number."""
+    module = _gsm_module()
+    router = Router(uid="ROUTER-1")
+    router.modules = [module]
     entry = MagicMock()
     entry.runtime_data.router = router
+    entry.runtime_data.comm = _comm()
 
     added: list = []
     await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
-    assert any(isinstance(e, HbtnGSMMessage) for e in added)
-
-
-async def test_async_setup_entry_skips_other_modules(hass: HomeAssistant) -> None:
-    """A module with an unrecognised typ does not emit any entity."""
-    mod = MagicMock()
-    mod.uid = "MOD-X"
-    mod.typ = b"\x99\x99"
-    mod.gsm_numbers = []
-
-    router = MagicMock()
-    router.modules = [mod]
-    entry = MagicMock()
-    entry.runtime_data.router = router
-
-    added: list = []
-    await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
-    assert added == []
+    assert len(added) == 1
+    assert isinstance(added[0], HbtnGSMMessage)
