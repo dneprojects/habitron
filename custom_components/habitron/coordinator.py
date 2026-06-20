@@ -14,9 +14,9 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from .const import DOMAIN, SCAN_INTERVAL
 
 if TYPE_CHECKING:
+    from habitron_client import Module, Router
+
     from .communicate import HbtnComm
-    from .module import HbtnModule
-    from .router import HbtnRouter
     from .smart_hub import SmartHub
 
 # Firmware is quasi-static and the bus read is comparatively slow, so it is
@@ -35,7 +35,7 @@ platform files.
 _LOGGER = logging.getLogger(__name__)
 
 
-class HbtnCoordinator(DataUpdateCoordinator[bytes]):
+class HbtnCoordinator(DataUpdateCoordinator[int]):
     """Habitron data update coordinator.
 
     ``async_system_update`` writes the bus status directly into the
@@ -73,14 +73,14 @@ class HbtnCoordinator(DataUpdateCoordinator[bytes]):
         """Run a first fetch during ``async_config_entry_first_refresh``."""
         await self._async_update_data()
 
-    async def _async_update_data(self) -> bytes:
+    async def _async_update_data(self) -> int:
         """Fetch the current Habitron status.
 
-        Returns the compact-status bytes used for change detection;
-        ``async_system_update`` also writes directly into the
-        module/input/output objects. Connection-level failures (timeouts,
-        network errors, refused connections) are converted to ``UpdateFailed``
-        so the coordinator flips ``last_update_success`` to False and every
+        Returns the compact-status CRC used for change detection;
+        ``async_system_update`` also updates the model in place and fires the
+        per-member listeners. Connection-level failures (timeouts, network
+        errors, refused connections) are converted to ``UpdateFailed`` so the
+        coordinator flips ``last_update_success`` to False and every
         ``CoordinatorEntity`` is automatically marked unavailable.
         """
         try:
@@ -129,7 +129,7 @@ class HbtnFirmwareCoordinator(DataUpdateCoordinator[dict[str, tuple[str, str]]])
 
     async def _async_update_data(self) -> dict[str, tuple[str, str]]:
         """Read one target's firmware (round-robin) and merge it into data."""
-        targets: list[HbtnRouter | HbtnModule] = [
+        targets: list[Router | Module] = [
             self.comm.router,
             *self.comm.router.modules,
         ]
@@ -139,9 +139,10 @@ class HbtnFirmwareCoordinator(DataUpdateCoordinator[dict[str, tuple[str, str]]])
             await self._read_target(target)
         return self.data
 
-    async def _read_target(self, target: HbtnRouter | HbtnModule) -> None:
+    async def _read_target(self, target: Router | Module) -> None:
         """Read installed/latest firmware for a single target into data."""
-        addr = getattr(target, "raddr", 0)
+        # Router has id 100 (no addr); module addr is raddr + 100.
+        addr = getattr(target, "addr", 100) - 100
         try:
             resp = await self.comm.handle_firmware(addr)
         except (OSError, ConnectionError, HabitronError) as err:
