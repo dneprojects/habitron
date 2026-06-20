@@ -2,6 +2,9 @@
 
 from unittest.mock import AsyncMock, MagicMock
 
+from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+from custom_components.habitron.const import DOMAIN
 from custom_components.habitron.device_trigger import (
     async_attach_trigger,
     async_get_triggers,
@@ -10,31 +13,22 @@ from homeassistant.core import Context, HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 
-async def test_get_triggers_no_event_entities(
-    hass: HomeAssistant, setup_integration
-) -> None:
+async def test_get_triggers_no_event_entities(hass: HomeAssistant) -> None:
     """A device with no event entities yields zero triggers."""
-    reg = er.async_get(hass)
-    # No event entities are created for the unknown device id used here.
     triggers = await async_get_triggers(hass, "unknown-device-id")
     assert triggers == []
-    # Touch the registry just to make ruff happy about the unused import.
-    assert reg is not None
 
 
-async def test_get_triggers_filters_inactive_and_finger(
-    hass: HomeAssistant, setup_integration
-) -> None:
+async def test_get_triggers_filters_inactive_and_finger(hass: HomeAssistant) -> None:
     """``inactive`` and ``finger`` event types are excluded from triggers."""
     reg = er.async_get(hass)
-    # Register a fake event entity for an existing device id.
-    entry = setup_integration
-    smhub = entry.runtime_data
+    entry = MockConfigEntry(domain=DOMAIN)
+    entry.add_to_hass(hass)
 
     dev_reg = dr.async_get(hass)
     device = dev_reg.async_get_or_create(
         config_entry_id=entry.entry_id,
-        identifiers={("habitron", smhub.uid)},
+        identifiers={(DOMAIN, "MOD-X")},
         name="Test device",
     )
     reg.async_get_or_create(
