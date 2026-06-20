@@ -247,6 +247,28 @@ Phase plan: (1) foundation (_helpers, const, smart_hub, communicate, coordinator
 + their tests; delete module/router/interfaces) → (2) reference platform switch
 + test → (3) remaining platforms + tests.
 
+#### Step 4 — DONE (2026-06-20). HACS integration fully on the v2 API.
+- All 17 entity platforms migrated (switch, sensor, binary_sensor, light, cover,
+  climate, number, select, button, text, notify, event, update, camera,
+  media_player, assist_satellite) + services, diagnostics, system_health,
+  device_trigger, ws_provider, smart_hub, communicate, coordinator.
+- Entities bind to model members via `add_listener`/`async_write_ha_state`;
+  commands go through `coordinator.comm` / `smhub.comm` (`module.addr`); the model
+  carries no back-references. `module.py`/`router.py`/`interfaces.py` deleted;
+  protocol consts trimmed from `const.py`; manifest pins `habitron_client==2.0.0`.
+- Lib follow-ups during the rewrite: `mode` notifiable member, `Finger.user`,
+  `SmartController.client_version` (commits in habitron-client `v2-device-model`).
+- **Full HACS test suite green: 518 passed.** ruff + mypy clean (mypy via the
+  /tmp/phacc test venv which has typed HA + habitron_client 2.0).
+- Naming: model↔entity clash → entity gets the `Hbtn` prefix (`HbtnColorLight`);
+  model imports stay plain. `BusMember` rename still deferred.
+
+### Step 5 — next: release + ship
+- Release `habitron_client` 2.0.0 to PyPI (needs explicit user OK).
+- Validate the HACS v2 build on real hardware end-to-end.
+- Regenerate the slim core tree from the v2 HACS source and redo core PR #174185
+  (the thin wrapper the reviewer asked for).
+
 #### Original Step-4 outline
 - Pin `habitron_client` 2.0 (once released); delete the moved modules
   (`module.py`, `router.py`, parsing in `communicate.py`, `interfaces.py`
