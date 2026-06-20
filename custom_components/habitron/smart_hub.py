@@ -3,13 +3,20 @@
 from enum import Enum
 from pathlib import Path
 
-from habitron_client import Diagnostic, Router, Sensor, async_build_system
+from habitron_client import (
+    Diagnostic,
+    Router,
+    Sensor,
+    SmartController,
+    async_build_system,
+)
 
 from homeassistant.components.frontend import add_extra_js_url
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import area_registry as ar, device_registry as dr
+from homeassistant.util import slugify
 
 from .communicate import HbtnComm as hbtn_com
 from .const import DOMAIN
@@ -130,6 +137,12 @@ class SmartHub:
         await self.comm.send_network_info(self.config.data["websock_token"])
         self.router = await async_build_system(self.comm.client, b_uid=self.uid)
         self.comm.set_router(self.router)
+        # Seed the WebRTC stream name for Touch modules (used by camera /
+        # media_player / assist / voice button to address the Flutter client).
+        for module in self.router.modules:
+            if isinstance(module, SmartController):
+                raddr = module.addr - self.router.id
+                module.stream_name = f"{slugify(module.name)}_{raddr}"
         await self._register_bus_devices()
         await self.comm.reinit_hub(1)
 
