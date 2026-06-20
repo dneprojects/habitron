@@ -2,15 +2,16 @@
 
 from unittest.mock import MagicMock
 
+from habitron_client import Area
 import pytest
 
-from custom_components.habitron.interfaces import TYPE_DIAG
 from custom_components.habitron.sensor import (
     AIRQUALITY_DESCRIPTION,
     CURRENT_DESCRIPTION,
     HUMIDITY_DESCRIPTION,
     ILLUMINANCE_DESCRIPTION,
     TIMEOUT_DESCRIPTION,
+    TYPE_DIAG,
     VOLTAGE_DESCRIPTION,
     WIND_DESCRIPTION,
     HbtnDescribedSensor,
@@ -174,12 +175,8 @@ def test_described_sensor_inherits_measurement_state_class() -> None:
     assert entity._attr_state_class is SensorStateClass.MEASUREMENT
 
 
-async def test_sensor_platform_setup(hass: HomeAssistant, setup_integration) -> None:
-    """The platform sets up without error against an empty router."""
-    # ``setup_integration`` already exercises the entire setup chain.
-    # The router fixture starts with no modules so no entities are
-    # added — but the setup must still complete without exception.
-    assert setup_integration.runtime_data is not None
+# Note: the full-integration setup smoke test lives in test_init once every
+# platform is migrated (it loads all platforms via ``setup_integration``).
 
 
 # ---------- Additional tests for non-described sensor classes ----------
@@ -399,7 +396,8 @@ def test_frequency_sensor_diag_branch() -> None:
 
 from unittest.mock import AsyncMock, patch  # noqa: E402
 
-from custom_components.habitron.module import SmartController  # noqa: E402
+from habitron_client import SmartController  # noqa: E402
+
 from custom_components.habitron.sensor import (  # noqa: E402
     HabitronClientSensor,
     LogicSensorPush,
@@ -425,11 +423,11 @@ def test_hbtn_diag_sensor_device_info_links_module() -> None:
     assert ("habitron", "MOD-1") in entity.device_info["identifiers"]
 
 
-async def test_analog_sensor_register_callback() -> None:
+async def test_analog_sensor_add_listener() -> None:
     """AnalogSensor.async_added_to_hass registers the input callback."""
     mod = _make_hbtnsensor_module()
     desc = _make_sensor_descriptor()
-    desc.register_callback = MagicMock()
+    desc.add_listener = MagicMock()
     coord = MagicMock(spec=DataUpdateCoordinator)
     entity = AnalogSensor(mod, desc, coord, 0)
     with patch(
@@ -438,25 +436,25 @@ async def test_analog_sensor_register_callback() -> None:
         new=AsyncMock(),
     ):
         await entity.async_added_to_hass()
-    desc.register_callback.assert_called()
+    desc.add_listener.assert_called()
 
 
-async def test_analog_sensor_remove_callback() -> None:
+async def test_analog_sensor_remove_listener() -> None:
     """AnalogSensor.async_will_remove_from_hass removes the callback."""
     mod = _make_hbtnsensor_module()
     desc = _make_sensor_descriptor()
-    desc.remove_callback = MagicMock()
+    desc.remove_listener = MagicMock()
     coord = MagicMock(spec=DataUpdateCoordinator)
     entity = AnalogSensor(mod, desc, coord, 0)
     await entity.async_will_remove_from_hass()
-    desc.remove_callback.assert_called()
+    desc.remove_listener.assert_called()
 
 
-async def test_ekey_id_sensor_register_callback() -> None:
+async def test_ekey_id_sensor_add_listener() -> None:
     """EKeySensorId registers the descriptor callback."""
     mod = _make_hbtnsensor_module()
     desc = _make_sensor_descriptor(name="Identifier")
-    desc.register_callback = MagicMock()
+    desc.add_listener = MagicMock()
     coord = MagicMock(spec=DataUpdateCoordinator)
     entity = EKeySensorId(mod, desc, coord, 0)
     with patch(
@@ -465,25 +463,25 @@ async def test_ekey_id_sensor_register_callback() -> None:
         new=AsyncMock(),
     ):
         await entity.async_added_to_hass()
-    desc.register_callback.assert_called()
+    desc.add_listener.assert_called()
 
 
-async def test_ekey_id_sensor_remove_callback() -> None:
+async def test_ekey_id_sensor_remove_listener() -> None:
     """EKeySensorId removes its descriptor callback."""
     mod = _make_hbtnsensor_module()
     desc = _make_sensor_descriptor(name="Identifier")
-    desc.remove_callback = MagicMock()
+    desc.remove_listener = MagicMock()
     coord = MagicMock(spec=DataUpdateCoordinator)
     entity = EKeySensorId(mod, desc, coord, 0)
     await entity.async_will_remove_from_hass()
-    desc.remove_callback.assert_called()
+    desc.remove_listener.assert_called()
 
 
-async def test_ekey_fngr_sensor_register_callback() -> None:
+async def test_ekey_fngr_sensor_add_listener() -> None:
     """EKeySensorFngr registers the descriptor callback."""
     mod = _make_hbtnsensor_module()
     desc = _make_sensor_descriptor(name="Finger")
-    desc.register_callback = MagicMock()
+    desc.add_listener = MagicMock()
     coord = MagicMock(spec=DataUpdateCoordinator)
     entity = EKeySensorFngr(mod, desc, coord, 0)
     with patch(
@@ -492,21 +490,21 @@ async def test_ekey_fngr_sensor_register_callback() -> None:
         new=AsyncMock(),
     ):
         await entity.async_added_to_hass()
-    desc.register_callback.assert_called()
+    desc.add_listener.assert_called()
 
 
-async def test_ekey_fngr_sensor_remove_callback() -> None:
+async def test_ekey_fngr_sensor_remove_listener() -> None:
     """EKeySensorFngr removes its descriptor callback."""
     mod = _make_hbtnsensor_module()
     desc = _make_sensor_descriptor(name="Finger")
-    desc.remove_callback = MagicMock()
+    desc.remove_listener = MagicMock()
     coord = MagicMock(spec=DataUpdateCoordinator)
     entity = EKeySensorFngr(mod, desc, coord, 0)
     await entity.async_will_remove_from_hass()
-    desc.remove_callback.assert_called()
+    desc.remove_listener.assert_called()
 
 
-async def test_logic_sensor_push_register_callback() -> None:
+async def test_logic_sensor_push_add_listener() -> None:
     """LogicSensorPush registers the logic callback."""
     mod = _make_hbtnsensor_module()
     logic = MagicMock()
@@ -514,7 +512,7 @@ async def test_logic_sensor_push_register_callback() -> None:
     logic.idx = 0
     logic.name = "Counter"
     logic.type = 5
-    logic.register_callback = MagicMock()
+    logic.add_listener = MagicMock()
     coord = MagicMock(spec=DataUpdateCoordinator)
     entity = LogicSensorPush(mod, logic, coord, 0)
     with patch(
@@ -523,10 +521,10 @@ async def test_logic_sensor_push_register_callback() -> None:
         new=AsyncMock(),
     ):
         await entity.async_added_to_hass()
-    logic.register_callback.assert_called()
+    logic.add_listener.assert_called()
 
 
-async def test_logic_sensor_push_remove_callback() -> None:
+async def test_logic_sensor_push_remove_listener() -> None:
     """LogicSensorPush removes the logic callback on remove."""
     mod = _make_hbtnsensor_module()
     logic = MagicMock()
@@ -534,11 +532,11 @@ async def test_logic_sensor_push_remove_callback() -> None:
     logic.idx = 0
     logic.name = "Counter"
     logic.type = 5
-    logic.remove_callback = MagicMock()
+    logic.remove_listener = MagicMock()
     coord = MagicMock(spec=DataUpdateCoordinator)
     entity = LogicSensorPush(mod, logic, coord, 0)
     await entity.async_will_remove_from_hass()
-    logic.remove_callback.assert_called()
+    logic.remove_listener.assert_called()
 
 
 def test_perc_sensor_normal_branch_reads_sensors() -> None:
@@ -780,7 +778,7 @@ async def test_async_setup_entry_emits_all_sensor_types(hass: HomeAssistant) -> 
     mod.uid = "MOD-1"
     mod.mod_type = "Smart Controller Touch"
     mod.typ = b"\x01\x03"
-    mod.area_member = 0
+    mod.area = 0
     mod.sensors = [temp, hum, illum, wind, air, ident, finger]
     mod.analogins = [ain]
     mod.logic = [logic]
@@ -810,7 +808,7 @@ async def test_async_setup_entry_emits_all_sensor_types(hass: HomeAssistant) -> 
     router.chan_timeouts = [chan_to]
     router.chan_currents = [chan_curr]
     router.voltages = [rt_vtg]
-    router.areas = {0: MagicMock()}
+    router.areas = [Area(nmbr=0, name="House")]
 
     entry = MagicMock()
     entry.runtime_data = smhub
@@ -849,7 +847,7 @@ async def test_async_setup_entry_analog_area_assignment_external(
     mod.uid = "MOD-A"
     mod.mod_type = "Other"
     mod.typ = b"\x01\x03"
-    mod.area_member = 0
+    mod.area = 0
     mod.sensors = []
     mod.analogins = [ain]
     mod.logic = []
@@ -865,9 +863,7 @@ async def test_async_setup_entry_analog_area_assignment_external(
     router.chan_timeouts = []
     router.chan_currents = []
     router.voltages = []
-    area = MagicMock()
-    area.get_name_id = MagicMock(return_value="area_5_id")
-    router.areas = dict.fromkeys(range(6), area)
+    router.areas = [Area(nmbr=5, name="area_5_id")]
 
     entry = MagicMock()
     entry.runtime_data = smhub
@@ -895,7 +891,7 @@ async def test_async_setup_entry_analog_area_overflow_falls_back(
     mod.uid = "MOD-OV"
     mod.mod_type = "Other"
     mod.typ = b"\x01\x03"
-    mod.area_member = 0
+    mod.area = 0
     mod.sensors = []
     mod.analogins = [ain]
     mod.logic = []
@@ -911,7 +907,7 @@ async def test_async_setup_entry_analog_area_overflow_falls_back(
     router.chan_timeouts = []
     router.chan_currents = []
     router.voltages = []
-    router.areas = {0: MagicMock()}
+    router.areas = [Area(nmbr=0, name="House")]
 
     entry = MagicMock()
     entry.runtime_data = smhub

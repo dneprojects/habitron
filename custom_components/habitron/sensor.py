@@ -4,6 +4,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
+from habitron_client import BusMember, Logic, Module, SmartController
+
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
@@ -24,20 +26,17 @@ from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
-from homeassistant.helpers.update_coordinator import (
-    CoordinatorEntity,
-    DataUpdateCoordinator,
-)
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import slugify
 
 from ._helpers import async_assign_entity_area, hbtn_device_info
-from .coordinator import HabitronConfigEntry
-from .interfaces import TYPE_DIAG, AreaDescriptor, IfDescriptor, LgcDescriptor
-from .module import HbtnModule, SmartController
+from .coordinator import HabitronConfigEntry, HbtnCoordinator
 
 if TYPE_CHECKING:
     from .smart_hub import SmartHub
 
 PARALLEL_UPDATES = 1
+TYPE_DIAG = 10  # diagnostic entity, hidden by default (was interfaces.TYPE_DIAG)
 
 
 async def async_setup_entry(  # noqa: C901
@@ -46,9 +45,9 @@ async def async_setup_entry(  # noqa: C901
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add sensors for passed config_entry in HA."""
-    hbtn_rt = entry.runtime_data.router
-    hbtn_cord = hbtn_rt.coord
     smhub = entry.runtime_data
+    hbtn_rt = smhub.router
+    hbtn_cord = smhub.coordinator
 
     new_devices: list[SensorEntity] = []
     for smhub_sensor in smhub.sensors:
@@ -74,7 +73,7 @@ async def async_setup_entry(  # noqa: C901
             new_devices.append(
                 # SmartHub stands in for an HbtnModule here (same lookup shape).
                 TemperatureDSensor(
-                    cast("HbtnModule", smhub),
+                    cast("Module", smhub),
                     smhub_diag,
                     hbtn_cord,
                     len(new_devices),
@@ -259,7 +258,7 @@ async def async_setup_entry(  # noqa: C901
 
     # --- Area Registry Handling ---
     registry: er.EntityRegistry = er.async_get(hass)
-    area_names: dict[int, AreaDescriptor] = hbtn_rt.areas
+    area_names = {area.nmbr: slugify(area.name) for area in hbtn_rt.areas}
 
     for hbt_module in hbtn_rt.modules:
         if hbt_module.typ in [b"\x01\x03", b"\x0b\x1f"]:
@@ -270,12 +269,12 @@ async def async_setup_entry(  # noqa: C901
                         domain="sensor",
                         unique_id=f"Mod_{hbt_module.uid}_adin{ain.nmbr}",
                         area_index=ain.area,
-                        area_member=hbt_module.area_member,
+                        area_member=hbt_module.area,
                         area_names=area_names,
                     )
 
 
-class HbtnSensor(CoordinatorEntity[DataUpdateCoordinator[bytes]], SensorEntity):
+class HbtnSensor(CoordinatorEntity[HbtnCoordinator], SensorEntity):
     """Base representation of a Habitron sensor."""
 
     _attr_has_entity_name = True
@@ -283,15 +282,15 @@ class HbtnSensor(CoordinatorEntity[DataUpdateCoordinator[bytes]], SensorEntity):
 
     def __init__(
         self,
-        module: HbtnModule,
-        sensor: IfDescriptor,
-        coord: DataUpdateCoordinator[bytes],
+        module: Module,
+        sensor: BusMember,
+        coord: HbtnCoordinator,
         idx: int,
     ) -> None:
         """Initialize a Habitron sensor, pass coordinator to CoordinatorEntity."""
         super().__init__(coord, context=idx)
         self.idx = idx
-        self._module: HbtnModule = module
+        self._module: Module = module
         self._sensor_idx = sensor.nmbr
         self._value = 0
         self._attr_unique_id = f"Mod_{self._module.uid}_snsr{sensor.nmbr}"
@@ -419,9 +418,9 @@ class AnalogSensor(HbtnSensor):
 
     def __init__(
         self,
-        module: HbtnModule,
-        sensor: IfDescriptor,
-        coord: DataUpdateCoordinator[bytes],
+        module: Module,
+        sensor: BusMember,
+        coord: HbtnCoordinator,
         idx: int,
     ) -> None:
         """Initialize the sensor."""
@@ -439,12 +438,12 @@ class AnalogSensor(HbtnSensor):
         # The call back registration is done once this entity is registered with HA
         # (rather than in the __init__)
         await super().async_added_to_hass()
-        self.sensor.register_callback(self._handle_coordinator_update)
+        self.sensor.add_listener(self._handle_coordinator_update)
 
     async def async_will_remove_from_hass(self) -> None:
         """Entity being removed from hass."""
         # The opposite of async_added_to_hass. Remove any registered call backs here.
-        self.sensor.remove_callback(self._handle_coordinator_update)
+        self.sensor.remove_listener(self._handle_coordinator_update)
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -461,9 +460,9 @@ class TemperatureSensor(HbtnSensor):
 
     def __init__(
         self,
-        module: HbtnModule,
-        sensor: IfDescriptor,
-        coord: DataUpdateCoordinator[bytes],
+        module: Module,
+        sensor: BusMember,
+        coord: HbtnCoordinator,
         idx: int,
     ) -> None:
         """Initialize the sensor."""
@@ -481,9 +480,9 @@ class EKeySensorId(HbtnSensor):
 
     def __init__(
         self,
-        module: HbtnModule,
-        sensor: IfDescriptor,
-        coord: DataUpdateCoordinator[bytes],
+        module: Module,
+        sensor: BusMember,
+        coord: HbtnCoordinator,
         idx: int,
     ) -> None:
         """Initialize the sensor."""
@@ -501,12 +500,12 @@ class EKeySensorId(HbtnSensor):
         # The call back registration is done once this entity is registered with HA
         # (rather than in the __init__)
         await super().async_added_to_hass()
-        self.sensor.register_callback(self._handle_coordinator_update)
+        self.sensor.add_listener(self._handle_coordinator_update)
 
     async def async_will_remove_from_hass(self) -> None:
         """Entity being removed from hass."""
         # The opposite of async_added_to_hass. Remove any registered call backs here.
-        self.sensor.remove_callback(self._handle_coordinator_update)
+        self.sensor.remove_listener(self._handle_coordinator_update)
 
 
 class EKeySensorFngr(HbtnSensor):
@@ -516,9 +515,9 @@ class EKeySensorFngr(HbtnSensor):
 
     def __init__(
         self,
-        module: HbtnModule,
-        sensor: IfDescriptor,
-        coord: DataUpdateCoordinator[bytes],
+        module: Module,
+        sensor: BusMember,
+        coord: HbtnCoordinator,
         idx: int,
     ) -> None:
         """Initialize the sensor."""
@@ -536,24 +535,24 @@ class EKeySensorFngr(HbtnSensor):
         # The call back registration is done once this entity is registered with HA
         # (rather than in the __init__)
         await super().async_added_to_hass()
-        self.sensor.register_callback(self._handle_coordinator_update)
+        self.sensor.add_listener(self._handle_coordinator_update)
 
     async def async_will_remove_from_hass(self) -> None:
         """Entity being removed from hass."""
         # The opposite of async_added_to_hass. Remove any registered call backs here.
-        self.sensor.remove_callback(self._handle_coordinator_update)
+        self.sensor.remove_listener(self._handle_coordinator_update)
 
 
-class HbtnDiagSensor(CoordinatorEntity[DataUpdateCoordinator[bytes]], SensorEntity):
+class HbtnDiagSensor(CoordinatorEntity[HbtnCoordinator], SensorEntity):
     """Base representation of a Habitron sensor."""
 
     _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(
         self,
-        module: HbtnModule,
-        diag: IfDescriptor,
-        coord: DataUpdateCoordinator[bytes],
+        module: Module,
+        diag: BusMember,
+        coord: HbtnCoordinator,
         idx: int,
     ) -> None:
         """Initialize a Habitron sensor, pass coordinator to CoordinatorEntity."""
@@ -590,9 +589,9 @@ class TemperatureDSensor(HbtnDiagSensor):
 
     def __init__(
         self,
-        module: HbtnModule,
-        diag: IfDescriptor,
-        coord: DataUpdateCoordinator[bytes],
+        module: Module,
+        diag: BusMember,
+        coord: HbtnCoordinator,
         idx: int,
     ) -> None:
         """Initialize the sensor."""
@@ -608,9 +607,9 @@ class StatusSensor(HbtnDiagSensor):
 
     def __init__(
         self,
-        module: HbtnModule,
-        diag: IfDescriptor,
-        coord: DataUpdateCoordinator[bytes],
+        module: Module,
+        diag: BusMember,
+        coord: HbtnCoordinator,
         idx: int,
     ) -> None:
         """Initialize the sensor."""
@@ -637,9 +636,9 @@ class LogicSensor(HbtnSensor):
 
     def __init__(
         self,
-        module: HbtnModule,
-        logic: LgcDescriptor,
-        coord: DataUpdateCoordinator[bytes],
+        module: Module,
+        logic: Logic,
+        coord: HbtnCoordinator,
         idx: int,
     ) -> None:
         """Initialize the sensor."""
@@ -668,12 +667,12 @@ class LogicSensorPush(LogicSensor):
         # The call back registration is done once this entity is registered with HA
         # (rather than in the __init__)
         await super().async_added_to_hass()
-        self.logic.register_callback(self._handle_coordinator_update)
+        self.logic.add_listener(self._handle_coordinator_update)
 
     async def async_will_remove_from_hass(self) -> None:
         """Entity being removed from hass."""
         # The opposite of async_added_to_hass. Remove any registered call backs here.
-        self.logic.remove_callback(self._handle_coordinator_update)
+        self.logic.remove_listener(self._handle_coordinator_update)
 
 
 class PercSensor(HbtnSensor):
@@ -684,12 +683,12 @@ class PercSensor(HbtnSensor):
     def __init__(
         self,
         module: SmartHub,
-        perctg: IfDescriptor,
-        coord: DataUpdateCoordinator[bytes],
+        perctg: BusMember,
+        coord: HbtnCoordinator,
         idx: int,
     ) -> None:
         """Initialize the sensor."""
-        super().__init__(cast("HbtnModule", module), perctg, coord, idx)
+        super().__init__(cast("Module", module), perctg, coord, idx)
         self.type = perctg.type
         self._attr_unique_id = f"Mod_{self._module.uid}_perc{perctg.nmbr}"
         if self._attr_name[:6].lower() == "memory":  # type: ignore[index]
@@ -726,12 +725,12 @@ class FrequencySensor(HbtnSensor):
     def __init__(
         self,
         module: SmartHub,
-        freq: IfDescriptor,
-        coord: DataUpdateCoordinator[bytes],
+        freq: BusMember,
+        coord: HbtnCoordinator,
         idx: int,
     ) -> None:
         """Initialize the sensor."""
-        super().__init__(cast("HbtnModule", module), freq, coord, idx)
+        super().__init__(cast("Module", module), freq, coord, idx)
         self.type = freq.type
         if self._attr_name.lower() == "cpu frequency":  # type: ignore[union-attr]
             self._attr_icon = "mdi:clock-fast"
@@ -828,7 +827,7 @@ class HabitronClientSensor(SensorEntity):
             self.async_write_ha_state()
 
 
-class EKeyUserNameSensor(CoordinatorEntity[DataUpdateCoordinator[bytes]], SensorEntity):
+class EKeyUserNameSensor(CoordinatorEntity[HbtnCoordinator], SensorEntity):
     """Resolve a Fanekey ``Identifier`` value to the matching user's name."""
 
     _attr_has_entity_name = True
@@ -836,9 +835,9 @@ class EKeyUserNameSensor(CoordinatorEntity[DataUpdateCoordinator[bytes]], Sensor
 
     def __init__(
         self,
-        module: HbtnModule,
+        module: Module,
         nmbr: int,
-        coord: DataUpdateCoordinator[bytes],
+        coord: HbtnCoordinator,
         idx: int,
     ) -> None:
         """Initialize the user-name sensor."""
@@ -853,20 +852,18 @@ class EKeyUserNameSensor(CoordinatorEntity[DataUpdateCoordinator[bytes]], Sensor
     async def async_added_to_hass(self) -> None:
         """Subscribe to the underlying sensor's push updates."""
         await super().async_added_to_hass()
-        self._module.sensors[self._nmbr].register_callback(
-            self._handle_coordinator_update
-        )
+        self._module.sensors[self._nmbr].add_listener(self._handle_coordinator_update)
 
     async def async_will_remove_from_hass(self) -> None:
         """Unsubscribe from the underlying sensor's push updates."""
-        self._module.sensors[self._nmbr].remove_callback(
+        self._module.sensors[self._nmbr].remove_listener(
             self._handle_coordinator_update
         )
 
     @callback
     def _handle_coordinator_update(self) -> None:
         """Translate the raw identifier value into a user name string."""
-        id_val = int(self._module.sensors[self._nmbr].value)
+        id_val = int(self._module.sensors[self._nmbr].value or 0)
         if id_val == 0:
             self._attr_native_value = "None"
         elif id_val == 255:
@@ -882,9 +879,7 @@ class EKeyUserNameSensor(CoordinatorEntity[DataUpdateCoordinator[bytes]], Sensor
         self.async_write_ha_state()
 
 
-class EKeyFingerNameSensor(
-    CoordinatorEntity[DataUpdateCoordinator[bytes]], SensorEntity
-):
+class EKeyFingerNameSensor(CoordinatorEntity[HbtnCoordinator], SensorEntity):
     """Resolve a Fanekey ``Finger`` value to the matching finger name."""
 
     _attr_has_entity_name = True
@@ -905,9 +900,9 @@ class EKeyFingerNameSensor(
 
     def __init__(
         self,
-        module: HbtnModule,
+        module: Module,
         nmbr: int,
-        coord: DataUpdateCoordinator[bytes],
+        coord: HbtnCoordinator,
         idx: int,
     ) -> None:
         """Initialize the finger-name sensor."""
@@ -922,20 +917,18 @@ class EKeyFingerNameSensor(
     async def async_added_to_hass(self) -> None:
         """Subscribe to the underlying sensor's push updates."""
         await super().async_added_to_hass()
-        self._module.sensors[self._nmbr].register_callback(
-            self._handle_coordinator_update
-        )
+        self._module.sensors[self._nmbr].add_listener(self._handle_coordinator_update)
 
     async def async_will_remove_from_hass(self) -> None:
         """Unsubscribe from the underlying sensor's push updates."""
-        self._module.sensors[self._nmbr].remove_callback(
+        self._module.sensors[self._nmbr].remove_listener(
             self._handle_coordinator_update
         )
 
     @callback
     def _handle_coordinator_update(self) -> None:
         """Translate the raw finger value into a finger-name string."""
-        id_val = int(self._module.sensors[self._nmbr].value)
+        id_val = int(self._module.sensors[self._nmbr].value or 0)
         if id_val == 0:
             self._attr_native_value = "None"
         elif id_val == 255:
