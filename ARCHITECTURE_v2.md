@@ -238,6 +238,11 @@ Branch `v2-thin-integration` in `habitron_repo` (off `dev`). Decisions
 - Delete: `module.py`, `router.py`, `interfaces.py`; trim protocol consts out of
   `const.py`; slim `communicate.py` to transport + `apply_event` + refresh.
 
+TODO (rename, later): `BusMember` is a placeholder name the user finds too
+vague ("Bus" not an established term, "member" generic; it really describes the
+entities). Rename across lib (`model.py` + `__init__`/`__all__`) and integration
+(`_helpers.py`, platform imports). Candidate names TBD.
+
 Phase plan: (1) foundation (_helpers, const, smart_hub, communicate, coordinator
 + their tests; delete module/router/interfaces) → (2) reference platform switch
 + test → (3) remaining platforms + tests.

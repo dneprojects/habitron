@@ -1,6 +1,6 @@
 """Platform for switch integration."""
 
-from typing import TYPE_CHECKING
+from habitron_client import BusMember, Flag, Module, Router
 
 # Import the device class from the component that you want to support
 from homeassistant.components.binary_sensor import (
@@ -12,21 +12,15 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
-from homeassistant.helpers.update_coordinator import (
-    CoordinatorEntity,
-    DataUpdateCoordinator,
-)
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import slugify
 
 from ._helpers import hbtn_device_info
 from .const import DOMAIN
-from .coordinator import HabitronConfigEntry
-from .interfaces import TYPE_DIAG, AreaDescriptor, IfDescriptor, StateDescriptor
+from .coordinator import HabitronConfigEntry, HbtnCoordinator
 
 PARALLEL_UPDATES = 1
-
-if TYPE_CHECKING:
-    from .module import HbtnModule
-    from .router import HbtnRouter
+TYPE_DIAG = 10  # diagnostic entity, hidden by default (was interfaces.TYPE_DIAG)
 
 
 async def async_setup_entry(
@@ -35,8 +29,9 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add binary sensors for Habitron inputs."""
-    hbtn_rt: HbtnRouter = entry.runtime_data.router
-    hbtn_cord = hbtn_rt.coord
+    smhub = entry.runtime_data
+    hbtn_rt = smhub.router
+    hbtn_cord = smhub.coordinator
 
     new_devices: list[BinarySensorEntity] = []
     for hbt_module in hbtn_rt.modules:
@@ -57,9 +52,7 @@ async def async_setup_entry(
                     RainSensor(mod_sensor, hbt_module, hbtn_cord, len(new_devices))
                 )
         if hbt_module.mod_type == "Smart Controller Touch":
-            listening_sensor = ListeningStatusSensor(hbt_module)
-            hbt_module.vce_stat = listening_sensor
-            new_devices.append(listening_sensor)
+            new_devices.append(ListeningStatusSensor(hbt_module))
     for rt_stat in hbtn_rt.states:
         new_devices.append(HbtnState(rt_stat, hbtn_rt, hbtn_cord, len(new_devices)))
 
@@ -67,43 +60,42 @@ async def async_setup_entry(
         async_add_entities(new_devices)
 
     registry: er.EntityRegistry = er.async_get(hass)
-    area_names: dict[int, AreaDescriptor] = hbtn_rt.areas
+    area_names = {area.nmbr: slugify(area.name) for area in hbtn_rt.areas}
 
     for hbt_module in hbtn_rt.modules:
         for mod_input in hbt_module.inputs:
             if (
                 abs(mod_input.type) == 2
                 and mod_input.area > 0
-                and mod_input.area != hbt_module.area_member
+                and mod_input.area != hbt_module.area
+                and mod_input.area in area_names
             ):  # switch
                 entity_entry = registry.async_get_entity_id(
                     "binary_sensor", DOMAIN, f"Mod_{hbt_module.uid}_in{mod_input.nmbr}"
                 )
                 if entity_entry:
                     registry.async_update_entity(
-                        entity_entry, area_id=area_names[mod_input.area].get_name_id()
+                        entity_entry, area_id=area_names[mod_input.area]
                     )
 
 
-class HbtnBinSensor(
-    CoordinatorEntity[DataUpdateCoordinator[bytes]], BinarySensorEntity
-):
+class HbtnBinSensor(CoordinatorEntity[HbtnCoordinator], BinarySensorEntity):
     """Representation of habitron switch input entities."""
 
     _attr_has_entity_name = True
 
     def __init__(
         self,
-        sens_or_inpt: IfDescriptor,
-        module: HbtnModule,
-        coord: DataUpdateCoordinator[bytes],
+        sens_or_inpt: BusMember,
+        module: Module,
+        coord: HbtnCoordinator,
         idx: int,
     ) -> None:
         """Initialize an InputSwitch, pass coordinator to CoordinatorEntity."""
         super().__init__(coord, context=idx)
         self.idx: int = idx
-        self._sens_or_inpt: IfDescriptor = sens_or_inpt
-        self._module: HbtnModule = module
+        self._sens_or_inpt: BusMember = sens_or_inpt
+        self._module: Module = module
         self._attr_name: str = sens_or_inpt.name
         self._nmbr: int = sens_or_inpt.nmbr
         self._on_state: bool = False
@@ -137,9 +129,9 @@ class InputSwitch(HbtnBinSensor):
 
     def __init__(
         self,
-        inp: IfDescriptor,
-        module: HbtnModule,
-        coord: DataUpdateCoordinator[bytes],
+        inp: BusMember,
+        module: Module,
+        coord: HbtnCoordinator,
         idx: int,
     ) -> None:
         """Initialize an InputSwitch, pass coordinator to CoordinatorEntity."""
@@ -165,12 +157,12 @@ class InputSwitchPush(InputSwitch):
         # The call back registration is done once this entity is registered with HA
         # (rather than in the __init__)
         await super().async_added_to_hass()
-        self._sens_or_inpt.register_callback(self._handle_coordinator_update)
+        self._sens_or_inpt.add_listener(self._handle_coordinator_update)
 
     async def async_will_remove_from_hass(self) -> None:
         """Entity being removed from hass."""
         # The opposite of async_added_to_hass. Remove any registered call backs here.
-        self._sens_or_inpt.remove_callback(self._handle_coordinator_update)
+        self._sens_or_inpt.remove_listener(self._handle_coordinator_update)
 
 
 class MotionSensor(HbtnBinSensor):
@@ -181,9 +173,9 @@ class MotionSensor(HbtnBinSensor):
 
     def __init__(
         self,
-        sensor: IfDescriptor,
-        module: HbtnModule,
-        coord: DataUpdateCoordinator[bytes],
+        sensor: BusMember,
+        module: Module,
+        coord: HbtnCoordinator,
         idx: int,
     ) -> None:
         """Initialize motion sensor."""
@@ -194,7 +186,7 @@ class MotionSensor(HbtnBinSensor):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        self._on_state = self._module.sensors[self._nmbr].value > 0
+        self._on_state = int(self._module.sensors[self._nmbr].value or 0) > 0
         self.async_write_ha_state()
 
 
@@ -210,12 +202,12 @@ class MotionSensorPush(MotionSensor):
         # The call back registration is done once this entity is registered with HA
         # (rather than in the __init__)
         await super().async_added_to_hass()
-        self._sens_or_inpt.register_callback(self._handle_coordinator_update)
+        self._sens_or_inpt.add_listener(self._handle_coordinator_update)
 
     async def async_will_remove_from_hass(self) -> None:
         """Entity being removed from hass."""
         # The opposite of async_added_to_hass. Remove any registered call backs here.
-        self._sens_or_inpt.remove_callback(self._handle_coordinator_update)
+        self._sens_or_inpt.remove_listener(self._handle_coordinator_update)
 
 
 class RainSensor(HbtnBinSensor):
@@ -226,9 +218,9 @@ class RainSensor(HbtnBinSensor):
 
     def __init__(
         self,
-        sensor: IfDescriptor,
-        module: HbtnModule,
-        coord: DataUpdateCoordinator[bytes],
+        sensor: BusMember,
+        module: Module,
+        coord: HbtnCoordinator,
         idx: int,
     ) -> None:
         """Initialize rain sensor."""
@@ -243,7 +235,7 @@ class RainSensor(HbtnBinSensor):
         self.async_write_ha_state()
 
 
-class HbtnState(CoordinatorEntity[DataUpdateCoordinator[bytes]], BinarySensorEntity):
+class HbtnState(CoordinatorEntity[HbtnCoordinator], BinarySensorEntity):
     """Representation of habitron state entities."""
 
     _attr_has_entity_name = True
@@ -251,16 +243,16 @@ class HbtnState(CoordinatorEntity[DataUpdateCoordinator[bytes]], BinarySensorEnt
 
     def __init__(
         self,
-        state: StateDescriptor,
-        module: HbtnModule | HbtnRouter,
-        coord: DataUpdateCoordinator[bytes],
+        state: Flag,
+        module: Module | Router,
+        coord: HbtnCoordinator,
         idx: int,
     ) -> None:
         """Initialize an Hbtnstate, pass coordinator to CoordinatorEntity."""
         super().__init__(coord, context=idx)
         self.idx: int = idx
-        self._state: StateDescriptor = state
-        self._module: HbtnModule | HbtnRouter = module
+        self._state: Flag = state
+        self._module: Module | Router = module
         self._nmb: int = state.nmbr
         self._on_state: bool = False
         self._attr_unique_id: str = f"Mod_{self._module.uid}_state{state.nmbr}"
@@ -277,8 +269,6 @@ class HbtnState(CoordinatorEntity[DataUpdateCoordinator[bytes]], BinarySensorEnt
     @property
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
-        if isinstance(self._module.id, int):
-            return hbtn_device_info(self._module.uid)  # router
         return hbtn_device_info(self._module.uid)
 
     @property
@@ -308,11 +298,11 @@ class ListeningStatusSensor(BinarySensorEntity):
 
     def __init__(
         self,
-        module: HbtnModule,
+        module: Module,
     ) -> None:
         """Initialize."""
         # Note: No 'super().__init__(...)' call to a coordinator
-        self._module: HbtnModule = module
+        self._module: Module = module
         self._attr_is_on: bool = False  # Default state is off
         self._attr_unique_id: str = f"Mod_{self._module.uid}_listening_status"
         self._stream_name = module.name.lower().replace(" ", "_")
