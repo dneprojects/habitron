@@ -2,6 +2,7 @@
 
 import logging
 
+from habitron_client import Module
 from webrtc_models import RTCIceCandidateInit
 
 from homeassistant.components.camera import (
@@ -14,8 +15,6 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from ._helpers import hbtn_device_info
 from .coordinator import HabitronConfigEntry
-from .module import HbtnModule
-from .router import HbtnRouter
 from .smart_hub import SmartHub
 from .ws_provider import HabitronWebRTCProvider
 
@@ -31,7 +30,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up Habitron cameras from a config entry."""
     smhub: SmartHub = entry.runtime_data
-    hbtn_rt: HbtnRouter = smhub.router
+    hbtn_rt = smhub.router
     if smhub.ws_provider is None:
         _LOGGER.error("WebRTC provider not available on SmartHub instance")
         return
@@ -67,15 +66,15 @@ class HbtnCam(Camera):
     def __init__(
         self,
         hass: HomeAssistant,
-        module: HbtnModule,
+        module: Module,
         idx: int,
         provider: HabitronWebRTCProvider,
     ) -> None:
         """Initialize the camera entity."""
         super().__init__()
-        self._stream_name = module.stream_name
+        self._stream_name = getattr(module, "stream_name", "")
         self.idx: int = idx
-        self._module: HbtnModule = module
+        self._module: Module = module
         self._attr_name = f"HbtnCam {idx + 1}"
         self._attr_unique_id = f"Mod_{self._module.uid}_camera"
         self._attr_device_info = hbtn_device_info(self._module.uid)
