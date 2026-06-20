@@ -27,7 +27,7 @@ def _module_summary(module: Any) -> dict[str, Any]:
             else None
         ),
         "mod_type": getattr(module, "mod_type", None),
-        "mod_addr": getattr(module, "mod_addr", None),
+        "addr": getattr(module, "addr", None),
         "sw_version": getattr(module, "sw_version", None),
         "input_count": len(getattr(module, "inputs", []) or []),
         "output_count": len(getattr(module, "outputs", []) or []),
@@ -42,7 +42,7 @@ async def async_get_config_entry_diagnostics(
     """Return diagnostics for the given Habitron config entry."""
     smhub = entry.runtime_data
     router = smhub.router
-    coordinator = router.coord
+    coordinator = smhub.coordinator
 
     return {
         "config_entry": {
@@ -64,7 +64,7 @@ async def async_get_config_entry_diagnostics(
             "id": router.id,
             "name": router.name,
             "version": router.version,
-            "sys_ok": router._sys_ok,  # noqa: SLF001
+            "sys_ok": router.sys_ok,
             "module_count": len(router.modules),
             "area_count": len(router.areas),
             "max_group": router.max_group,

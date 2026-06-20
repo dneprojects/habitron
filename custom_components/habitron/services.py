@@ -192,7 +192,7 @@ async def _async_dispatch_sc_command_for_device(
             continue
         mod_uid = str(identifier[1])
         for hub in hubs:
-            module = hub.router.get_module_by_uid(mod_uid)
+            module = next((m for m in hub.router.modules if m.uid == mod_uid), None)
             if module is None or getattr(module, "typ", None) != b"\x01\x04":
                 continue
             if hub.ws_provider is None:
