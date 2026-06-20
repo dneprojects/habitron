@@ -21,6 +21,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN
 
 if TYPE_CHECKING:
+    from .communicate import HbtnComm
     from .coordinator import HbtnCoordinator
 
 
@@ -60,7 +61,7 @@ class HabitronEntity(CoordinatorEntity["HbtnCoordinator"]):
         self._attr_device_info = hbtn_device_info(module.uid)
 
     @property
-    def comm(self) -> object:
+    def comm(self) -> HbtnComm:
         """Return the transport wrapper held by the coordinator."""
         return self.coordinator.comm
 
