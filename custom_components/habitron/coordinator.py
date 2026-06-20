@@ -5,7 +5,7 @@ from datetime import timedelta
 import logging
 from typing import TYPE_CHECKING
 
-from habitron_client import HabitronError, HabitronTimeoutError
+from habitron_client import HabitronError, HabitronTimeoutError, Module, Router
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -14,8 +14,6 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from .const import DOMAIN, SCAN_INTERVAL
 
 if TYPE_CHECKING:
-    from habitron_client import Module, Router
-
     from .communicate import HbtnComm
     from .smart_hub import SmartHub
 
@@ -141,8 +139,8 @@ class HbtnFirmwareCoordinator(DataUpdateCoordinator[dict[str, tuple[str, str]]])
 
     async def _read_target(self, target: Router | Module) -> None:
         """Read installed/latest firmware for a single target into data."""
-        # Router has id 100 (no addr); module addr is raddr + 100.
-        addr = getattr(target, "addr", 100) - 100
+        # Module addr is raddr + 100; the router has no raddr (uses 0).
+        addr = (target.addr - 100) if isinstance(target, Module) else 0
         try:
             resp = await self.comm.handle_firmware(addr)
         except (OSError, ConnectionError, HabitronError) as err:
