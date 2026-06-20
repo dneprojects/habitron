@@ -3,6 +3,8 @@
 import logging
 from typing import Any
 
+from habitron_client import Module
+
 from homeassistant.components.climate import (
     ClimateEntity,
     ClimateEntityFeature,
@@ -14,15 +16,10 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
-from homeassistant.helpers.update_coordinator import (
-    CoordinatorEntity,
-    DataUpdateCoordinator,
-)
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .coordinator import HabitronConfigEntry
-from .module import HbtnModule
-from .router import HbtnRouter
+from .coordinator import HabitronConfigEntry, HbtnCoordinator
 
 PARALLEL_UPDATES = 1
 
@@ -35,8 +32,9 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add climate units for passed config_entry in HA."""
-    hbtn_rt: HbtnRouter = entry.runtime_data.router
-    hbtn_cord: DataUpdateCoordinator[bytes] = hbtn_rt.coord
+    smhub = entry.runtime_data
+    hbtn_rt = smhub.router
+    hbtn_cord = smhub.coordinator
 
     new_devices = []
     for hbt_module in hbtn_rt.modules:
@@ -53,7 +51,7 @@ async def async_setup_entry(
 
                 # Logic to monitor and toggle the second entity
                 @callback
-                def clean_enable_logic(module: HbtnModule = hbt_module) -> None:
+                def clean_enable_logic(module: Module = hbt_module) -> None:
                     registry = er.async_get(hass)
                     u_id = f"Mod_{module.uid}_climate_2"
                     entity_id = registry.async_get_entity_id("climate", DOMAIN, u_id)
@@ -86,7 +84,7 @@ async def async_setup_entry(
         async_add_entities(new_devices)
 
 
-class HbtnClimate(CoordinatorEntity[DataUpdateCoordinator[bytes]], ClimateEntity):
+class HbtnClimate(CoordinatorEntity[HbtnCoordinator], ClimateEntity):
     """Representation of habitron climate entities."""
 
     _attr_has_entity_name = True
@@ -101,13 +99,13 @@ class HbtnClimate(CoordinatorEntity[DataUpdateCoordinator[bytes]], ClimateEntity
 
     def __init__(
         self,
-        module: HbtnModule,
-        coord: DataUpdateCoordinator[bytes],
+        module: Module,
+        coord: HbtnCoordinator,
         controller_idx: int,
     ) -> None:
         """Initialize climate unit with instance index (0 or 1)."""
         super().__init__(coord, context=module.uid)
-        self._module: HbtnModule = module
+        self._module: Module = module
         self._controller_idx = controller_idx
 
         # Unique ID must differ for the second entity
@@ -121,7 +119,7 @@ class HbtnClimate(CoordinatorEntity[DataUpdateCoordinator[bytes]], ClimateEntity
         self._curr_hvac_mode = HVACMode.HEAT
         self._target_temperature = 20.0
         self._curr_temperature = 20.0
-        self._curr_humidity = None
+        self._curr_humidity: float | None = None
 
         self._attr_target_temperature_high = 25.0
         self._attr_target_temperature_low = 15.0
@@ -197,17 +195,17 @@ class HbtnClimate(CoordinatorEntity[DataUpdateCoordinator[bytes]], ClimateEntity
         # Map temperature sensors
         if len(self._module.sensors) > 1:
             if self._controller_idx == 0:
-                self._curr_temperature = self._module.sensors[1].value
+                self._curr_temperature = float(self._module.sensors[1].value or 0)
                 self._target_temperature = self._module.setvalues[0].value
             else:
-                self._curr_temperature = self._module.sensors[2].value
+                self._curr_temperature = float(self._module.sensors[2].value or 0)
                 self._target_temperature = self._module.setvalues[1].value
 
             # Map humidity if available
             if len(self._module.sensors) > 3:
-                self._curr_humidity = self._module.sensors[3].value
+                self._curr_humidity = float(self._module.sensors[3].value or 0)
         else:
-            self._curr_temperature = self._module.sensors[0].value
+            self._curr_temperature = float(self._module.sensors[0].value or 0)
             self._target_temperature = self._module.setvalues[0].value
 
         self.update_action()
@@ -238,8 +236,8 @@ class HbtnClimate(CoordinatorEntity[DataUpdateCoordinator[bytes]], ClimateEntity
         """Set temperature."""
         if (temp := kwargs.get(ATTR_TEMPERATURE)) is not None:
             self._target_temperature = temp
-            await self._module.comm.async_set_setpoint(
-                self._module.mod_addr, self._controller_idx + 1, int(temp * 10)
+            await self.coordinator.comm.async_set_setpoint(
+                self._module.addr, self._controller_idx + 1, int(temp * 10)
             )
             await self.coordinator.async_request_refresh()
 
@@ -255,7 +253,7 @@ class HbtnClimate(CoordinatorEntity[DataUpdateCoordinator[bytes]], ClimateEntity
         self._module.climate_settings = val
 
         # This update affects both controllers
-        await self._module.comm.async_set_climate_mode(
-            self._module.mod_addr, val, self._module.climate_ctl12
+        await self.coordinator.comm.async_set_climate_mode(
+            self._module.addr, val, self._module.climate_ctl12
         )
         await self.coordinator.async_request_refresh()

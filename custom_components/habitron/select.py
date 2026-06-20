@@ -1,25 +1,24 @@
 """Platform for select integration."""
 
 from enum import Enum
+import logging
+
+from habitron_client import Module, Router, Sensor
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
-from homeassistant.helpers.update_coordinator import (
-    CoordinatorEntity,
-    DataUpdateCoordinator,
-)
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from ._helpers import hbtn_device_info
-from .coordinator import HabitronConfigEntry
-from .interfaces import IfDescriptor
-from .module import HbtnModule
-from .router import AlarmMode, DaytimeMode, HbtnRouter
+from .const import AlarmMode, DaytimeMode
+from .coordinator import HabitronConfigEntry, HbtnCoordinator
 from .smart_hub import LoggingLevels, SmartHub
 
 PARALLEL_UPDATES = 1
+_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
@@ -28,9 +27,9 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add input_select for passed config_entry in HA."""
-    hbtn_rt: HbtnRouter = entry.runtime_data.router
-    hbtn_cord: DataUpdateCoordinator[bytes] = hbtn_rt.coord
     smhub = entry.runtime_data
+    hbtn_rt = smhub.router
+    hbtn_cord = smhub.coordinator
 
     new_devices: list[SelectEntity] = []
     for hbt_module in hbtn_rt.modules:
@@ -72,24 +71,22 @@ async def async_setup_entry(
         async_add_entities(new_devices)
 
 
-class HbtnMode(CoordinatorEntity[DataUpdateCoordinator[bytes]], SelectEntity):
+class HbtnMode(CoordinatorEntity[HbtnCoordinator], SelectEntity):
     """Representation of a input select for Habitron modes."""
 
     _attr_has_entity_name = True
 
     def __init__(
         self,
-        module: int | HbtnModule,
-        hbtnr: HbtnRouter,
-        coord: DataUpdateCoordinator[bytes],
+        module: int | Module,
+        hbtnr: Router,
+        coord: HbtnCoordinator,
         idx: int,
     ) -> None:
         """Initialize a Habitron mode, pass coordinator to CoordinatorEntity."""
         super().__init__(coord, context=idx)
         self.idx = idx
-        self._module: HbtnModule | HbtnRouter = (
-            hbtnr if isinstance(module, int) else module
-        )
+        self._module: Module | Router = hbtnr if isinstance(module, int) else module
         self._mode = (
             int(hbtnr.mode.value) if isinstance(module, int) else int(module.mode.value)
         )
@@ -110,7 +107,7 @@ class HbtnMode(CoordinatorEntity[DataUpdateCoordinator[bytes]], SelectEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
-        if isinstance(self._module, HbtnRouter):
+        if isinstance(self._module, Router):
             return hbtn_device_info(self.hbtnr.uid)
         return hbtn_device_info(self._module.uid)
 
@@ -138,7 +135,7 @@ class HbtnMode(CoordinatorEntity[DataUpdateCoordinator[bytes]], SelectEntity):
             return
         self._value = self._mode & self._mask
         if self._value not in [c.value for c in self._enum]:
-            self.hbtnr.logger.warning("Could not find %s in mode enum", self._value)
+            _LOGGER.warning("Could not find %s in mode enum", self._value)
             return
         self._current_option = self._enum(self._value).name
         self.async_write_ha_state()
@@ -147,11 +144,13 @@ class HbtnMode(CoordinatorEntity[DataUpdateCoordinator[bytes]], SelectEntity):
         """Change the selected option."""
         mode_val = self._enum[option].value
         self._mode = (int(self._module.mode.value) & (0xFF - self._mask)) + mode_val
-        if isinstance(self._module, HbtnRouter):
+        if isinstance(self._module, Router):
             # Router-level mode change targets group 0.
-            await self.hbtnr.comm.async_set_group_mode(0, self._mode)
+            await self.coordinator.comm.async_set_group_mode(0, self._mode)
         else:
-            await self._module.comm.async_set_group_mode(self._module.group, self._mode)
+            await self.coordinator.comm.async_set_group_mode(
+                self._module.group, self._mode
+            )
 
 
 class HbtnSelectDaytimeMode(HbtnMode):
@@ -159,9 +158,9 @@ class HbtnSelectDaytimeMode(HbtnMode):
 
     def __init__(
         self,
-        module: int | HbtnModule,
-        hbtnr: HbtnRouter,
-        coord: DataUpdateCoordinator[bytes],
+        module: int | Module,
+        hbtnr: Router,
+        coord: HbtnCoordinator,
         idx: int,
     ) -> None:
         """Initialize daytime mode selector."""
@@ -170,12 +169,12 @@ class HbtnSelectDaytimeMode(HbtnMode):
         self._enum = DaytimeMode
         self._value = self._mode & self._mask
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
-        if isinstance(self._module, HbtnRouter):
+        if isinstance(self._module, Router):
             self._attr_name = "Group 0 daytime"
             self._attr_unique_id = f"Rt_{self.hbtnr.uid}_group_0_daytime_mode"
             if self._value == 0:
                 # hot fix: why is mode 0?
-                hbtnr.logger.info("Enum value 0 for router")
+                _LOGGER.info("Enum value 0 for router")
                 self._value = 1
             self._current_option = self._enum(self._value).name
         else:
@@ -186,17 +185,19 @@ class HbtnSelectDaytimeMode(HbtnMode):
             )
             if self._value == 0:
                 # Not clear, inherit mode of group 0?
-                hbtnr.logger.info("Enum value 0 for router daytime mode")
+                _LOGGER.info("Enum value 0 for router daytime mode")
                 self._value = 1
             self._current_option = self._enum(self._value).name
 
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
         mode_val = self._enum[option].value
-        if isinstance(self._module, HbtnRouter):
-            await self.hbtnr.comm.async_set_daytime_mode(0, mode_val)
+        if isinstance(self._module, Router):
+            await self.coordinator.comm.async_set_daytime_mode(0, mode_val)
         else:
-            await self._module.comm.async_set_daytime_mode(self._module.group, mode_val)
+            await self.coordinator.comm.async_set_daytime_mode(
+                self._module.group, mode_val
+            )
 
 
 class HbtnSelectAlarmMode(HbtnMode):
@@ -204,9 +205,9 @@ class HbtnSelectAlarmMode(HbtnMode):
 
     def __init__(
         self,
-        module: int | HbtnModule,
-        hbtnr: HbtnRouter,
-        coord: DataUpdateCoordinator[bytes],
+        module: int | Module,
+        hbtnr: Router,
+        coord: HbtnCoordinator,
         idx: int,
     ) -> None:
         """Initialize alarm mode selector."""
@@ -215,7 +216,7 @@ class HbtnSelectAlarmMode(HbtnMode):
         self._enum = AlarmMode
         self._value = self._mode & self._mask
         self._current_option = self._enum(self._value).name
-        if isinstance(self._module, HbtnRouter):
+        if isinstance(self._module, Router):
             self._attr_name = "Group 0 alarm"
             self._attr_unique_id = f"Rt_{self.hbtnr.uid}_group_0_alarm_mode"
         else:
@@ -225,10 +226,12 @@ class HbtnSelectAlarmMode(HbtnMode):
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
         set_val = bool(self._enum[option].value > 0)
-        if isinstance(self._module, HbtnRouter):
-            await self.hbtnr.comm.async_set_alarm_mode(0, set_val)
+        if isinstance(self._module, Router):
+            await self.coordinator.comm.async_set_alarm_mode(0, set_val)
         else:
-            await self._module.comm.async_set_alarm_mode(self._module.group, set_val)
+            await self.coordinator.comm.async_set_alarm_mode(
+                self._module.group, set_val
+            )
 
 
 class HbtnSelectGroupMode(HbtnMode):
@@ -236,9 +239,9 @@ class HbtnSelectGroupMode(HbtnMode):
 
     def __init__(
         self,
-        module: int | HbtnModule,
-        hbtnr: HbtnRouter,
-        coord: DataUpdateCoordinator[bytes],
+        module: int | Module,
+        hbtnr: Router,
+        coord: HbtnCoordinator,
         idx: int,
     ) -> None:
         """Initialize group mode selector."""
@@ -272,7 +275,7 @@ class HbtnSelectGroupMode(HbtnMode):
         if self._value == 0:
             self._value = 32
         self._current_option = self._enum(self._value).name
-        if isinstance(self._module, HbtnRouter):
+        if isinstance(self._module, Router):
             self._attr_name = "Group 0 mode"
             self._attr_unique_id = f"Rt_{self.hbtnr.uid}_group_0_mode"
         else:
@@ -282,10 +285,12 @@ class HbtnSelectGroupMode(HbtnMode):
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
         set_val = self._enum[option].value
-        if isinstance(self._module, HbtnRouter):
-            await self.hbtnr.comm.async_set_group_mode(0, set_val)
+        if isinstance(self._module, Router):
+            await self.coordinator.comm.async_set_group_mode(0, set_val)
         else:
-            await self._module.comm.async_set_group_mode(self._module.group, set_val)
+            await self.coordinator.comm.async_set_group_mode(
+                self._module.group, set_val
+            )
 
 
 class HbtnSelectDaytimeModePush(HbtnSelectDaytimeMode):
@@ -300,14 +305,14 @@ class HbtnSelectDaytimeModePush(HbtnSelectDaytimeMode):
         # called where ever there are changes.
         # The call back registration is done once this entity is registered with HA
         # (rather than in the __init__)
-        if isinstance(self._module, HbtnModule):
-            self._module.mode.register_callback(self._handle_coordinator_update)
+        if isinstance(self._module, Module):
+            self._module.mode.add_listener(self._handle_coordinator_update)
 
     async def async_will_remove_from_hass(self) -> None:
         """Entity being removed from hass."""
         # The opposite of async_added_to_hass. Remove any registered call backs here.
-        if isinstance(self._module, HbtnModule):
-            self._module.mode.remove_callback(self._handle_coordinator_update)
+        if isinstance(self._module, Module):
+            self._module.mode.remove_listener(self._handle_coordinator_update)
 
 
 class HbtnSelectAlarmModePush(HbtnSelectAlarmMode):
@@ -322,14 +327,14 @@ class HbtnSelectAlarmModePush(HbtnSelectAlarmMode):
         # called where ever there are changes.
         # The call back registration is done once this entity is registered with HA
         # (rather than in the __init__)
-        if isinstance(self._module, HbtnModule):
-            self._module.mode.register_callback(self._handle_coordinator_update)
+        if isinstance(self._module, Module):
+            self._module.mode.add_listener(self._handle_coordinator_update)
 
     async def async_will_remove_from_hass(self) -> None:
         """Entity being removed from hass."""
         # The opposite of async_added_to_hass. Remove any registered call backs here.
-        if isinstance(self._module, HbtnModule):
-            self._module.mode.remove_callback(self._handle_coordinator_update)
+        if isinstance(self._module, Module):
+            self._module.mode.remove_listener(self._handle_coordinator_update)
 
 
 class HbtnSelectGroupModePush(HbtnSelectGroupMode):
@@ -344,19 +349,17 @@ class HbtnSelectGroupModePush(HbtnSelectGroupMode):
         # called where ever there are changes.
         # The call back registration is done once this entity is registered with HA
         # (rather than in the __init__)
-        if isinstance(self._module, HbtnModule):
-            self._module.mode.register_callback(self._handle_coordinator_update)
+        if isinstance(self._module, Module):
+            self._module.mode.add_listener(self._handle_coordinator_update)
 
     async def async_will_remove_from_hass(self) -> None:
         """Entity being removed from hass."""
         # The opposite of async_added_to_hass. Remove any registered call backs here.
-        if isinstance(self._module, HbtnModule):
-            self._module.mode.remove_callback(self._handle_coordinator_update)
+        if isinstance(self._module, Module):
+            self._module.mode.remove_listener(self._handle_coordinator_update)
 
 
-class HbtnSelectLoggingLevel(
-    CoordinatorEntity[DataUpdateCoordinator[bytes]], SelectEntity
-):
+class HbtnSelectLoggingLevel(CoordinatorEntity[HbtnCoordinator], SelectEntity):
     """Logging level object."""
 
     _attr_has_entity_name = True
@@ -364,8 +367,8 @@ class HbtnSelectLoggingLevel(
     def __init__(
         self,
         smhub: SmartHub,
-        level: IfDescriptor,
-        coord: DataUpdateCoordinator[bytes],
+        level: Sensor,
+        coord: HbtnCoordinator,
         idx: int,
     ) -> None:
         """Initialize a Habitron mode, pass coordinator to CoordinatorEntity."""
@@ -373,7 +376,7 @@ class HbtnSelectLoggingLevel(
         self.idx = idx
         self._level = level
         self._nmbr = level.nmbr
-        self._value = level.value
+        self._value = int(level.value or 0)
         self._smhub = smhub
         self._current_option = ""
         self._enum = LoggingLevels
@@ -411,8 +414,8 @@ class HbtnSelectLoggingLevel(
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator, get current module mode."""
-        self._value = int(self._level.value / 10)
-        self._current_option = self._enum(int(self._level.value / 10)).name
+        self._value = int(float(self._level.value or 0) / 10)
+        self._current_option = self._enum(self._value).name
         self.async_write_ha_state()
 
     async def async_select_option(self, option: str) -> None:
