@@ -1,5 +1,13 @@
 # Latest changes
 
+## v3.0.0b1
+
+### Internal
+- The device model and bus-protocol parsing now live in the `habitron_client` library (v2.0.0); the integration is a thin wrapper that binds entities to library members and forwards commands. No user-visible behaviour change is intended — this is a structural refactor ahead of the Home Assistant core submission.
+
+### Note
+- Beta release. Requires `habitron_client==2.0.0`. Please report any entity or state that differs from v2.10.3.
+
 ## v2.10.3
 
 ### Fixed
