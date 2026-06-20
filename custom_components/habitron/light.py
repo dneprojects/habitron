@@ -2,6 +2,8 @@
 
 from typing import Any
 
+from habitron_client import ColorLed, Module, Output
+
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS,
     ATTR_RGB_COLOR,
@@ -11,16 +13,11 @@ from homeassistant.components.light import (
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
-from homeassistant.helpers.update_coordinator import (
-    CoordinatorEntity,
-    DataUpdateCoordinator,
-)
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import slugify
 
 from ._helpers import async_assign_entity_area, hbtn_device_info
-from .coordinator import HabitronConfigEntry
-from .interfaces import AreaDescriptor, CLedDescriptor, IfDescriptor
-from .module import HbtnModule
-from .router import HbtnRouter
+from .coordinator import HabitronConfigEntry, HbtnCoordinator
 
 PARALLEL_UPDATES = 1
 
@@ -31,15 +28,15 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add lights for passed config_entry in HA."""
-    hbtn_rt: HbtnRouter = entry.runtime_data.router
-    hbtn_cord = hbtn_rt.coord
+    smhub = entry.runtime_data
+    hbtn_rt = smhub.router
+    hbtn_cord = smhub.coordinator
 
     new_devices: list[LightEntity] = []
     for hbt_module in hbtn_rt.modules:
         for mod_output in hbt_module.outputs:
-            # other type numbers disable output
-            # type == 1, standard output: -> switch entities
-            if mod_output.type == 2:  # dimmer
+            # type == 1 (standard output) is a switch entity; type == 2 dims.
+            if mod_output.type == 2:
                 new_devices.append(
                     DimmedOutputPush(
                         mod_output, hbt_module, hbtn_cord, len(new_devices)
@@ -47,24 +44,22 @@ async def async_setup_entry(
                 )
 
         if hbt_module.typ in [b"\x01\x04", b"\x32\x01"]:
-            for cled in hbt_module.cleds:
-                led_name = "Color Corner"
+            for cled in hbt_module.color_leds:
                 if cled.nmbr == 0:
                     led_name = "Color Ambient"
                 else:
                     led_name = f"Color Corner {cled.nmbr}"
-                if cled.name.strip() == "":
-                    cled.set_name(f"{led_name}")
-                else:
-                    cled.set_name(f"{led_name}: {cled.name}")
+                cled.name = (
+                    led_name if cled.name.strip() == "" else f"{led_name}: {cled.name}"
+                )
                 new_devices.append(
-                    ColorLed(cled, hbt_module, hbtn_cord, len(new_devices))
+                    HbtnColorLight(cled, hbt_module, hbtn_cord, len(new_devices))
                 )
     if new_devices:
         async_add_entities(new_devices)
 
     registry: er.EntityRegistry = er.async_get(hass)
-    area_names: dict[int, AreaDescriptor] = hbtn_rt.areas
+    area_names = {area.nmbr: slugify(area.name) for area in hbtn_rt.areas}
 
     for hbt_module in hbtn_rt.modules:
         for mod_output in hbt_module.outputs:
@@ -74,80 +69,70 @@ async def async_setup_entry(
                     domain="light",
                     unique_id=f"Mod_{hbt_module.uid}_out{mod_output.nmbr}",
                     area_index=mod_output.area,
-                    area_member=hbt_module.area_member,
+                    area_member=hbt_module.area,
                     area_names=area_names,
                 )
 
 
-class SwitchedLight(CoordinatorEntity[DataUpdateCoordinator[bytes]], LightEntity):
-    """Representation of habitron light entities."""
+class SwitchedLight(CoordinatorEntity[HbtnCoordinator], LightEntity):
+    """Representation of a Habitron output as an on/off light."""
 
     _attr_has_entity_name = True
     _attr_color_mode = ColorMode.ONOFF
     _attr_supported_color_modes = {ColorMode.ONOFF}
 
     def __init__(
-        self,
-        output: IfDescriptor,
-        module: HbtnModule,
-        coord: DataUpdateCoordinator[bytes],
-        idx: int,
+        self, output: Output, module: Module, coord: HbtnCoordinator, idx: int
     ) -> None:
         """Initialize an HbtnLight, pass coordinator to CoordinatorEntity."""
         super().__init__(coord, context=idx)
         self.idx: int = idx
-        self._output: IfDescriptor = output
-        self._module: HbtnModule = module
+        self._output = output
+        self._module = module
         if output.name.strip() == "":
             self._attr_name = f"Out {output.nmbr + 1}"
-            # Entity will not show up
             self._attr_entity_registry_enabled_default = False
         else:
             self._attr_name = output.name
         self._nmbr: int = output.nmbr
         self._brightness: int = 255
         self._out_offs = 0  # Dimm 1 = Out 1 + offs
-        self._attr_unique_id: str | None = f"Mod_{self._module.uid}_out{output.nmbr}"
-        self._attr_device_info = hbtn_device_info(self._module.uid)
+        self._attr_unique_id: str | None = f"Mod_{module.uid}_out{output.nmbr}"
+        self._attr_device_info = hbtn_device_info(module.uid)
 
     @property
     def is_on(self) -> bool:
         """Return status of output."""
-        return bool(self._output.value == 1)
+        return self._output.is_on
 
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        self._attr_is_on = self._output.value == 1
+        self._attr_is_on = self._output.is_on
         self.async_write_ha_state()
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Instruct the light to turn on."""
-        await self._module.comm.async_set_output(
-            self._module.mod_addr, self._nmbr + 1, 1
+        await self.coordinator.comm.async_set_output(
+            self._module.addr, self._nmbr + 1, 1
         )
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Instruct the light to turn off."""
-        await self._module.comm.async_set_output(
-            self._module.mod_addr, self._nmbr + 1, 0
+        await self.coordinator.comm.async_set_output(
+            self._module.addr, self._nmbr + 1, 0
         )
 
 
 class DimmedOutput(SwitchedLight):
-    """Representation of habitron light entities, dimmable."""
+    """Representation of a Habitron dimmable output."""
 
-    _attr_brightness = True
     _attr_color_mode = ColorMode.BRIGHTNESS
     _attr_supported_color_modes = {ColorMode.BRIGHTNESS}
     _attr_translation_key = "dimmed_output"
 
     def __init__(
-        self,
-        output: IfDescriptor,
-        module: HbtnModule,
-        coord: DataUpdateCoordinator[bytes],
-        idx: int,
+        self, output: Output, module: Module, coord: HbtnCoordinator, idx: int
     ) -> None:
         """Initialize a dimmable Habitron Light."""
         super().__init__(output, module, coord, idx)
@@ -162,20 +147,17 @@ class DimmedOutput(SwitchedLight):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        self._attr_is_on = self._output.value == 1
-        self._brightness = int(
-            self._module.dimmers[self._nmbr - self._out_offs].value * 2.55
+        self._attr_is_on = self._output.is_on
+        self._brightness = round(
+            self._module.dimmers[self._nmbr - self._out_offs].brightness * 2.55
         )
         self.async_write_ha_state()
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        """Instruct the light to turn on."""
-        # await self._module.comm.async_set_output(
-        #     self._module.mod_addr, self._nmbr + 1, 1
-        # )
+        """Instruct the light to turn on (with optional brightness)."""
         self._brightness = kwargs.get(ATTR_BRIGHTNESS, self._brightness)
-        await self._module.comm.async_set_dimmval(
-            self._module.mod_addr,
+        await self.coordinator.comm.async_set_dimmval(
+            self._module.addr,
             self._nmbr - self._out_offs + 1,
             round(self._brightness * 100.0 / 255),
         )
@@ -185,137 +167,81 @@ class SwitchedLightPush(SwitchedLight):
     """Version for push update."""
 
     async def async_added_to_hass(self) -> None:
-        """Run when this Entity has been added to HA."""
-        # Importantly for a push integration, the module that will be getting updates
-        # needs to notify HA of changes. The dummy device has a registercallback
-        # method, so to this we add the 'self.async_write_ha_state' method, to be
-        # called where ever there are changes.
-        # The call back registration is done once this entity is registered with HA
-        # (rather than in the __init__)
+        """Subscribe to the output's change notifications."""
         await super().async_added_to_hass()
-        self._output.register_callback(self.async_write_ha_state)
+        self._output.add_listener(self.async_write_ha_state)
 
     async def async_will_remove_from_hass(self) -> None:
-        """Entity being removed from hass."""
-        # The opposite of async_added_to_hass. Remove any registered call backs here.
-        self._output.remove_callback(self.async_write_ha_state)
+        """Unsubscribe the output listener."""
+        self._output.remove_listener(self.async_write_ha_state)
+        await super().async_will_remove_from_hass()
 
 
-class DimmedOutputPush(SwitchedLightPush):
-    """Representation of habitron light entities, dimmable."""
+class DimmedOutputPush(DimmedOutput):
+    """Representation of a Habitron dimmable output with push updates."""
 
-    _attr_brightness = True
-    _attr_color_mode = ColorMode.BRIGHTNESS
-    _attr_supported_color_modes = {ColorMode.BRIGHTNESS}
+    async def async_added_to_hass(self) -> None:
+        """Subscribe to the output's change notifications."""
+        await super().async_added_to_hass()
+        self._output.add_listener(self.async_write_ha_state)
 
-    def __init__(
-        self,
-        output: IfDescriptor,
-        module: HbtnModule,
-        coord: DataUpdateCoordinator[bytes],
-        idx: int,
-    ) -> None:
-        """Initialize a dimmable Habitron Light."""
-        super().__init__(output, module, coord, idx)
-        if module.typ[0] == 1:
-            self._out_offs = 10  # Dimm 1 = Out 11
-
-    @property
-    def brightness(self) -> int | None:
-        """Return the brightness of the light."""
-        return self._brightness
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self._attr_is_on = self._output.value == 1
-        self._brightness = round(
-            self._module.dimmers[self._nmbr - self._out_offs].value * 2.55
-        )
-        self.async_write_ha_state()
-
-    async def async_turn_on(self, **kwargs: Any) -> None:
-        """Instruct the light to turn on."""
-        # await self._module.comm.async_set_output(
-        #     self._module.mod_addr, self._nmbr + 1, 1
-        # )
-        self._brightness = kwargs.get(ATTR_BRIGHTNESS, self._brightness)
-        await self._module.comm.async_set_dimmval(
-            self._module.mod_addr,
-            self._nmbr - self._out_offs + 1,
-            round(self._brightness * 100.0 / 255),
-        )
+    async def async_will_remove_from_hass(self) -> None:
+        """Unsubscribe the output listener."""
+        self._output.remove_listener(self.async_write_ha_state)
+        await super().async_will_remove_from_hass()
 
 
-class ColorLed(CoordinatorEntity[DataUpdateCoordinator[bytes]], LightEntity):
-    """Representation of habitron light entities."""
+class HbtnColorLight(CoordinatorEntity[HbtnCoordinator], LightEntity):
+    """Representation of a Habitron RGB colour LED."""
 
     _attr_has_entity_name = True
     _attr_color_mode = ColorMode.RGB
     _attr_supported_color_modes = {ColorMode.RGB}
 
     def __init__(
-        self,
-        led: CLedDescriptor,
-        module: HbtnModule,
-        coord: DataUpdateCoordinator[bytes],
-        idx: int,
+        self, led: ColorLed, module: Module, coord: HbtnCoordinator, idx: int
     ) -> None:
         """Initialize an HbtnLight, pass coordinator to CoordinatorEntity."""
         super().__init__(coord, context=idx)
         self.idx: int = idx
-        self._led: CLedDescriptor = led
-        self._module: HbtnModule = module
-        if led.name.strip() == "":
-            self._attr_name = f"CLED {led.nmbr}"
-        else:
-            self._attr_name = led.name
+        self._led = led
+        self._module = module
+        self._attr_name = led.name if led.name.strip() else f"CLED {led.nmbr}"
         self._nmbr: int = led.nmbr
-        self._out_offs: int = 0
         self._brightness: int = 255
         self._rgb_color: tuple[int, int, int] = (50, 50, 50)
-        self._org_color: tuple[int, int, int] = (50, 50, 50)
-        self._hs_color: tuple[float, float] = (0.0, 0.0)
-        self._attr_unique_id: str | None = f"Mod_{self._module.uid}_rgbled{led.nmbr}"
-        self._attr_device_info = hbtn_device_info(self._module.uid)
+        self._attr_unique_id: str | None = f"Mod_{module.uid}_rgbled{led.nmbr}"
+        self._attr_device_info = hbtn_device_info(module.uid)
         if led.type < 0:
-            # Entity will not show up
             self._attr_entity_registry_enabled_default = False
-        if led.nmbr == 0:
-            self._attr_icon = "mdi:square-outline"
-        if led.nmbr == 1:
-            self._attr_icon = "mdi:arrow-top-left-bold-box-outline"
-        if led.nmbr == 2:
-            self._attr_icon = "mdi:arrow-top-right-bold-box-outline"
-        if led.nmbr == 3:
-            self._attr_icon = "mdi:arrow-bottom-left-bold-box-outline"
-        if led.nmbr == 4:
-            self._attr_icon = "mdi:arrow-bottom-right-bold-box-outline"
+        _corner_icons = {
+            0: "mdi:square-outline",
+            1: "mdi:arrow-top-left-bold-box-outline",
+            2: "mdi:arrow-top-right-bold-box-outline",
+            3: "mdi:arrow-bottom-left-bold-box-outline",
+            4: "mdi:arrow-bottom-right-bold-box-outline",
+        }
+        if led.nmbr in _corner_icons:
+            self._attr_icon = _corner_icons[led.nmbr]
 
     async def async_added_to_hass(self) -> None:
-        """Run when this Entity has been added to HA."""
-        # Importantly for a push integration, the module that will be getting updates
-        # needs to notify HA of changes. The dummy device has a registercallback
-        # method, so to this we add the 'self.async_write_ha_state' method, to be
-        # called where ever there are changes.
-        # The call back registration is done once this entity is registered with HA
-        # (rather than in the __init__)
+        """Subscribe to the colour-LED's change notifications."""
         await super().async_added_to_hass()
-        self._led.register_callback(self._handle_coordinator_update)
+        self._led.add_listener(self._handle_coordinator_update)
 
     async def async_will_remove_from_hass(self) -> None:
-        """Entity being removed from hass."""
-        # The opposite of async_added_to_hass. Remove any registered call backs here.
-        self._led.remove_callback(self._handle_coordinator_update)
+        """Unsubscribe the colour-LED listener."""
+        self._led.remove_listener(self._handle_coordinator_update)
+        await super().async_will_remove_from_hass()
 
     @property
     def is_on(self) -> bool | None:
         """Return status of output."""
-        return self._led.value[0] == 1
+        return self._led.is_on
 
     @property
     def rgb_color(self) -> tuple[int, int, int] | None:
-        """Return the brightness of the light."""
+        """Return the colour of the light."""
         return self._rgb_color
 
     @property
@@ -326,62 +252,48 @@ class ColorLed(CoordinatorEntity[DataUpdateCoordinator[bytes]], LightEntity):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        self._attr_is_on = self._led.value[0] == 1
-        r_dimmed = self._led.value[1]
-        g_dimmed = self._led.value[2]
-        b_dimmed = self._led.value[3]
+        self._attr_is_on = self._led.is_on
+        r_dimmed, g_dimmed, b_dimmed = (
+            self._led.rgb[0],
+            self._led.rgb[1],
+            self._led.rgb[2],
+        )
         max_channel = max(r_dimmed, g_dimmed, b_dimmed)
         if max_channel > 0:
-            # 1. Calculate brightness (0..255) based on the highest channel
+            # Brightness from the highest channel; rescale to the 100% colour.
             self._brightness = max_channel
-            # 2. Re-calculate the original 100% color for the HA color picker
             self._rgb_color = (
                 min(round((r_dimmed / max_channel) * 255), 255),
                 min(round((g_dimmed / max_channel) * 255), 255),
                 min(round((b_dimmed / max_channel) * 255), 255),
             )
         else:
-            # All channels off — keep the last-known colour, drop brightness to 0.
+            # All channels off — keep the last colour, drop brightness to 0.
             self._brightness = 0
         self.async_write_ha_state()
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Instruct the light to turn on."""
-
-        # __init__ seeds both ``_rgb_color`` and ``_brightness`` so we can read
-        # them directly when the user didn't supply new values via the
-        # frontend's color picker / brightness slider.
         if ATTR_RGB_COLOR in kwargs:
             self._rgb_color = kwargs[ATTR_RGB_COLOR]
         if ATTR_BRIGHTNESS in kwargs:
             self._brightness = kwargs[ATTR_BRIGHTNESS]
 
-        # Calculate the dimmed color for your hardware based on current brightness
-        # We use a float factor to avoid early truncation during calculation
         bright_factor = self._brightness / 255.0
-
         dimmed_col = (
             max(round(self._rgb_color[0] * bright_factor), 1),
             max(round(self._rgb_color[1] * bright_factor), 1),
             max(round(self._rgb_color[2] * bright_factor), 1),
         )
-        # Update the LED indicator value with the 100% color
-        self._led.value = [
-            1,
-            dimmed_col[0],
-            dimmed_col[1],
-            dimmed_col[2],
-        ]
-
-        await self._module.comm.async_set_rgbval(
-            self._module.mod_addr,
-            self._nmbr,
-            list(dimmed_col),
+        self._led.is_on = True
+        self._led.rgb = [dimmed_col[0], dimmed_col[1], dimmed_col[2], 0]
+        await self.coordinator.comm.async_set_rgbval(
+            self._module.addr, self._nmbr, list(dimmed_col)
         )
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Instruct the light to turn off."""
-        self._led.value[0] = 0
-        await self._module.comm.async_set_rgb_output(
-            self._module.mod_addr, self._nmbr, 0
+        self._led.is_on = False
+        await self.coordinator.comm.async_set_rgb_output(
+            self._module.addr, self._nmbr, 0
         )

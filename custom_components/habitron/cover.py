@@ -4,6 +4,8 @@ import asyncio
 import logging
 from typing import Any
 
+from habitron_client import Cover, Module
+
 from homeassistant.components.cover import (
     ATTR_POSITION,
     ATTR_TILT_POSITION,
@@ -14,16 +16,11 @@ from homeassistant.components.cover import (
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
-from homeassistant.helpers.update_coordinator import (
-    CoordinatorEntity,
-    DataUpdateCoordinator,
-)
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import slugify
 
 from ._helpers import async_assign_entity_area, hbtn_device_info
-from .coordinator import HabitronConfigEntry
-from .interfaces import AreaDescriptor, CovDescriptor
-from .module import HbtnModule
-from .router import HbtnRouter
+from .coordinator import HabitronConfigEntry, HbtnCoordinator
 
 PARALLEL_UPDATES = 1
 
@@ -37,8 +34,9 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add covers for passed config_entry in HA."""
-    hbtn_rt: HbtnRouter = entry.runtime_data.router
-    hbtn_cord: DataUpdateCoordinator[bytes] = hbtn_rt.coord
+    smhub = entry.runtime_data
+    hbtn_rt = smhub.router
+    hbtn_cord = smhub.coordinator
 
     new_devices: list[CoverEntity] = []
     for hbt_module in hbtn_rt.modules:
@@ -57,7 +55,7 @@ async def async_setup_entry(
         async_add_entities(new_devices)
 
     registry: er.EntityRegistry = er.async_get(hass)
-    area_names: dict[int, AreaDescriptor] = hbtn_rt.areas
+    area_names = {area.nmbr: slugify(area.name) for area in hbtn_rt.areas}
 
     for hbt_module in hbtn_rt.modules:
         for mod_cover in hbt_module.covers:
@@ -67,7 +65,7 @@ async def async_setup_entry(
                     domain="cover",
                     unique_id=f"Mod_{hbt_module.uid}_cover{mod_cover.nmbr}",
                     area_index=mod_cover.area,
-                    area_member=hbt_module.area_member,
+                    area_member=hbt_module.area,
                     area_names=area_names,
                 )
 
@@ -75,7 +73,7 @@ async def async_setup_entry(
 # This entire class could be written to extend a base class to ensure common attributes
 # are kept identical/in sync. It's broken apart here between the Cover and Sensors to
 # be explicit about what is returned, and the comments outline where the overlap is.
-class HbtnShutter(CoordinatorEntity[DataUpdateCoordinator[bytes]], CoverEntity):
+class HbtnShutter(CoordinatorEntity[HbtnCoordinator], CoverEntity):
     """Representation of a shutter cover."""
 
     _attr_has_entity_name = True
@@ -90,17 +88,17 @@ class HbtnShutter(CoordinatorEntity[DataUpdateCoordinator[bytes]], CoverEntity):
 
     def __init__(
         self,
-        cover: CovDescriptor,
-        module: HbtnModule,
-        coord: DataUpdateCoordinator[bytes],
+        cover: Cover,
+        module: Module,
+        coord: HbtnCoordinator,
         idx: int,
     ) -> None:
         """Initialize an HbtnShutter, pass coordinator to CoordinatorEntity."""
         super().__init__(coord, context=idx)
         self.idx: int = idx
-        self._cover: CovDescriptor = cover
+        self._cover: Cover = cover
         self._area_member: int = cover.area
-        self._module: HbtnModule = module
+        self._module: Module = module
         if cover.name.strip() == "":
             self._attr_name = f"Out {cover.nmbr + 1}"
             # Entity will not show up
@@ -117,7 +115,7 @@ class HbtnShutter(CoordinatorEntity[DataUpdateCoordinator[bytes]], CoverEntity):
             self._out_down = self._nmbr * 2
         self._position: int = 0
         self._moving: int = 0
-        self.stop_delay: int = module.comm.router.cover_autostop_del
+        self.stop_delay: int = coord.comm.router.cover_autostop_del
         self._stop_task: asyncio.Task[None] | None = None
         self._attr_unique_id: str | None = f"Mod_{self._module.uid}_cover{cover.nmbr}"
         self._attr_device_info = hbtn_device_info(self._module.uid)
@@ -131,12 +129,12 @@ class HbtnShutter(CoordinatorEntity[DataUpdateCoordinator[bytes]], CoverEntity):
         # The call back registration is done once this entity is registered with HA
         # (rather than in the __init__)
         await super().async_added_to_hass()
-        self._cover.register_callback(self._handle_coordinator_update)
+        self._cover.add_listener(self._handle_coordinator_update)
 
     async def async_will_remove_from_hass(self) -> None:
         """Entity being removed from hass."""
         # The opposite of async_added_to_hass. Remove any registered call backs here.
-        self._cover.remove_callback(self._handle_coordinator_update)
+        self._cover.remove_listener(self._handle_coordinator_update)
         if self._stop_task is not None and not self._stop_task.done():
             self._stop_task.cancel()
 
@@ -159,7 +157,7 @@ class HbtnShutter(CoordinatorEntity[DataUpdateCoordinator[bytes]], CoverEntity):
     @property
     def current_cover_position(self) -> int | None:
         """Return the current position of the cover."""
-        self._position = 100 - int(self._cover.value)
+        self._position = 100 - int(self._cover.position)
         return self._position
 
     @property
@@ -185,11 +183,11 @@ class HbtnShutter(CoordinatorEntity[DataUpdateCoordinator[bytes]], CoverEntity):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        self._position = 100 - int(self._cover.value)
-        self.stop_delay = self._module.comm.router.cover_autostop_del
-        if self._module.outputs[self._out_up].value > 0:
+        self._position = 100 - int(self._cover.position)
+        self.stop_delay = self.coordinator.comm.router.cover_autostop_del
+        if self._module.outputs[self._out_up].is_on:
             self._moving = 1
-        elif self._module.outputs[self._out_down].value > 0:
+        elif self._module.outputs[self._out_down].is_on:
             self._moving = -1
         else:
             self._moving = 0
@@ -206,12 +204,12 @@ class HbtnShutter(CoordinatorEntity[DataUpdateCoordinator[bytes]], CoverEntity):
         # Handle network failures gracefully
         try:
             if self._moving == 1:
-                await self._module.comm.async_set_output(
-                    self._module.mod_addr, self._out_up + 1, 0
+                await self.coordinator.comm.async_set_output(
+                    self._module.addr, self._out_up + 1, 0
                 )
             else:
-                await self._module.comm.async_set_output(
-                    self._module.mod_addr, self._out_down + 1, 0
+                await self.coordinator.comm.async_set_output(
+                    self._module.addr, self._out_down + 1, 0
                 )
         except TimeoutError:
             # Log specific timeout error without period
@@ -231,35 +229,35 @@ class HbtnShutter(CoordinatorEntity[DataUpdateCoordinator[bytes]], CoverEntity):
     # the cover to the desired position, or open and close it all the way.
     async def async_stop_cover(self, **kwargs: Any) -> None:
         """Stop the cover."""
-        await self._module.comm.async_set_output(
-            self._module.mod_addr, self._out_up + 1, 0
+        await self.coordinator.comm.async_set_output(
+            self._module.addr, self._out_up + 1, 0
         )
-        await self._module.comm.async_set_output(
-            self._module.mod_addr, self._out_down + 1, 0
+        await self.coordinator.comm.async_set_output(
+            self._module.addr, self._out_down + 1, 0
         )
         self._moving = 0
-        self._position = 100 - int(self._cover.value)
+        self._position = 100 - int(self._cover.position)
 
     async def async_open_cover(self, **kwargs: Any) -> None:
         """Open the cover."""
-        self._position = 100 - int(self._cover.value)
-        await self._module.comm.async_set_output(
-            self._module.mod_addr, self._out_up + 1, 1
+        self._position = 100 - int(self._cover.position)
+        await self.coordinator.comm.async_set_output(
+            self._module.addr, self._out_up + 1, 1
         )
         self._moving = 1
 
     async def async_close_cover(self, **kwargs: Any) -> None:
         """Close the cover."""
-        self._position = 100 - int(self._cover.value)
-        await self._module.comm.async_set_output(
-            self._module.mod_addr, self._out_down + 1, 1
+        self._position = 100 - int(self._cover.position)
+        await self.coordinator.comm.async_set_output(
+            self._module.addr, self._out_down + 1, 1
         )
         self._moving = -1
 
     async def async_set_cover_position(self, **kwargs: Any) -> None:
         """Move the cover to position."""
         tmp_position = int(kwargs.get(ATTR_POSITION))  # type: ignore[arg-type]
-        self._position = 100 - int(self._cover.value)
+        self._position = 100 - int(self._cover.position)
         sh_nmbr = self._nmbr + 1
         if self._module.mod_type[:16] == "Smart Controller":
             sh_nmbr -= 2  # map #3..5 to 1..3
@@ -271,8 +269,8 @@ class HbtnShutter(CoordinatorEntity[DataUpdateCoordinator[bytes]], CoverEntity):
             self._moving = 1
         if self._position > tmp_position:
             self._moving = -1
-        await self._module.comm.async_set_shutterpos(
-            self._module.mod_addr,
+        await self.coordinator.comm.async_set_shutterpos(
+            self._module.addr,
             sh_nmbr,
             100 - tmp_position,
         )
@@ -294,9 +292,9 @@ class HbtnBlind(HbtnShutter):
 
     def __init__(
         self,
-        cover: CovDescriptor,
-        module: HbtnModule,
-        coord: DataUpdateCoordinator[bytes],
+        cover: Cover,
+        module: Module,
+        coord: HbtnCoordinator,
         idx: int,
     ) -> None:
         """Initialize an HbtnShutterTilt."""
@@ -311,16 +309,16 @@ class HbtnBlind(HbtnShutter):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        self._position = 100 - int(self._module.covers[self._nmbr].value)
+        self._position = 100 - int(self._module.covers[self._nmbr].position)
         self._tilt_position = 100 - self._module.covers[self._nmbr].tilt
-        self.stop_delay = self._module.comm.router.cover_autostop_del
-        if self._module.outputs[self._out_up].value > 0:
+        self.stop_delay = self.coordinator.comm.router.cover_autostop_del
+        if self._module.outputs[self._out_up].is_on:
             self._moving = 1
-        elif self._module.outputs[self._out_down].value > 0:
+        elif self._module.outputs[self._out_down].is_on:
             self._moving = -1
         else:
             self._moving = 0
-        self._position = 100 - int(self._cover.value)
+        self._position = 100 - int(self._cover.position)
         if self._moving == 1:
             if (self._position == 100) and (self.stop_delay >= 0):
                 self._schedule_stop(self.stop_delay)
@@ -338,8 +336,8 @@ class HbtnBlind(HbtnShutter):
             sh_nmbr -= 2  # map #3..5 to 1..3
             if sh_nmbr < 1:
                 sh_nmbr += 5  # ...and 1..2 to 4..5
-        await self._module.comm.async_set_blindtilt(
-            self._module.mod_addr,
+        await self.coordinator.comm.async_set_blindtilt(
+            self._module.addr,
             sh_nmbr,
             100 - tmp_tilt_position,
         )
@@ -352,8 +350,8 @@ class HbtnBlind(HbtnShutter):
             sh_nmbr -= 2  # map #3..5 to 1..3
             if sh_nmbr < 1:
                 sh_nmbr += 5  # ...and 1..2 to 4..5
-        await self._module.comm.async_set_blindtilt(
-            self._module.mod_addr,
+        await self.coordinator.comm.async_set_blindtilt(
+            self._module.addr,
             sh_nmbr,
             0,
         )
@@ -366,8 +364,8 @@ class HbtnBlind(HbtnShutter):
             sh_nmbr -= 2  # map #3..5 to 1..3
             if sh_nmbr < 1:
                 sh_nmbr += 5  # ...and 1..2 to 4..5
-        await self._module.comm.async_set_blindtilt(
-            self._module.mod_addr,
+        await self.coordinator.comm.async_set_blindtilt(
+            self._module.addr,
             sh_nmbr,
             100,
         )
