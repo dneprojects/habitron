@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from habitron_client import Router
 import pytest
 
 from custom_components.habitron.smart_hub import LoggingLevels, SmartHub
@@ -25,7 +26,7 @@ def smart_hub_stub() -> SmartHub:
     """Build a SmartHub with the heavy dependencies stubbed out."""
     with (
         patch("custom_components.habitron.smart_hub.hbtn_com") as mock_com,
-        patch("custom_components.habitron.smart_hub.hbtr") as mock_router_cls,
+        patch("custom_components.habitron.smart_hub.HbtnCoordinator"),
     ):
         comm = MagicMock()
         comm.com_ip = MOCK_HOST
@@ -42,12 +43,11 @@ def smart_hub_stub() -> SmartHub:
         comm.get_smhub_version = AsyncMock()
         comm.reinit_hub = AsyncMock()
         comm.send_network_info = AsyncMock()
+        comm.send_devregid = AsyncMock()
+        comm.set_router = MagicMock()
         comm.hub_restart = AsyncMock()
         comm.hub_reboot = AsyncMock()
         mock_com.return_value = comm
-        router = MagicMock()
-        router.initialize = AsyncMock()
-        mock_router_cls.return_value = router
 
         hass = MagicMock()
         hass.async_add_executor_job = AsyncMock()
@@ -86,6 +86,11 @@ async def test_smhub_async_setup_populates_fields_and_diagnostics(
 
     with (
         patch("custom_components.habitron.smart_hub.dr") as mock_dr,
+        patch("custom_components.habitron.smart_hub.ar"),
+        patch(
+            "custom_components.habitron.smart_hub.async_build_system",
+            new=AsyncMock(return_value=Router()),
+        ),
         patch("custom_components.habitron.smart_hub.add_extra_js_url"),
         patch("custom_components.habitron.smart_hub.StaticPathConfig"),
     ):
@@ -113,6 +118,11 @@ async def test_smhub_async_setup_addon_branch_sets_ingress_base_url(
 
     with (
         patch("custom_components.habitron.smart_hub.dr") as mock_dr,
+        patch("custom_components.habitron.smart_hub.ar"),
+        patch(
+            "custom_components.habitron.smart_hub.async_build_system",
+            new=AsyncMock(return_value=Router()),
+        ),
         patch("custom_components.habitron.smart_hub.add_extra_js_url"),
         patch("custom_components.habitron.smart_hub.StaticPathConfig"),
     ):
@@ -138,6 +148,11 @@ async def test_smhub_async_setup_swallows_static_path_install_error(
 
     with (
         patch("custom_components.habitron.smart_hub.dr") as mock_dr,
+        patch("custom_components.habitron.smart_hub.ar"),
+        patch(
+            "custom_components.habitron.smart_hub.async_build_system",
+            new=AsyncMock(return_value=Router()),
+        ),
         patch("custom_components.habitron.smart_hub.add_extra_js_url"),
         patch("custom_components.habitron.smart_hub.StaticPathConfig"),
     ):
