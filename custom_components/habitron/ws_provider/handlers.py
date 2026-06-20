@@ -325,7 +325,7 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
         """Handle client registering its stream name."""
         stream_name = msg["stream_name"]
         client_version = msg.get("version", "unknown")
-        module = provider.rtr.get_module_by_stream(stream_name)
+        module = provider.module_by_stream(stream_name)
         if module:
             module.client_version = client_version
         if existing_conn := provider.active_ws_connections.get(stream_name):
@@ -636,7 +636,7 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
         payload = msg["payload"]
         _LOGGER.debug("Received device state report for %s: %s", stream_name, payload)
 
-        module = provider.rtr.get_module_by_stream(stream_name)
+        module = provider.module_by_stream(stream_name)
         if module:
             fw_version = payload.get("version", "0.0.0")
             module.client_version = fw_version

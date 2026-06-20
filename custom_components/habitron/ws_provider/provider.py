@@ -14,6 +14,8 @@ import re
 from typing import TYPE_CHECKING, Any
 import uuid
 
+from habitron_client import Module, Router
+
 from homeassistant.components.camera import (
     Camera,
     CameraWebRTCProvider,
@@ -27,9 +29,9 @@ from homeassistant.components.camera import (
 from homeassistant.components.websocket_api import ActiveConnection
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.util import slugify
 
 from ..const import DOMAIN
-from ..router import HbtnRouter
 
 if TYPE_CHECKING:
     from ..assist_satellite import HbtnAssistSat
@@ -47,7 +49,7 @@ def _filter_ipv6_candidates(sdp: str) -> str:
 class HabitronWebRTCProvider(CameraWebRTCProvider):
     """WebRTC and Voice provider that forwards commands to connected Flutter clients."""
 
-    def __init__(self, hass: HomeAssistant, hbtn_rt: HbtnRouter) -> None:
+    def __init__(self, hass: HomeAssistant, hbtn_rt: Router) -> None:
         """Initialize the provider."""
         self.hass = hass
         self.rtr = hbtn_rt
@@ -68,6 +70,16 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
         self._remove_provider: Callable[[], None] | None = (
             async_register_webrtc_provider(self.hass, self)
         )
+
+    def module_by_stream(self, stream_name: str) -> Module | None:
+        """Return the Smart Controller Touch module for a WebRTC stream name."""
+        for module in self.rtr.modules:
+            if module.mod_type != "Smart Controller Touch":
+                continue
+            raddr = module.addr - self.rtr.id
+            if f"{slugify(module.name)}_{raddr}" == stream_name:
+                return module
+        return None
 
     @callback
     def async_close(self) -> None:

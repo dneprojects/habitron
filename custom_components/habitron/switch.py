@@ -1,23 +1,23 @@
 """Platform for switch integration."""
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+from habitron_client import Flag, Led, Module, Output
 
 from homeassistant.components.switch import SwitchDeviceClass, SwitchEntity
 from homeassistant.const import EntityCategory
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
-from homeassistant.helpers.update_coordinator import (
-    CoordinatorEntity,
-    DataUpdateCoordinator,
-)
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import slugify
 
-from ._helpers import async_assign_entity_area, hbtn_device_info
-from .coordinator import HabitronConfigEntry
-from .interfaces import AreaDescriptor, IfDescriptor, StateDescriptor
-from .module import HbtnModule
-from .router import HbtnRouter
+from ._helpers import HabitronEntity, async_assign_entity_area, hbtn_device_info
+from .coordinator import HabitronConfigEntry, HbtnCoordinator
+
+if TYPE_CHECKING:
+    from .ws_provider import HabitronWebRTCProvider
 
 PARALLEL_UPDATES = 1
 
@@ -28,189 +28,133 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add switches for passed config_entry in HA."""
-    hbtn_rt: HbtnRouter = entry.runtime_data.router
-    hbtn_cord = hbtn_rt.coord
+    smhub = entry.runtime_data
+    router = smhub.router
+    coord = smhub.coordinator
 
     new_devices: list[SwitchEntity] = []
-    for hbt_module in hbtn_rt.modules:
-        for mod_output in hbt_module.outputs:
-            if abs(mod_output.type) == 1:  # standard
+    for module in router.modules:
+        for output in module.outputs:
+            if abs(output.type) == 1:  # standard relay output
                 new_devices.append(
-                    SwitchedOutputPush(
-                        mod_output, hbt_module, hbtn_cord, len(new_devices)
-                    )
+                    SwitchedOutput(coord, module, output, len(new_devices))
                 )
-        for mod_led in hbt_module.leds:
-            if mod_led.type == 0:
-                if hbt_module.typ == b"\x01\x04" and mod_led.nmbr == 0:
-                    # CLED 0 is used for ambient light, so skip it for RGB LED entities
-                    pass
-                else:
-                    if mod_led.nmbr == 0:
-                        led_name = "LED white"
-                        led_no = ""
-                    else:
-                        led_name = "LED red"
-                        led_no = str(mod_led.nmbr)
-                    if mod_led.name.strip() == "":
-                        mod_led.set_name(f"{led_name} {led_no}")
-                    else:
-                        mod_led.set_name(f"{led_name} {led_no}: {mod_led.name}")
-                    new_devices.append(
-                        SwitchedLed(mod_led, hbt_module, hbtn_cord, len(new_devices))
-                    )
-        for flg_idx, mod_flg in enumerate(hbt_module.flags):
-            new_devices.append(HbtnFlagPush(mod_flg, hbt_module, hbtn_cord, flg_idx))
-
-        if hbt_module.mod_type.startswith("Smart Controller"):
+        for led in module.leds:
+            if led.type != 0:
+                continue
+            if module.typ == b"\x01\x04" and led.nmbr == 0:
+                # CLED 0 is the ambient light on the Touch, not a switchable LED.
+                continue
+            new_devices.append(SwitchedLed(coord, module, led, len(new_devices)))
+        for flag in module.flags:
             new_devices.append(
-                ClimateCtlSwitch(hbt_module, hbtn_cord, len(new_devices))
+                HbtnFlag(
+                    coord,
+                    flag,
+                    device_uid=module.uid,
+                    mod_addr=module.addr,
+                    idx=len(new_devices),
+                )
             )
+        if module.mod_type.startswith("Smart Controller"):
+            new_devices.append(ClimateCtlSwitch(coord, module, len(new_devices)))
+        if (
+            module.mod_type == "Smart Controller Touch"
+            and smhub.ws_provider is not None
+        ):
+            new_devices.append(MicrophoneSwitch(module, smhub.ws_provider))
 
-        if hbt_module.mod_type == "Smart Controller Touch":
-            new_devices.append(MicrophoneSwitch(hbt_module))
-    for flg_idx, rt_flg in enumerate(hbtn_rt.flags):
-        new_devices.append(HbtnFlagPush(rt_flg, hbtn_rt, hbtn_cord, flg_idx))
+    for flag in router.flags:
+        new_devices.append(
+            HbtnFlag(
+                coord,
+                flag,
+                device_uid=router.uid,
+                mod_addr=router.id,
+                idx=len(new_devices),
+            )
+        )
 
     if new_devices:
         async_add_entities(new_devices)
 
-    registry: er.EntityRegistry = er.async_get(hass)
-    area_names: dict[int, AreaDescriptor] = hbtn_rt.areas
-
-    for hbt_module in hbtn_rt.modules:
-        for mod_output in hbt_module.outputs:
-            if abs(mod_output.type) == 1:  # standard
+    registry = er.async_get(hass)
+    area_names = {area.nmbr: slugify(area.name) for area in router.areas}
+    for module in router.modules:
+        for output in module.outputs:
+            if abs(output.type) == 1:
                 async_assign_entity_area(
                     registry,
                     domain="switch",
-                    unique_id=f"Mod_{hbt_module.uid}_out{mod_output.nmbr}",
-                    area_index=mod_output.area,
-                    area_member=hbt_module.area_member,
+                    unique_id=f"Mod_{module.uid}_out{output.nmbr}",
+                    area_index=output.area,
+                    area_member=module.area,
                     area_names=area_names,
                     propagate_to_hidden_duplicates=True,
                 )
 
 
-class SwitchedOutput(CoordinatorEntity[DataUpdateCoordinator[bytes]], SwitchEntity):
-    """Representation of habitron output as switch entities."""
-
-    _attr_has_entity_name = True
+class SwitchedOutput(HabitronEntity, SwitchEntity):
+    """Representation of a Habitron relay output as a switch."""
 
     def __init__(
-        self,
-        output: IfDescriptor,
-        module: HbtnModule,
-        coord: DataUpdateCoordinator[bytes],
-        idx: int,
+        self, coordinator: HbtnCoordinator, module: Module, output: Output, idx: int
     ) -> None:
-        """Initialize an HbtnSwitch, pass coordinator to CoordinatorEntity."""
-        super().__init__(coord, context=idx)
-        self.idx: int = idx
-        self._output: IfDescriptor = output
-        self._area_member: int = output.area
-        self._module: HbtnModule = module
-        if output.name.strip() == "":
-            self._attr_name = f"Out {output.nmbr + 1}"
-        else:
-            self._attr_name = output.name
-        self._nmbr: int = output.nmbr
-        self._out_offs = 0  # Dimm 1 = Out 1 + offs
-        self._attr_unique_id: str | None = f"Mod_{self._module.uid}_out{output.nmbr}"
+        """Initialize the output switch."""
+        super().__init__(coordinator, module, output, idx)
+        self._output = output
+        self._nmbr = output.nmbr
+        self._attr_name = (
+            output.name if output.name.strip() else f"Out {output.nmbr + 1}"
+        )
+        self._attr_unique_id = f"Mod_{module.uid}_out{output.nmbr}"
         if output.type < 0:
-            # Entity will not show up
             self._attr_entity_registry_enabled_default = False
-        self._attr_device_info = hbtn_device_info(self._module.uid)
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self._attr_is_on = self._output.value == 1
-        self.async_write_ha_state()
-
-    async def async_turn_on(self, **kwargs: Any) -> None:
-        """Instruct the light to turn on."""
-        await self._module.comm.async_set_output(
-            self._module.mod_addr, self._nmbr + 1, 1
-        )
-        self._attr_is_on = True
-
-    async def async_turn_off(self, **kwargs: Any) -> None:
-        """Instruct the light to turn off."""
-        await self._module.comm.async_set_output(
-            self._module.mod_addr, self._nmbr + 1, 0
-        )
-        self._attr_is_on = False
-
-
-class SwitchedOutputPush(SwitchedOutput):
-    """Version for push update."""
-
-    async def async_added_to_hass(self) -> None:
-        """Run when this Entity has been added to HA."""
-        # Importantly for a push integration, the module that will be getting updates
-        # needs to notify HA of changes. The dummy device has a registercallback
-        # method, so to this we add the 'self.async_write_ha_state' method, to be
-        # called where ever there are changes.
-        # The call back registration is done once this entity is registered with HA
-        # (rather than in the __init__)
-        await super().async_added_to_hass()
-        self._output.register_callback(self.async_write_ha_state)
-
-    async def async_will_remove_from_hass(self) -> None:
-        """Entity being removed from hass."""
-        # The opposite of async_added_to_hass. Remove any registered call backs here.
-        self._output.remove_callback(self.async_write_ha_state)
-
-
-class SwitchedLed(CoordinatorEntity[DataUpdateCoordinator[bytes]], SwitchEntity):
-    """Module switch background LEDs."""
-
-    _attr_device_class = SwitchDeviceClass.SWITCH
-    _attr_has_entity_name = True
-
-    def __init__(
-        self,
-        led: IfDescriptor,
-        module: HbtnModule,
-        coord: DataUpdateCoordinator[bytes],
-        idx: int,
-    ) -> None:
-        """Initialize an HbtnLED, pass coordinator to CoordinatorEntity."""
-        super().__init__(coord, context=idx)
-        self.idx: int = idx
-        self._led: IfDescriptor = led
-        self._module: HbtnModule = module
-        self._attr_name: str | None = led.name
-        self._nmbr: int = led.nmbr
-        self._state: bool = False
-        self._attr_unique_id: str | None = f"Mod_{self._module.uid}_led{led.nmbr}"
-        self._attr_device_info = hbtn_device_info(self._module.uid)
-
-    async def async_added_to_hass(self) -> None:
-        """Run when this Entity has been added to HA."""
-        # Importantly for a push integration, the module that will be getting updates
-        # needs to notify HA of changes. The dummy device has a registercallback
-        # method, so to this we add the 'self.async_write_ha_state' method, to be
-        # called where ever there are changes.
-        # The call back registration is done once this entity is registered with HA
-        # (rather than in the __init__)
-        await super().async_added_to_hass()
-        self._led.register_callback(self._handle_coordinator_update)
-
-    async def async_will_remove_from_hass(self) -> None:
-        """Entity being removed from hass."""
-        # The opposite of async_added_to_hass. Remove any registered call backs here.
-        self._led.remove_callback(self._handle_coordinator_update)
 
     @property
     def is_on(self) -> bool:
-        """Return status of output."""
-        return self._state
+        """Return whether the output is on."""
+        return self._output.is_on
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Turn the output on."""
+        await self.comm.async_set_output(self._module.addr, self._nmbr + 1, 1)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Turn the output off."""
+        await self.comm.async_set_output(self._module.addr, self._nmbr + 1, 0)
+
+
+class SwitchedLed(HabitronEntity, SwitchEntity):
+    """Representation of a Habitron module background LED as a switch."""
+
+    _attr_device_class = SwitchDeviceClass.SWITCH
+
+    def __init__(
+        self, coordinator: HbtnCoordinator, module: Module, led: Led, idx: int
+    ) -> None:
+        """Initialize the LED switch."""
+        super().__init__(coordinator, module, led, idx)
+        self._led = led
+        self._nmbr = led.nmbr
+        if led.nmbr == 0:
+            led_name, led_no = "LED white", ""
+        else:
+            led_name, led_no = "LED red", str(led.nmbr)
+        if led.name.strip() == "":
+            self._attr_name = f"{led_name} {led_no}"
+        else:
+            self._attr_name = f"{led_name} {led_no}: {led.name}"
+        self._attr_unique_id = f"Mod_{module.uid}_led{led.nmbr}"
+
+    @property
+    def is_on(self) -> bool:
+        """Return whether the LED is on."""
+        return self._led.is_on
 
     @property
     def icon(self) -> str:
-        """Icon of the led, based on number and state."""
+        """Icon of the LED, based on number and state."""
         if (self._nmbr > 0) & self.is_on:
             return "mdi:circle-double"
         if (self._nmbr > 0) & (not self.is_on):
@@ -219,25 +163,17 @@ class SwitchedLed(CoordinatorEntity[DataUpdateCoordinator[bytes]], SwitchEntity)
             return "mdi:white-balance-sunny"
         return "mdi:circle-medium"
 
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self._state = self._led.value == 1
-        self.async_write_ha_state()
-
     async def async_turn_on(self, **kwargs: Any) -> None:
-        """Instruct the led to turn on."""
-        await self._module.comm.async_set_led_outp(self._module.mod_addr, self._nmbr, 1)
-        self._state = True
+        """Turn the LED on."""
+        await self.comm.async_set_led_outp(self._module.addr, self._nmbr, 1)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        """Instruct the led to turn off."""
-        await self._module.comm.async_set_led_outp(self._module.mod_addr, self._nmbr, 0)
-        self._state = False
+        """Turn the LED off."""
+        await self.comm.async_set_led_outp(self._module.addr, self._nmbr, 0)
 
 
-class HbtnFlag(CoordinatorEntity[DataUpdateCoordinator[bytes]], SwitchEntity):
-    """Module switch local flag."""
+class HbtnFlag(CoordinatorEntity[HbtnCoordinator], SwitchEntity):
+    """Representation of a Habitron flag (module or router) as a switch."""
 
     _attr_device_class = SwitchDeviceClass.SWITCH
     _attr_has_entity_name = True
@@ -245,93 +181,102 @@ class HbtnFlag(CoordinatorEntity[DataUpdateCoordinator[bytes]], SwitchEntity):
 
     def __init__(
         self,
-        flag: StateDescriptor,
-        module: HbtnRouter | HbtnModule,
-        coord: DataUpdateCoordinator[bytes],
+        coordinator: HbtnCoordinator,
+        flag: Flag,
+        *,
+        device_uid: str,
+        mod_addr: int,
         idx: int,
     ) -> None:
-        """Initialize an HbtnFlag, pass coordinator to CoordinatorEntity."""
-        super().__init__(coord, context=idx)
-        self.idx: int = idx
-        self._flag: StateDescriptor = flag
-        self._module: HbtnRouter | HbtnModule = module
-        self._attr_name: str | None = flag.name
-        self._nmbr: int = flag.nmbr
-        self._state: bool = False
-        self._attr_unique_id: str | None = f"Mod_{self._module.uid}_flag{self._nmbr}"
-        self._attr_device_info = hbtn_device_info(self._module.uid)
+        """Initialize the flag switch (router flags use the router address)."""
+        super().__init__(coordinator, context=idx)
+        self.idx = idx
+        self._flag = flag
+        self._mod_addr = mod_addr
+        self._nmbr = flag.nmbr
+        self._attr_name = flag.name
+        self._attr_unique_id = f"Mod_{device_uid}_flag{flag.nmbr}"
+        self._attr_device_info = hbtn_device_info(device_uid)
+
+    async def async_added_to_hass(self) -> None:
+        """Subscribe to the flag's change notifications."""
+        await super().async_added_to_hass()
+        self._flag.add_listener(self.async_write_ha_state)
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Unsubscribe the flag listener."""
+        self._flag.remove_listener(self.async_write_ha_state)
+        await super().async_will_remove_from_hass()
 
     @property
     def is_on(self) -> bool:
-        """Return status of output."""
-        return self._state
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self._state = self._flag.value == 1
-        self.async_write_ha_state()
+        """Return whether the flag is set."""
+        return self._flag.value == 1
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        """Instruct the flag to turn on."""
-        if isinstance(self._module, HbtnModule):
-            mod_addr = self._module.mod_addr
-        else:
-            mod_addr = self._module.id
-        await self._module.comm.async_set_flag(mod_addr, self._nmbr, 1)
-        self._state = True
+        """Set the flag."""
+        await self.coordinator.comm.async_set_flag(self._mod_addr, self._nmbr, 1)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        """Instruct the flag to turn off."""
-        if isinstance(self._module, HbtnModule):
-            mod_addr = self._module.mod_addr
-        else:
-            mod_addr = self._module.id
-        await self._module.comm.async_set_flag(mod_addr, self._nmbr, 0)
-        self._state = False
+        """Clear the flag."""
+        await self.coordinator.comm.async_set_flag(self._mod_addr, self._nmbr, 0)
 
 
-class HbtnFlagPush(HbtnFlag):
-    """Representation of habitron flag entities for push update."""
+class ClimateCtlSwitch(CoordinatorEntity[HbtnCoordinator], SwitchEntity):
+    """Switch to select the second climate controller of a Smart Controller."""
 
-    async def async_added_to_hass(self) -> None:
-        """Run when this Entity has been added to HA."""
-        # Importantly for a push integration, the module that will be getting updates
-        # needs to notify HA of changes. The dummy device has a registercallback
-        # method, so to this we add the 'self.async_write_ha_state' method, to be
-        # called where ever there are changes.
-        # The call back registration is done once this entity is registered with HA
-        # (rather than in the __init__)
-        await super().async_added_to_hass()
-        self._flag.register_callback(self._handle_coordinator_update)
+    _attr_has_entity_name = True
+    _attr_translation_key = "climate_ctl"
+    _attr_entity_category = EntityCategory.CONFIG
 
-    async def async_will_remove_from_hass(self) -> None:
-        """Entity being removed from hass."""
-        # The opposite of async_added_to_hass. Remove any registered call backs here.
-        self._flag.remove_callback(self._handle_coordinator_update)
+    def __init__(
+        self, coordinator: HbtnCoordinator, module: Module, idx: int = 0
+    ) -> None:
+        """Initialize the climate-control switch."""
+        super().__init__(coordinator, context=idx)
+        self.idx = idx
+        self._module = module
+        self._attr_unique_id = f"Mod_{module.uid}_Climate Controller 2"
+        self._attr_name = "Climate Controller 2"
+        self._attr_entity_registry_enabled_default = False
+        self._attr_device_info = hbtn_device_info(module.uid)
+
+    @property
+    def is_on(self) -> bool:
+        """Return whether the second climate controller is active."""
+        return self._module.climate_ctl12 == 2
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Activate the second climate controller."""
+        self._module.climate_ctl12 = 2
+        await self.coordinator.comm.async_set_climate_mode(
+            self._module.addr, self._module.climate_settings, self._module.climate_ctl12
+        )
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Activate the first climate controller."""
+        self._module.climate_ctl12 = 1
+        await self.coordinator.comm.async_set_climate_mode(
+            self._module.addr, self._module.climate_settings, self._module.climate_ctl12
+        )
 
 
 class MicrophoneSwitch(SwitchEntity):
-    """Representation of a button to trigger a speech command."""
+    """Switch to toggle the WebRTC microphone of a Smart Controller Touch."""
 
     _attr_has_entity_name = True
     _attr_translation_key = "microphone"
 
-    def __init__(self, module: HbtnModule) -> None:
-        """Initialize a switch for the microphone."""
-        self._name = "Microphone Mode"
+    def __init__(self, module: Module, provider: HabitronWebRTCProvider) -> None:
+        """Initialize the microphone switch."""
         self._module = module
+        self._name = "Microphone Mode"
         self._stream_name = module.name.lower().replace(" ", "_")
-        self._provider = module.comm.router.smhub.ws_provider
-        self._active_ws_connections = (
-            self._provider.active_ws_connections if self._provider else {}
-        )
-        self._attr_unique_id = f"Mod_{self._module.uid}_{self._name}"
+        self._provider = provider
+        self._attr_unique_id = f"Mod_{module.uid}_{self._name}"
         self._attr_name = "Microphone Mode"
         self._state = False
 
-    # To link this entity to its device, this property must return an
-    # identifiers value matching that used in the module
     @property
     def device_info(self) -> DeviceInfo:
         """Return information to link this entity with the correct device."""
@@ -339,80 +284,23 @@ class MicrophoneSwitch(SwitchEntity):
 
     @property
     def is_on(self) -> bool:
-        """Return status of output."""
+        """Return the microphone mode state."""
         return self._state
 
-    async def async_turn_on(self, **kwargs: Any) -> None:
-        """Instruct the flag to turn on."""
-        ws_connection = self._active_ws_connections.get(self._stream_name)
+    def _send_audio_mode(self, *, enabled: bool) -> None:
+        """Send the audio-mode command over the module's websocket, if open."""
+        ws_connection = self._provider.active_ws_connections.get(self._stream_name)
         if ws_connection:
             ws_connection.send_message(
-                {"type": "habitron/set_webrtc_audio_mode", "audio_enabled": True}
+                {"type": "habitron/set_webrtc_audio_mode", "audio_enabled": enabled}
             )
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Enable the microphone."""
+        self._send_audio_mode(enabled=True)
         self._state = True
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        """Instruct the flag to turn off."""
-        ws_connection = self._active_ws_connections.get(self._stream_name)
-        if ws_connection:
-            ws_connection.send_message(
-                {"type": "habitron/set_webrtc_audio_mode", "audio_enabled": False}
-            )
+        """Disable the microphone."""
+        self._send_audio_mode(enabled=False)
         self._state = False
-
-
-class ClimateCtlSwitch(CoordinatorEntity[DataUpdateCoordinator[bytes]], SwitchEntity):
-    """Representation of a button to trigger a speech command."""
-
-    _attr_has_entity_name = True
-    _attr_translation_key = "climate_ctl"
-
-    def __init__(
-        self, module: HbtnModule, coord: DataUpdateCoordinator[bytes], idx: int = 0
-    ) -> None:
-        """Initialize the climate control switch, pass coordinator to base."""
-        super().__init__(coord, context=idx)
-        self._name = "Climate Controller 2"
-        self._module = module
-        self._attr_unique_id = f"Mod_{self._module.uid}_{self._name}"
-        self._attr_name = self._name
-        self._attr_entity_category = EntityCategory.CONFIG
-        self._attr_entity_registry_enabled_default = (
-            False  # Entity will initially be disabled
-        )
-        self._state = self._module.climate_ctl12 == 2
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self._state = self._module.climate_ctl12 == 2
-        self.async_write_ha_state()
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return information to link this entity with the correct device."""
-        return hbtn_device_info(self._module.uid)
-
-    @property
-    def is_on(self) -> bool:
-        """Return status of output."""
-        self._state = self._module.climate_ctl12 == 2
-        return self._state
-
-    async def async_turn_on(self, **kwargs: Any) -> None:
-        """Instruct the flag to turn on."""
-        self._module.climate_ctl12 = 2
-        await self._module.comm.async_set_climate_mode(
-            self._module.mod_addr,
-            self._module.climate_settings,
-            self._module.climate_ctl12,
-        )
-
-    async def async_turn_off(self, **kwargs: Any) -> None:
-        """Instruct the flag to turn off."""
-        self._module.climate_ctl12 = 1
-        await self._module.comm.async_set_climate_mode(
-            self._module.mod_addr,
-            self._module.climate_settings,
-            self._module.climate_ctl12,
-        )
