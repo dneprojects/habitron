@@ -7,6 +7,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from aiohttp import ClientError, ClientSession
+from habitron_client import SmartController
 
 from homeassistant.components import media_source
 from homeassistant.components.media_player import (
@@ -25,12 +26,10 @@ from homeassistant.helpers.restore_state import RestoreEntity
 
 from ._helpers import hbtn_device_info
 from .coordinator import HabitronConfigEntry
-from .module import SmartController
 
 PARALLEL_UPDATES = 1
 
 if TYPE_CHECKING:
-    from .module import HbtnModule
     from .smart_hub import SmartHub
     from .ws_provider import HabitronWebRTCProvider
 
@@ -63,20 +62,18 @@ async def async_setup_entry(
     """Set up the Habitron media player entities."""
     smhub: SmartHub = entry.runtime_data
     provider = smhub.ws_provider
-    new_devices = []
 
     if provider is None:
         _LOGGER.error("WebSocket provider not available for media player setup")
         return
 
     # Create a media player entity for each 'Smart Controller Touch' module.
-    for hbt_module in smhub.router.modules:
-        if (
-            isinstance(hbt_module, SmartController)
-            and hbt_module.mod_type == "Smart Controller Touch"
-        ):
-            new_devices.append(HbtnMediaPlayer(hbt_module, provider, hass))
-            hbt_module.media_player = new_devices[-1]
+    new_devices = [
+        HbtnMediaPlayer(hbt_module, provider, hass)
+        for hbt_module in smhub.router.modules
+        if isinstance(hbt_module, SmartController)
+        and hbt_module.mod_type == "Smart Controller Touch"
+    ]
 
     if new_devices:
         async_add_entities(new_devices)
@@ -94,16 +91,14 @@ class HbtnMediaPlayer(MediaPlayerEntity, RestoreEntity):
 
     def __init__(
         self,
-        module: HbtnModule,
+        module: SmartController,
         provider: HabitronWebRTCProvider,
         hass: HomeAssistant,
     ) -> None:
         """Initialize the media player."""
-        self._module: HbtnModule = module
+        self._module: SmartController = module
         self._provider = provider
-        self._stream_name: str = (
-            module.name.lower().replace(" ", "_") + f"_{module.raddr}"
-        )
+        self._stream_name: str = module.stream_name
         self._hass = hass
         self._attr_unique_id = f"Mod_{self._module.uid}_mediaplayer"
         self._attr_device_info = hbtn_device_info(self._module.uid)

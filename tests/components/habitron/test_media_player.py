@@ -3,15 +3,14 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from aiohttp import ClientError
+from habitron_client import SmartController
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.media_player import (
     HbtnMediaPlayer,
     QueueItem,
     async_setup_entry,
 )
-from custom_components.habitron.module import SmartController
 from homeassistant.components.media_player import (
     MediaPlayerEnqueue,
     MediaPlayerEntityFeature,
@@ -20,11 +19,6 @@ from homeassistant.components.media_player import (
 from homeassistant.core import HomeAssistant
 
 from .conftest import class_attr
-
-
-async def test_media_player_setup(setup_integration: MockConfigEntry) -> None:
-    """The media_player platform sets up cleanly against an empty router."""
-    assert setup_integration.runtime_data is not None
 
 
 def test_translation_key() -> None:
@@ -42,7 +36,7 @@ def _make_touch_module(uid: str = "MOD-T") -> MagicMock:
     mod.uid = uid
     mod.name = "Touch 1"
     mod.mod_type = "Smart Controller Touch"
-    mod.raddr = 5
+    mod.stream_name = "touch_1_5"
     return mod
 
 
@@ -904,7 +898,6 @@ async def test_async_setup_entry_adds_player_for_touch_module(
     await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
     assert len(added) == 1
     assert isinstance(added[0], HbtnMediaPlayer)
-    assert touch.media_player is added[0]
 
 
 async def test_async_setup_entry_short_circuits_without_provider(
