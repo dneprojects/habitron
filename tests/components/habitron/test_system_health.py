@@ -20,7 +20,7 @@ def _make_hub_entry(modules: int, sys_ok: bool) -> MagicMock:
     hangs the event loop with a half-mocked SmartHub.
     """
     hub = MagicMock()
-    hub.comm.router._sys_ok = sys_ok
+    hub.router.sys_ok = sys_ok
     hub.router.modules = [MagicMock() for _ in range(modules)]
     entry = MagicMock()
     entry.runtime_data = hub

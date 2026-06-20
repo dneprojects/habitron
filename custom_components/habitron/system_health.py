@@ -20,7 +20,7 @@ def _aggregate_router_status(hubs: list[Any]) -> str:
     """Return aggregate router health across all configured SmartHubs."""
     if not hubs:
         return "no hubs"
-    if all(hub.comm.router._sys_ok for hub in hubs):  # noqa: SLF001
+    if all(hub.router.sys_ok for hub in hubs):
         return "ok"
     return "errors"
 
