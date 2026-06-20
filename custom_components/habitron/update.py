@@ -4,8 +4,9 @@ from asyncio import sleep
 import hashlib
 import logging
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+from habitron_client import Module, Router
 from packaging.version import parse as parse_version
 
 from homeassistant.components.http import StaticPathConfig
@@ -24,8 +25,9 @@ from ._axml import read_apk_version_name
 from ._helpers import hbtn_device_info
 from .const import DOMAIN
 from .coordinator import HabitronConfigEntry, HbtnFirmwareCoordinator
-from .module import HbtnModule
-from .router import HbtnRouter
+
+if TYPE_CHECKING:
+    from .smart_hub import SmartHub
 
 PARALLEL_UPDATES = 1
 
@@ -47,8 +49,9 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add update entities for Habitron system."""
-    hbtn_rt: HbtnRouter = entry.runtime_data.router
-    fw_coord = HbtnFirmwareCoordinator(hass, entry, hbtn_rt.comm)
+    smhub = entry.runtime_data
+    hbtn_rt = smhub.router
+    fw_coord = HbtnFirmwareCoordinator(hass, entry, smhub.comm)
 
     new_devices: list[UpdateEntity] = []
     # Add router update entity
@@ -61,7 +64,7 @@ async def async_setup_entry(
         # Check for Smart Controller Touch type
         if hbt_module.typ == b"\x01\x04":
             _LOGGER.info("Creating SCTouchAppUpdate for %s", hbt_module.uid)
-            new_devices.append(SCTouchAppUpdate(hbt_module, hbtn_rt))
+            new_devices.append(SCTouchAppUpdate(hbt_module, smhub))
 
     if new_devices:
         # Prime firmware versions with one read before the entities go live.
@@ -79,11 +82,11 @@ class SCTouchAppUpdate(UpdateEntity):
     _attr_should_poll = True
     _attr_supported_features = UpdateEntityFeature.INSTALL
 
-    def __init__(self, module: HbtnModule, router: HbtnRouter) -> None:
+    def __init__(self, module: Module, smhub: SmartHub) -> None:
         """Initialize the app update entity."""
         self._module = module
-        self._router = router
-        self._hass = router.hass
+        self._smhub = smhub
+        self._hass = smhub.hass
         self.firmware_dir = Path("")
 
         self._attr_unique_id = f"mod_{self._module.uid}_app_update"
@@ -185,10 +188,8 @@ class SCTouchAppUpdate(UpdateEntity):
            when this path is used.
         """
         base_path = Path(self._hass.config.path())
-        if self._router.smhub.addon_slug:
-            self.firmware_dir = (
-                Path("/share") / self._router.smhub.addon_slug / "firmware"
-            )
+        if self._smhub.addon_slug:
+            self.firmware_dir = Path("/share") / self._smhub.addon_slug / "firmware"
             return
 
         new_path = base_path / DOMAIN / "firmware"
@@ -268,8 +269,8 @@ class SCTouchAppUpdate(UpdateEntity):
                 translation_key="update_no_version_info",
             )
 
-        stream_name = self._module.stream_name
-        provider = self._router.smhub.ws_provider
+        stream_name = getattr(self._module, "stream_name", "")
+        provider = self._smhub.ws_provider
         if provider is None:
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
@@ -328,14 +329,14 @@ class HbtnModuleUpdate(CoordinatorEntity[HbtnFirmwareCoordinator], UpdateEntity)
 
     def __init__(
         self,
-        module: HbtnModule | HbtnRouter,
+        module: Module | Router,
         coord: HbtnFirmwareCoordinator,
         idx: int,
     ) -> None:
         """Initialize entity."""
         super().__init__(coord)
         self.idx = idx
-        self._module: HbtnModule | HbtnRouter = module
+        self._module: Module | Router = module
         self._attr_unique_id = f"Mod_{self._module.uid}_update"
         self.flash_in_progress = False
         # Installed version is known from setup; latest fills in once polled.
@@ -362,11 +363,11 @@ class HbtnModuleUpdate(CoordinatorEntity[HbtnFirmwareCoordinator], UpdateEntity)
         self.async_write_ha_state()
         await sleep(0.1)
         try:
-            if isinstance(self._module, HbtnRouter):
-                await self._module.comm.update_firmware(self._module.id)
+            if isinstance(self._module, Router):
+                await self.coordinator.comm.update_firmware(self._module.id)
                 self._module.version = version or ""
             else:
-                await self._module.comm.update_firmware(self._module.mod_addr)
+                await self.coordinator.comm.update_firmware(self._module.addr)
                 self._module.sw_version = version or ""
         finally:
             self.flash_in_progress = False

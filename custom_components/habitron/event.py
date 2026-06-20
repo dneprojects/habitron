@@ -1,22 +1,21 @@
 """Platform for events integration."""
 
-from typing import Any
+from habitron_client import BusMember, Finger, Input, Module
 
 from homeassistant.components.event import EventDeviceClass, EventEntity
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.util import slugify
 
 from ._helpers import async_assign_entity_area, hbtn_device_info
 from .coordinator import HabitronConfigEntry
 
-# Import the device class from the component that you want to support
-from .interfaces import AreaDescriptor, IfDescriptor
-from .module import HbtnModule
-
 PARALLEL_UPDATES = 1
+
+# Input press codes carried on the member value by ``apply_event``.
+INP_EVENT_TYPES = ["inactive", "single_press", "long_press", "long_press_end"]
 
 
 async def async_setup_entry(
@@ -25,37 +24,28 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add event entities for Habitron system."""
-    hbtn_rt = entry.runtime_data.router
-    hbtn_cord = hbtn_rt.coord
+    smhub = entry.runtime_data
+    hbtn_rt = smhub.router
 
     new_devices: list[EventEntity] = []
     for hbt_module in hbtn_rt.modules:
         for mod_input in hbt_module.inputs:
             if abs(mod_input.type) == 1:  # pulse switch
                 new_devices.append(
-                    InputPressed(mod_input, hbt_module, hbtn_cord, len(new_devices))
+                    InputPressed(mod_input, hbt_module, len(new_devices))
                 )
         if hbt_module.mod_type == "Fanekey":
-            # Keep the general finger entity
             new_devices.append(
-                FingerDetected(
-                    hbt_module.fingers[0], hbt_module, hbtn_cord, len(new_devices)
-                )
+                FingerDetected(hbt_module.fingers[0], hbt_module, len(new_devices))
             )
-
-            # Create one entity per user, removing the German name list here
             for user_obj in hbt_module.ids:
-                u_id = user_obj.nmbr  # all IfDescriptors expose ``nmbr``
-                u_name = user_obj.name
-
                 new_devices.append(
                     EkeyUserEvent(
                         hbt_module.fingers[0],
                         hbt_module,
-                        hbtn_cord,
                         len(new_devices),
-                        u_id,
-                        u_name,
+                        user_obj.nmbr,
+                        user_obj.name,
                     )
                 )
 
@@ -63,7 +53,7 @@ async def async_setup_entry(
         async_add_entities(new_devices)
 
     registry: er.EntityRegistry = er.async_get(hass)
-    area_names: dict[int, AreaDescriptor] = hbtn_rt.areas
+    area_names = {area.nmbr: slugify(area.name) for area in hbtn_rt.areas}
 
     for hbt_module in hbtn_rt.modules:
         for mod_input in hbt_module.inputs:
@@ -73,35 +63,26 @@ async def async_setup_entry(
                     domain="event",
                     unique_id=f"Mod_{hbt_module.uid}_evnt{mod_input.nmbr}",
                     area_index=mod_input.area,
-                    area_member=hbt_module.area_member,
+                    area_member=hbt_module.area,
                     area_names=area_names,
                 )
 
 
 class HbtnEvent(EventEntity):
-    """Representation of habitron event."""
+    """Base representation of a Habitron event entity."""
 
     _attr_translation_key = "hbtn_event"
 
-    def __init__(
-        self,
-        event_if: IfDescriptor,
-        module: HbtnModule,
-        coord: DataUpdateCoordinator[bytes],
-        idx: int,
-    ) -> None:
-        """Initialize an HbtnEvent, pass coordinator to CoordinatorEntity."""
+    def __init__(self, event_if: BusMember, module: Module, idx: int) -> None:
+        """Initialize an HbtnEvent bound to a model member."""
         super().__init__()
         self.idx = idx
         self._if = event_if
         self._module = module
         self._attr_name = f"{event_if.name}"
         self._nmbr = event_if.nmbr
-        self._state = None
-        self._brightness = None
-        self._attr_unique_id = f"Mod_{self._module.uid}_evnt{event_if.nmbr}"
+        self._attr_unique_id = f"Mod_{module.uid}_evnt{event_if.nmbr}"
         if event_if.type < 0:
-            # Entity will not show up
             self._attr_entity_registry_enabled_default = False
 
     @property
@@ -110,144 +91,111 @@ class HbtnEvent(EventEntity):
         return hbtn_device_info(self._module.uid)
 
     @callback
-    def _async_handle_event(self, event: str, *args: Any) -> None:
-        """Handle event."""
-        self._trigger_event(event, {"extra_data": 123})
-        self.async_write_ha_state()
+    def _handle_member_update(self) -> None:
+        """React to a member change (overridden per event kind)."""
 
     async def async_added_to_hass(self) -> None:
-        """Register callbacks for input update."""
+        """Subscribe to the member's change notifications."""
         await super().async_added_to_hass()
-        self._if.register_callback(self._async_handle_event)
+        self._if.add_listener(self._handle_member_update)
 
     async def async_will_remove_from_hass(self) -> None:
-        """Entity being removed from hass."""
-        # The opposite of async_added_to_hass. Remove any registered call backs here.
-        self._if.remove_callback(self._async_handle_event)
+        """Unsubscribe the member listener."""
+        self._if.remove_listener(self._handle_member_update)
 
 
 class InputPressed(HbtnEvent):
-    """Representation of habitron button short press event."""
+    """A Habitron button (short/long) press event."""
 
     _attr_device_class = EventDeviceClass.BUTTON
     _attr_has_entity_name = True
     _attr_event_types = ["single_press", "long_press", "long_press_end"]
 
+    def __init__(self, event_if: Input, module: Module, idx: int) -> None:
+        """Initialize the button-press event."""
+        super().__init__(event_if, module, idx)
+        self._input = event_if
+
     @callback
-    def _async_handle_event(self, event: str, *args: Any) -> None:
-        """Handle event."""
-        # The bus emits an "inactive" reset after a press; it is a state reset,
-        # not a button event, so ignore anything outside the declared types.
+    def _handle_member_update(self) -> None:
+        """Translate the input press code into a button event."""
+        code = int(self._input.value)
+        if not 0 <= code < len(INP_EVENT_TYPES):
+            return
+        event = INP_EVENT_TYPES[code]
+        # The "inactive" reset (code 0) is a state reset, not a button event.
         if event not in self.event_types:
             return
-        self._trigger_event(event, {"extra_data": 123})
+        self._trigger_event(event)
         self.async_write_ha_state()
 
 
 class FingerDetected(HbtnEvent):
-    """Representation of habitron button short press event."""
+    """A Fanekey finger-detected event (with user/finger attributes)."""
 
     _attr_device_class = EventDeviceClass.BUTTON
     _attr_has_entity_name = True
     _attr_event_types = ["finger"]
 
-    def __init__(
-        self,
-        event_if: IfDescriptor,
-        module: HbtnModule,
-        coord: DataUpdateCoordinator[bytes],
-        idx: int,
-    ) -> None:
-        """Initialize FingerDetected and setup extra attributes."""
-        super().__init__(event_if, module, coord, idx)
-        # Initialize attributes to be visible in HA UI
-        self._attr_extra_state_attributes = {
-            "last_user": None,
-            "last_finger": None,
-        }
+    def __init__(self, event_if: Finger, module: Module, idx: int) -> None:
+        """Initialize the finger-detected event."""
+        super().__init__(event_if, module, idx)
+        self._finger = event_if
+        self._attr_extra_state_attributes = {"last_user": None, "last_finger": None}
 
     @callback
-    def _async_handle_event(self, event: str, user: int, finger: int) -> None:
-        """Handle event."""
-        # Ignore the "inactive" reset emitted after a finger read.
-        if event not in self.event_types:
+    def _handle_member_update(self) -> None:
+        """Fire the finger event from the member's raw user/finger values."""
+        user = self._finger.user
+        finger = self._finger.value
+        if not 1 <= finger <= 138:  # 0 is the inactive reset
             return
-        if finger > 10:
-            # user disabled
-            user = user * (-1)
+        if finger > 10:  # disabled user
+            user = user * -1
             finger = finger - 128
-        self._trigger_event(event, {"user": f"{user}", "finger": f"{finger}"})
-
-        # Update attributes to show in HA frontend directly
-        self._attr_extra_state_attributes = {
-            "last_user": user,
-            "last_finger": finger,
-        }
-
+        self._trigger_event("finger", {"user": f"{user}", "finger": f"{finger}"})
+        self._attr_extra_state_attributes = {"last_user": user, "last_finger": finger}
         self.async_write_ha_state()
 
 
 class EkeyUserEvent(HbtnEvent):
-    """Representation of a specific user event."""
+    """A per-user Fanekey event firing a finger-specific event type."""
 
     _attr_device_class = EventDeviceClass.BUTTON
     _attr_has_entity_name = True
 
+    _FINGER_NAMES = {
+        1: "left_pinky",
+        2: "left_ring",
+        3: "left_middle",
+        4: "left_index",
+        5: "left_thumb",
+        6: "right_thumb",
+        7: "right_index",
+        8: "right_middle",
+        9: "right_ring",
+        10: "right_pinky",
+    }
+
     def __init__(
-        self,
-        event_if: IfDescriptor,
-        module: HbtnModule,
-        coord: DataUpdateCoordinator[bytes],
-        idx: int,
-        u_id: int,
-        u_name: str,
+        self, event_if: Finger, module: Module, idx: int, u_id: int, u_name: str
     ) -> None:
-        """Initialize specific user event."""
-        super().__init__(event_if, module, coord, idx)
+        """Initialize a per-user finger event."""
+        super().__init__(event_if, module, idx)
+        self._finger = event_if
         self._u_id = u_id
-
-        # Technical keys for UI mapping
-        self._attr_event_types = [f"{self._get_finger_name(i)}" for i in range(1, 11)]
-
-        # Name formulation
+        self._attr_event_types = list(self._FINGER_NAMES.values())
         self._attr_name = f"{u_name}"
-        self._attr_unique_id = f"Mod_{self._module.uid}_u{u_id}"
+        self._attr_unique_id = f"Mod_{module.uid}_u{u_id}"
 
     @callback
-    def _async_handle_event(self, event: str, user: int, finger: int) -> None:
-        """Handle event and match user ID."""
-        if finger > 10:
-            # Handle disabled users
-            calc_user = user * (-1)
-            calc_finger = finger - 128
-        else:
-            calc_user = user
-            calc_finger = finger
-
-        if calc_user == self._u_id:
-            if 1 <= calc_finger <= 10:
-                # Use technical key for the triggered event
-                finger_event_type = f"{self._get_finger_name(calc_finger)}"
-
-                self._trigger_event(finger_event_type, {"finger_id": calc_finger})
-
-                self.async_write_ha_state()
-
-    def _get_finger_name(self, finger_id: int) -> str:
-        """Helper method to get a user-friendly name for the finger."""
-        finger_names = {
-            1: "left_pinky",
-            2: "left_ring",
-            3: "left_middle",
-            4: "left_index",
-            5: "left_thumb",
-            6: "right_thumb",
-            7: "right_index",
-            8: "right_middle",
-            9: "right_ring",
-            10: "right_pinky",
-        }
-        return finger_names.get(finger_id, f"Finger {finger_id}")
-
-
-# End of file event classes.
+    def _handle_member_update(self) -> None:
+        """Fire a finger-named event when the matching user is detected."""
+        user = self._finger.user
+        finger = self._finger.value
+        if finger > 10:  # disabled user
+            user = user * -1
+            finger = finger - 128
+        if user == self._u_id and 1 <= finger <= 10:
+            self._trigger_event(self._FINGER_NAMES[finger], {"finger_id": finger})
+            self.async_write_ha_state()
