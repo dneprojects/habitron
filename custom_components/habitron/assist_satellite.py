@@ -3,6 +3,8 @@
 import asyncio
 import logging
 
+from habitron_client import SmartController
+
 from homeassistant.components.assist_pipeline import PipelineEvent, PipelineEventType
 from homeassistant.components.assist_satellite import (
     AssistSatelliteAnnouncement,
@@ -19,7 +21,6 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from ._helpers import hbtn_device_info
 from .coordinator import HabitronConfigEntry
-from .module import SmartController
 from .smart_hub import SmartHub
 from .ws_provider import HabitronWebRTCProvider
 
@@ -133,7 +134,7 @@ class HbtnAssistSat(AssistSatelliteEntity):
     async def async_announce(self, announcement: AssistSatelliteAnnouncement) -> None:
         """Sends an announcement to the device.."""
         _LOGGER.debug("Sending media URL to Flutter client: %s", announcement.media_id)
-        media_player = self._module.media_player
+        media_player = self._provider.media_players.get(self._stream_name)
         if media_player is None:
             _LOGGER.warning(
                 "No media player available for %s, cannot announce", self._stream_name
