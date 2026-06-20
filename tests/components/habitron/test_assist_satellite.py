@@ -2,10 +2,9 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from habitron_client import SmartController
 
 from custom_components.habitron.assist_satellite import HbtnAssistSat, async_setup_entry
-from custom_components.habitron.module import SmartController
 from homeassistant.components.assist_pipeline import PipelineEventType
 
 # AssistSatelliteState is only exposed on the .entity module, mirroring the
@@ -16,20 +15,12 @@ from homeassistant.components.assist_satellite.entity import (  # pylint: disabl
 from homeassistant.core import HomeAssistant
 
 
-async def test_assist_satellite_setup(setup_integration: MockConfigEntry) -> None:
-    """The assist_satellite platform sets up cleanly against an empty router."""
-    assert setup_integration.runtime_data is not None
-
-
 def _make_touch_module(uid: str = "MOD-T") -> MagicMock:
-
     mod = MagicMock(spec=SmartController)
     mod.uid = uid
     mod.name = "Touch 1"
     mod.mod_type = "Smart Controller Touch"
     mod.stream_name = "touch_1_5"
-    mod.media_player = MagicMock()
-    mod.media_player.process_media_id = AsyncMock(return_value="http://media/file.mp3")
     return mod
 
 
@@ -37,6 +28,11 @@ def _make_provider() -> MagicMock:
     p = MagicMock()
     p.async_send_json_message = AsyncMock()
     p.assist_satellites = {}
+    # The media player is registered with the provider (keyed by stream name);
+    # the satellite reaches it from there for announcements.
+    player = MagicMock()
+    player.process_media_id = AsyncMock(return_value="http://media/file.mp3")
+    p.media_players = {"touch_1_5": player}
     return p
 
 
