@@ -1,6 +1,6 @@
 """The Habitron integration."""
 
-from habitron_client import HabitronTimeoutError
+from habitron_client import HabitronError, HabitronTimeoutError
 
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
@@ -69,11 +69,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: HabitronConfigEntry) -> 
             translation_key="connect_refused",
             translation_placeholders={"error": str(ex)},
         ) from ex
-    except (OSError, ConnectionError) as ex:
-        # Network-level failures (DNS, socket errors, ...) are transient
-        # and should let HA retry the entry. Programming errors such as
-        # AttributeError/KeyError must propagate so they show up in the
-        # logs instead of being masked as a retry loop.
+    except (OSError, ConnectionError, HabitronError) as ex:
+        # Any transient SmartHub problem at setup — a dropped connection or
+        # incomplete data while the hub is (re)booting (HabitronConnectionError
+        # / HabitronProtocolError), DNS/socket errors — must let HA retry the
+        # entry. Otherwise a brief hub outage at setup leaves the integration
+        # permanently down until a manual reload. Programming errors such as
+        # AttributeError/KeyError still propagate (they are not HabitronError)
+        # so they surface in the logs instead of being masked as a retry loop.
         raise ConfigEntryNotReady(
             translation_domain=DOMAIN,
             translation_key="connect_error",
