@@ -1,5 +1,10 @@
 # Latest changes
 
+## v3.0.0b2
+
+### Fixed
+- Smart Controller Mini colour LEDs now update their state (on/off and colour) via the mirror/poll again, independently of the output events. Requires `habitron_client==2.0.1`.
+
 ## v3.0.0b1
 
 ### Internal
