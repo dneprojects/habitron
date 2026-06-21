@@ -135,7 +135,13 @@ class HbtnMode(CoordinatorEntity[HbtnCoordinator], SelectEntity):
             return
         self._value = self._mode & self._mask
         if self._value not in [c.value for c in self._enum]:
-            _LOGGER.warning("Could not find %s in mode enum", self._value)
+            # A masked value of 0 means this sub-mode is not initialised yet —
+            # the hub reports a non-zero full mode but a 0 sub-field while it is
+            # mid-reboot. Skip quietly until a valid value arrives (same
+            # rationale as the mode==0 guard above); only a genuinely unknown
+            # non-zero value is unexpected and worth a warning.
+            if self._value:
+                _LOGGER.warning("Could not find %s in mode enum", self._value)
             return
         self._current_option = self._enum(self._value).name
         self.async_write_ha_state()
