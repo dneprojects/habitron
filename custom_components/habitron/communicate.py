@@ -80,7 +80,13 @@ class HbtnComm:
 
         self.logger.info("Got network ip: %s", self._network_ip)
 
+        # CRC change-detection key for the bus status stream (the 10s
+        # coordinator). Other read streams (firmware, single-module status, …)
+        # keep their own per-target CRC in ``_stream_crc`` so they cannot clobber
+        # this one — sharing a single field made unrelated reads invalidate each
+        # other's dedup (extra reads, occasionally a missed status change).
         self.crc: int = 0
+        self._stream_crc: dict[str, int] = {}
         self._rtr: Router
         self.update_suspended: bool = False
         self._last_status: bytes = b""  # last compact status, for change detection
@@ -398,9 +404,9 @@ class HbtnComm:
     async def get_compact_status(self) -> bytes:
         """Get compact status for all modules, if changed crc."""
         resp_bytes, crc = await self.client.get_compact_status()
-        if crc == self.crc:
+        if crc == self._stream_crc.get("compact"):
             return b""
-        self.crc = crc
+        self._stream_crc["compact"] = crc
         return resp_bytes
 
     async def get_module_status(self, mod_id: int) -> bytes:
@@ -408,9 +414,10 @@ class HbtnComm:
         resp_bytes, crc = await self.client.get_module_status(
             self._convert_mod_id(mod_id)
         )
-        if crc == self.crc:
+        key = f"modstat:{mod_id}"
+        if crc == self._stream_crc.get(key):
             return b""
-        self.crc = crc
+        self._stream_crc[key] = crc
         return resp_bytes
 
     async def async_get_module_definitions(self, mod_id: int) -> bytes:
@@ -504,17 +511,19 @@ class HbtnComm:
     async def handle_firmware(self, mod_nmbr: int) -> bytes:
         """Handle router/module firmware update file status."""
         resp_bytes, crc = await self.client.handle_firmware(mod_nmbr)
-        if crc == self.crc:
+        key = f"fw:{mod_nmbr}"
+        if crc == self._stream_crc.get(key):
             return b""
-        self.crc = crc
+        self._stream_crc[key] = crc
         return resp_bytes
 
     async def update_firmware(self, mod_nmbr: int) -> bytes:
         """Start router/module firmware updates."""
         resp_bytes, crc = await self.client.update_firmware(mod_nmbr)
-        if crc == self.crc:
+        key = f"fwupd:{mod_nmbr}"
+        if crc == self._stream_crc.get(key):
             return b""
-        self.crc = crc
+        self._stream_crc[key] = crc
         return resp_bytes
 
     async def async_power_cycle_channel(self, channel: int) -> None:
