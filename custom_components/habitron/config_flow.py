@@ -252,12 +252,22 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 await self.hass.async_add_executor_job(socket.gethostbyname, host_str)
             )
         for entry in self._async_current_entries(include_ignore=False):
-            if entry.data.get(KEY_HOST) in candidate_hosts:
+            # Match on host/IP, or on the hub's MAC: a loaded entry exposes its
+            # SmartHub as ``runtime_data`` whose ``uid`` is the MAC without
+            # separators — exactly the SSDP unique_id here. This catches the
+            # common case where the entry was added under a non-IP host (e.g.
+            # the add-on host ``local``) whose stored id is not the MAC, so a
+            # plain host/unique_id comparison would miss and the same hub would
+            # be offered again.
+            smhub = getattr(entry, "runtime_data", None)
+            same_mac = bool(unique_id) and getattr(smhub, "uid", None) == unique_id
+            if entry.data.get(KEY_HOST) in candidate_hosts or same_mac:
                 if entry.unique_id != unique_id:
                     _LOGGER.debug(
-                        "adopting stable id %s for existing entry at %s (host match)",
+                        "adopting stable id %s for existing entry at %s (%s match)",
                         unique_id,
                         entry.data.get(KEY_HOST),
+                        "MAC" if same_mac else "host",
                     )
                     self.hass.config_entries.async_update_entry(
                         entry, unique_id=unique_id

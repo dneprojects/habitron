@@ -1,10 +1,12 @@
 """SmartHub class — the integration's thin binding to the habitron_client model."""
 
 from enum import Enum
+import logging
 from pathlib import Path
 
 from habitron_client import (
     Diagnostic,
+    HabitronError,
     Router,
     Sensor,
     SmartController,
@@ -22,6 +24,8 @@ from .communicate import HbtnComm as hbtn_com
 from .const import DOMAIN
 from .coordinator import HbtnCoordinator
 from .ws_provider import HabitronWebRTCProvider
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class LoggingLevels(Enum):
@@ -212,8 +216,20 @@ class SmartHub:
                 dev_reg.async_update_device(dev.id, area_id=area.id)
 
     async def update(self) -> None:
-        """Refresh the hub-level diagnostics from the SmartHub info query."""
-        info = await self.comm.get_smhub_update()
+        """Refresh the hub-level diagnostics from the SmartHub info query.
+
+        These are non-essential host sensors (CPU/memory/disk/log levels),
+        decoupled from the bus status: a transient bad/dropped response must not
+        fail the coordinator tick (which would mark *every* entity unavailable)
+        or abort entry setup. Swallow the library's protocol/connection errors
+        and keep the last values; the next tick refreshes them. Genuine
+        connectivity loss still surfaces through the bus refresh that follows.
+        """
+        try:
+            info = await self.comm.get_smhub_update()
+        except HabitronError as err:
+            _LOGGER.debug("SmartHub diagnostics update skipped: %s", err)
+            return
         if not info or not self.diags:
             return
         hardware = info["hardware"]
