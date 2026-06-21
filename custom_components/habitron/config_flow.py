@@ -21,7 +21,7 @@ from homeassistant.helpers.service_info.ssdp import (
     SsdpServiceInfo,
 )
 
-from .const import CONF_DEFAULT_HOST, DOMAIN
+from .const import CONF_DEFAULT_HOST, DOMAIN, KEY_RESOLVED_IP
 from .coordinator import HabitronConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
@@ -252,27 +252,41 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 await self.hass.async_add_executor_job(socket.gethostbyname, host_str)
             )
         for entry in self._async_current_entries(include_ignore=False):
-            # Match on host/IP, or on the hub's MAC: a loaded entry exposes its
-            # SmartHub as ``runtime_data`` whose ``uid`` is the MAC without
-            # separators — exactly the SSDP unique_id here. This catches the
-            # common case where the entry was added under a non-IP host (e.g.
-            # the add-on host ``local``) whose stored id is not the MAC, so a
-            # plain host/unique_id comparison would miss and the same hub would
-            # be offered again.
+            # Match the hub by any stable signal we have:
+            #  * the hub MAC — a loaded entry exposes its SmartHub as
+            #    ``runtime_data`` whose ``uid`` is the MAC without separators,
+            #    exactly the SSDP unique_id when the MAC probe succeeded;
+            #  * the configured/resolved host or its runtime IP — catches the
+            #    common case where the entry was added under a non-IP host (e.g.
+            #    the add-on host ``local``). ``resolved_ip`` is persisted on the
+            #    entry, so this matches even while the entry is unloaded and the
+            #    hub is unreachable for a MAC probe (a reboot during startup),
+            #    which is exactly when ``unique_id`` falls back to the SSDP UDN.
             smhub = getattr(entry, "runtime_data", None)
             same_mac = bool(unique_id) and getattr(smhub, "uid", None) == unique_id
-            if entry.data.get(KEY_HOST) in candidate_hosts or same_mac:
-                if entry.unique_id != unique_id:
-                    _LOGGER.debug(
-                        "adopting stable id %s for existing entry at %s (%s match)",
-                        unique_id,
-                        entry.data.get(KEY_HOST),
-                        "MAC" if same_mac else "host",
-                    )
-                    self.hass.config_entries.async_update_entry(
-                        entry, unique_id=unique_id
-                    )
-                return self.async_abort(reason="already_configured")
+            same_host = (
+                entry.data.get(KEY_HOST) in candidate_hosts
+                or entry.data.get(KEY_RESOLVED_IP) in candidate_hosts
+                or getattr(smhub, "host", None) in candidate_hosts
+            )
+            if not (same_mac or same_host):
+                continue
+            # Adopt a more stable id only when we actually have one: a MAC
+            # match, or an entry still on the host-based fallback id. Never
+            # downgrade an existing MAC/UDN id to a transient fallback (the UDN
+            # we get when only the host matched because the MAC probe timed out).
+            existing = entry.unique_id
+            if (
+                same_mac or existing is None or str(existing).startswith("habitron_")
+            ) and existing != unique_id:
+                _LOGGER.debug(
+                    "adopting stable id %s for existing entry at %s (%s match)",
+                    unique_id,
+                    entry.data.get(KEY_HOST),
+                    "MAC" if same_mac else "host",
+                )
+                self.hass.config_entries.async_update_entry(entry, unique_id=unique_id)
+            return self.async_abort(reason="already_configured")
 
         self.context["title_placeholders"] = {"name": host_str}
         return await self.async_step_discovery_confirm()
