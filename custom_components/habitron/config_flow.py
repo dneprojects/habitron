@@ -21,7 +21,7 @@ from homeassistant.helpers.service_info.ssdp import (
     SsdpServiceInfo,
 )
 
-from .const import CONF_DEFAULT_HOST, DOMAIN, KEY_RESOLVED_IP
+from .const import CONF_DEFAULT_HOST, DOMAIN
 from .coordinator import HabitronConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
@@ -251,22 +251,32 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             candidate_hosts.add(
                 await self.hass.async_add_executor_job(socket.gethostbyname, host_str)
             )
+
+        # A hub configured as the ``local`` sentinel runs on the same machine as
+        # Home Assistant, so its LAN address is one of HA's own source IPs. Ask
+        # HA directly — this needs neither the hub to be reachable nor the entry
+        # to be loaded, so it deduplicates even when the hub is rebooting during
+        # startup (when the MAC probe times out and SSDP falls back to the UDN).
+        local_is_candidate = any(
+            str(ip) in candidate_hosts
+            for ip in await network.async_get_enabled_source_ips(self.hass)
+        )
         for entry in self._async_current_entries(include_ignore=False):
             # Match the hub by any stable signal we have:
             #  * the hub MAC — a loaded entry exposes its SmartHub as
             #    ``runtime_data`` whose ``uid`` is the MAC without separators,
             #    exactly the SSDP unique_id when the MAC probe succeeded;
-            #  * the configured/resolved host or its runtime IP — catches the
-            #    common case where the entry was added under a non-IP host (e.g.
-            #    the add-on host ``local``). ``resolved_ip`` is persisted on the
-            #    entry, so this matches even while the entry is unloaded and the
-            #    hub is unreachable for a MAC probe (a reboot during startup),
-            #    which is exactly when ``unique_id`` falls back to the SSDP UDN.
+            #  * the configured host, its runtime IP, or — for a ``local`` entry
+            #    — one of HA's own source IPs. This matches even while the entry
+            #    is unloaded and the hub is unreachable for a MAC probe (a reboot
+            #    during startup), which is exactly when ``unique_id`` falls back
+            #    to the SSDP UDN and a plain id comparison would miss.
             smhub = getattr(entry, "runtime_data", None)
             same_mac = bool(unique_id) and getattr(smhub, "uid", None) == unique_id
+            host_conf = entry.data.get(KEY_HOST)
             same_host = (
-                entry.data.get(KEY_HOST) in candidate_hosts
-                or entry.data.get(KEY_RESOLVED_IP) in candidate_hosts
+                host_conf in candidate_hosts
+                or (host_conf == CONF_DEFAULT_HOST and local_is_candidate)
                 or getattr(smhub, "host", None) in candidate_hosts
             )
             if not (same_mac or same_host):

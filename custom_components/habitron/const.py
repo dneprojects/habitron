@@ -13,12 +13,6 @@ from typing import Final
 DOMAIN = "habitron"  # internal name of the integration, matches the directory
 CONF_DEFAULT_HOST = "local"  # default host string of SmartCenter, uses own ip
 
-# Resolved hub IP persisted in the config entry. The configured host may be a
-# non-IP sentinel (``local``) that only resolves to an address at runtime; we
-# store that address so SSDP discovery can deduplicate against it even when the
-# hub is briefly unreachable for a MAC probe and the entry is not yet loaded.
-KEY_RESOLVED_IP: Final = "resolved_ip"
-
 # Heartbeat interval used by the coordinator. Not user-configurable per
 # Home Assistant integration guidelines — the bus protocol itself is
 # CRC-deduplicated and state changes arrive on a separate push channel,
