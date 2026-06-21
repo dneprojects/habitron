@@ -21,7 +21,7 @@ from homeassistant.helpers import area_registry as ar, device_registry as dr
 from homeassistant.util import slugify
 
 from .communicate import HbtnComm as hbtn_com
-from .const import DOMAIN, KEY_RESOLVED_IP
+from .const import DOMAIN
 from .coordinator import HbtnCoordinator
 from .ws_provider import HabitronWebRTCProvider
 
@@ -97,17 +97,6 @@ class SmartHub:
         self._type = self.comm.com_hwtype
         self.host = self.comm.com_ip
         self.addon_slug = self.comm.slugname
-
-        # Persist the resolved IP so SSDP discovery can deduplicate this hub by
-        # address even when it is briefly unreachable for a MAC probe and this
-        # entry is not yet loaded (e.g. a reboot during HA startup). The
-        # configured host may be the ``local`` sentinel that only resolves at
-        # runtime; without this the rediscovered LAN IP looks like a new device.
-        if self.host and self.config.data.get(KEY_RESOLVED_IP) != self.host:
-            self.hass.config_entries.async_update_entry(
-                self.config,
-                data={**self.config.data, KEY_RESOLVED_IP: self.host},
-            )
 
         if self.comm.is_addon:
             self.base_url = f"http://{self.host}:8123/{self.addon_slug}/ingress?index="
