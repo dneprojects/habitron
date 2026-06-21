@@ -5,11 +5,11 @@ import contextlib
 import json
 import logging
 import socket
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urlparse
 
 # pylint:disable=unused-import
-from habitron_client import test_connection
+from habitron_client import HabitronClient, HabitronError, test_connection
 import voluptuous as vol
 
 from homeassistant import config_entries, exceptions
@@ -40,6 +40,26 @@ async def _get_local_ip(hass: HomeAssistant) -> str:
         return await network.async_get_source_ip(hass, target_ip="8.8.8.8")
     except Exception:  # noqa: BLE001
         return "127.0.0.1"
+
+
+async def _async_hub_mac(host: str) -> str | None:
+    """Return the SmartHub's colon-stripped MAC — its stable identity.
+
+    The MAC identifies the hub independently of the address it is reached at, so
+    the same hub seen at a local IP and at a VPN-routed address cannot be added
+    twice. Returns ``None`` if the hub can't be reached or reports no MAC, in
+    which case the caller falls back to a serial/host-based id.
+    """
+    try:
+        async with HabitronClient(host) as client:
+            info = cast("dict[str, Any]", await client.get_smhub_info())
+        mac = str(info["hardware"]["network"]["lan mac"])
+    except (HabitronError, OSError, KeyError, TypeError) as err:
+        _LOGGER.debug("could not read MAC from hub at %s: %s", host, err)
+        return None
+    cleaned = mac.replace(":", "").replace("-", "")
+    _LOGGER.debug("hub at %s reports MAC %s", host, cleaned)
+    return cleaned or None
 
 
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
@@ -79,7 +99,7 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     if not result:
         raise CannotConnect
 
-    return {"title": host_name}
+    return {"title": host_name, "mac": await _async_hub_mac(host_to_test)}
 
 
 class UDPDiscoveryProtocol(asyncio.DatagramProtocol):
@@ -188,8 +208,14 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # to a UDP probe (which may return a serial), and only use the
         # host as last resort. A host-based id changes on DHCP-lease
         # renewals and would otherwise look like a new device.
+        # The MAC is the hub's stable identity — the same across every address
+        # it is reachable at (a local IP, a VPN-routed one, ...), so prefer it
+        # to avoid adding the same hub twice. Fall back to the UPnP UDN/serial,
+        # a UDP-probe serial, and finally the host.
+        unique_id: str | None = await _async_hub_mac(host_str)
         upnp = discovery_info.upnp or {}
-        unique_id: str | None = upnp.get(ATTR_UPNP_UDN) or upnp.get(ATTR_UPNP_SERIAL)
+        if unique_id is None:
+            unique_id = upnp.get(ATTR_UPNP_UDN) or upnp.get(ATTR_UPNP_SERIAL)
         target_device: dict[str, Any] | None = None
 
         if unique_id is None:
@@ -202,11 +228,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if not unique_id:
             _LOGGER.warning(
-                "Habitron at %s exposed no UDN/serial; using host as fallback id",
+                "Habitron at %s exposed no MAC/UDN/serial; using host as fallback id",
                 host_str,
             )
             unique_id = f"habitron_{host_str}"
 
+        _LOGGER.debug("SSDP discovery at %s -> unique_id %s", host_str, unique_id)
         await self.async_set_unique_id(unique_id)
         self._abort_if_unique_id_configured(updates={KEY_HOST: host_str})
 
@@ -227,6 +254,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         for entry in self._async_current_entries(include_ignore=False):
             if entry.data.get(KEY_HOST) in candidate_hosts:
                 if entry.unique_id != unique_id:
+                    _LOGGER.debug(
+                        "adopting stable id %s for existing entry at %s (host match)",
+                        unique_id,
+                        entry.data.get(KEY_HOST),
+                    )
                     self.hass.config_entries.async_update_entry(
                         entry, unique_id=unique_id
                     )
@@ -286,30 +318,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 default_host = device.get("host", device.get("ip", CONF_DEFAULT_HOST))
 
         if user_input is not None:
-            # Try a UDP probe to obtain a stable serial-based unique_id;
-            # fall back to the host string when no probe response arrives.
             host_input = user_input[KEY_HOST]
-            unique_id: str | None = None
-            devices = await self._discover_habitron()
-            target = next(
-                (
-                    d
-                    for d in devices
-                    if d.get("ip") == host_input or d.get("host") == host_input
-                ),
-                None,
-            )
-            if target:
-                unique_id = target.get("serial")
-            if unique_id is None:
-                unique_id = f"habitron_{host_input}"
-
-            await self.async_set_unique_id(unique_id)
-            self._abort_if_unique_id_configured()
-
             try:
                 info = await validate_input(self.hass, user_input)
-                return self.async_create_entry(title=info["title"], data=user_input)
             except CannotConnect:
                 errors["base"] = "cannot_connect"
             except HostNotFound:
@@ -319,6 +330,29 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             except Exception:  # pylint: disable=broad-except
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
+            else:
+                # Prefer the hub's MAC (stable across addresses); fall back to a
+                # UDP-probe serial, then the host string.
+                unique_id: str | None = info.get("mac")
+                if not unique_id:
+                    devices = await self._discover_habitron()
+                    target = next(
+                        (
+                            d
+                            for d in devices
+                            if d.get("ip") == host_input or d.get("host") == host_input
+                        ),
+                        None,
+                    )
+                    unique_id = (
+                        target.get("serial") if target else None
+                    ) or f"habitron_{host_input}"
+                _LOGGER.debug(
+                    "manual setup of %s -> unique_id %s", host_input, unique_id
+                )
+                await self.async_set_unique_id(unique_id)
+                self._abort_if_unique_id_configured()
+                return self.async_create_entry(title=info["title"], data=user_input)
 
             default_host = user_input[KEY_HOST]
 
