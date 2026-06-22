@@ -2,7 +2,8 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from habitron_client import HabitronClient, Module, Router
+from habitron_client import HabitronClient, HabitronTimeoutError, Module, Router
+import pytest
 
 from custom_components.habitron.communicate import HbtnComm
 
@@ -260,3 +261,328 @@ async def test_async_setup_resolves_host_and_connects() -> None:
         await comm.async_setup()
     assert comm._host == "10.0.0.9"
     client.connect.assert_awaited()
+
+
+# ---------------------------------------------------------------------------
+# per-stream CRC dedup (firmware / module status)
+# ---------------------------------------------------------------------------
+
+
+async def test_get_module_status_dedupes_and_caches() -> None:
+    """Module status returns the payload then dedupes on an unchanged CRC."""
+    comm = _make_comm()
+    comm._client.get_module_status = AsyncMock(return_value=(b"m", 5))
+    assert await comm.get_module_status(105) == b"m"
+    assert comm._stream_crc["modstat:105"] == 5
+    assert await comm.get_module_status(105) == b""
+
+
+async def test_handle_firmware_dedupes_and_caches() -> None:
+    """Firmware status returns the payload then dedupes on an unchanged CRC."""
+    comm = _make_comm()
+    comm._client.handle_firmware = AsyncMock(return_value=(b"fw", 9))
+    assert await comm.handle_firmware(5) == b"fw"
+    assert comm._stream_crc["fw:5"] == 9
+    assert await comm.handle_firmware(5) == b""
+
+
+async def test_update_firmware_dedupes_and_caches() -> None:
+    """Firmware update returns the payload then dedupes on an unchanged CRC."""
+    comm = _make_comm()
+    comm._client.update_firmware = AsyncMock(return_value=(b"u", 3))
+    assert await comm.update_firmware(5) == b"u"
+    assert comm._stream_crc["fwupd:5"] == 3
+    assert await comm.update_firmware(5) == b""
+
+
+async def test_stream_crcs_are_independent() -> None:
+    """An identical CRC in a different stream does not dedupe (no clobber)."""
+    comm = _make_comm()
+    comm._client.get_compact_status = AsyncMock(return_value=(b"c", 7))
+    comm._client.handle_firmware = AsyncMock(return_value=(b"f", 7))
+    assert await comm.get_compact_status() == b"c"
+    # Same CRC value, different stream → still returns its payload.
+    assert await comm.handle_firmware(0) == b"f"
+    assert comm._stream_crc["compact"] == 7
+    assert comm._stream_crc["fw:0"] == 7
+    # The bus-status stream keeps its own field untouched.
+    assert comm.crc == 0
+
+
+# ---------------------------------------------------------------------------
+# command wrappers — module-addr converting pass-throughs
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("method", "args", "client_method", "expected"),
+    [
+        ("async_set_rgb_output", (105, 2, 1), "set_rgb_output", (5, 2, True)),
+        ("async_set_rgbval", (105, 1, [1, 2, 3]), "set_rgbval", (5, 1, [1, 2, 3])),
+        ("async_set_shutterpos", (105, 1, 40), "set_shutterpos", (5, 1, 40)),
+        ("async_set_blindtilt", (105, 1, 30), "set_blindtilt", (5, 1, 30)),
+        ("async_inc_dec_counter", (105, 2, 1), "inc_dec_counter", (5, 2, 1)),
+        ("async_set_setpoint", (105, 1, 210), "set_setpoint", (5, 1, 210)),
+        ("async_set_climate_mode", (105, 1, 2), "set_climate_mode", (5, 1, 2)),
+        ("async_call_dir_command", (105, 7), "call_dir_command", (5, 7)),
+        ("async_call_vis_command", (105, 7), "call_vis_command", (5, 7)),
+        ("async_get_module_definitions", (105,), "get_module_definitions", (5,)),
+        ("async_get_module_settings", (105,), "get_module_settings", (5,)),
+        ("send_message", (105, 3), "send_message", (5, 3)),
+        ("send_message_text", (105, "hi"), "send_message_text", (5, "hi")),
+        ("send_sms", (105, 3, 9), "send_sms", (5, 3, 9)),
+    ],
+)
+async def test_mod_id_converting_passthroughs(
+    method: str, args: tuple, client_method: str, expected: tuple
+) -> None:
+    """Wrappers convert the bus address (105→5) and forward to the client."""
+    comm = _make_comm()
+    await getattr(comm, method)(*args)
+    getattr(comm._client, client_method).assert_awaited_once_with(*expected)
+
+
+# ---------------------------------------------------------------------------
+# command wrappers — plain pass-throughs (no address conversion)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("method", "args", "client_method", "expected"),
+    [
+        ("async_set_log_level", (1, 2), "set_log_level", (1, 2)),
+        ("get_smr", (), "get_smr", ()),
+        ("async_get_router_status", (), "get_router_status", ()),
+        ("async_get_router_modules", (), "get_router_modules", ()),
+        ("get_global_descriptions", (), "get_global_descriptions", ()),
+        ("async_get_error_status", (), "get_error_status", ()),
+        ("async_start_mirror", (), "start_mirror", ()),
+        ("async_stop_mirror", (), "stop_mirror", ()),
+        ("hub_restart", (), "hub_restart", ()),
+        ("hub_reboot", (), "hub_reboot", ()),
+        ("module_restart", (7,), "module_restart", (7,)),
+        ("restart_fwd_tbl", (), "restart_fwd_tbl", ()),
+        ("send_devregid", (5, "abc"), "send_devregid", (5, "abc")),
+        ("async_call_coll_command", (7,), "call_coll_command", (7,)),
+    ],
+)
+async def test_plain_passthroughs(
+    method: str, args: tuple, client_method: str, expected: tuple
+) -> None:
+    """Wrappers without address conversion forward verbatim to the client."""
+    comm = _make_comm()
+    await getattr(comm, method)(*args)
+    getattr(comm._client, client_method).assert_awaited_once_with(*expected)
+
+
+# ---------------------------------------------------------------------------
+# mode-setting helpers with mapping logic
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(("new_mode", "expected"), [(1, 0x42), (2, 0x43)])
+async def test_set_daytime_mode_maps_to_group_mode(
+    new_mode: int, expected: int
+) -> None:
+    """Daytime modes 1/2 map to group-mode 0x42/0x43."""
+    comm = _make_comm()
+    await comm.async_set_daytime_mode(2, new_mode)
+    comm._client.set_group_mode.assert_awaited_once_with(2, expected)
+
+
+async def test_set_daytime_mode_ignores_unknown_value() -> None:
+    """An unmapped daytime value sends nothing."""
+    comm = _make_comm()
+    await comm.async_set_daytime_mode(2, 3)
+    comm._client.set_group_mode.assert_not_called()
+
+
+@pytest.mark.parametrize(("alarm", "expected"), [(True, 0x40), (False, 0x41)])
+async def test_set_alarm_mode_maps_to_group_mode(alarm: bool, expected: int) -> None:
+    """Alarm on/off maps to group-mode 0x40/0x41."""
+    comm = _make_comm()
+    await comm.async_set_alarm_mode(2, alarm)
+    comm._client.set_group_mode.assert_awaited_once_with(2, expected)
+
+
+async def test_power_cycle_channel_downs_then_ups_with_pause() -> None:
+    """Power-cycle downs the channel, waits, then ups it again."""
+    comm = _make_comm()
+    with patch(
+        "custom_components.habitron.communicate.asyncio.sleep",
+        new=AsyncMock(),
+    ) as mock_sleep:
+        await comm.async_power_cycle_channel(2)
+    comm._client.power_cycle_channel_down.assert_awaited_once_with(2)
+    comm._client.power_cycle_channel_up.assert_awaited_once_with(2)
+    mock_sleep.assert_awaited_once_with(2)
+
+
+# ---------------------------------------------------------------------------
+# config-file save helpers
+# ---------------------------------------------------------------------------
+
+
+async def test_save_module_status_uses_module_filename() -> None:
+    """save_module_status reads the module status and writes a .mstat file."""
+    comm = _make_comm()
+    comm.get_module_status = AsyncMock(return_value=b"\x01\x02\x03")
+    comm.save_config_data = AsyncMock()
+    await comm.save_module_status(105)
+    assert comm.save_config_data.call_args.args[0] == "Module_105.mstat"
+
+
+async def test_save_router_status_uses_router_filename() -> None:
+    """save_router_status reads the router status and writes a .rstat file."""
+    comm = _make_comm()
+    comm.async_get_router_status = AsyncMock(return_value=b"\x01\x02")
+    comm.save_config_data = AsyncMock()
+    await comm.save_router_status()
+    assert comm.save_config_data.call_args.args[0] == "Router_1.rstat"
+
+
+async def test_save_smg_file_serialises_bytes() -> None:
+    """save_smg_file renders settings bytes as semicolon-separated values."""
+    comm = _make_comm()
+    comm.async_get_module_settings = AsyncMock(return_value=b"\x01\x02")
+    comm.save_config_data = AsyncMock()
+    await comm.save_smg_file(105)
+    fname, data = comm.save_config_data.call_args.args
+    assert fname == "Module_105.smg"
+    assert data == "1;2;"
+
+
+async def test_save_smr_file_serialises_bytes() -> None:
+    """save_smr_file renders router-settings bytes as semicolon-separated values."""
+    comm = _make_comm()
+    comm.get_smr = AsyncMock(return_value=b"\x05")
+    comm.save_config_data = AsyncMock()
+    await comm.save_smr_file()
+    fname, data = comm.save_config_data.call_args.args
+    assert fname == "Router_1.smr"
+    assert data == "5;"
+
+
+async def test_save_smc_file_parses_blocks_and_terminates() -> None:
+    """save_smc_file walks the header + variable-length blocks without error."""
+    comm = _make_comm()
+    comm.async_get_module_definitions = AsyncMock(return_value=bytes(19))
+    comm.save_config_data = AsyncMock()
+    await comm.save_smc_file(105)
+    assert comm.save_config_data.call_args.args[0] == "Module_105.smc"
+
+
+async def test_save_config_data_writes_via_anyio() -> None:
+    """save_config_data ensures the dir then writes the payload to the file."""
+    comm = _make_comm()
+    comm._hass.async_add_executor_job = AsyncMock()
+    mock_file = AsyncMock()
+    ctx = MagicMock()
+    ctx.__aenter__ = AsyncMock(return_value=mock_file)
+    ctx.__aexit__ = AsyncMock(return_value=False)
+    with patch(
+        "custom_components.habitron.communicate.anyio.open_file",
+        new=AsyncMock(return_value=ctx),
+    ):
+        await comm.save_config_data("Dump.txt", "payload;")
+    comm._hass.async_add_executor_job.assert_awaited()  # mkdir
+    mock_file.write.assert_awaited_once_with("payload;")
+
+
+# ---------------------------------------------------------------------------
+# connection guard / host resolution / reconfigure / info errors
+# ---------------------------------------------------------------------------
+
+
+def test_client_property_raises_when_not_connected() -> None:
+    """Accessing ``client`` before async_setup is a hard error."""
+    comm = _make_comm()
+    comm._client = None
+    with pytest.raises(RuntimeError, match="not connected"):
+        _ = comm.client
+
+
+async def test_async_setup_local_host_uses_own_ip() -> None:
+    """A ``local`` host resolves via get_own_ip (the add-on/same-host path)."""
+    comm = _make_comm("local")
+    comm._client = None
+    comm._hass.async_add_executor_job = AsyncMock(return_value="10.0.0.9")
+    client = AsyncMock(spec=HabitronClient)
+    with (
+        patch(
+            "custom_components.habitron.communicate.network.async_get_source_ip",
+            new=AsyncMock(return_value="10.0.0.1"),
+        ),
+        patch(
+            "custom_components.habitron.communicate.HabitronClient",
+            return_value=client,
+        ),
+    ):
+        await comm.async_setup()
+    assert comm._host == "10.0.0.9"
+    client.connect.assert_awaited()
+
+
+async def test_set_host_reconfigures_and_reloads() -> None:
+    """set_host swaps the client to a freshly resolved host and reloads."""
+    comm = _make_comm("1.2.3.4")
+    comm._hass.async_add_executor_job = AsyncMock(return_value="5.6.7.8")
+    comm._hass.config_entries.async_update_entry = MagicMock()
+    comm._hass.config_entries.async_reload = AsyncMock()
+    new_client = AsyncMock(spec=HabitronClient)
+    with patch(
+        "custom_components.habitron.communicate.HabitronClient",
+        return_value=new_client,
+    ):
+        await comm.set_host("new-host")
+    assert comm._host == "5.6.7.8"
+    new_client.connect.assert_awaited()
+    comm._hass.config_entries.async_reload.assert_awaited_once()
+
+
+async def test_set_host_noop_when_unchanged() -> None:
+    """set_host with the current host neither reconnects nor reloads."""
+    comm = _make_comm("1.2.3.4")
+    comm._host_conf = "same-host"
+    comm._hass.config_entries.async_update_entry = MagicMock()
+    comm._hass.config_entries.async_reload = AsyncMock()
+    await comm.set_host("same-host")
+    comm._hass.config_entries.async_reload.assert_not_called()
+
+
+async def test_get_smhub_info_timeout_reraises() -> None:
+    """A timeout during the info fetch is re-raised as HabitronTimeoutError."""
+    comm = _make_comm()
+    comm._client.get_smhub_info = AsyncMock(side_effect=HabitronTimeoutError("t"))
+    with pytest.raises(HabitronTimeoutError):
+        await comm.get_smhub_info()
+
+
+async def test_get_smhub_info_generic_error_reraises() -> None:
+    """An unexpected error during the info fetch propagates unchanged."""
+    comm = _make_comm()
+    comm._client.get_smhub_info = AsyncMock(side_effect=ValueError("boom"))
+    with pytest.raises(ValueError, match="boom"):
+        await comm.get_smhub_info()
+
+
+async def test_set_led_outp_unknown_module_is_noop() -> None:
+    """async_set_led_outp on an unknown module logs and sends nothing."""
+    comm = _make_comm()
+    comm.set_router(Router())  # no modules
+    await comm.async_set_led_outp(999, 0, 1)
+    comm._client.set_output.assert_not_called()
+
+
+def test_hostname_property_returns_cached_value() -> None:
+    """The hostname property exposes the cached hub hostname."""
+    comm = _make_comm()
+    comm._hostname = "smarthub-1"
+    assert comm.hostname == "smarthub-1"
+
+
+async def test_get_smhub_version_passthrough() -> None:
+    """get_smhub_version forwards to the client unchanged."""
+    comm = _make_comm()
+    comm._client.get_smhub_version = AsyncMock(return_value=b"SmartIP 1.2.3")
+    assert await comm.get_smhub_version() == b"SmartIP 1.2.3"

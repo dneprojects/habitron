@@ -6,6 +6,7 @@ from habitron_client import Module, Router, Sensor
 
 from custom_components.habitron.const import AlarmMode, DaytimeMode
 from custom_components.habitron.select import (
+    HbtnMode,
     HbtnSelectAlarmModePush,
     HbtnSelectDaytimeModePush,
     HbtnSelectGroupModePush,
@@ -182,3 +183,114 @@ async def test_async_setup_entry_emits_mode_and_log_selects(
     assert any(isinstance(e, HbtnSelectAlarmModePush) for e in added)
     assert any(isinstance(e, HbtnSelectGroupModePush) for e in added)
     assert any(isinstance(e, HbtnSelectLoggingLevel) for e in added)
+
+
+# ---------------------------------------------------------------------------
+# base HbtnMode._handle_coordinator_update branches + base select_option
+# ---------------------------------------------------------------------------
+
+
+def test_mode_handle_ignores_zero_full_mode() -> None:
+    """A full mode of 0 (uninitialised) is skipped without writing state."""
+    module = _module(mode=0x02)
+    entity = HbtnSelectDaytimeModePush(module, _router(), _coord(), 0)
+    entity.async_write_ha_state = MagicMock()
+    module.mode.value = 0
+    entity._handle_coordinator_update()
+    entity.async_write_ha_state.assert_not_called()
+
+
+def test_mode_handle_skips_uninitialised_submode() -> None:
+    """A non-zero full mode with a 0 masked sub-mode is skipped quietly."""
+    module = _module(mode=0x02)
+    entity = HbtnSelectDaytimeModePush(module, _router(), _coord(), 0)
+    entity.async_write_ha_state = MagicMock()
+    module.mode.value = 0x04  # 0x04 & 0x03 == 0
+    entity._handle_coordinator_update()
+    entity.async_write_ha_state.assert_not_called()
+
+
+def test_mode_handle_warns_on_unknown_nonzero_value() -> None:
+    """An unknown non-zero masked value is skipped (logged as a warning)."""
+    module = _module(mode=0x20)  # valid 'present' for construction
+    entity = HbtnSelectGroupModePush(module, _router(), _coord(), 0)
+    entity.async_write_ha_state = MagicMock()
+    module.mode.value = 0x80  # 0x80 & 0xF0 == 128, not a group value
+    entity._handle_coordinator_update()
+    entity.async_write_ha_state.assert_not_called()
+
+
+def test_mode_handle_sets_valid_option() -> None:
+    """A valid masked value sets the current option and writes state."""
+    module = _module(mode=0x02)
+    entity = HbtnSelectDaytimeModePush(module, _router(), _coord(), 0)
+    entity.async_write_ha_state = MagicMock()
+    module.mode.value = 0x02  # daytime 'night'
+    entity._handle_coordinator_update()
+    assert entity.current_option == "night"
+    entity.async_write_ha_state.assert_called_once()
+
+
+async def test_base_mode_select_option_module_and_router() -> None:
+    """The base HbtnMode.async_select_option targets group vs router (group 0)."""
+    coord = _coord()
+    mod_entity = HbtnMode(_module(group=7), _router(), coord, 0)
+    await mod_entity.async_select_option("day")
+    assert coord.comm.async_set_group_mode.await_args.args[0] == 7
+
+    rt_entity = HbtnMode(0, _router(), coord, 0)
+    await rt_entity.async_select_option("night")
+    assert coord.comm.async_set_group_mode.await_args.args[0] == 0
+
+
+# ---------------------------------------------------------------------------
+# router-backed + edge-case subclass branches
+# ---------------------------------------------------------------------------
+
+
+async def test_alarm_select_router_path() -> None:
+    """The router-backed alarm select targets group 0."""
+    coord = _coord()
+    entity = HbtnSelectAlarmModePush(0, _router(), coord, 0)
+    await entity.async_select_option("on")
+    coord.comm.async_set_alarm_mode.assert_awaited_with(0, True)
+
+
+async def test_group_select_module_and_router_paths() -> None:
+    """Group-mode select forwards the resolved value for module + router."""
+    coord = _coord()
+    mod_entity = HbtnSelectGroupModePush(_module(group=5), _router(), coord, 0)
+    await mod_entity.async_select_option("present")
+    coord.comm.async_set_group_mode.assert_awaited_with(5, 32)
+
+    rt_entity = HbtnSelectGroupModePush(0, _router(), coord, 0)
+    await rt_entity.async_select_option("absent")
+    coord.comm.async_set_group_mode.assert_awaited_with(0, 16)
+
+
+def test_group_mode_handles_unprintable_and_equal_user_names() -> None:
+    """Non-printable / duplicate user names fall back to ``Unbekannt(2)``."""
+    router = Router(uid="ROUTER-Z", user1_name="\x00\x01", user2_name="\x00\x01")
+    entity = HbtnSelectGroupModePush(_module(group=4), router, _coord(), 0)
+    assert "Unbekannt" in entity.options
+    assert "Unbekannt2" in entity.options
+
+
+def test_daytime_module_zero_value_hotfix() -> None:
+    """A module daytime sub-mode of 0 is hot-fixed to 'day'."""
+    entity = HbtnSelectDaytimeModePush(_module(mode=0x04), _router(), _coord(), 0)
+    assert entity.current_option == "day"
+
+
+def test_daytime_router_zero_value_hotfix() -> None:
+    """A router daytime sub-mode of 0 is hot-fixed to 'day'."""
+    router = _router()
+    router.mode.value = 0x04  # 0x04 & 0x03 == 0
+    entity = HbtnSelectDaytimeModePush(0, router, _coord(), 0)
+    assert entity.current_option == "day"
+
+
+def test_group_mode_zero_value_hotfix() -> None:
+    """A group sub-mode of 0 is hot-fixed to 'present' (32)."""
+    entity = HbtnSelectGroupModePush(_module(mode=0x05), _router(), _coord(), 0)
+    assert entity.current_option == "present"
