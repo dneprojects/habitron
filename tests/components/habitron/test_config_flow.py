@@ -3,7 +3,7 @@
 import asyncio
 import json
 import socket
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from habitron_client import HabitronTimeoutError
 import pytest
@@ -17,6 +17,7 @@ from custom_components.habitron.config_flow import (
     HostNotFound,
     InvalidHost,
     UDPDiscoveryProtocol,
+    _async_hub_mac,
     _get_local_ip,
     validate_input,
 )
@@ -931,3 +932,56 @@ async def test_user_flow_picks_up_serial_from_udp_probe(
         await hass.async_block_till_done()
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["result"].unique_id == "SERIAL-X"
+
+
+async def test_async_hub_mac_returns_cleaned_mac() -> None:
+    """_async_hub_mac reads the hub info and returns the colon-stripped MAC."""
+    client = AsyncMock()
+    client.get_smhub_info = AsyncMock(
+        return_value={"hardware": {"network": {"lan mac": "AA:BB:CC:DD:EE:FF"}}}
+    )
+    ctx = MagicMock()
+    ctx.__aenter__ = AsyncMock(return_value=client)
+    ctx.__aexit__ = AsyncMock(return_value=False)
+    with patch(
+        "custom_components.habitron.config_flow.HabitronClient", return_value=ctx
+    ):
+        assert await _async_hub_mac("1.2.3.4") == "AABBCCDDEEFF"
+
+
+async def test_async_hub_mac_returns_none_on_error() -> None:
+    """An unreachable hub yields ``None`` so the caller can fall back."""
+    with patch(
+        "custom_components.habitron.config_flow.HabitronClient",
+        side_effect=OSError("no route"),
+    ):
+        assert await _async_hub_mac("1.2.3.4") is None
+
+
+async def test_ssdp_skips_non_matching_entry_then_confirms(
+    hass: HomeAssistant,
+    setup_homeassistant: None,
+    mock_habitron_client: MagicMock,
+    mock_smart_hub_setup: None,
+    mock_ws_provider: MagicMock,
+    mock_coordinator_refresh,
+) -> None:
+    """An unrelated existing entry is skipped; discovery still offers the hub."""
+    MockConfigEntry(
+        domain=DOMAIN,
+        title="Other hub",
+        unique_id="habitron_9.9.9.9",
+        data={KEY_HOST: "9.9.9.9", "websock_token": ""},
+    ).add_to_hass(hass)
+
+    discovery = SsdpServiceInfo(
+        ssdp_usn=f"{MOCK_UDN}::urn:habitron-com:device:SmartHub:1",
+        ssdp_st="urn:habitron-com:device:SmartHub:1",
+        ssdp_location=f"http://{MOCK_HOST}:80/desc.xml",
+        upnp={ATTR_UPNP_UDN: MOCK_UDN},
+    )
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_SSDP}, data=discovery
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "discovery_confirm"

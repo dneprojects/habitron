@@ -2,7 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from habitron_client import Router
+from habitron_client import HabitronError, Router
 import pytest
 
 from custom_components.habitron.smart_hub import LoggingLevels, SmartHub
@@ -267,3 +267,15 @@ def test_async_register_forwards_system_health_info() -> None:
     register = MagicMock()
     async_register(hass, register)
     register.async_register_info.assert_called_with(system_health_info)
+
+
+async def test_update_swallows_habitron_error(smart_hub_stub: SmartHub) -> None:
+    """A library error during the diagnostics read is non-fatal (swallowed).
+
+    Host diagnostics are decoupled from the bus status: a dropped/bad response
+    must not fail the coordinator tick or abort setup, so update() catches the
+    library error and keeps the last values.
+    """
+    smart_hub_stub.comm.get_smhub_update.side_effect = HabitronError("boom")
+    await smart_hub_stub.update()  # must not raise
+    smart_hub_stub.comm.get_smhub_update.assert_awaited_once()
