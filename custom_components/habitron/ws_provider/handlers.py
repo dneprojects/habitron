@@ -72,7 +72,7 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
     @websocket_api.websocket_command(
         {
             vol.Required("type"): "habitron/voice_pipeline_status",
-            vol.Required("disabled"): bool,  # Expects an empty dict for now
+            vol.Required("disabled"): bool,
         }
     )
     @websocket_api.async_response
@@ -114,7 +114,7 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
     @websocket_api.websocket_command(
         {
             vol.Required("type"): "habitron/voice_pipeline_start",
-            vol.Required("payload"): dict,  # Expects an empty dict for now
+            vol.Required("payload"): dict,  # reserved for future fields; currently sent empty
         }
     )
     @websocket_api.async_response
