@@ -14,12 +14,12 @@
   "issue_tracker": "https://github.com/dneprojects/habitron/issues",
   "homeassistant": "2026.3.0",
   "requirements": [
-    "habitron_client==2.0.5"
+    "habitron_client==2.0.6"
   ],
   "ssdp": [
     {
       "st": "urn:habitron-com:device:SmartHub:1"
     }
   ],
-  "version": "3.0.1"
+  "version": "3.0.2"
 }
