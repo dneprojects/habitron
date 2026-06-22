@@ -1,5 +1,15 @@
 # Latest changes
 
+## v3.0.1
+
+### Fixed
+- A malformed/garbled SmartHub diagnostics response (one containing control
+  characters) no longer crashes the update coordinator with repeated
+  "Unexpected error fetching Habitron updates data". The host-diagnostics fetch
+  shares the bus status tick; a bad response is now treated as a transient
+  protocol error and that tick's diagnostics are skipped, while the bus status
+  keeps updating. Requires `habitron_client==2.0.5`.
+
 ## v3.0.0
 
 Major release: the device model and bus-protocol parsing now live in the
