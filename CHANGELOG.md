@@ -1,5 +1,17 @@
 # Latest changes
 
+## v3.0.2
+
+### Fixed
+- Resolves the recurring "Unexpected error fetching Habitron updates data" /
+  malformed SmartHub diagnostics at the root. The bus client now uses a fresh
+  socket per command (as the original synchronous client did) instead of one
+  persistent connection. The persistent connection could be left shifted by one
+  frame after an interrupted exchange, so every later poll read the previous
+  command's response — recurring roughly every 20 s until the integration was
+  reloaded. Per-command sockets make that desync impossible; responses are also
+  validated by marker byte and length. Requires `habitron_client==2.0.6`.
+
 ## v3.0.1
 
 ### Fixed
