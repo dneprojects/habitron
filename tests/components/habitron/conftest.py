@@ -79,6 +79,22 @@ def mock_habitron_client() -> Generator[MagicMock]:
             "custom_components.habitron.config_flow.ConfigFlow._discover_habitron",
             new=AsyncMock(return_value=[]),
         ),
+        # The MAC probe and HA-source-IP lookup open sockets; stub them so the
+        # config-flow tests don't hit the network. Default the MAC probe to
+        # ``None`` (no MAC) so discovery falls back to the UDN/serial id the
+        # tests assert on; tests that exercise the MAC path override it.
+        patch(
+            "custom_components.habitron.config_flow._async_hub_mac",
+            new=AsyncMock(return_value=None),
+        ),
+        patch(
+            "custom_components.habitron.config_flow.network.async_get_enabled_source_ips",
+            new=AsyncMock(return_value=[]),
+        ),
+        patch(
+            "custom_components.habitron.config_flow.socket.gethostbyname",
+            return_value="192.168.1.10",
+        ),
         patch(
             "custom_components.habitron.communicate.get_own_ip",
             return_value="192.168.1.10",

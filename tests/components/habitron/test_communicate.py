@@ -199,7 +199,7 @@ async def test_update_entity_ignores_foreign_host() -> None:
 async def test_get_compact_status_dedupes_on_unchanged_crc() -> None:
     """An unchanged CRC returns empty bytes (no work)."""
     comm = _make_comm()
-    comm.crc = 42
+    comm._stream_crc["compact"] = 42
     comm._client.get_compact_status = AsyncMock(return_value=(b"payload", 42))
     assert await comm.get_compact_status() == b""
 
@@ -207,10 +207,9 @@ async def test_get_compact_status_dedupes_on_unchanged_crc() -> None:
 async def test_get_compact_status_caches_new_crc() -> None:
     """A changed CRC returns the payload and caches the new CRC."""
     comm = _make_comm()
-    comm.crc = 0
     comm._client.get_compact_status = AsyncMock(return_value=(b"payload", 7))
     assert await comm.get_compact_status() == b"payload"
-    assert comm.crc == 7
+    assert comm._stream_crc["compact"] == 7
 
 
 # ---------------------------------------------------------------------------

@@ -314,7 +314,8 @@ async def test_validate_input_local_loopback_rewrites_host(
     data = {KEY_HOST: "192.168.1.10", "websock_token": ""}
     info = await validate_input(hass, data)
     assert data[KEY_HOST] == "local"
-    assert info == {"title": MOCK_NAME}
+    # validate_input also returns the probed MAC (stubbed to None here).
+    assert info == {"title": MOCK_NAME, "mac": None}
 
 
 async def test_validate_input_invalid_host_too_short(hass: HomeAssistant) -> None:
