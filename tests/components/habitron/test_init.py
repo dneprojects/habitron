@@ -1,9 +1,9 @@
 """Setup / unload / migration tests for the Habitron integration."""
 
+from collections.abc import Awaitable, Callable
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from habitron_client import HabitronClient, Router, SmartController
-import pytest
+from habitron_client import Router, SmartController
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron import (
@@ -15,15 +15,6 @@ from custom_components.habitron.services import SERVICE_HUB_RESTART
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
-
-from .const import (
-    MOCK_CONFIG_DATA,
-    MOCK_CONFIG_OPTIONS,
-    MOCK_HOST,
-    MOCK_NAME,
-    MOCK_SMHUB_INFO,
-    MOCK_UID,
-)
 
 
 async def test_setup_entry(
@@ -219,10 +210,7 @@ async def test_setup_entry_removes_stale_device(
 
 async def test_touch_module_creates_webrtc_platform_entities(
     hass: HomeAssistant,
-    setup_homeassistant: None,
-    mock_ws_provider: MagicMock,
-    mock_coordinator_refresh: AsyncMock,
-    monkeypatch: pytest.MonkeyPatch,
+    real_setup: Callable[..., Awaitable[tuple[MockConfigEntry, AsyncMock]]],
 ) -> None:
     """A Smart Controller Touch module wires up the HACS WebRTC platforms.
 
@@ -230,17 +218,6 @@ async def test_touch_module_creates_webrtc_platform_entities(
     asserts the camera, media_player and assist_satellite entities are created
     for it — the HACS-only feature platforms that depend on the ws provider.
     """
-    monkeypatch.delenv("SUPERVISOR_TOKEN", raising=False)
-
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        title=MOCK_NAME,
-        unique_id=MOCK_UID,
-        data=MOCK_CONFIG_DATA,
-        options=MOCK_CONFIG_OPTIONS,
-    )
-    entry.add_to_hass(hass)
-
     module = SmartController(
         uid="MOD-T",
         addr=104,
@@ -251,32 +228,7 @@ async def test_touch_module_creates_webrtc_platform_entities(
     router = Router(uid="rt_1", id=100)
     router.modules = [module]
 
-    client = AsyncMock(spec=HabitronClient)
-    client.host = MOCK_HOST
-    client.get_smhub_info = AsyncMock(return_value=MOCK_SMHUB_INFO)
-    client.get_smhub_update = AsyncMock(return_value=None)
-
-    with (
-        patch(
-            "custom_components.habitron.communicate.HabitronClient",
-            return_value=client,
-        ),
-        patch(
-            "custom_components.habitron.communicate.get_own_ip",
-            return_value="192.168.1.10",
-        ),
-        patch(
-            "custom_components.habitron.communicate.get_host_ip",
-            return_value=MOCK_HOST,
-        ),
-        patch(
-            "custom_components.habitron.smart_hub.async_build_system",
-            new=AsyncMock(return_value=router),
-        ),
-        patch("custom_components.habitron.smart_hub.add_extra_js_url"),
-    ):
-        assert await hass.config_entries.async_setup(entry.entry_id)
-        await hass.async_block_till_done()
+    entry, _client = await real_setup(router)
 
     ent_reg = er.async_get(hass)
     domains = {

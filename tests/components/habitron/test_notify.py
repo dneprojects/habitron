@@ -1,11 +1,15 @@
 """Tests for the Habitron notify platform (GSM/SMS, v2 model)."""
 
+from collections.abc import Awaitable, Callable
 from unittest.mock import AsyncMock, MagicMock
 
 from habitron_client import HbtnCommand, Module, Router
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.habitron.const import DOMAIN
 from custom_components.habitron.notify import HbtnGSMMessage, async_setup_entry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 
 
 def _gsm_module() -> Module:
@@ -60,3 +64,33 @@ async def test_async_setup_entry_builds_sms_entities(hass: HomeAssistant) -> Non
     await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
     assert len(added) == 1
     assert isinstance(added[0], HbtnGSMMessage)
+
+
+async def test_send_message_service_reaches_bus(
+    hass: HomeAssistant,
+    real_setup: Callable[..., Awaitable[tuple[MockConfigEntry, AsyncMock]]],
+) -> None:
+    """``notify.send_message`` resolves a stored message and sends the SMS.
+
+    Public path: full setup creates the SMS notify entity for a GSM module,
+    then a real service call routes the (resolved) message id to the bus client.
+    """
+    module = _gsm_module()
+    router = Router(uid="rt_1", id=100)
+    router.modules = [module]
+    _entry, client = await real_setup(router)
+
+    entity_id = er.async_get(hass).async_get_entity_id(
+        "notify", DOMAIN, "Mod_MOD-GSM_sms01701234"
+    )
+    assert entity_id is not None
+
+    await hass.services.async_call(
+        "notify",
+        "send_message",
+        {"entity_id": entity_id, "message": "Alarm"},
+        blocking=True,
+    )
+    # comm converts the absolute addr (105) to the bus id (addr - 100 = 5);
+    # "Alarm" -> stored message id 3; SMS contact id 1.
+    client.send_sms.assert_awaited_once_with(5, 3, 1)

@@ -1,7 +1,8 @@
 """Tests for the Habitron diagnostics support (habitron_client v2 model)."""
 
+from collections.abc import Awaitable, Callable
 from datetime import timedelta
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 from habitron_client import Module, Router
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -20,6 +21,7 @@ from .const import (
     MOCK_HOST,
     MOCK_HWTYPE,
     MOCK_NAME,
+    MOCK_SMHUB_INFO,
     MOCK_UID,
     MOCK_VERSION,
 )
@@ -141,3 +143,27 @@ async def test_device_diagnostics_unknown_identifier(hass: HomeAssistant) -> Non
     )
     info = await async_get_device_diagnostics(hass, entry, device)
     assert info["target"] is None
+
+
+async def test_config_entry_diagnostics_over_real_setup(
+    hass: HomeAssistant,
+    real_setup: Callable[..., Awaitable[tuple[MockConfigEntry, AsyncMock]]],
+) -> None:
+    """Diagnostics over a real setup redact secrets and reflect the live model.
+
+    Public path: a full config-entry setup yields the real ``SmartHub`` in
+    ``runtime_data``, so the dump reads live hub/router/module state instead of
+    a hand-built mock — while secrets stay redacted.
+    """
+    router = Router(uid="rt_1", id=100, name="Home", version="1.0", max_group=2)
+    router.modules = [_module()]
+    entry, _client = await real_setup(router)
+
+    info = await async_get_config_entry_diagnostics(hass, entry)
+
+    assert info["config_entry"]["data"]["websock_token"] == "**REDACTED**"
+    assert info["hub"]["uid"] == MOCK_UID
+    assert info["hub"]["version"] == MOCK_SMHUB_INFO["software"]["version"]
+    assert info["router"]["module_count"] == 1
+    assert info["modules"][0]["uid"] == "MOD-1"
+    assert info["modules"][0]["type"] == "0104"
