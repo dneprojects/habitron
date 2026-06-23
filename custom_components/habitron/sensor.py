@@ -35,7 +35,7 @@ from .coordinator import HabitronConfigEntry, HbtnCoordinator
 if TYPE_CHECKING:
     from .smart_hub import SmartHub
 
-PARALLEL_UPDATES = 1
+PARALLEL_UPDATES = 0
 TYPE_DIAG = 10  # diagnostic entity, hidden by default (was interfaces.TYPE_DIAG)
 
 
@@ -348,6 +348,11 @@ class HbtnDescribedSensor(HbtnSensor):
         """Initialize the described sensor."""
         super().__init__(module, sensor, coord, idx)
         self.entity_description = description
+        # The base unique_id is ``Mod_{uid}_snsr{nmbr}``. Described sensors are
+        # built against the same router with independently numbered streams, so
+        # timeout/current/voltage would all collide on ``snsr0``. Append the
+        # description key to keep each entity's unique_id distinct.
+        self._attr_unique_id = f"{self._attr_unique_id}_{description.key}"
         if description.diag_check and abs(sensor.type) == TYPE_DIAG:
             self._attr_entity_category = EntityCategory.DIAGNOSTIC
             self._attr_entity_registry_enabled_default = False
@@ -884,19 +889,25 @@ class EKeyFingerNameSensor(CoordinatorEntity[HbtnCoordinator], SensorEntity):
 
     _attr_has_entity_name = True
     _attr_translation_key = "ekey_finger_name"
+    _attr_device_class = SensorDeviceClass.ENUM
 
-    _FINGER_NAMES: tuple[str, ...] = (
-        "Kleiner Finger links",
-        "Ringfinger links",
-        "Mittelfinger links",
-        "Zeigefinger links",
-        "Daumen links",
-        "Daumen rechts",
-        "Zeigefinger rechts",
-        "Mittelfinger rechts",
-        "Ringfinger rechts",
-        "Kleiner Finger rechts",
+    # Stable, language-independent enum keys ordered by the hub's raw finger
+    # value (1..10). Localized labels live in strings.json under
+    # ``entity.sensor.ekey_finger_name.state`` — the state itself must not carry
+    # display text.
+    _FINGER_KEYS: tuple[str, ...] = (
+        "left_pinky",
+        "left_ring",
+        "left_middle",
+        "left_index",
+        "left_thumb",
+        "right_thumb",
+        "right_index",
+        "right_middle",
+        "right_ring",
+        "right_pinky",
     )
+    _attr_options = list(_FINGER_KEYS)
 
     def __init__(
         self,
@@ -912,7 +923,7 @@ class EKeyFingerNameSensor(CoordinatorEntity[HbtnCoordinator], SensorEntity):
         self._nmbr = nmbr
         self._attr_unique_id = f"Mod_{self._module.uid}_ekey_fngr_ident"
         self._attr_device_info = hbtn_device_info(self._module.uid)
-        self._attr_native_value = "None"
+        self._attr_native_value = None
 
     async def async_added_to_hass(self) -> None:
         """Subscribe to the underlying sensor's push updates."""
@@ -929,12 +940,9 @@ class EKeyFingerNameSensor(CoordinatorEntity[HbtnCoordinator], SensorEntity):
     def _handle_coordinator_update(self) -> None:
         """Translate the raw finger value into a finger-name string."""
         id_val = int(self._module.sensors[self._nmbr].value or 0)
-        if id_val == 0:
-            self._attr_native_value = "None"
-        elif id_val == 255:
-            self._attr_native_value = "Error"
-        elif id_val in range(1, 11):
-            self._attr_native_value = self._FINGER_NAMES[id_val - 1]
+        if id_val in range(1, 11):
+            self._attr_native_value = self._FINGER_KEYS[id_val - 1]
         else:
-            self._attr_native_value = "Unknown"
+            # 0 (idle), 255 (error) or out of range → no current finger.
+            self._attr_native_value = None
         self.async_write_ha_state()

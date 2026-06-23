@@ -56,7 +56,7 @@ class HbtnComm:
             # there once the resolved host is known.
             self._host = ""
 
-        self.logger.info(
+        self.logger.debug(
             "Initializing hub, host conf: %s, initial ip: %s",
             self._host_conf,
             self._host,
@@ -77,8 +77,6 @@ class HbtnComm:
         self._hwtype: str = ""
         self._version: str = ""
         self._network_ip: str = ""
-
-        self.logger.info("Got network ip: %s", self._network_ip)
 
         # CRC change-detection key for the bus status stream (the 10s
         # coordinator). Other read streams (firmware, single-module status, …)
@@ -149,12 +147,12 @@ class HbtnComm:
 
     @property
     def hbtn_version(self) -> str:
-        """Firmware version of SmartHub."""
+        """Habitron integration version reported to the hub."""
         return self._hbtn_version
 
     @property
     def com_hwtype(self) -> str:
-        """Firmware version of SmartHub."""
+        """Hardware platform type of SmartHub."""
         return self._hwtype
 
     @property
@@ -441,21 +439,13 @@ class HbtnComm:
         await self.save_config_data(file_name, format_block_output(data))
 
     async def save_smc_file(self, mod_id: int) -> None:
-        """Get module definitions (smc) and saves them to file."""
-        data = await self.async_get_module_definitions(mod_id)
-        file_name = f"Module_{mod_id}.smc"
-        str_data = ""
-        for b_idx in range(7):
-            str_data += f"{data[b_idx]};"  # header
-        str_data += chr(13)
-        data = data[b_idx + 1 : len(data)]
-        while len(data) > 6:
-            line_len = data[5] + 5
-            for b_idx in range(line_len):
-                str_data += f"{data[b_idx]};"
-            str_data += chr(13)
-            data = data[b_idx + 1 : len(data)]
-        await self.save_config_data(file_name, str_data)
+        """Get module definitions (.smc) and save them to file.
+
+        The library formats the raw definition block (and validates its framing)
+        so the integration only writes the resulting text.
+        """
+        smc = await self.client.get_module_definitions_smc(self._convert_mod_id(mod_id))
+        await self.save_config_data(f"Module_{mod_id}.smc", smc)
 
     async def save_smg_file(self, mod_id: int) -> None:
         """Get module settings (smg) and saves them to file."""

@@ -67,7 +67,7 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
 
     # 1. Local IP Check
     own_ip = await _get_local_ip(hass)
-    _LOGGER.info("Smart Center own IP: %s", own_ip)
+    _LOGGER.debug("Smart Center own IP: %s", own_ip)
 
     host_input = data[KEY_HOST]
 
