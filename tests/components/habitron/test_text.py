@@ -1,11 +1,15 @@
 """Tests for the Habitron text platform (habitron_client v2 model)."""
 
+from collections.abc import Awaitable, Callable
 from unittest.mock import AsyncMock, MagicMock
 
 from habitron_client import Module, Router
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.habitron.const import DOMAIN
 from custom_components.habitron.text import HbtnDisplayText, async_setup_entry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 
 
 def _module(typ: bytes = b"\x01\x02") -> Module:
@@ -49,3 +53,35 @@ async def test_async_setup_entry_only_for_display_modules(hass: HomeAssistant) -
     await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
     assert len(added) == 1
     assert isinstance(added[0], HbtnDisplayText)
+
+
+async def test_set_value_service_reaches_bus_and_updates_state(
+    hass: HomeAssistant,
+    real_setup: Callable[..., Awaitable[tuple[MockConfigEntry, AsyncMock]]],
+) -> None:
+    """``text.set_value`` forwards to the module display and reflects in state.
+
+    Public path: full setup creates the display-text entity for a display
+    module, then a real service call writes the value to the bus client and the
+    entity state mirrors it.
+    """
+    router = Router(uid="rt_1", id=100)
+    router.modules = [_module()]
+    _entry, client = await real_setup(router)
+
+    entity_id = er.async_get(hass).async_get_entity_id(
+        "text", DOMAIN, "Mod_MOD-1_message"
+    )
+    assert entity_id is not None
+
+    await hass.services.async_call(
+        "text",
+        "set_value",
+        {"entity_id": entity_id, "value": "Hello"},
+        blocking=True,
+    )
+    # comm converts the absolute addr (105) to the bus id (addr - 100 = 5).
+    client.send_message_text.assert_awaited_once_with(5, "Hello")
+    state = hass.states.get(entity_id)
+    assert state is not None
+    assert state.state == "Hello"

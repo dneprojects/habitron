@@ -1,9 +1,10 @@
 """Pytest fixtures for the Habitron integration."""
 
-from collections.abc import Generator
+from collections.abc import Awaitable, Callable, Generator
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from habitron_client import HabitronClient, Router
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -32,6 +33,7 @@ from .const import (  # noqa: E402
     MOCK_HWTYPE,
     MOCK_MAC,
     MOCK_NAME,
+    MOCK_SMHUB_INFO,
     MOCK_UID,
     MOCK_VERSION,
 )
@@ -206,3 +208,69 @@ async def setup_integration(
     assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
     return mock_config_entry
+
+
+@pytest.fixture
+def real_setup(
+    hass: HomeAssistant,
+    setup_homeassistant: None,
+    mock_ws_provider: MagicMock,
+    mock_coordinator_refresh: AsyncMock,
+    monkeypatch: pytest.MonkeyPatch,
+) -> Callable[..., Awaitable[tuple[MockConfigEntry, AsyncMock]]]:
+    """Return a factory that runs a *real* setup over a caller-supplied router.
+
+    Unlike ``setup_integration`` (which stubs ``SmartHub.async_setup``), this
+    drives the real config-entry setup pipeline — only the ``habitron_client``
+    boundary, the bus-model build and the frontend iconset JS are mocked. The
+    factory returns the loaded entry plus the client mock, so callers can drive
+    the public surface (services, diagnostics) and assert on the bus calls.
+    """
+
+    async def _setup(
+        router: Router, *, supervisor_token: str | None = None
+    ) -> tuple[MockConfigEntry, AsyncMock]:
+        if supervisor_token is None:
+            monkeypatch.delenv("SUPERVISOR_TOKEN", raising=False)
+        else:
+            monkeypatch.setenv("SUPERVISOR_TOKEN", supervisor_token)
+
+        entry = MockConfigEntry(
+            domain=DOMAIN,
+            title=MOCK_NAME,
+            unique_id=MOCK_UID,
+            data=MOCK_CONFIG_DATA,
+            options=MOCK_CONFIG_OPTIONS,
+        )
+        entry.add_to_hass(hass)
+
+        client = AsyncMock(spec=HabitronClient)
+        client.host = MOCK_HOST
+        client.get_smhub_info = AsyncMock(return_value=MOCK_SMHUB_INFO)
+        client.get_smhub_update = AsyncMock(return_value=None)
+
+        with (
+            patch(
+                "custom_components.habitron.communicate.HabitronClient",
+                return_value=client,
+            ),
+            patch(
+                "custom_components.habitron.communicate.get_own_ip",
+                return_value="192.168.1.10",
+            ),
+            patch(
+                "custom_components.habitron.communicate.get_host_ip",
+                return_value=MOCK_HOST,
+            ),
+            patch(
+                "custom_components.habitron.smart_hub.async_build_system",
+                new=AsyncMock(return_value=router),
+            ),
+            patch("custom_components.habitron.smart_hub.add_extra_js_url"),
+        ):
+            assert await hass.config_entries.async_setup(entry.entry_id)
+            await hass.async_block_till_done()
+
+        return entry, client
+
+    return _setup

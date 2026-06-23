@@ -1,8 +1,9 @@
 """Tests for the Habitron domain services (habitron_client v2 model)."""
 
+from collections.abc import Awaitable, Callable
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from habitron_client import HabitronClient, Module, Router
+from habitron_client import Module, Router
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -21,15 +22,6 @@ from custom_components.habitron.ws_provider import HabitronWebRTCProvider
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import device_registry as dr
-
-from .const import (
-    MOCK_CONFIG_DATA,
-    MOCK_CONFIG_OPTIONS,
-    MOCK_HOST,
-    MOCK_NAME,
-    MOCK_SMHUB_INFO,
-    MOCK_UID,
-)
 
 _TARGETED = "custom_components.habitron.services._targeted_hubs"
 
@@ -201,10 +193,7 @@ async def test_sc_system_command_no_target_devices() -> None:
 
 async def test_sc_system_command_service_dispatches_to_touch_module(
     hass: HomeAssistant,
-    setup_homeassistant: None,
-    mock_ws_provider: MagicMock,
-    mock_coordinator_refresh: AsyncMock,
-    monkeypatch: pytest.MonkeyPatch,
+    real_setup: Callable[..., Awaitable[tuple[MockConfigEntry, AsyncMock]]],
 ) -> None:
     """Calling the ``sc_system_command`` service reaches the Touch ws provider.
 
@@ -212,57 +201,19 @@ async def test_sc_system_command_service_dispatches_to_touch_module(
     Touch module (registered as a device), then a real ``hass.services.async_call``
     resolves that device and forwards the command to the module's ws provider.
     """
-    monkeypatch.delenv("SUPERVISOR_TOKEN", raising=False)
-
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        title=MOCK_NAME,
-        unique_id=MOCK_UID,
-        data=MOCK_CONFIG_DATA,
-        options=MOCK_CONFIG_OPTIONS,
-    )
-    entry.add_to_hass(hass)
-
     module = Module(uid="MOD-T", addr=104, typ=b"\x01\x04", name="Touch")
     module.stream_name = "touch_1"
     router = Router(uid="rt_1", id=100)
     router.modules = [module]
 
-    client = AsyncMock(spec=HabitronClient)
-    client.host = MOCK_HOST
-    client.get_smhub_info = AsyncMock(return_value=MOCK_SMHUB_INFO)
-    client.get_smhub_update = AsyncMock(return_value=None)
+    await real_setup(router)
 
-    with (
-        patch(
-            "custom_components.habitron.communicate.HabitronClient",
-            return_value=client,
-        ),
-        patch(
-            "custom_components.habitron.communicate.get_own_ip",
-            return_value="192.168.1.10",
-        ),
-        patch(
-            "custom_components.habitron.communicate.get_host_ip",
-            return_value=MOCK_HOST,
-        ),
-        patch(
-            "custom_components.habitron.smart_hub.async_build_system",
-            new=AsyncMock(return_value=router),
-        ),
-        patch("custom_components.habitron.smart_hub.add_extra_js_url"),
-        patch.object(
-            HabitronWebRTCProvider,
-            "async_send_system_command",
-            new=AsyncMock(),
-        ) as mock_send,
-    ):
-        assert await hass.config_entries.async_setup(entry.entry_id)
-        await hass.async_block_till_done()
+    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, "MOD-T")})
+    assert device is not None
 
-        device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, "MOD-T")})
-        assert device is not None
-
+    with patch.object(
+        HabitronWebRTCProvider, "async_send_system_command", new=AsyncMock()
+    ) as mock_send:
         await hass.services.async_call(
             DOMAIN,
             "sc_system_command",

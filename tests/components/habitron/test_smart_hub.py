@@ -1,8 +1,9 @@
 """Tests for the Habitron SmartHub class."""
 
+from collections.abc import Awaitable, Callable
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from habitron_client import HabitronClient, HabitronError, Router
+from habitron_client import HabitronError, Router
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -12,14 +13,7 @@ from custom_components.habitron.system_health import async_register, system_heal
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
-from .const import (
-    MOCK_CONFIG_DATA,
-    MOCK_CONFIG_OPTIONS,
-    MOCK_HOST,
-    MOCK_NAME,
-    MOCK_SMHUB_INFO,
-    MOCK_UID,
-)
+from .const import MOCK_HOST, MOCK_SMHUB_INFO
 
 
 def test_logging_levels_enum_values() -> None:
@@ -101,10 +95,7 @@ def test_smhub_version_property(smart_hub_stub: SmartHub) -> None:
 )
 async def test_setup_registers_hub_device(
     hass: HomeAssistant,
-    setup_homeassistant: None,
-    mock_ws_provider: MagicMock,
-    mock_coordinator_refresh: AsyncMock,
-    monkeypatch: pytest.MonkeyPatch,
+    real_setup: Callable[..., Awaitable[tuple[MockConfigEntry, AsyncMock]]],
     supervisor_token: str | None,
     expected_conf_url: str,
 ) -> None:
@@ -115,53 +106,14 @@ async def test_setup_registers_hub_device(
     the frontend iconset JS are mocked, so the real wiring (addon vs standalone
     base URL included) runs.
     """
-    if supervisor_token is None:
-        monkeypatch.delenv("SUPERVISOR_TOKEN", raising=False)
-    else:
-        monkeypatch.setenv("SUPERVISOR_TOKEN", supervisor_token)
-
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        title=MOCK_NAME,
-        unique_id=MOCK_UID,
-        data=MOCK_CONFIG_DATA,
-        options=MOCK_CONFIG_OPTIONS,
-    )
-    entry.add_to_hass(hass)
-
-    client = AsyncMock(spec=HabitronClient)
-    client.host = MOCK_HOST
-    client.get_smhub_info = AsyncMock(return_value=MOCK_SMHUB_INFO)
-    client.get_smhub_update = AsyncMock(return_value=None)
     router = Router(uid="rt_1")
     router.modules = []
-
-    with (
-        patch(
-            "custom_components.habitron.communicate.HabitronClient",
-            return_value=client,
-        ),
-        patch(
-            "custom_components.habitron.communicate.get_own_ip",
-            return_value="192.168.1.10",
-        ),
-        patch(
-            "custom_components.habitron.communicate.get_host_ip",
-            return_value=MOCK_HOST,
-        ),
-        patch(
-            "custom_components.habitron.smart_hub.async_build_system",
-            new=AsyncMock(return_value=router),
-        ),
-        patch("custom_components.habitron.smart_hub.add_extra_js_url"),
-    ):
-        assert await hass.config_entries.async_setup(entry.entry_id)
-        await hass.async_block_till_done()
+    await real_setup(router, supervisor_token=supervisor_token)
 
     device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, "AABBCCDDEEFF")})
     assert device is not None
     assert device.manufacturer == "Habitron GmbH"
-    assert device.sw_version == "9.9.9"
+    assert device.sw_version == MOCK_SMHUB_INFO["software"]["version"]
     assert device.configuration_url == expected_conf_url
 
 
