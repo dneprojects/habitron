@@ -24,6 +24,20 @@ MOCK_CONFIG_OPTIONS: Final = {
     "websock_token": MOCK_WEBSOCK_TOKEN,
 }
 
+# A realistic SmartHub info payload as ``HabitronClient.get_smhub_info`` returns
+# it. Shared by the public-surface setup tests; treated read-only.
+MOCK_SMHUB_INFO: Final = {
+    "software": {"version": "9.9.9", "slug": "habitron_smarthub"},
+    "hardware": {
+        "platform": {"type": "Other"},
+        "network": {
+            "ip": MOCK_HOST,
+            "host": "smarthub",
+            "lan mac": MOCK_MAC,
+        },
+    },
+}
+
 # Module type bytes used internally by Habitron.
 TYPE_SMART_CONTROLLER: Final = b"\x01\x03"
 TYPE_SMART_CONTROLLER_TOUCH: Final = b"\x01\x04"
