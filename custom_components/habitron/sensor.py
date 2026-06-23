@@ -23,11 +23,10 @@ from homeassistant.const import (
     UnitOfTemperature,
 )
 from homeassistant.core import Event, HomeAssistant, callback
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import area_registry as ar, entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.util import slugify
 
 from ._helpers import async_assign_entity_area, hbtn_device_info
 from .coordinator import HabitronConfigEntry, HbtnCoordinator
@@ -258,7 +257,10 @@ async def async_setup_entry(  # noqa: C901
 
     # --- Area Registry Handling ---
     registry: er.EntityRegistry = er.async_get(hass)
-    area_names = {area.nmbr: slugify(area.name) for area in hbtn_rt.areas}
+    area_reg = ar.async_get(hass)
+    area_ids = {
+        area.nmbr: area_reg.async_get_or_create(area.name).id for area in hbtn_rt.areas
+    }
 
     for hbt_module in hbtn_rt.modules:
         if hbt_module.typ in [b"\x01\x03", b"\x0b\x1f"]:
@@ -270,7 +272,7 @@ async def async_setup_entry(  # noqa: C901
                         unique_id=f"Mod_{hbt_module.uid}_adin{ain.nmbr}",
                         area_index=ain.area,
                         area_member=hbt_module.area,
-                        area_names=area_names,
+                        area_ids=area_ids,
                     )
 
 
@@ -626,11 +628,12 @@ class StatusSensor(HbtnDiagSensor):
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
         self._attr_native_value = self._module.diags[self._diag_idx].value
-        self.async_write_ha_state()
+        # Set the icon before writing state so it reflects the current value.
         if self._attr_native_value:
             self._attr_icon = "mdi:lan-disconnect"
         else:
             self._attr_icon = "mdi:lan-check"
+        self.async_write_ha_state()
 
 
 class LogicSensor(HbtnSensor):

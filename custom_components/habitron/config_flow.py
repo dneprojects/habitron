@@ -188,7 +188,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         finally:
             transport.close()
 
-        # cast because protocol is typed as BaseProtocol in create_datagram_endpoint return
+        # ``create_datagram_endpoint`` infers the concrete protocol type from the
+        # factory, so ``protocol`` is a UDPDiscoveryProtocol here.
         return protocol.found_devices
 
     async def async_step_ssdp(

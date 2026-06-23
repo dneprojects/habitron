@@ -7,11 +7,10 @@ from habitron_client import Flag, Led, Module, Output
 from homeassistant.components.switch import SwitchDeviceClass, SwitchEntity
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import area_registry as ar, entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.util import slugify
 
 from ._helpers import HabitronEntity, async_assign_entity_area, hbtn_device_info
 from .coordinator import HabitronConfigEntry, HbtnCoordinator
@@ -79,7 +78,10 @@ async def async_setup_entry(
         async_add_entities(new_devices)
 
     registry = er.async_get(hass)
-    area_names = {area.nmbr: slugify(area.name) for area in router.areas}
+    area_reg = ar.async_get(hass)
+    area_ids = {
+        area.nmbr: area_reg.async_get_or_create(area.name).id for area in router.areas
+    }
     for module in router.modules:
         for output in module.outputs:
             if abs(output.type) == 1:
@@ -89,7 +91,7 @@ async def async_setup_entry(
                     unique_id=f"Mod_{module.uid}_out{output.nmbr}",
                     area_index=output.area,
                     area_member=module.area,
-                    area_names=area_names,
+                    area_ids=area_ids,
                     propagate_to_hidden_duplicates=True,
                 )
 

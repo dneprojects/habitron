@@ -1,5 +1,28 @@
 # Latest changes
 
+## v3.1.0b2 (beta)
+
+Further code-review fixes ported from the core review.
+
+### Fixed
+- **Entity area assignment** now resolves each Habitron area to its real HA
+  area-registry id (creating the area when needed) instead of a slugified name.
+  A slugified name does not reliably match an area id (renames, umlauts,
+  duplicate names), so entities could end up with a dangling area. Applies to
+  **all** entity platforms.
+- Diagnostic "lan" icon now reflects the current value (it lagged one update).
+- Module-number service fields reject out-of-range values (only 1..64).
+
+### Changed
+- Hub-acting services (`hub_restart`, `mod_restart`, `save_*`, …) accept an
+  optional **device** target to pick a specific SmartHub. With a single
+  configured hub the device may be omitted, so existing single-hub automations
+  keep working unchanged.
+- Removed the unused `set_host` reconfiguration path (reconfiguration runs
+  through the config flow's reload).
+- Minor cleanups: coordinator uses the config entry directly; corrected internal
+  comments.
+
 ## v3.1.0b1 (beta)
 
 Pulls in `habitron_client==2.0.7` and ports the latest code-review improvements.

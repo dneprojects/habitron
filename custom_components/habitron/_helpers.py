@@ -83,17 +83,17 @@ def async_assign_entity_area(
     unique_id: str,
     area_index: int,
     area_member: int,
-    area_names: dict[int, str],
+    area_ids: dict[int, str],
     propagate_to_hidden_duplicates: bool = False,
 ) -> None:
     """Push the entity identified by (domain, unique_id) into the right HA area.
 
     ``area_index`` is the bus-side area number from the module description.
-    ``area_names`` maps a bus area number to its slugified HA area id (the
-    consumer slugifies ``Area.name`` — the library carries only number + name).
-    When ``area_index`` is unknown or equals the module's own ``area_member``,
-    the entity is reset to the "no area" default; otherwise it is moved into the
-    matching area.
+    ``area_ids`` maps a bus area number to its HA area-registry id
+    (``AreaEntry.id``), resolved by the consumer from ``Area.name`` via the area
+    registry. When ``area_index`` is unknown or equals the module's own
+    ``area_member``, the entity is reset to the "no area" default; otherwise it
+    is moved into the matching area.
 
     ``propagate_to_hidden_duplicates`` extends the same area to every *hidden*
     entity on the same device that shares the original name — needed by platforms
@@ -102,9 +102,9 @@ def async_assign_entity_area(
     entity_entry = registry.async_get_entity_id(domain, DOMAIN, unique_id)
     if not entity_entry:
         return
-    if area_index not in area_names:
+    if area_index not in area_ids:
         area_index = 0
-    target_area = None if area_index in (0, area_member) else area_names[area_index]
+    target_area = None if area_index in (0, area_member) else area_ids[area_index]
     registry.async_update_entity(entity_entry, area_id=target_area)
     if not propagate_to_hidden_duplicates:
         return
