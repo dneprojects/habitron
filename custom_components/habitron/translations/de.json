@@ -340,7 +340,7 @@
     },
     "update_entity": {
       "name": "Update-Event an Hub weiterleiten",
-      "description": "Interner Hook, mit dem Automatisierungen Statusänderungen an einen Hub injizieren können.",
+      "description": "Übergibt ein Bus-Statusänderungs-Event an Home Assistant. Der SmartHub ruft dies über die WebSocket-API auf, um Aktualisierungen zu pushen; die Felder enthalten rohe Habitron-Event-Codes und werden normalerweise nicht von Hand gesetzt.",
       "fields": {
         "hub_uid": {
           "name": "Hub-UID",

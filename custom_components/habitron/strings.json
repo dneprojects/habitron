@@ -340,7 +340,7 @@
     },
     "update_entity": {
       "name": "Forward update event to hub",
-      "description": "Internal hook used by automations to inject state-change events into a hub.",
+      "description": "Delivers a bus state-change event into Home Assistant. The SmartHub calls this over the WebSocket API to push updates; the fields carry raw Habitron event codes and are not normally set by hand.",
       "fields": {
         "hub_uid": {
           "name": "Hub UID",
