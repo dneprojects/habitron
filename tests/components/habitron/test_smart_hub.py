@@ -2,13 +2,17 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from habitron_client import HabitronError, Router
+from habitron_client import HabitronClient, HabitronError, Router
 import pytest
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.habitron.const import DOMAIN
 from custom_components.habitron.smart_hub import LoggingLevels, SmartHub
 from custom_components.habitron.system_health import async_register, system_health_info
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 
-from .const import MOCK_HOST
+from .const import MOCK_CONFIG_DATA, MOCK_CONFIG_OPTIONS, MOCK_HOST, MOCK_NAME, MOCK_UID
 
 
 def test_logging_levels_enum_values() -> None:
@@ -78,88 +82,95 @@ def test_smhub_version_property(smart_hub_stub: SmartHub) -> None:
     assert smart_hub_stub.smhub_version == "1.2.3"
 
 
-async def test_smhub_async_setup_populates_fields_and_diagnostics(
-    smart_hub_stub: SmartHub,
-) -> None:
-    """async_setup populates uid, base_url, registers the device and diagnostics."""
-    smart_hub_stub.comm.get_smhub_update.return_value = None
+def _smhub_info() -> dict:
+    """A realistic SmartHub info payload as the client returns it."""
+    return {
+        "software": {"version": "9.9.9", "slug": "habitron_smarthub"},
+        "hardware": {
+            "platform": {"type": "Other"},
+            "network": {
+                "ip": MOCK_HOST,
+                "host": "smarthub",
+                "lan mac": "AA:BB:CC:DD:EE:FF",
+            },
+        },
+    }
 
-    with (
-        patch("custom_components.habitron.smart_hub.dr") as mock_dr,
-        patch("custom_components.habitron.smart_hub.ar"),
-        patch(
-            "custom_components.habitron.smart_hub.async_build_system",
-            new=AsyncMock(return_value=Router()),
+
+@pytest.mark.parametrize(
+    ("supervisor_token", "expected_conf_url"),
+    [
+        (None, f"http://{MOCK_HOST}:7780/hub"),
+        (
+            "token",
+            f"http://{MOCK_HOST}:8123/habitron_smarthub/ingress?index=/hub",
         ),
-        patch("custom_components.habitron.smart_hub.add_extra_js_url"),
-        patch("custom_components.habitron.smart_hub.StaticPathConfig"),
-    ):
-        mock_dr.async_get.return_value = MagicMock()
-        mock_dr.CONNECTION_NETWORK_MAC = "mac"
-        await smart_hub_stub.async_setup()
-
-    # uid is the colon-stripped MAC
-    assert smart_hub_stub.uid == "AABBCCDDEEFF"
-    # base_url uses port 7780 for non-addon installs
-    assert smart_hub_stub.base_url.endswith(":7780")
-    # Raspberry Pi branch fills three diags + two sensors + two log levels
-    assert len(smart_hub_stub.diags) == 3
-    assert len(smart_hub_stub.sensors) == 2
-    assert len(smart_hub_stub.loglvl) == 2
-
-
-async def test_smhub_async_setup_addon_branch_sets_ingress_base_url(
-    smart_hub_stub: SmartHub,
+    ],
+)
+async def test_setup_registers_hub_device(
+    hass: HomeAssistant,
+    setup_homeassistant: None,
+    mock_ws_provider: MagicMock,
+    mock_coordinator_refresh: AsyncMock,
+    monkeypatch: pytest.MonkeyPatch,
+    supervisor_token: str | None,
+    expected_conf_url: str,
 ) -> None:
-    """When ``comm.is_addon`` is True, base_url points at the ingress endpoint."""
-    smart_hub_stub.comm.is_addon = True
-    smart_hub_stub.comm.slugname = "habitron_smarthub"
-    smart_hub_stub.comm.com_hwtype = "Other"  # skip RPi diag setup
+    """Full config-entry setup registers the hub device in the registry.
 
-    with (
-        patch("custom_components.habitron.smart_hub.dr") as mock_dr,
-        patch("custom_components.habitron.smart_hub.ar"),
-        patch(
-            "custom_components.habitron.smart_hub.async_build_system",
-            new=AsyncMock(return_value=Router()),
-        ),
-        patch("custom_components.habitron.smart_hub.add_extra_js_url"),
-        patch("custom_components.habitron.smart_hub.StaticPathConfig"),
-    ):
-        mock_dr.async_get.return_value = MagicMock()
-        mock_dr.CONNECTION_NETWORK_MAC = "mac"
-        await smart_hub_stub.async_setup()
+    Drives the public path (config entry -> SmartHub.async_setup -> device
+    registry); only the ``habitron_client`` boundary, the bus-model build and
+    the frontend iconset JS are mocked, so the real wiring (addon vs standalone
+    base URL included) runs.
+    """
+    if supervisor_token is None:
+        monkeypatch.delenv("SUPERVISOR_TOKEN", raising=False)
+    else:
+        monkeypatch.setenv("SUPERVISOR_TOKEN", supervisor_token)
 
-    assert "habitron_smarthub/ingress?index=" in smart_hub_stub.base_url
-    # Non-RPi branch leaves the diag/sensor/loglvl lists empty
-    assert smart_hub_stub.diags == []
-    assert smart_hub_stub.sensors == []
-    assert smart_hub_stub.loglvl == []
-
-
-async def test_smhub_async_setup_swallows_static_path_install_error(
-    smart_hub_stub: SmartHub,
-) -> None:
-    """If the static-path registration raises, async_setup keeps going."""
-    smart_hub_stub.hass.http.async_register_static_paths = AsyncMock(
-        side_effect=RuntimeError("already installed")
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=MOCK_NAME,
+        unique_id=MOCK_UID,
+        data=MOCK_CONFIG_DATA,
+        options=MOCK_CONFIG_OPTIONS,
     )
-    smart_hub_stub.comm.com_hwtype = "Other"
+    entry.add_to_hass(hass)
+
+    client = AsyncMock(spec=HabitronClient)
+    client.host = MOCK_HOST
+    client.get_smhub_info = AsyncMock(return_value=_smhub_info())
+    client.get_smhub_update = AsyncMock(return_value=None)
+    router = Router(uid="rt_1")
+    router.modules = []
 
     with (
-        patch("custom_components.habitron.smart_hub.dr") as mock_dr,
-        patch("custom_components.habitron.smart_hub.ar"),
+        patch(
+            "custom_components.habitron.communicate.HabitronClient",
+            return_value=client,
+        ),
+        patch(
+            "custom_components.habitron.communicate.get_own_ip",
+            return_value="192.168.1.10",
+        ),
+        patch(
+            "custom_components.habitron.communicate.get_host_ip",
+            return_value=MOCK_HOST,
+        ),
         patch(
             "custom_components.habitron.smart_hub.async_build_system",
-            new=AsyncMock(return_value=Router()),
+            new=AsyncMock(return_value=router),
         ),
         patch("custom_components.habitron.smart_hub.add_extra_js_url"),
-        patch("custom_components.habitron.smart_hub.StaticPathConfig"),
     ):
-        mock_dr.async_get.return_value = MagicMock()
-        mock_dr.CONNECTION_NETWORK_MAC = "mac"
-        # Must NOT raise even though async_register_static_paths errored
-        await smart_hub_stub.async_setup()
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, "AABBCCDDEEFF")})
+    assert device is not None
+    assert device.manufacturer == "Habitron GmbH"
+    assert device.sw_version == "9.9.9"
+    assert device.configuration_url == expected_conf_url
 
 
 async def test_update_short_circuits_when_no_info(smart_hub_stub: SmartHub) -> None:
