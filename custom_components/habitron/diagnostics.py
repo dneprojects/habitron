@@ -54,7 +54,7 @@ async def async_get_config_entry_diagnostics(
         "hub": {
             "uid": smhub.uid,
             "version": smhub.smhub_version,
-            "type": smhub._type,  # noqa: SLF001
+            "type": smhub.smhub_type,
             "host": smhub.host,
             "addon_slug": smhub.addon_slug,
             "online": smhub.online,
@@ -103,7 +103,10 @@ async def async_get_device_diagnostics(
 
     target: dict[str, Any] | None = None
     if target_uid == smhub.uid:
-        target = {"kind": "hub", "summary": {"uid": smhub.uid, "name": smhub._name}}  # noqa: SLF001
+        target = {
+            "kind": "hub",
+            "summary": {"uid": smhub.uid, "name": smhub.smhub_name},
+        }
     elif target_uid == router.uid:
         target = {"kind": "router", "summary": {"uid": router.uid, "name": router.name}}
     else:

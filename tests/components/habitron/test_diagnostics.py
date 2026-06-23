@@ -39,8 +39,8 @@ def _module(uid: str = "MOD-1", name: str = "Living room") -> Module:
 def _smhub(router: Router) -> MagicMock:
     smhub = MagicMock()
     smhub.uid = MOCK_UID
-    smhub._name = MOCK_NAME
-    smhub._type = MOCK_HWTYPE
+    smhub.smhub_name = MOCK_NAME
+    smhub.smhub_type = MOCK_HWTYPE
     smhub.smhub_version = MOCK_VERSION
     smhub.host = MOCK_HOST
     smhub.addon_slug = ""

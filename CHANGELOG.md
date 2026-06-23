@@ -1,5 +1,27 @@
 # Latest changes
 
+## v3.1.0b1 (beta)
+
+Pulls in `habitron_client==2.0.7` and ports the latest code-review improvements.
+
+### Changed
+- **eKey finger-name sensor** now reports stable enum keys instead of hardcoded
+  German text, with localized labels (en/de) supplied via translations
+  (`SensorDeviceClass.ENUM`). ⚠ The entity **state values change** (e.g.
+  `left_thumb` instead of "Daumen links"); the displayed label stays localized.
+- `.smc` module-definition formatting moved into the library
+  (`get_module_definitions_smc`), with length validation against truncated
+  responses.
+- Diagnostics use public `SmartHub` properties (`smhub_type`/`smhub_name`)
+  instead of private attributes.
+- Routine setup logging downgraded from info to debug.
+
+### Fixed
+- Duplicate `unique_id` for described router sensors (timeout/current/voltage all
+  shared `…_snsr0`); each now appends its description key.
+- `PARALLEL_UPDATES = 0` for the read-only, push-driven sensor platform.
+- Corrected copy-paste property docstrings.
+
 ## v3.0.2
 
 ### Fixed

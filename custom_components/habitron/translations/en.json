@@ -137,7 +137,19 @@
         "name": "Identifier name"
       },
       "ekey_finger_name": {
-        "name": "Finger name"
+        "name": "Finger name",
+        "state": {
+          "left_thumb": "Left thumb",
+          "left_index": "Left index finger",
+          "left_middle": "Left middle finger",
+          "left_ring": "Left ring finger",
+          "left_pinky": "Left little finger",
+          "right_thumb": "Right thumb",
+          "right_index": "Right index finger",
+          "right_middle": "Right middle finger",
+          "right_ring": "Right ring finger",
+          "right_pinky": "Right little finger"
+        }
       },
       "wind": {
         "name": "Wind"

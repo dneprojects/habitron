@@ -85,6 +85,16 @@ class SmartHub:
         """Version for SmartHub."""
         return self._version
 
+    @property
+    def smhub_type(self) -> str:
+        """Hardware platform type of the SmartHub."""
+        return self._type
+
+    @property
+    def smhub_name(self) -> str:
+        """Configured name of the SmartHub (the config entry title)."""
+        return self._name
+
     async def async_setup(self) -> None:
         """Connect, register the hub device and build the bus model."""
         # 1. Open the client connection and fetch hub info (mac/version/host).

@@ -137,7 +137,19 @@
         "name": "Identifier-Name"
       },
       "ekey_finger_name": {
-        "name": "Finger-Name"
+        "name": "Finger-Name",
+        "state": {
+          "left_thumb": "Daumen links",
+          "left_index": "Zeigefinger links",
+          "left_middle": "Mittelfinger links",
+          "left_ring": "Ringfinger links",
+          "left_pinky": "Kleiner Finger links",
+          "right_thumb": "Daumen rechts",
+          "right_index": "Zeigefinger rechts",
+          "right_middle": "Mittelfinger rechts",
+          "right_ring": "Ringfinger rechts",
+          "right_pinky": "Kleiner Finger rechts"
+        }
       },
       "wind": {
         "name": "Wind"

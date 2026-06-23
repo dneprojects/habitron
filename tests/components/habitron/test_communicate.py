@@ -463,13 +463,15 @@ async def test_save_smr_file_serialises_bytes() -> None:
     assert data == "5;"
 
 
-async def test_save_smc_file_parses_blocks_and_terminates() -> None:
-    """save_smc_file walks the header + variable-length blocks without error."""
+async def test_save_smc_file_writes_library_formatted_text() -> None:
+    """save_smc_file writes the .smc text the library formats from the module."""
     comm = _make_comm()
-    comm.async_get_module_definitions = AsyncMock(return_value=bytes(19))
+    comm._client.get_module_definitions_smc = AsyncMock(return_value="0;1;2;\r")
     comm.save_config_data = AsyncMock()
     await comm.save_smc_file(105)
-    assert comm.save_config_data.call_args.args[0] == "Module_105.smc"
+    # mod_id 105 -> bus address 5; filename keeps the mod_id.
+    comm._client.get_module_definitions_smc.assert_awaited_once_with(5)
+    assert comm.save_config_data.call_args.args == ("Module_105.smc", "0;1;2;\r")
 
 
 async def test_save_config_data_writes_via_anyio() -> None:
