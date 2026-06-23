@@ -1,6 +1,6 @@
 """Tests for the Habitron domain services (habitron_client v2 model)."""
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from habitron_client import Module, Router
 import pytest
@@ -15,9 +15,10 @@ from custom_components.habitron.services import (
     _async_save_module_smc,
     _async_sc_system_command,
     _async_update_entity,
-    _primary_hub,
 )
 from homeassistant.exceptions import ServiceValidationError
+
+_TARGETED = "custom_components.habitron.services._targeted_hubs"
 
 
 def _hub(host: str = "1.2.3.4") -> MagicMock:
@@ -57,52 +58,35 @@ def _call(hass: MagicMock, data: dict) -> MagicMock:
 
 
 # ---------------------------------------------------------------------------
-# _primary_hub
-# ---------------------------------------------------------------------------
-
-
-def test_primary_hub_no_hub_raises() -> None:
-    """No loaded hub raises a ServiceValidationError."""
-    with pytest.raises(ServiceValidationError):
-        _primary_hub(_hass([]))
-
-
-def test_primary_hub_returns_first() -> None:
-    """The first loaded hub is returned."""
-    hub = _hub()
-    assert _primary_hub(_hass([_entry(hub)])) is hub
-
-
-# ---------------------------------------------------------------------------
-# restart / save services
+# restart / save services (hub resolved via _targeted_hubs)
 # ---------------------------------------------------------------------------
 
 
 async def test_restart_and_reboot_hub() -> None:
-    """Hub restart/reboot forward to the comm wrapper."""
+    """Hub restart/reboot forward to the comm wrapper of the targeted hub."""
     hub = _hub()
-    hass = _hass([_entry(hub)])
-    await _async_restart_hub(_call(hass, {}))
-    hub.comm.hub_restart.assert_awaited()
-    await _async_reboot_hub(_call(hass, {}))
-    hub.comm.hub_reboot.assert_awaited()
+    with patch(_TARGETED, AsyncMock(return_value=[hub])):
+        await _async_restart_hub(_call(_hass([_entry(hub)]), {}))
+        hub.comm.hub_restart.assert_awaited()
+        await _async_reboot_hub(_call(_hass([_entry(hub)]), {}))
+        hub.comm.hub_reboot.assert_awaited()
 
 
 async def test_restart_module_and_router() -> None:
     """Module restart adds 100 to the address; router restart targets 0."""
     hub = _hub()
-    hass = _hass([_entry(hub)])
-    await _async_restart_module(_call(hass, {"mod_nmbr": 5}))
-    hub.comm.module_restart.assert_awaited_with(105)
-    await _async_restart_router(_call(hass, {}))
-    hub.comm.module_restart.assert_awaited_with(0)
+    with patch(_TARGETED, AsyncMock(return_value=[hub])):
+        await _async_restart_module(_call(_hass([_entry(hub)]), {"mod_nmbr": 5}))
+        hub.comm.module_restart.assert_awaited_with(105)
+        await _async_restart_router(_call(_hass([_entry(hub)]), {}))
+        hub.comm.module_restart.assert_awaited_with(0)
 
 
 async def test_save_module_smc() -> None:
     """Saving a module .smc file forwards the (100 + nmbr) address."""
     hub = _hub()
-    hass = _hass([_entry(hub)])
-    await _async_save_module_smc(_call(hass, {"mod_nmbr": 3}))
+    with patch(_TARGETED, AsyncMock(return_value=[hub])):
+        await _async_save_module_smc(_call(_hass([_entry(hub)]), {"mod_nmbr": 3}))
     hub.comm.save_smc_file.assert_awaited_with(103)
 
 

@@ -14,10 +14,9 @@ from homeassistant.components.cover import (
     CoverEntityFeature,
 )
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import area_registry as ar, entity_registry as er
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.util import slugify
 
 from ._helpers import async_assign_entity_area, hbtn_device_info
 from .coordinator import HabitronConfigEntry, HbtnCoordinator
@@ -55,7 +54,10 @@ async def async_setup_entry(
         async_add_entities(new_devices)
 
     registry: er.EntityRegistry = er.async_get(hass)
-    area_names = {area.nmbr: slugify(area.name) for area in hbtn_rt.areas}
+    area_reg = ar.async_get(hass)
+    area_ids = {
+        area.nmbr: area_reg.async_get_or_create(area.name).id for area in hbtn_rt.areas
+    }
 
     for hbt_module in hbtn_rt.modules:
         for mod_cover in hbt_module.covers:
@@ -66,7 +68,7 @@ async def async_setup_entry(
                     unique_id=f"Mod_{hbt_module.uid}_cover{mod_cover.nmbr}",
                     area_index=mod_cover.area,
                     area_member=hbt_module.area,
-                    area_names=area_names,
+                    area_ids=area_ids,
                 )
 
 

@@ -123,10 +123,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: HabitronConfigEntry) ->
 
 async def update_listener(hass: HomeAssistant, entry: HabitronConfigEntry) -> None:
     """Handle options update by reloading the config entry."""
-    # ``set_host`` triggered a reload itself, which left the rest of this
-    # listener acting on a hub instance that was being torn down. Doing
-    # the reload here unconditionally keeps host, interval and token in
-    # sync via the normal setup path.
+    # Reload unconditionally so host, interval and token changes are picked up
+    # via the normal setup path.
     await hass.config_entries.async_reload(entry.entry_id)
 
 

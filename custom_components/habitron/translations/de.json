@@ -234,11 +234,23 @@
   "services": {
     "hub_restart": {
       "name": "Hub Neustart",
-      "description": "Startet den SmartHub-Dienst weich neu."
+      "description": "Startet den SmartHub-Dienst weich neu.",
+      "fields": {
+        "device_id": {
+          "name": "Gerät",
+          "description": "Ein Habitron-Gerät am Ziel-SmartHub (Hub, Router oder Modul). Bei nur einem Hub optional."
+        }
+      }
     },
     "hub_reboot": {
       "name": "Hub Reboot",
-      "description": "Startet den SmartHub-Host neu."
+      "description": "Startet den SmartHub-Host neu.",
+      "fields": {
+        "device_id": {
+          "name": "Gerät",
+          "description": "Ein Habitron-Gerät am Ziel-SmartHub (Hub, Router oder Modul). Bei nur einem Hub optional."
+        }
+      }
     },
     "mod_restart": {
       "name": "Modul Neustart",
@@ -247,12 +259,22 @@
         "mod_nmbr": {
           "name": "Modul-Nummer",
           "description": "Habitron Modul-Adresse, Standard 0xFF für alle."
+        },
+        "device_id": {
+          "name": "Gerät",
+          "description": "Ein Habitron-Gerät am Ziel-SmartHub (Hub, Router oder Modul). Bei nur einem Hub optional."
         }
       }
     },
     "rtr_restart": {
       "name": "Router Neustart",
-      "description": "Startet den Habitron-Router neu."
+      "description": "Startet den Habitron-Router neu.",
+      "fields": {
+        "device_id": {
+          "name": "Gerät",
+          "description": "Ein Habitron-Gerät am Ziel-SmartHub (Hub, Router oder Modul). Bei nur einem Hub optional."
+        }
+      }
     },
     "save_module_smc": {
       "name": "Modul .smc-Datei speichern",
@@ -261,6 +283,10 @@
         "mod_nmbr": {
           "name": "Modul-Nummer",
           "description": "Habitron Modul-Adresse."
+        },
+        "device_id": {
+          "name": "Gerät",
+          "description": "Ein Habitron-Gerät am Ziel-SmartHub (Hub, Router oder Modul). Bei nur einem Hub optional."
         }
       }
     },
@@ -271,12 +297,22 @@
         "mod_nmbr": {
           "name": "Modul-Nummer",
           "description": "Habitron Modul-Adresse."
+        },
+        "device_id": {
+          "name": "Gerät",
+          "description": "Ein Habitron-Gerät am Ziel-SmartHub (Hub, Router oder Modul). Bei nur einem Hub optional."
         }
       }
     },
     "save_router_smr": {
       "name": "Router .smr-Datei speichern",
-      "description": "Liest Router-Einstellungen aus und speichert sie als .smr-Textdatei."
+      "description": "Liest Router-Einstellungen aus und speichert sie als .smr-Textdatei.",
+      "fields": {
+        "device_id": {
+          "name": "Gerät",
+          "description": "Ein Habitron-Gerät am Ziel-SmartHub (Hub, Router oder Modul). Bei nur einem Hub optional."
+        }
+      }
     },
     "save_module_status": {
       "name": "Modulstatus speichern",
@@ -285,12 +321,22 @@
         "mod_nmbr": {
           "name": "Modul-Nummer",
           "description": "Habitron Modul-Adresse."
+        },
+        "device_id": {
+          "name": "Gerät",
+          "description": "Ein Habitron-Gerät am Ziel-SmartHub (Hub, Router oder Modul). Bei nur einem Hub optional."
         }
       }
     },
     "save_router_status": {
       "name": "Routerstatus speichern",
-      "description": "Liest den Routerstatus aus und speichert ihn als .rstat-Textdatei."
+      "description": "Liest den Routerstatus aus und speichert ihn als .rstat-Textdatei.",
+      "fields": {
+        "device_id": {
+          "name": "Gerät",
+          "description": "Ein Habitron-Gerät am Ziel-SmartHub (Hub, Router oder Modul). Bei nur einem Hub optional."
+        }
+      }
     },
     "update_entity": {
       "name": "Update-Event an Hub weiterleiten",

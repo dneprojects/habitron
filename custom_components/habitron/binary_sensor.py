@@ -9,11 +9,10 @@ from homeassistant.components.binary_sensor import (
 )
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import area_registry as ar, entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.util import slugify
 
 from ._helpers import hbtn_device_info
 from .const import DOMAIN
@@ -60,7 +59,10 @@ async def async_setup_entry(
         async_add_entities(new_devices)
 
     registry: er.EntityRegistry = er.async_get(hass)
-    area_names = {area.nmbr: slugify(area.name) for area in hbtn_rt.areas}
+    area_reg = ar.async_get(hass)
+    area_ids = {
+        area.nmbr: area_reg.async_get_or_create(area.name).id for area in hbtn_rt.areas
+    }
 
     for hbt_module in hbtn_rt.modules:
         for mod_input in hbt_module.inputs:
@@ -68,14 +70,14 @@ async def async_setup_entry(
                 abs(mod_input.type) == 2
                 and mod_input.area > 0
                 and mod_input.area != hbt_module.area
-                and mod_input.area in area_names
+                and mod_input.area in area_ids
             ):  # switch
                 entity_entry = registry.async_get_entity_id(
                     "binary_sensor", DOMAIN, f"Mod_{hbt_module.uid}_in{mod_input.nmbr}"
                 )
                 if entity_entry:
                     registry.async_update_entity(
-                        entity_entry, area_id=area_names[mod_input.area]
+                        entity_entry, area_id=area_ids[mod_input.area]
                     )
 
 

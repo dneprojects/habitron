@@ -6,9 +6,11 @@ from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
 
+from homeassistant.const import ATTR_DEVICE_ID
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.service import async_extract_config_entry_ids
 
 from .const import (
     DOMAIN,
@@ -45,15 +47,24 @@ SERVICE_SAVE_ROUTER_STATUS = "save_router_status"
 SERVICE_UPDATE_ENTITY = "update_entity"
 SERVICE_SC_SYSTEM_COMMAND = "sc_system_command"
 
-_NO_ARGS_SCHEMA = vol.Schema({})
+# Hub-acting services pick the hub via a Habitron device. The device is
+# optional: with a single configured hub it is inferred, so existing single-hub
+# automations keep working without a target.
+_HUB_TARGET_SCHEMA = vol.Schema({vol.Optional(ATTR_DEVICE_ID): str})
 _MOD_RESTART_SCHEMA = vol.Schema(
     {
-        vol.Optional(RESTART_KEY_NMBR, default=1): int,
+        vol.Optional(ATTR_DEVICE_ID): str,
+        # Module addresses are 1..64; reject anything outside (e.g. 65) instead
+        # of forwarding an invalid bus address.
+        vol.Optional(RESTART_KEY_NMBR, default=1): vol.All(
+            int, vol.Range(min=1, max=64)
+        ),
     }
 )
 _MOD_FILE_SCHEMA = vol.Schema(
     {
-        vol.Required(FILE_MOD_NMBR, default=1): int,
+        vol.Optional(ATTR_DEVICE_ID): str,
+        vol.Required(FILE_MOD_NMBR, default=1): vol.All(int, vol.Range(min=1, max=64)),
     }
 )
 _UPDATE_ENTITY_SCHEMA = vol.Schema(
@@ -78,78 +89,89 @@ _SC_SYSTEM_COMMAND_SCHEMA = vol.Schema(
 )
 
 
-def _primary_hub(hass: HomeAssistant) -> SmartHub:
-    """Return the single loaded Habitron hub.
+async def _targeted_hubs(call: ServiceCall) -> list[SmartHub]:
+    """Return the loaded SmartHub(s) for the call.
 
-    Raises ``ServiceValidationError`` with translatable message keys
-    when no hub is loaded. When multiple hubs are loaded the first one
-    is returned and a warning is logged — a proper multi-hub target
-    selector belongs to a follow-up refactor.
+    A hub is selected by targeting any Habitron device (hub, router or module);
+    the owning config entry is resolved via the target. When no device is
+    targeted and exactly one hub is configured, that single hub is used (the
+    common case); with several hubs a target is required. Raises
+    ``ServiceValidationError`` when the call does not resolve to a loaded hub.
     """
-    entries = hass.config_entries.async_loaded_entries(DOMAIN)
-    if not entries:
+    loaded = call.hass.config_entries.async_loaded_entries(DOMAIN)
+    entry_ids = await async_extract_config_entry_ids(call)
+    if entry_ids:
+        hubs: list[SmartHub] = [
+            entry.runtime_data for entry in loaded if entry.entry_id in entry_ids
+        ]
+    elif len(loaded) == 1:
+        hubs = [loaded[0].runtime_data]
+    else:
+        hubs = []
+    if not hubs:
         raise ServiceValidationError(
             translation_domain=DOMAIN,
             translation_key="no_hub_loaded",
         )
-    if len(entries) > 1:
-        _LOGGER.warning(
-            "Habitron singleton service called with %d hubs configured; "
-            "targeting the first-loaded entry (%s)",
-            len(entries),
-            entries[0].entry_id,
-        )
-    hub: SmartHub = entries[0].runtime_data
-    return hub
+    return hubs
 
 
 async def _async_restart_hub(call: ServiceCall) -> None:
-    """Trigger a soft restart of the active SmartHub."""
-    await _primary_hub(call.hass).comm.hub_restart()
+    """Trigger a soft restart of the targeted SmartHub(s)."""
+    for hub in await _targeted_hubs(call):
+        await hub.comm.hub_restart()
 
 
 async def _async_reboot_hub(call: ServiceCall) -> None:
-    """Trigger a reboot of the active SmartHub."""
-    await _primary_hub(call.hass).comm.hub_reboot()
+    """Trigger a reboot of the targeted SmartHub(s)."""
+    for hub in await _targeted_hubs(call):
+        await hub.comm.hub_reboot()
 
 
 async def _async_restart_module(call: ServiceCall) -> None:
     """Restart a single Habitron module."""
     mod_nmbr = call.data.get(RESTART_KEY_NMBR, RESTART_ALL)
-    await _primary_hub(call.hass).comm.module_restart(100 + mod_nmbr)
+    for hub in await _targeted_hubs(call):
+        await hub.comm.module_restart(100 + mod_nmbr)
 
 
 async def _async_restart_router(call: ServiceCall) -> None:
-    """Restart the router."""
-    await _primary_hub(call.hass).comm.module_restart(0)
+    """Restart the router of the targeted hub(s)."""
+    for hub in await _targeted_hubs(call):
+        await hub.comm.module_restart(0)
 
 
 async def _async_save_module_smc(call: ServiceCall) -> None:
     """Persist a module's .smc file."""
     mod_nmbr = call.data.get(FILE_MOD_NMBR, 1)
-    await _primary_hub(call.hass).comm.save_smc_file(100 + mod_nmbr)
+    for hub in await _targeted_hubs(call):
+        await hub.comm.save_smc_file(100 + mod_nmbr)
 
 
 async def _async_save_module_smg(call: ServiceCall) -> None:
     """Persist a module's .smg file."""
     mod_nmbr = call.data.get(FILE_MOD_NMBR, 1)
-    await _primary_hub(call.hass).comm.save_smg_file(100 + mod_nmbr)
+    for hub in await _targeted_hubs(call):
+        await hub.comm.save_smg_file(100 + mod_nmbr)
 
 
 async def _async_save_router_smr(call: ServiceCall) -> None:
     """Persist the router's .smr file."""
-    await _primary_hub(call.hass).comm.save_smr_file()
+    for hub in await _targeted_hubs(call):
+        await hub.comm.save_smr_file()
 
 
 async def _async_save_module_status(call: ServiceCall) -> None:
     """Persist a module's status to disk."""
     mod_nmbr = call.data.get(FILE_MOD_NMBR, 1)
-    await _primary_hub(call.hass).comm.save_module_status(100 + mod_nmbr)
+    for hub in await _targeted_hubs(call):
+        await hub.comm.save_module_status(100 + mod_nmbr)
 
 
 async def _async_save_router_status(call: ServiceCall) -> None:
     """Persist the router status to disk."""
-    await _primary_hub(call.hass).comm.save_router_status()
+    for hub in await _targeted_hubs(call):
+        await hub.comm.save_router_status()
 
 
 async def _async_update_entity(call: ServiceCall) -> None:
@@ -252,15 +274,15 @@ async def _async_sc_system_command(call: ServiceCall) -> None:
 _ServiceHandler = Callable[[ServiceCall], Coroutine[Any, Any, None]]
 
 _SERVICE_REGISTRY: tuple[tuple[str, _ServiceHandler, vol.Schema], ...] = (
-    (SERVICE_HUB_RESTART, _async_restart_hub, _NO_ARGS_SCHEMA),
-    (SERVICE_HUB_REBOOT, _async_reboot_hub, _NO_ARGS_SCHEMA),
+    (SERVICE_HUB_RESTART, _async_restart_hub, _HUB_TARGET_SCHEMA),
+    (SERVICE_HUB_REBOOT, _async_reboot_hub, _HUB_TARGET_SCHEMA),
     (SERVICE_MOD_RESTART, _async_restart_module, _MOD_RESTART_SCHEMA),
-    (SERVICE_RTR_RESTART, _async_restart_router, _NO_ARGS_SCHEMA),
+    (SERVICE_RTR_RESTART, _async_restart_router, _HUB_TARGET_SCHEMA),
     (SERVICE_SAVE_MODULE_SMC, _async_save_module_smc, _MOD_FILE_SCHEMA),
     (SERVICE_SAVE_MODULE_SMG, _async_save_module_smg, _MOD_FILE_SCHEMA),
-    (SERVICE_SAVE_ROUTER_SMR, _async_save_router_smr, _NO_ARGS_SCHEMA),
+    (SERVICE_SAVE_ROUTER_SMR, _async_save_router_smr, _HUB_TARGET_SCHEMA),
     (SERVICE_SAVE_MODULE_STATUS, _async_save_module_status, _MOD_FILE_SCHEMA),
-    (SERVICE_SAVE_ROUTER_STATUS, _async_save_router_status, _NO_ARGS_SCHEMA),
+    (SERVICE_SAVE_ROUTER_STATUS, _async_save_router_status, _HUB_TARGET_SCHEMA),
     (SERVICE_UPDATE_ENTITY, _async_update_entity, _UPDATE_ENTITY_SCHEMA),
     (
         SERVICE_SC_SYSTEM_COMMAND,

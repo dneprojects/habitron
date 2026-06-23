@@ -4,10 +4,9 @@ from habitron_client import BusMember, Finger, Input, Module
 
 from homeassistant.components.event import EventDeviceClass, EventEntity
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import area_registry as ar, entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
-from homeassistant.util import slugify
 
 from ._helpers import async_assign_entity_area, hbtn_device_info
 from .coordinator import HabitronConfigEntry
@@ -53,7 +52,10 @@ async def async_setup_entry(
         async_add_entities(new_devices)
 
     registry: er.EntityRegistry = er.async_get(hass)
-    area_names = {area.nmbr: slugify(area.name) for area in hbtn_rt.areas}
+    area_reg = ar.async_get(hass)
+    area_ids = {
+        area.nmbr: area_reg.async_get_or_create(area.name).id for area in hbtn_rt.areas
+    }
 
     for hbt_module in hbtn_rt.modules:
         for mod_input in hbt_module.inputs:
@@ -64,7 +66,7 @@ async def async_setup_entry(
                     unique_id=f"Mod_{hbt_module.uid}_evnt{mod_input.nmbr}",
                     area_index=mod_input.area,
                     area_member=hbt_module.area,
-                    area_names=area_names,
+                    area_ids=area_ids,
                 )
 
 

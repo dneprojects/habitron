@@ -63,7 +63,7 @@ class HbtnCoordinator(DataUpdateCoordinator[int]):
             always_update=False,
         )
         self.comm = hbtn_comm
-        self.config = hbtn_comm._config  # noqa: SLF001
+        self.config = entry
         self.rtr_id = 1
         self.previous_devices: set[str] = set()
 

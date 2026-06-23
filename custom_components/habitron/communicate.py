@@ -65,8 +65,7 @@ class HbtnComm:
 
         # Persistent client. Constructed + connected in ``async_setup`` so the
         # blocking DNS lookup that may be needed for the host stays off the
-        # event loop. Replaced wholesale on ``set_host`` (the lib's host is
-        # read-only).
+        # event loop.
         self._client: HabitronClient | None = None
 
         self._hass: HomeAssistant = hass
@@ -194,23 +193,6 @@ class HbtnComm:
     def _convert_mod_id(self, mod_id: int) -> int:
         """Helper to calculate module address."""
         return int(mod_id - 100)
-
-    async def set_host(self, host: str) -> None:
-        """Update host information for integration re-configuration."""
-        self._hass.config_entries.async_update_entry(
-            self._config, data=self._config.options
-        )
-        if self._host_conf == host:
-            return
-        self._host_conf = host
-        self._host = await self._hass.async_add_executor_job(
-            get_host_ip, self._host_conf
-        )
-        # The lib's HabitronClient.host is read-only — replace the instance.
-        await self.async_close()
-        self._client = HabitronClient(self._host, self._port)
-        await self._client.connect()
-        await self._hass.config_entries.async_reload(self._config.entry_id)
 
     async def send_network_info(self, tok: str) -> None:
         """Send home assistant ipv4."""

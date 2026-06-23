@@ -525,33 +525,6 @@ async def test_async_setup_local_host_uses_own_ip() -> None:
     client.connect.assert_awaited()
 
 
-async def test_set_host_reconfigures_and_reloads() -> None:
-    """set_host swaps the client to a freshly resolved host and reloads."""
-    comm = _make_comm("1.2.3.4")
-    comm._hass.async_add_executor_job = AsyncMock(return_value="5.6.7.8")
-    comm._hass.config_entries.async_update_entry = MagicMock()
-    comm._hass.config_entries.async_reload = AsyncMock()
-    new_client = AsyncMock(spec=HabitronClient)
-    with patch(
-        "custom_components.habitron.communicate.HabitronClient",
-        return_value=new_client,
-    ):
-        await comm.set_host("new-host")
-    assert comm._host == "5.6.7.8"
-    new_client.connect.assert_awaited()
-    comm._hass.config_entries.async_reload.assert_awaited_once()
-
-
-async def test_set_host_noop_when_unchanged() -> None:
-    """set_host with the current host neither reconnects nor reloads."""
-    comm = _make_comm("1.2.3.4")
-    comm._host_conf = "same-host"
-    comm._hass.config_entries.async_update_entry = MagicMock()
-    comm._hass.config_entries.async_reload = AsyncMock()
-    await comm.set_host("same-host")
-    comm._hass.config_entries.async_reload.assert_not_called()
-
-
 async def test_get_smhub_info_timeout_reraises() -> None:
     """A timeout during the info fetch is re-raised as HabitronTimeoutError."""
     comm = _make_comm()
