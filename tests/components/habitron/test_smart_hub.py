@@ -12,7 +12,14 @@ from custom_components.habitron.system_health import async_register, system_heal
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
-from .const import MOCK_CONFIG_DATA, MOCK_CONFIG_OPTIONS, MOCK_HOST, MOCK_NAME, MOCK_UID
+from .const import (
+    MOCK_CONFIG_DATA,
+    MOCK_CONFIG_OPTIONS,
+    MOCK_HOST,
+    MOCK_NAME,
+    MOCK_SMHUB_INFO,
+    MOCK_UID,
+)
 
 
 def test_logging_levels_enum_values() -> None:
@@ -82,21 +89,6 @@ def test_smhub_version_property(smart_hub_stub: SmartHub) -> None:
     assert smart_hub_stub.smhub_version == "1.2.3"
 
 
-def _smhub_info() -> dict:
-    """A realistic SmartHub info payload as the client returns it."""
-    return {
-        "software": {"version": "9.9.9", "slug": "habitron_smarthub"},
-        "hardware": {
-            "platform": {"type": "Other"},
-            "network": {
-                "ip": MOCK_HOST,
-                "host": "smarthub",
-                "lan mac": "AA:BB:CC:DD:EE:FF",
-            },
-        },
-    }
-
-
 @pytest.mark.parametrize(
     ("supervisor_token", "expected_conf_url"),
     [
@@ -139,7 +131,7 @@ async def test_setup_registers_hub_device(
 
     client = AsyncMock(spec=HabitronClient)
     client.host = MOCK_HOST
-    client.get_smhub_info = AsyncMock(return_value=_smhub_info())
+    client.get_smhub_info = AsyncMock(return_value=MOCK_SMHUB_INFO)
     client.get_smhub_update = AsyncMock(return_value=None)
     router = Router(uid="rt_1")
     router.modules = []
