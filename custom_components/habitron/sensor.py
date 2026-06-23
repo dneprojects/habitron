@@ -438,12 +438,7 @@ class AnalogSensor(HbtnSensor):
 
     async def async_added_to_hass(self) -> None:
         """Run when this Entity has been added to HA."""
-        # Importantly for a push integration, the module that will be getting updates
-        # needs to notify HA of changes. The dummy device has a registercallback
-        # method, so to this we add the 'self.async_write_ha_state' method, to be
-        # called where ever there are changes.
-        # The call back registration is done once this entity is registered with HA
-        # (rather than in the __init__)
+        # Push subscription: keep HA state in sync whenever the bus member changes.
         await super().async_added_to_hass()
         self.sensor.add_listener(self._handle_coordinator_update)
 
@@ -500,12 +495,7 @@ class EKeySensorId(HbtnSensor):
 
     async def async_added_to_hass(self) -> None:
         """Run when this Entity has been added to HA."""
-        # Importantly for a push integration, the module that will be getting updates
-        # needs to notify HA of changes. The dummy device has a registercallback
-        # method, so to this we add the 'self.async_write_ha_state' method, to be
-        # called where ever there are changes.
-        # The call back registration is done once this entity is registered with HA
-        # (rather than in the __init__)
+        # Push subscription: keep HA state in sync whenever the bus member changes.
         await super().async_added_to_hass()
         self.sensor.add_listener(self._handle_coordinator_update)
 
@@ -535,12 +525,7 @@ class EKeySensorFngr(HbtnSensor):
 
     async def async_added_to_hass(self) -> None:
         """Run when this Entity has been added to HA."""
-        # Importantly for a push integration, the module that will be getting updates
-        # needs to notify HA of changes. The dummy device has a registercallback
-        # method, so to this we add the 'self.async_write_ha_state' method, to be
-        # called where ever there are changes.
-        # The call back registration is done once this entity is registered with HA
-        # (rather than in the __init__)
+        # Push subscription: keep HA state in sync whenever the bus member changes.
         await super().async_added_to_hass()
         self.sensor.add_listener(self._handle_coordinator_update)
 
@@ -668,12 +653,7 @@ class LogicSensorPush(LogicSensor):
 
     async def async_added_to_hass(self) -> None:
         """Run when this Entity has been added to HA."""
-        # Importantly for a push integration, the module that will be getting updates
-        # needs to notify HA of changes. The dummy device has a registercallback
-        # method, so to this we add the 'self.async_write_ha_state' method, to be
-        # called where ever there are changes.
-        # The call back registration is done once this entity is registered with HA
-        # (rather than in the __init__)
+        # Push subscription: keep HA state in sync whenever the bus member changes.
         await super().async_added_to_hass()
         self.logic.add_listener(self._handle_coordinator_update)
 
