@@ -11,8 +11,8 @@
   "documentation": "https://github.com/dneprojects/habitron",
   "integration_type": "hub",
   "iot_class": "local_push",
-  "loggers": ["habitron_client"],
   "issue_tracker": "https://github.com/dneprojects/habitron/issues",
+  "loggers": ["habitron_client"],
   "requirements": [
     "habitron_client==2.0.7"
   ],
@@ -21,5 +21,5 @@
       "st": "urn:habitron-com:device:SmartHub:1"
     }
   ],
-  "version": "3.1.0b4"
+  "version": "3.1.0b5"
 }
