@@ -1,5 +1,19 @@
 # Latest changes
 
+## v3.1.0b3 (beta)
+
+### Fixed
+- **APK upload to the SC Touch** failed with an invalid-scheme error: the
+  firmware download URL was built from `hass.config.internal_url`, which is
+  `None` unless explicitly configured, producing a scheme-less address the
+  Touch app rejects. URLs are now built via `get_url`, which always returns an
+  absolute URL (internal, auto-detected, or external). The same fix applies to
+  media-player artwork and TTS/media URLs.
+
+### Changed
+- Added public-surface tests (notify/text/diagnostics, system command + WebRTC
+  platforms, hub setup via the config-entry path) and a shared setup fixture.
+
 ## v3.1.0b2 (beta)
 
 Further code-review fixes ported from the core review.
