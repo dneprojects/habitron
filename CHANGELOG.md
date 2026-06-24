@@ -1,5 +1,12 @@
 # Latest changes
 
+## v3.1.0b5 (beta)
+
+### Fixed
+- **HACS/hassfest manifest validation**: ordered the manifest keys correctly
+  (`domain`, `name`, then alphabetical) — `loggers` had been placed before
+  `issue_tracker`, which hassfest rejects.
+
 ## v3.1.0b4 (beta)
 
 ### Fixed
