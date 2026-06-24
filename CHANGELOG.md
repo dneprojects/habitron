@@ -1,5 +1,13 @@
 # Latest changes
 
+## v3.1.0b4 (beta)
+
+### Fixed
+- **HACS/hassfest manifest validation**: removed the `homeassistant` key from
+  `manifest.json`. That key is not allowed for custom integrations (it is
+  core-only) and made hassfest reject the manifest. The minimum Home Assistant
+  version is already declared in `hacs.json` (`2026.4.0`).
+
 ## v3.1.0b3 (beta)
 
 ### Fixed
