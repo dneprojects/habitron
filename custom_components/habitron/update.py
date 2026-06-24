@@ -19,6 +19,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.network import NoURLAvailableError, get_url
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from ._axml import read_apk_version_name
@@ -240,15 +241,23 @@ class SCTouchAppUpdate(UpdateEntity):
         """
         source_file = self.firmware_dir / filename
 
+        # Resolve a fully-qualified base URL (with scheme) for the client to
+        # download from. ``hass.config.internal_url`` is ``None`` unless the
+        # user explicitly set one, which would yield a scheme-less URL the
+        # Touch app rejects; ``get_url`` always returns an absolute URL.
+        try:
+            base_url = get_url(self._hass)
+        except NoURLAvailableError:
+            _LOGGER.error("No Home Assistant URL available to serve firmware")
+            return None, None
+
         def _hash_job() -> tuple[str | None, str | None]:
             try:
                 sha256 = hashlib.sha256()
                 with source_file.open("rb") as f:
                     for chunk in iter(lambda: f.read(65536), b""):
                         sha256.update(chunk)
-                url = (
-                    f"{self._hass.config.internal_url}{_FIRMWARE_URL_PREFIX}/{filename}"
-                )
+                url = f"{base_url}{_FIRMWARE_URL_PREFIX}/{filename}"
                 return url, sha256.hexdigest()
             except Exception:
                 _LOGGER.exception("Error hashing file %s", filename)

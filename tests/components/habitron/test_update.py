@@ -1,5 +1,7 @@
 """Tests for the Habitron update platform (habitron_client v2 model)."""
 
+import hashlib
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from habitron_client import Module, Router
@@ -102,6 +104,45 @@ async def test_sctouch_app_install_without_version_raises() -> None:
     entity._attr_latest_version = None
     with pytest.raises(HomeAssistantError):
         await entity.async_install(None, backup=False)
+
+
+async def test_sctouch_app_install_sends_absolute_url(
+    hass: HomeAssistant, tmp_path: Path
+) -> None:
+    """A successful install sends a fully-qualified URL with a scheme.
+
+    Regression guard: the URL must come from ``get_url`` (always absolute),
+    not from ``hass.config.internal_url`` which is ``None`` unless configured
+    and would otherwise yield a scheme-less address the Touch app rejects.
+    """
+    apk = tmp_path / "sctouch_v1.3.0.apk"
+    apk.write_bytes(b"payload")
+    expected_checksum = hashlib.sha256(b"payload").hexdigest()
+
+    module = Module(uid="MOD-T", addr=104, typ=b"\x01\x04", name="Touch")
+    smhub = _smhub()
+    smhub.hass = hass
+    provider = MagicMock()
+    provider.active_ws_connections = {"": True}
+    provider.async_send_json_message = AsyncMock()
+    smhub.ws_provider = provider
+
+    entity = SCTouchAppUpdate(module, smhub)
+    entity.firmware_dir = tmp_path
+    entity._attr_latest_version = "1.3.0"
+    entity._latest_apk_filename = "sctouch_v1.3.0.apk"
+
+    with patch(
+        "custom_components.habitron.update.get_url",
+        return_value="http://ha.local:8123",
+    ):
+        await entity.async_install("1.3.0", backup=False)
+
+    provider.async_send_json_message.assert_awaited_once()
+    _stream, message = provider.async_send_json_message.await_args.args
+    payload = message["payload"]
+    assert payload["url"] == "http://ha.local:8123/habitron-firmware/sctouch_v1.3.0.apk"
+    assert payload["checksum"] == expected_checksum
 
 
 # ---------------------------------------------------------------------------
