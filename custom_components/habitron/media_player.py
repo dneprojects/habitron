@@ -22,6 +22,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.helpers.network import NoURLAvailableError, get_url
 from homeassistant.helpers.restore_state import RestoreEntity
 
 from ._helpers import hbtn_device_info
@@ -343,6 +344,26 @@ class HbtnMediaPlayer(MediaPlayerEntity, RestoreEntity):
             self._poll_remove = None
             _LOGGER.debug("[%s] Stopped proxy metadata polling", self.entity_id)
 
+    def _to_absolute_url(self, url: str) -> str:
+        """Turn a relative HA URL into an absolute one with a scheme.
+
+        ``hass.config.internal_url`` is ``None`` unless explicitly configured,
+        which would produce a scheme-less URL the client cannot resolve.
+        ``get_url`` always yields an absolute URL; if none is available the
+        relative URL is returned unchanged as a best-effort fallback.
+        """
+        if not url.startswith("/"):
+            return url
+        try:
+            return f"{get_url(self.hass)}{url}"
+        except NoURLAvailableError:
+            _LOGGER.warning(
+                "[%s] No Home Assistant URL available to resolve %s",
+                self.entity_id,
+                url,
+            )
+            return url
+
     async def _extract_metadata(
         self, media_id: str, kwargs: dict[str, Any]
     ) -> dict[str, Any]:
@@ -398,9 +419,7 @@ class HbtnMediaPlayer(MediaPlayerEntity, RestoreEntity):
             "artist": artist,
         }
         if artwork_url:
-            if artwork_url.startswith("/"):
-                artwork_url = f"{self.hass.config.internal_url}{artwork_url}"
-            client_metadata["entity_picture"] = artwork_url
+            client_metadata["entity_picture"] = self._to_absolute_url(artwork_url)
 
         return client_metadata
 
@@ -504,11 +523,8 @@ class HbtnMediaPlayer(MediaPlayerEntity, RestoreEntity):
 
             # Make it an absolute URL if it's relative
             # (e.g., /api/tts_proxy/... -> http://<ha_ip>:8123/api/tts_proxy/...)
-            if url.startswith("/"):
-                return f"{self.hass.config.internal_url}{url}"
-
             # If it's already absolute (e.g., from a radio stream), return as is.
-            return url
+            return self._to_absolute_url(url)
 
         # If it's not a media-source URL (e.g., a direct http:// URL),
         # return it as is.

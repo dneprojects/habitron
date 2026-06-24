@@ -449,13 +449,16 @@ async def test_extract_metadata_browse_exception_logged_and_continued() -> None:
 
 
 async def test_extract_metadata_relative_artwork_becomes_absolute() -> None:
-    """A leading-slash artwork URL is prefixed with ``hass.config.internal_url``."""
+    """A leading-slash artwork URL is made absolute via ``get_url``."""
     player = _make_player()
-    player.hass.config.internal_url = "http://ha.local"
     kwargs = {
         "extra": {"metadata": {"title": "T", "artist": "A", "imageUrl": "/art.png"}}
     }
-    out = await player._extract_metadata("http://x", kwargs)
+    with patch(
+        "custom_components.habitron.media_player.get_url",
+        return_value="http://ha.local",
+    ):
+        out = await player._extract_metadata("http://x", kwargs)
     assert out["entity_picture"] == "http://ha.local/art.png"
 
 
@@ -477,12 +480,17 @@ async def test_async_browse_media_filters_audio() -> None:
 async def test_process_media_id_resolves_media_source() -> None:
     """A media-source URI is resolved + absolutised."""
     player = _make_player()
-    player.hass.config.internal_url = "http://ha.local"
     resolved = MagicMock()
     resolved.url = "/api/tts_proxy/abc"
-    with patch(
-        "custom_components.habitron.media_player.media_source.async_resolve_media",
-        new=AsyncMock(return_value=resolved),
+    with (
+        patch(
+            "custom_components.habitron.media_player.media_source.async_resolve_media",
+            new=AsyncMock(return_value=resolved),
+        ),
+        patch(
+            "custom_components.habitron.media_player.get_url",
+            return_value="http://ha.local",
+        ),
     ):
         out = await player._process_media_id("media-source://tts/abc")
     assert out == "http://ha.local/api/tts_proxy/abc"
