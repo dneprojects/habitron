@@ -1,21 +1,31 @@
 # Latest changes
 
-## v3.1.0b5 (beta)
+## v3.1.0
 
-### Fixed
-- **HACS/hassfest manifest validation**: ordered the manifest keys correctly
-  (`domain`, `name`, then alphabetical) — `loggers` had been placed before
-  `issue_tracker`, which hassfest rejects.
+Pulls in `habitron_client==2.0.7` and ports the latest code-review improvements
+(previously released as betas v3.1.0b1–b5).
 
-## v3.1.0b4 (beta)
-
-### Fixed
-- **HACS/hassfest manifest validation**: removed the `homeassistant` key from
-  `manifest.json`. That key is not allowed for custom integrations (it is
-  core-only) and made hassfest reject the manifest. The minimum Home Assistant
-  version is already declared in `hacs.json` (`2026.4.0`).
-
-## v3.1.0b3 (beta)
+### Changed
+- **eKey finger-name sensor** now reports stable enum keys instead of hardcoded
+  German text, with localized labels (en/de) supplied via translations
+  (`SensorDeviceClass.ENUM`). ⚠ The entity **state values change** (e.g.
+  `left_thumb` instead of "Daumen links"); the displayed label stays localized.
+- Hub-acting services (`hub_restart`, `mod_restart`, `save_*`, …) accept an
+  optional **device** target to pick a specific SmartHub. With a single
+  configured hub the device may be omitted, so existing single-hub automations
+  keep working unchanged.
+- `.smc` module-definition formatting moved into the library
+  (`get_module_definitions_smc`), with length validation against truncated
+  responses.
+- Diagnostics use public `SmartHub` properties (`smhub_type`/`smhub_name`)
+  instead of private attributes.
+- Routine setup logging downgraded from info to debug.
+- Removed the unused `set_host` reconfiguration path (reconfiguration runs
+  through the config flow's reload).
+- Added public-surface tests (notify/text/diagnostics, system command + WebRTC
+  platforms, hub setup via the config-entry path) and a shared setup fixture.
+- Minor cleanups: coordinator uses the config entry directly; corrected internal
+  comments and copy-paste property docstrings.
 
 ### Fixed
 - **APK upload to the SC Touch** failed with an invalid-scheme error: the
@@ -24,55 +34,20 @@
   Touch app rejects. URLs are now built via `get_url`, which always returns an
   absolute URL (internal, auto-detected, or external). The same fix applies to
   media-player artwork and TTS/media URLs.
-
-### Changed
-- Added public-surface tests (notify/text/diagnostics, system command + WebRTC
-  platforms, hub setup via the config-entry path) and a shared setup fixture.
-
-## v3.1.0b2 (beta)
-
-Further code-review fixes ported from the core review.
-
-### Fixed
 - **Entity area assignment** now resolves each Habitron area to its real HA
   area-registry id (creating the area when needed) instead of a slugified name.
   A slugified name does not reliably match an area id (renames, umlauts,
   duplicate names), so entities could end up with a dangling area. Applies to
   **all** entity platforms.
-- Diagnostic "lan" icon now reflects the current value (it lagged one update).
-- Module-number service fields reject out-of-range values (only 1..64).
-
-### Changed
-- Hub-acting services (`hub_restart`, `mod_restart`, `save_*`, …) accept an
-  optional **device** target to pick a specific SmartHub. With a single
-  configured hub the device may be omitted, so existing single-hub automations
-  keep working unchanged.
-- Removed the unused `set_host` reconfiguration path (reconfiguration runs
-  through the config flow's reload).
-- Minor cleanups: coordinator uses the config entry directly; corrected internal
-  comments.
-
-## v3.1.0b1 (beta)
-
-Pulls in `habitron_client==2.0.7` and ports the latest code-review improvements.
-
-### Changed
-- **eKey finger-name sensor** now reports stable enum keys instead of hardcoded
-  German text, with localized labels (en/de) supplied via translations
-  (`SensorDeviceClass.ENUM`). ⚠ The entity **state values change** (e.g.
-  `left_thumb` instead of "Daumen links"); the displayed label stays localized.
-- `.smc` module-definition formatting moved into the library
-  (`get_module_definitions_smc`), with length validation against truncated
-  responses.
-- Diagnostics use public `SmartHub` properties (`smhub_type`/`smhub_name`)
-  instead of private attributes.
-- Routine setup logging downgraded from info to debug.
-
-### Fixed
 - Duplicate `unique_id` for described router sensors (timeout/current/voltage all
   shared `…_snsr0`); each now appends its description key.
 - `PARALLEL_UPDATES = 0` for the read-only, push-driven sensor platform.
-- Corrected copy-paste property docstrings.
+- Diagnostic "lan" icon now reflects the current value (it lagged one update).
+- Module-number service fields reject out-of-range values (only 1..64).
+- **HACS/hassfest manifest validation**: removed the core-only `homeassistant`
+  key and ordered the keys correctly (`domain`, `name`, then alphabetical), so
+  hassfest accepts the manifest. The minimum Home Assistant version is declared
+  in `hacs.json` (`2026.4.0`).
 
 ## v3.0.2
 
