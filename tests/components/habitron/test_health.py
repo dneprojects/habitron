@@ -62,9 +62,10 @@ async def test_fault_mask_change_refreshes_issue(hass: HomeAssistant) -> None:
 
     module.health.value = 0x01  # F1 only
     module.health.notify()
-    assert "F16" not in reg.async_get_issue(DOMAIN, issue_id).translation_placeholders[
-        "faults"
-    ]
+    assert (
+        "F16"
+        not in reg.async_get_issue(DOMAIN, issue_id).translation_placeholders["faults"]
+    )
 
     module.health.value = 0x10  # now F16 only
     module.health.notify()

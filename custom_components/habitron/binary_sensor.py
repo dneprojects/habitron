@@ -52,9 +52,7 @@ async def async_setup_entry(
                 )
         if hbt_module.mod_type == "Smart Controller Touch":
             new_devices.append(ListeningStatusSensor(hbt_module))
-        new_devices.append(
-            ModuleHealthSensor(hbt_module, hbtn_cord, len(new_devices))
-        )
+        new_devices.append(ModuleHealthSensor(hbt_module, hbtn_cord, len(new_devices)))
     for rt_stat in hbtn_rt.states:
         new_devices.append(HbtnState(rt_stat, hbtn_rt, hbtn_cord, len(new_devices)))
 
