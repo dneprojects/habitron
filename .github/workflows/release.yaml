@@ -72,7 +72,7 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           # Look for header "## VERSION" or "## vVERSION" and take all
           # lines until the next "## " header.
-          awk "/^## v?$VERSION/{flag=1; next} /^## /{flag=0} flag" changelog.md > release_notes.md
+          awk "/^## v?$VERSION/{flag=1; next} /^## /{flag=0} flag" CHANGELOG.md > release_notes.md
 
           # Fallback if the version isn't in the changelog yet.
           if [ ! -s release_notes.md ]; then
