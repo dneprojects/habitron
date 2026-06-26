@@ -473,7 +473,6 @@
     },
     "module_fault": {
       "title": "Habitron module {module} reports a fault",
-      "description": "The Habitron module \"{module}\" reported one or more operate-mode faults:\n\n{faults}\n\nCheck the module's power, wiring and bus connection. This issue clears automatically once the SmartHub reports the module fault-free again.",
       "fix_flow": {
         "step": {
           "confirm_restart": {
