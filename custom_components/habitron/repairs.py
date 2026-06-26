@@ -17,10 +17,9 @@ between raising the issue and opening the flow is handled correctly.
 from habitron_client import Module, Router, decode_module_faults
 import voluptuous as vol
 
-from homeassistant.components.repairs import RepairsFlow
+from homeassistant.components.repairs import RepairsFlow, RepairsFlowResult
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
-from homeassistant.data_entry_flow import FlowResult
 
 from .coordinator import HabitronConfigEntry
 from .smart_hub import SmartHub
@@ -85,7 +84,7 @@ class ModuleFaultRepairFlow(RepairsFlow):
 
     async def async_step_init(
         self, user_input: dict[str, str] | None = None
-    ) -> FlowResult:
+    ) -> RepairsFlowResult:
         """Pick the recovery step from the module's current fault mask."""
         resolved = _resolve_module(self.hass, self._data)
         if resolved is None:
@@ -102,7 +101,7 @@ class ModuleFaultRepairFlow(RepairsFlow):
 
     async def async_step_confirm_restart(
         self, user_input: dict[str, str] | None = None
-    ) -> FlowResult:
+    ) -> RepairsFlowResult:
         """Offer a plain module restart for a reachable, faulty module."""
         resolved = _resolve_module(self.hass, self._data)
         if resolved is None:
@@ -122,7 +121,7 @@ class ModuleFaultRepairFlow(RepairsFlow):
 
     async def async_step_confirm_power_cycle(
         self, user_input: dict[str, str] | None = None
-    ) -> FlowResult:
+    ) -> RepairsFlowResult:
         """Offer a channel power cycle for an unreachable module (F1)."""
         resolved = _resolve_module(self.hass, self._data)
         if resolved is None:

@@ -473,7 +473,6 @@
     },
     "module_fault": {
       "title": "Habitron-Modul {module} meldet einen Fehler",
-      "description": "Das Habitron-Modul \"{module}\" meldet einen oder mehrere Fehler im Betriebsmodus:\n\n{faults}\n\nPrüfe Stromversorgung, Verkabelung und Busanbindung des Moduls. Der Hinweis verschwindet automatisch, sobald der SmartHub das Modul wieder als fehlerfrei meldet.",
       "fix_flow": {
         "step": {
           "confirm_restart": {
