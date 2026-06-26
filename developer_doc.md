@@ -4,6 +4,59 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.1.1
+
+Pulls in `habitron_client==2.0.8` and surfaces the SmartHub's new per-module
+operate-mode fault detection.
+
+### Added
+- **Per-module health.** The SmartHub now fires a `SYS_ERR` (event type 16) HA
+  event **per module** (`mod_id > 0`) whose `arg1` is a one-byte fault bitmask
+  (`arg2` reserved). The library applies it to a new notifiable
+  `Module.health` member (`habitron_client` ≥ 2.0.8) and exposes
+  `decode_module_faults()` / `ModuleFault`, mapping the bitmask to display codes
+  and labels. The bit layout is the fixed contract shared with the SmartHub
+  firmware (`0x08` reserved):
+
+  | bit | code | label |
+  | --- | --- | --- |
+  | `0x01` | F1 | Timeout Modulkommunikation |
+  | `0x02` | F2 | Fehler Modulkommunikation |
+  | `0x04` | F4 | Abspeicherfehler |
+  | `0x10` | F16 | Fehler Leistungsteil |
+  | `0x20` | F32 | Fehler Ekey/GSM-Kommunikation |
+  | `0x40` | F3 | Weiterleitungstabelle nicht geheilt |
+  | `0x80` | F5 | Spiegelung gestört |
+
+- **`ModuleHealthSensor`** (`binary_sensor`, `problem` device class, diagnostic
+  category) bound to `module.health`; the active `fault_codes` and `faults`
+  (code + label) are exposed as attributes. `arg1 == 0` means the module is
+  healthy again.
+- **Repairs issue per module** (`health.py`): `async_setup_module_health_issues`
+  subscribes each `module.health` member and mirrors it into a `module_fault`
+  repair issue (stable id `module_fault_<module-uid>`, severity ERROR, the fault
+  list passed as a translation placeholder, `is_persistent=False` so the user can
+  also Ignore it). `arg1 == 0` deletes the issue. The subscription is independent
+  of the diagnostic entity so faults are tracked even when that entity is
+  disabled. The issue carries `{entry_id, module_uid}` in its `data` for the fix
+  flow.
+- **Fixable repair flow** (`repairs.py`, `ModuleFaultRepairFlow`): the issue is
+  `is_fixable=True` and offers a recovery action picked from the module's *live*
+  fault mask at click time:
+  - **F1 (comm timeout, `0x01`) set** → the module is unreachable on the bus, so
+    a restart command would not arrive. Step `confirm_power_cycle` offers a
+    **channel power cycle** (`comm.async_power_cycle_channel`) and warns that the
+    whole channel (pair) drops, listing the co-located modules from
+    `router.chan_list`. F1 takes precedence even when combined with other bits.
+  - **otherwise** → step `confirm_restart` offers a plain
+    **module restart** (`comm.module_restart(module.addr)`).
+  - The flow re-reads the model on every step: a cleared mask completes the flow
+    (HA drops the issue), an unloaded hub / removed module aborts
+    (`module_unavailable`), an unmapped channel aborts (`channel_unknown`).
+
+The existing global router `SYS_ERR` path (`mod_id == 0`, router system-error
+state / `router_system_error` issue) keeps its own contract and is untouched.
+
 ## v3.1.0
 
 Pulls in `habitron_client==2.0.7` and ports the latest code-review improvements

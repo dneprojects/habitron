@@ -3,6 +3,9 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.1.1
+- New: per-module health sensor and a repair with one-click recovery (module restart, or channel power cycle when the module is unreachable) for SmartHub operate-mode faults.
+
 ## v3.1.0
 - New: hub actions (restart, save, …) can target a specific SmartHub in multi-hub setups.
 - ⚠ eKey finger-name sensor: state values changed (the displayed label stays localized).

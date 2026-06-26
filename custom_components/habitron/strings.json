@@ -77,6 +77,9 @@
       },
       "listening_status": {
         "name": "Listening status"
+      },
+      "module_health": {
+        "name": "Health"
       }
     },
     "button": {
@@ -467,6 +470,26 @@
     "router_system_error": {
       "title": "Router system error",
       "description": "The Habitron router detected an error, e.g. a module communication error."
+    },
+    "module_fault": {
+      "title": "Habitron module {module} reports a fault",
+      "description": "The Habitron module \"{module}\" reported one or more operate-mode faults:\n\n{faults}\n\nCheck the module's power, wiring and bus connection. This issue clears automatically once the SmartHub reports the module fault-free again.",
+      "fix_flow": {
+        "step": {
+          "confirm_restart": {
+            "title": "Restart module {module}?",
+            "description": "Module \"{module}\" reported the following fault(s):\n\n{faults}\n\nRestarting reboots only this module and may clear a transient fault. Press Submit to restart it now. If that does not help, check the module's hardware and wiring — or ignore this notification on the repair card."
+          },
+          "confirm_power_cycle": {
+            "title": "Power-cycle channel {channel}?",
+            "description": "Module \"{module}\" reports a communication timeout (F1) and can no longer be reached on the bus — a module restart command would not arrive. The only remaining remote action is a power cycle of router channel {channel}.\n\n⚠ Coarse action: this briefly cuts power to the whole channel (and its coupled channel pair), so every other module on that channel is reset as well:\n\n{others}\n\nMake sure this is safe right now (covers, lights and climate on these modules will briefly drop). Press Submit to power down channel {channel} and switch it back on."
+          }
+        },
+        "abort": {
+          "module_unavailable": "The module is no longer available (the hub was unloaded or the module was removed). The notification will be cleared.",
+          "channel_unknown": "The module could not be mapped to a router channel, so a power cycle is not possible. Try a manual power reset at the SmartHub."
+        }
+      }
     }
   },
   "device_automation": {

@@ -77,6 +77,9 @@
       },
       "listening_status": {
         "name": "Mikrofonstatus"
+      },
+      "module_health": {
+        "name": "Zustand"
       }
     },
     "button": {
@@ -467,6 +470,26 @@
     "router_system_error": {
       "title": "Router-Systemfehler",
       "description": "Der Habitron-Router hat einen Fehler festgestellt, z. B. einen Kommunikationsfehler mit einem Modul."
+    },
+    "module_fault": {
+      "title": "Habitron-Modul {module} meldet einen Fehler",
+      "description": "Das Habitron-Modul \"{module}\" meldet einen oder mehrere Fehler im Betriebsmodus:\n\n{faults}\n\nPrüfe Stromversorgung, Verkabelung und Busanbindung des Moduls. Der Hinweis verschwindet automatisch, sobald der SmartHub das Modul wieder als fehlerfrei meldet.",
+      "fix_flow": {
+        "step": {
+          "confirm_restart": {
+            "title": "Modul {module} neu starten?",
+            "description": "Modul „{module}“ meldet folgende Störung(en):\n\n{faults}\n\nEin Neustart betrifft nur dieses Modul und kann eine vorübergehende Störung beheben. Mit „Absenden“ wird das Modul jetzt neu gestartet. Hilft das nicht, prüfe Hardware und Verkabelung – oder ignoriere die Meldung über die Reparaturkarte."
+          },
+          "confirm_power_cycle": {
+            "title": "Spannungsreset für Kanal {channel}?",
+            "description": "Modul „{module}“ meldet einen Kommunikations-Timeout (F1) und ist über den Bus nicht mehr erreichbar – ein Modul-Neustart-Befehl käme dort nicht an. Die einzige verbleibende Fernmaßnahme ist ein Spannungsreset von Router-Kanal {channel}.\n\n⚠ Grobe Maßnahme: Dabei wird kurzzeitig die Spannung des gesamten Kanals (bzw. des gekoppelten Kanalpaars) abgeschaltet. Alle weiteren Module an diesem Kanal werden dadurch ebenfalls zurückgesetzt:\n\n{others}\n\nStelle sicher, dass das gerade unkritisch ist (Rollläden, Licht und Klima dieser Module fallen kurz aus). Mit „Absenden“ wird Kanal {channel} spannungsfrei geschaltet und wieder eingeschaltet."
+          }
+        },
+        "abort": {
+          "module_unavailable": "Das Modul ist nicht mehr verfügbar (der Hub wurde entladen oder das Modul entfernt). Die Meldung wird entfernt.",
+          "channel_unknown": "Das Modul konnte keinem Router-Kanal zugeordnet werden, daher ist ein Spannungsreset nicht möglich. Führe den Spannungsreset ggf. manuell am SmartHub durch."
+        }
+      }
     }
   },
   "device_automation": {
