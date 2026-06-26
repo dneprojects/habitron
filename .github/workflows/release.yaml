@@ -45,6 +45,13 @@ jobs:
           VERSION=$(jq -r '.version' custom_components/habitron/manifest.json)
           echo "Version found: $VERSION"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          # A version with any letter (e.g. 3.1.1b1, 3.1.1rc1) is a pre-release,
+          # so HACS only offers it to users who opted into betas.
+          if echo "$VERSION" | grep -qE '[a-zA-Z]'; then
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Check if tag exists
         id: check_tag
@@ -87,6 +94,6 @@ jobs:
           name: Release v${{ steps.version.outputs.version }}
           body_path: release_notes.md
           draft: false
-          prerelease: false
+          prerelease: ${{ steps.version.outputs.prerelease }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
