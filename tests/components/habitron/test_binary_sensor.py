@@ -9,6 +9,7 @@ from custom_components.habitron.binary_sensor import (
     InputSwitch,
     InputSwitchPush,
     ListeningStatusSensor,
+    ModuleHealthSensor,
     MotionSensor,
     RainSensor,
     async_setup_entry,
@@ -147,6 +148,52 @@ def test_hbtn_state_reflects_flag_value() -> None:
 
 
 # ---------------------------------------------------------------------------
+# ModuleHealthSensor (per-module operate-mode faults)
+# ---------------------------------------------------------------------------
+
+
+def test_module_health_sensor_state_and_attributes() -> None:
+    """ModuleHealthSensor reflects the fault mask and lists active faults."""
+    module = _module()
+    entity = ModuleHealthSensor(module, MagicMock(), 0)
+    assert entity.unique_id == "Mod_MOD-1_health"
+    assert ("habitron", "MOD-1") in entity.device_info["identifiers"]
+    # Healthy: off, no faults.
+    assert entity.is_on is False
+    assert entity.extra_state_attributes == {"fault_codes": [], "faults": []}
+    # F1 (0x01) + F16 (0x10) active.
+    module.health.value = 0x11
+    assert entity.is_on is True
+    assert entity.extra_state_attributes["fault_codes"] == ["F1", "F16"]
+    assert entity.extra_state_attributes["faults"] == [
+        "F1: Timeout Modulkommunikation",
+        "F16: Fehler Leistungsteil",
+    ]
+
+
+async def test_module_health_push_listener_lifecycle() -> None:
+    """ModuleHealthSensor subscribes/unsubscribes the health listener."""
+    module = _module()
+    entity = ModuleHealthSensor(module, MagicMock(), 0)
+    with (
+        patch(
+            "homeassistant.helpers.update_coordinator."
+            "CoordinatorEntity.async_added_to_hass",
+            new=AsyncMock(),
+        ),
+        patch(
+            "homeassistant.helpers.update_coordinator."
+            "CoordinatorEntity.async_will_remove_from_hass",
+            new=AsyncMock(),
+        ),
+    ):
+        await entity.async_added_to_hass()
+        assert len(module.health._listeners) == 1
+        await entity.async_will_remove_from_hass()
+        assert len(module.health._listeners) == 0
+
+
+# ---------------------------------------------------------------------------
 # ListeningStatusSensor
 # ---------------------------------------------------------------------------
 
@@ -204,6 +251,7 @@ async def test_async_setup_entry_emits_entities(hass: HomeAssistant) -> None:
     assert any(isinstance(e, MotionSensor) for e in added)
     assert any(isinstance(e, RainSensor) for e in added)
     assert any(isinstance(e, ListeningStatusSensor) for e in added)
+    assert any(isinstance(e, ModuleHealthSensor) for e in added)
     assert any(isinstance(e, HbtnState) for e in added)
 
 

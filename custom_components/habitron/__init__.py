@@ -10,6 +10,7 @@ from homeassistant.helpers.device_registry import DeviceEntry
 
 from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
+from .health import async_setup_module_health_issues
 from .services import async_remove_services, async_setup_services
 from .smart_hub import SmartHub
 from .system_health import system_health_info  # noqa: F401
@@ -51,6 +52,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: HabitronConfigEntry) -> 
         entry.async_on_unload(entry.add_update_listener(update_listener))
 
         _async_cleanup_stale_devices(hass, entry, smhub)
+
+        # Mirror per-module operate-mode faults (SYS_ERR) into repairs issues.
+        async_setup_module_health_issues(hass, entry, smhub)
 
         # Services live on the domain, not on the entry. The helper is
         # idempotent so subsequent entries are a no-op.

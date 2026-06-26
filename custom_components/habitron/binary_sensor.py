@@ -1,6 +1,6 @@
 """Platform for switch integration."""
 
-from habitron_client import BusMember, Flag, Module, Router
+from habitron_client import BusMember, Flag, Module, Router, decode_module_faults
 
 # Import the device class from the component that you want to support
 from homeassistant.components.binary_sensor import (
@@ -52,6 +52,9 @@ async def async_setup_entry(
                 )
         if hbt_module.mod_type == "Smart Controller Touch":
             new_devices.append(ListeningStatusSensor(hbt_module))
+        new_devices.append(
+            ModuleHealthSensor(hbt_module, hbtn_cord, len(new_devices))
+        )
     for rt_stat in hbtn_rt.states:
         new_devices.append(HbtnState(rt_stat, hbtn_rt, hbtn_cord, len(new_devices)))
 
@@ -288,6 +291,63 @@ class HbtnState(CoordinatorEntity[HbtnCoordinator], BinarySensorEntity):
         """Handle updated data from the coordinator."""
         self._on_state = self._state.value == 1
         self.async_write_ha_state()
+
+
+class ModuleHealthSensor(CoordinatorEntity[HbtnCoordinator], BinarySensorEntity):
+    """Per-module operate-mode health, fed by SmartHub ``SYS_ERR`` events.
+
+    Bound to ``module.health`` (a one-byte fault bitmask, 0 = healthy). The
+    entity is a diagnostic ``problem`` sensor; the active fault codes/labels are
+    exposed as attributes. The user-facing "needs attention" surface is the
+    repairs issue raised alongside it (see ``health.py``).
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "module_health"
+    _attr_device_class = BinarySensorDeviceClass.PROBLEM
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(
+        self,
+        module: Module,
+        coord: HbtnCoordinator,
+        idx: int,
+    ) -> None:
+        """Initialize the health sensor, pass coordinator to CoordinatorEntity."""
+        super().__init__(coord, context=idx)
+        self.idx: int = idx
+        self._module: Module = module
+        self._health: BusMember = module.health
+        self._attr_unique_id: str = f"Mod_{module.uid}_health"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return information to link this entity with the correct device."""
+        return hbtn_device_info(self._module.uid)
+
+    @property
+    def is_on(self) -> bool:
+        """Return True while the module reports at least one fault."""
+        return self._module.health.value != 0
+
+    @property
+    def extra_state_attributes(self) -> dict[str, list[str]]:
+        """Expose the active fault codes and their labels."""
+        faults = decode_module_faults(self._module.health.value)
+        return {
+            "fault_codes": [fault.code for fault in faults],
+            "faults": [f"{fault.code}: {fault.label}" for fault in faults],
+        }
+
+    async def async_added_to_hass(self) -> None:
+        """Subscribe to the health member's push updates."""
+        await super().async_added_to_hass()
+        self._health.add_listener(self.async_write_ha_state)
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Unsubscribe the health listener."""
+        self._health.remove_listener(self.async_write_ha_state)
+        await super().async_will_remove_from_hass()
 
 
 class ListeningStatusSensor(BinarySensorEntity):
