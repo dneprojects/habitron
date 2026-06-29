@@ -328,10 +328,17 @@ class HbtnSensorEntityDescription(SensorEntityDescription):
     ``diag_check`` enables the common pattern of falling back to a hidden
     diagnostic entity when the underlying descriptor's ``type`` field is
     flagged as diagnostic.
+
+    ``disambiguate`` appends the description ``key`` to the unique_id. It is
+    only needed for router-level streams (timeout/current/voltage) that share
+    the same ``nmbr`` and would otherwise collide. Per-module sensors have a
+    distinct ``nmbr`` and MUST keep the bare ``Mod_{uid}_snsr{nmbr}`` id so
+    their entity_ids stay stable (see _async_restore_legacy_sensor_ids).
     """
 
     value_fn: Callable[[Any, int], Any]
     diag_check: bool = False
+    disambiguate: bool = False
 
 
 class HbtnDescribedSensor(HbtnSensor):
@@ -350,11 +357,14 @@ class HbtnDescribedSensor(HbtnSensor):
         """Initialize the described sensor."""
         super().__init__(module, sensor, coord, idx)
         self.entity_description = description
-        # The base unique_id is ``Mod_{uid}_snsr{nmbr}``. Described sensors are
-        # built against the same router with independently numbered streams, so
-        # timeout/current/voltage would all collide on ``snsr0``. Append the
-        # description key to keep each entity's unique_id distinct.
-        self._attr_unique_id = f"{self._attr_unique_id}_{description.key}"
+        # The base unique_id is ``Mod_{uid}_snsr{nmbr}``. Router streams
+        # (timeout/current/voltage) share the same ``nmbr`` and would collide,
+        # so they opt in to a key suffix via ``disambiguate``. Per-module
+        # sensors have a distinct ``nmbr`` and keep the bare id, otherwise a
+        # format change re-registers them and HA 2026.6 rewrites their
+        # entity_id (the 3.1.0b1 rename regression).
+        if description.disambiguate:
+            self._attr_unique_id = f"{self._attr_unique_id}_{description.key}"
         if description.diag_check and abs(sensor.type) == TYPE_DIAG:
             self._attr_entity_category = EntityCategory.DIAGNOSTIC
             self._attr_entity_registry_enabled_default = False
@@ -400,6 +410,7 @@ CURRENT_DESCRIPTION = HbtnSensorEntityDescription(
     native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
     value_fn=lambda module, idx: module.chan_currents[idx].value,
     diag_check=True,
+    disambiguate=True,
 )
 VOLTAGE_DESCRIPTION = HbtnSensorEntityDescription(
     key="voltage",
@@ -407,6 +418,7 @@ VOLTAGE_DESCRIPTION = HbtnSensorEntityDescription(
     native_unit_of_measurement=UnitOfElectricPotential.VOLT,
     value_fn=lambda module, idx: module.voltages[idx].value,
     diag_check=True,
+    disambiguate=True,
 )
 TIMEOUT_DESCRIPTION = HbtnSensorEntityDescription(
     key="timeout",
@@ -414,6 +426,7 @@ TIMEOUT_DESCRIPTION = HbtnSensorEntityDescription(
     native_unit_of_measurement="",
     value_fn=lambda module, idx: module.chan_timeouts[idx].value,
     diag_check=True,
+    disambiguate=True,
 )
 
 

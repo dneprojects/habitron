@@ -57,6 +57,24 @@ operate-mode fault detection.
 The existing global router `SYS_ERR` path (`mod_id == 0`, router system-error
 state / `router_system_error` issue) keeps its own contract and is untouched.
 
+### Fixed
+- **Per-module sensor entity_ids restored (3.1.0 rename regression).** Beta
+  3.1.0b1 appended the description `key` to *every* `HbtnDescribedSensor`
+  unique_id, including the per-module humidity/illuminance/wind/airquality
+  sensors whose `nmbr` is already unique
+  (`Mod_{uid}_snsr{n}` → `Mod_{uid}_snsr{n}_{key}`). The changed unique_id made
+  Home Assistant register fresh entities, and 2026.6's entity-id area prefix
+  rewrote their entity_ids to `sensor.<area>_<device>_<name>`; temperature and
+  climate (stable ids) were untouched — hence only some sensors moved. The key
+  suffix is now opt-in via a new `HbtnSensorEntityDescription.disambiguate`
+  flag, set only on the colliding router streams (current/voltage/timeout). A
+  one-time, idempotent migration in `async_setup_entry`
+  (`_async_restore_legacy_sensor_ids`) realigns the per-module sensors: it drops
+  the suffixed duplicate when the original bare-id entry still exists (upgrade
+  case — the original entity_id takes over), otherwise rewrites the unique_id in
+  place (fresh 3.1.0b1 install). A regression test pins both unique_id formats so
+  any future format change fails CI.
+
 ## v3.1.0
 
 Pulls in `habitron_client==2.0.7` and ports the latest code-review improvements

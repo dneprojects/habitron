@@ -175,6 +175,50 @@ def test_described_sensor_inherits_measurement_state_class() -> None:
     assert entity._attr_state_class is SensorStateClass.MEASUREMENT
 
 
+@pytest.mark.parametrize(
+    "description",
+    [
+        HUMIDITY_DESCRIPTION,
+        ILLUMINANCE_DESCRIPTION,
+        WIND_DESCRIPTION,
+        AIRQUALITY_DESCRIPTION,
+    ],
+)
+def test_module_sensor_unique_id_has_no_key_suffix(
+    description: HbtnSensorEntityDescription,
+) -> None:
+    """Per-module described sensors MUST keep the bare ``Mod_{uid}_snsr{n}`` id.
+
+    Regression guard for the 3.1.0b1 rename: these sensors have a distinct
+    ``nmbr``, so the description key must NOT be appended. Appending it changes
+    the unique_id, which re-registers the entity and lets HA 2026.6 rewrite its
+    entity_id. If this fails, a unique_id format change is about to break
+    existing installs — add an entity-registry migration, do not just retune it.
+    """
+    module = _make_module()
+    sensor_desc = _make_sensor_descriptor()
+    coord = MagicMock(spec=DataUpdateCoordinator)
+    entity = HbtnDescribedSensor(module, sensor_desc, coord, 0, description)
+    assert description.disambiguate is False
+    assert entity.unique_id == f"Mod_{module.uid}_snsr0"
+
+
+@pytest.mark.parametrize(
+    "description",
+    [CURRENT_DESCRIPTION, VOLTAGE_DESCRIPTION, TIMEOUT_DESCRIPTION],
+)
+def test_router_sensor_unique_id_keeps_key_suffix(
+    description: HbtnSensorEntityDescription,
+) -> None:
+    """Router streams share ``nmbr`` and so keep the disambiguating key suffix."""
+    module = _make_module()
+    sensor_desc = _make_sensor_descriptor(type_=1)
+    coord = MagicMock(spec=DataUpdateCoordinator)
+    entity = HbtnDescribedSensor(module, sensor_desc, coord, 0, description)
+    assert description.disambiguate is True
+    assert entity.unique_id == f"Mod_{module.uid}_snsr0_{description.key}"
+
+
 # Note: the full-integration setup smoke test lives in test_init once every
 # platform is migrated (it loads all platforms via ``setup_integration``).
 
