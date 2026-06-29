@@ -1,11 +1,14 @@
 """The Habitron integration."""
 
+import logging
+import re
+
 from habitron_client import HabitronError, HabitronTimeoutError
 
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.device_registry import DeviceEntry
 
 from .const import DOMAIN
@@ -15,6 +18,15 @@ from .services import async_remove_services, async_setup_services
 from .smart_hub import SmartHub
 from .system_health import system_health_info  # noqa: F401
 from .ws_provider import HabitronWebRTCProvider
+
+_LOGGER = logging.getLogger(__name__)
+
+# Per-module described-sensor keys that Beta 3.1.0b1 wrongly appended to the
+# unique_id; see _async_restore_legacy_sensor_ids.
+_LEGACY_SUFFIXED_KEYS = ("humidity", "illuminance", "wind", "airquality")
+_LEGACY_UID_RE = re.compile(
+    r"^(Mod_.+_snsr\d+)_(?:" + "|".join(_LEGACY_SUFFIXED_KEYS) + r")$"
+)
 
 PLATFORMS: list[Platform] = [
     Platform.ASSIST_SATELLITE,
@@ -52,6 +64,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: HabitronConfigEntry) -> 
         entry.async_on_unload(entry.add_update_listener(update_listener))
 
         _async_cleanup_stale_devices(hass, entry, smhub)
+
+        # Undo the 3.1.0b1 per-module sensor unique_id churn before the sensor
+        # platform registers entities, so the original entity_ids are restored.
+        _async_restore_legacy_sensor_ids(hass, entry)
 
         # Mirror per-module operate-mode faults (SYS_ERR) into repairs issues.
         async_setup_module_health_issues(hass, entry, smhub)
@@ -154,3 +170,48 @@ def _async_cleanup_stale_devices(
             if identifier[0] == DOMAIN and identifier[1] not in keep_uids:
                 dev_reg.async_remove_device(device.id)
                 break
+
+
+def _async_restore_legacy_sensor_ids(
+    hass: HomeAssistant, entry: HabitronConfigEntry
+) -> None:
+    """Undo the Beta 3.1.0b1 per-module sensor unique_id churn.
+
+    3.1.0b1 appended the description ``key`` to every described sensor's
+    unique_id, including per-module humidity/illuminance/wind/airquality whose
+    ``nmbr`` was already unique. That changed their unique_id, so Home Assistant
+    registered fresh entities and (under 2026.6) rewrote the entity_ids
+    (``sensor.<area>_<device>_<name>``). The suffix is now restricted to the
+    colliding router streams (current/voltage/timeout); this one-time, idempotent
+    migration realigns the per-module sensors with the original
+    ``Mod_{uid}_snsr{nmbr}`` id:
+
+    - if the original bare-id entry still exists (upgrade case) the suffixed
+      duplicate is removed so the original — and its entity_id — takes over;
+    - otherwise (fresh 3.1.0b1 install) the suffixed entry's unique_id is
+      rewritten in place, keeping the entity and its entity_id.
+    """
+    ent_reg = er.async_get(hass)
+    for ent in er.async_entries_for_config_entry(ent_reg, entry.entry_id):
+        if ent.domain != "sensor":
+            continue
+        match = _LEGACY_UID_RE.match(ent.unique_id or "")
+        if not match:
+            continue
+        base_uid = match.group(1)
+        if ent_reg.async_get_entity_id("sensor", DOMAIN, base_uid):
+            _LOGGER.info(
+                "Habitron: removing duplicate sensor %s (unique_id %s); "
+                "restoring original %s",
+                ent.entity_id,
+                ent.unique_id,
+                base_uid,
+            )
+            ent_reg.async_remove(ent.entity_id)
+        else:
+            _LOGGER.info(
+                "Habitron: migrating sensor unique_id %s -> %s",
+                ent.unique_id,
+                base_uid,
+            )
+            ent_reg.async_update_entity(ent.entity_id, new_unique_id=base_uid)

@@ -5,6 +5,7 @@ User-facing release notes. For the detailed technical changelog see
 
 ## v3.1.1
 - New: per-module health sensor and a repair with one-click recovery (module restart, or channel power cycle when the module is unreachable) for SmartHub operate-mode faults.
+- Fixed: room-controller sensors (air quality, illuminance, humidity) keep their original entity IDs again — a 3.1.0 change had renamed them (e.g. prefixed the area).
 
 ## v3.1.0
 - New: hub actions (restart, save, …) can target a specific SmartHub in multi-hub setups.
