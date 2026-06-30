@@ -74,6 +74,15 @@ state / `router_system_error` issue) keeps its own contract and is untouched.
   case — the original entity_id takes over), otherwise rewrites the unique_id in
   place (fresh 3.1.0b1 install). A regression test pins both unique_id formats so
   any future format change fails CI.
+- **Colour LED brightness on a colour-only `turn_on`.** When `async_turn_on`
+  gets `rgb_color` without `brightness`, `HbtnColorLight` now derives the
+  brightness from the highest RGB channel and rescales the colour to 100 %,
+  mirroring `_handle_coordinator_update`. Previously the colour was applied
+  against the stale `_brightness`, so an off LED (`_brightness == 0`) produced
+  `(1,1,1)` and stayed invisible. The added normalisation also keeps the
+  write/read round-trip consistent — a sub-255 colour is no longer dimmed twice
+  (`dimmed = normalized_rgb * max_channel / 255 == input rgb`), so the state no
+  longer jumps on the next coordinator update.
 
 ## v3.1.0
 
