@@ -277,7 +277,18 @@ class HbtnColorLight(CoordinatorEntity[HbtnCoordinator], LightEntity):
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Instruct the light to turn on."""
         if ATTR_RGB_COLOR in kwargs:
-            self._rgb_color = kwargs[ATTR_RGB_COLOR]
+            rgb = kwargs[ATTR_RGB_COLOR]
+            max_channel = max(rgb)
+            if ATTR_BRIGHTNESS not in kwargs and max_channel > 0:
+                # Derive brightness from the highest channel and rescale the
+                # colour to 100 %, mirroring _handle_coordinator_update so the
+                # write/read round-trip stays consistent.
+                self._brightness = max_channel
+                self._rgb_color = tuple(
+                    min(round(c / max_channel * 255), 255) for c in rgb
+                )
+            else:
+                self._rgb_color = rgb
         if ATTR_BRIGHTNESS in kwargs:
             self._brightness = kwargs[ATTR_BRIGHTNESS]
 
