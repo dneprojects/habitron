@@ -4,6 +4,16 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.1.2
+
+Housekeeping release, no code changes to the integration itself. Two Home
+Assistant long-lived access tokens that had been left in commented-out example
+lines of `__init__.py` and `communicate.py` were scrubbed from the entire git
+history (`git filter-repo --replace-text`, all branches and tags force-pushed).
+The tokens had already been revoked in Home Assistant, so they carried no live
+access; this release exists so HACS/core review sees a clean history and a fresh
+tag. No manifest, entity, or behavioral changes.
+
 ## v3.1.1
 
 Pulls in `habitron_client==2.0.8` and surfaces the SmartHub's new per-module
