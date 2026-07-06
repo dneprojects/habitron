@@ -477,16 +477,29 @@
         "step": {
           "confirm_restart": {
             "title": "Modul {module} neu starten?",
-            "description": "Modul „{module}“ meldet folgende Störung(en):\n\n{faults}\n\nEin Neustart betrifft nur dieses Modul und kann eine vorübergehende Störung beheben. Mit „Absenden“ wird das Modul jetzt neu gestartet. Hilft das nicht, prüfe Hardware und Verkabelung – oder ignoriere die Meldung über die Reparaturkarte."
+            "description": "Modul „{module}“ meldet folgende Störung(en):\n\n{faults}\n\nEin Neustart betrifft nur dieses Modul und kann eine vorübergehende Störung beheben. Wähle „Modul neu starten“, um es jetzt neu zu starten, oder „Ignorieren“, um die Meldung auszublenden. Hilft ein Neustart nicht, prüfe Hardware und Verkabelung.",
+            "menu_options": {
+              "restart": "Modul neu starten",
+              "ignore": "Meldung ignorieren"
+            }
           },
           "confirm_power_cycle": {
             "title": "Spannungsreset für Kanal {channel}?",
-            "description": "Modul „{module}“ meldet einen Kommunikations-Timeout (F1) und ist über den Bus nicht mehr erreichbar – ein Modul-Neustart-Befehl käme dort nicht an. Die einzige verbleibende Fernmaßnahme ist ein Spannungsreset von Router-Kanal {channel}.\n\n⚠ Grobe Maßnahme: Dabei wird kurzzeitig die Spannung des gesamten Kanals (bzw. des gekoppelten Kanalpaars) abgeschaltet. Alle weiteren Module an diesem Kanal werden dadurch ebenfalls zurückgesetzt:\n\n{others}\n\nStelle sicher, dass das gerade unkritisch ist (Rollläden, Licht und Klima dieser Module fallen kurz aus). Mit „Absenden“ wird Kanal {channel} spannungsfrei geschaltet und wieder eingeschaltet."
+            "description": "Modul „{module}“ meldet einen Kommunikations-Timeout (F1) und ist über den Bus nicht mehr erreichbar – ein Modul-Neustart-Befehl käme dort nicht an. Die einzige verbleibende Fernmaßnahme ist ein Spannungsreset von Router-Kanal {channel}.\n\n⚠ Grobe Maßnahme: Dabei wird kurzzeitig die Spannung des gesamten Kanals (bzw. des gekoppelten Kanalpaars) abgeschaltet. Alle weiteren Module an diesem Kanal werden dadurch ebenfalls zurückgesetzt:\n\n{others}\n\nStelle sicher, dass das gerade unkritisch ist (Rollläden, Licht und Klima dieser Module fallen kurz aus). Wähle „Kanal spannungsfrei schalten“, um ihn ab- und wieder einzuschalten, oder „Ignorieren“, um die Meldung auszublenden.",
+            "menu_options": {
+              "power_cycle": "Kanal spannungsfrei schalten",
+              "ignore": "Meldung ignorieren"
+            }
+          },
+          "room_controller_unreachable": {
+            "title": "Raumcontroller {module} ist nicht erreichbar",
+            "description": "Der Raumcontroller „{module}“ meldet einen Kommunikations-Timeout (F1) und ist über den Bus nicht mehr erreichbar:\n\n{faults}\n\nArbeitet der Controller ansonsten normal, kann es sich um eine kurzzeitige Bus-Störung handeln – prüfe bei anhaltendem Fehler die Bus-Verkabelung und den Stecker des Moduls. Mit „Absenden“ wird diese Meldung ignoriert; sie erscheint für diesen Fehler erst wieder, wenn du sie in der Reparaturliste erneut einblendest."
           }
         },
         "abort": {
           "module_unavailable": "Das Modul ist nicht mehr verfügbar (der Hub wurde entladen oder das Modul entfernt). Die Meldung wird entfernt.",
-          "channel_unknown": "Das Modul konnte keinem Router-Kanal zugeordnet werden, daher ist ein Spannungsreset nicht möglich. Führe den Spannungsreset ggf. manuell am SmartHub durch."
+          "channel_unknown": "Das Modul konnte keinem Router-Kanal zugeordnet werden, daher ist ein Spannungsreset nicht möglich. Führe den Spannungsreset ggf. manuell am SmartHub durch.",
+          "ignored": "Meldung ignoriert. Du kannst sie in der Reparaturliste wieder einblenden."
         }
       }
     }

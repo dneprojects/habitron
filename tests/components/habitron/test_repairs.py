@@ -2,7 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from habitron_client import Module, Router
+from habitron_client import Module, Router, SmartController
 
 from custom_components.habitron import repairs
 from custom_components.habitron.repairs import ModuleFaultRepairFlow, _channel_and_peers
@@ -55,23 +55,25 @@ def test_channel_and_peers_unknown_channel() -> None:
 
 
 async def test_non_comm_fault_offers_and_runs_restart(hass: HomeAssistant) -> None:
-    """A reachable fault routes to the restart step and restarts the module."""
+    """A reachable fault offers a restart/ignore menu and restarts the module."""
     module = _module()
     module.health.value = 0x10  # F16 only -> module reachable
     smhub = MagicMock()
     smhub.comm.module_restart = AsyncMock()
     flow = _flow(hass)
     with patch.object(repairs, "_resolve_module", return_value=(smhub, module)):
-        form = await flow.async_step_init()
-        assert form["step_id"] == "confirm_restart"
-        assert "F16: Fehler Leistungsteil" in form["description_placeholders"]["faults"]
-        result = await flow.async_step_confirm_restart({})
+        menu = await flow.async_step_init()
+        assert menu["type"] == "menu"
+        assert menu["step_id"] == "confirm_restart"
+        assert set(menu["menu_options"]) == {"restart", "ignore"}
+        assert "F16: Fehler Leistungsteil" in menu["description_placeholders"]["faults"]
+        result = await flow.async_step_restart()
     smhub.comm.module_restart.assert_awaited_once_with(module.addr)
     assert result["type"] == "create_entry"
 
 
 async def test_comm_timeout_offers_and_runs_power_cycle(hass: HomeAssistant) -> None:
-    """F1 routes to the power-cycle step, warns about peers, cycles the channel."""
+    """F1 offers a power-cycle/ignore menu, warns about peers, cycles the channel."""
     module = _module(addr=105)  # mod_id 5
     module.health.value = 0x01 | 0x10  # F1 dominates even with F16 present
     peer = _module(uid="MOD-2", name="Neighbor", addr=106)  # mod_id 6
@@ -83,13 +85,47 @@ async def test_comm_timeout_offers_and_runs_power_cycle(hass: HomeAssistant) -> 
     smhub.comm.async_power_cycle_channel = AsyncMock()
     flow = _flow(hass)
     with patch.object(repairs, "_resolve_module", return_value=(smhub, module)):
-        form = await flow.async_step_init()
-        assert form["step_id"] == "confirm_power_cycle"
-        assert form["description_placeholders"]["channel"] == "1"
-        assert "Neighbor" in form["description_placeholders"]["others"]
-        result = await flow.async_step_confirm_power_cycle({})
+        menu = await flow.async_step_init()
+        assert menu["type"] == "menu"
+        assert menu["step_id"] == "confirm_power_cycle"
+        assert set(menu["menu_options"]) == {"power_cycle", "ignore"}
+        assert menu["description_placeholders"]["channel"] == "1"
+        assert "Neighbor" in menu["description_placeholders"]["others"]
+        result = await flow.async_step_power_cycle()
     smhub.comm.async_power_cycle_channel.assert_awaited_once_with(1)
     assert result["type"] == "create_entry"
+
+
+async def test_room_controller_comm_timeout_offers_ignore(hass: HomeAssistant) -> None:
+    """F1 on a room controller shows an info step (no power cycle) and ignores."""
+    module = SmartController(uid="MOD-1", addr=105, typ=b"\x01\x02", name="Living")
+    module.health.value = 0x01  # F1
+    smhub = MagicMock()
+    flow = _flow(hass)
+    with (
+        patch.object(repairs, "_resolve_module", return_value=(smhub, module)),
+        patch.object(repairs.ir, "async_ignore_issue") as ignore,
+    ):
+        form = await flow.async_step_init()
+        assert form["type"] == "form"
+        assert form["step_id"] == "room_controller_unreachable"
+        # No channel power cycle is offered for a 230 V-supplied room controller.
+        assert "channel" not in form["description_placeholders"]
+        smhub.comm.async_power_cycle_channel.assert_not_called()
+        result = await flow.async_step_room_controller_unreachable({})
+    ignore.assert_called_once_with(hass, repairs.DOMAIN, "module_fault_MOD-1", True)
+    assert result["type"] == "abort"
+    assert result["reason"] == "ignored"
+
+
+async def test_ignore_step_ignores_issue(hass: HomeAssistant) -> None:
+    """The ignore menu option ignores the issue via the issue registry."""
+    flow = _flow(hass)
+    with patch.object(repairs.ir, "async_ignore_issue") as ignore:
+        result = await flow.async_step_ignore()
+    ignore.assert_called_once_with(hass, repairs.DOMAIN, "module_fault_MOD-1", True)
+    assert result["type"] == "abort"
+    assert result["reason"] == "ignored"
 
 
 async def test_cleared_fault_completes_flow(hass: HomeAssistant) -> None:

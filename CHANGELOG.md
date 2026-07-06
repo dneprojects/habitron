@@ -3,6 +3,9 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.1.3
+- Module-fault repairs can now be ignored in every case; unreachable room controllers no longer offer a channel power cycle.
+
 ## v3.1.2
 - Maintenance release — no functional or behavioral changes; repository history cleanup only.
 

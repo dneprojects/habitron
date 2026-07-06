@@ -4,6 +4,28 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.1.3
+
+Refines the `module_fault` repair flow (`repairs.py`).
+
+### Changed
+- **Ignore in every step.** The restart and power-cycle confirm steps are now
+  `async_show_menu` menus offering the action *or* "Ignore" (previously a single
+  Submit button ran the action with no way to dismiss). Ignoring calls
+  `issue_registry.async_ignore_issue(..., True)`, so the issue is hidden with
+  standard HA semantics until the user re-enables it — not resolved-and-recreated
+  on the next health poll.
+- **Room controllers.** An `F1` communication timeout on a `SmartController` no
+  longer offers a channel power cycle: a room controller has its own 230 V
+  supply, so cutting the router channel would not reset it (and would needlessly
+  reset the channel's other modules). A new `room_controller_unreachable` step
+  shows only the fault text — no channel, no co-located module list — and offers
+  Ignore.
+
+Adds the `menu_options`, `room_controller_unreachable` and `abort.ignored`
+strings in `strings.json` and `translations/de.json`, plus repair-flow tests for
+the room-controller and ignore paths.
+
 ## v3.1.2
 
 Housekeeping release, no code changes to the integration itself. Two Home

@@ -7,20 +7,27 @@ remote recovery action based on the module's *current* fault mask.
   bus, so a restart command would never arrive. The only remaining remote action
   is a **power cycle of the module's router channel** — a coarse measure that
   also resets every other module on that channel (pair). The confirm step warns
-  about this and lists the co-located modules.
+  about this and lists the co-located modules. A **room controller** keeps its
+  own 230 V supply, so a channel power cycle cannot reset it — for those the flow
+  only shows the fault and offers to ignore it.
 * Any other fault: a plain **module restart**, which may clear a transient fault.
+
+Every step also offers **Ignore**, which hides the issue (standard HA
+issue-registry semantics) until the user re-enables it.
 
 The flow always re-reads the live model, so a fault that cleared (or changed)
 between raising the issue and opening the flow is handled correctly.
 """
 
-from habitron_client import Module, Router, decode_module_faults
+from habitron_client import Module, Router, SmartController, decode_module_faults
 import voluptuous as vol
 
 from homeassistant.components.repairs import RepairsFlow, RepairsFlowResult
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import issue_registry as ir
 
+from .const import DOMAIN
 from .coordinator import HabitronConfigEntry
 from .smart_hub import SmartHub
 
@@ -96,33 +103,45 @@ class ModuleFaultRepairFlow(RepairsFlow):
             # The fault already cleared; complete the flow so HA drops the issue.
             return self.async_create_entry(title="", data={})
         if mask & _FAULT_COMM_TIMEOUT:
+            if isinstance(module, SmartController):
+                # Room controllers keep their own 230 V supply, so a channel
+                # power cycle cannot reset them — offer info + ignore only.
+                return await self.async_step_room_controller_unreachable()
             return await self.async_step_confirm_power_cycle()
         return await self.async_step_confirm_restart()
 
     async def async_step_confirm_restart(
         self, user_input: dict[str, str] | None = None
     ) -> RepairsFlowResult:
-        """Offer a plain module restart for a reachable, faulty module."""
+        """Offer a restart (or ignore) for a reachable, faulty module."""
         resolved = _resolve_module(self.hass, self._data)
         if resolved is None:
             return self.async_abort(reason="module_unavailable")
-        smhub, module = resolved
-        if user_input is not None:
-            await smhub.comm.module_restart(module.addr)
-            return self.async_create_entry(title="", data={})
-        return self.async_show_form(
+        _, module = resolved
+        return self.async_show_menu(
             step_id="confirm_restart",
-            data_schema=vol.Schema({}),
+            menu_options=["restart", "ignore"],
             description_placeholders={
                 "module": module.name,
                 "faults": _format_faults(module.health.value),
             },
         )
 
+    async def async_step_restart(
+        self, user_input: dict[str, str] | None = None
+    ) -> RepairsFlowResult:
+        """Restart the module (chosen from the confirm_restart menu)."""
+        resolved = _resolve_module(self.hass, self._data)
+        if resolved is None:
+            return self.async_abort(reason="module_unavailable")
+        smhub, module = resolved
+        await smhub.comm.module_restart(module.addr)
+        return self.async_create_entry(title="", data={})
+
     async def async_step_confirm_power_cycle(
         self, user_input: dict[str, str] | None = None
     ) -> RepairsFlowResult:
-        """Offer a channel power cycle for an unreachable module (F1)."""
+        """Offer a channel power cycle (or ignore) for an unreachable module (F1)."""
         resolved = _resolve_module(self.hass, self._data)
         if resolved is None:
             return self.async_abort(reason="module_unavailable")
@@ -131,23 +150,60 @@ class ModuleFaultRepairFlow(RepairsFlow):
         if channel is None:
             # Module not mapped to a channel — cannot power cycle.
             return self.async_abort(reason="channel_unknown")
-        if user_input is not None:
-            await smhub.comm.async_power_cycle_channel(channel)
-            return self.async_create_entry(title="", data={})
         others = (
             "\n".join(f"- {name}" for name in peers)
             if peers
             else "- (keine weiteren / none)"
         )
-        return self.async_show_form(
+        return self.async_show_menu(
             step_id="confirm_power_cycle",
-            data_schema=vol.Schema({}),
+            menu_options=["power_cycle", "ignore"],
             description_placeholders={
                 "module": module.name,
                 "channel": str(channel),
                 "others": others,
             },
         )
+
+    async def async_step_power_cycle(
+        self, user_input: dict[str, str] | None = None
+    ) -> RepairsFlowResult:
+        """Power-cycle the module's router channel (chosen from the menu)."""
+        resolved = _resolve_module(self.hass, self._data)
+        if resolved is None:
+            return self.async_abort(reason="module_unavailable")
+        smhub, module = resolved
+        channel, _ = _channel_and_peers(smhub.router, module)
+        if channel is None:
+            return self.async_abort(reason="channel_unknown")
+        await smhub.comm.async_power_cycle_channel(channel)
+        return self.async_create_entry(title="", data={})
+
+    async def async_step_room_controller_unreachable(
+        self, user_input: dict[str, str] | None = None
+    ) -> RepairsFlowResult:
+        """Show an unreachable room controller's fault and offer to ignore it."""
+        resolved = _resolve_module(self.hass, self._data)
+        if resolved is None:
+            return self.async_abort(reason="module_unavailable")
+        _, module = resolved
+        if user_input is not None:
+            return await self.async_step_ignore()
+        return self.async_show_form(
+            step_id="room_controller_unreachable",
+            data_schema=vol.Schema({}),
+            description_placeholders={
+                "module": module.name,
+                "faults": _format_faults(module.health.value),
+            },
+        )
+
+    async def async_step_ignore(
+        self, user_input: dict[str, str] | None = None
+    ) -> RepairsFlowResult:
+        """Permanently ignore this fault issue (hidden until re-enabled)."""
+        ir.async_ignore_issue(self.hass, DOMAIN, self._issue_id, True)
+        return self.async_abort(reason="ignored")
 
 
 async def async_create_fix_flow(
