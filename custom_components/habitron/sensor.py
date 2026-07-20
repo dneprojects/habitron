@@ -276,6 +276,17 @@ async def async_setup_entry(  # noqa: C901
                     )
 
 
+def _host_diags_unavailable(module: Module) -> bool:
+    """Return True while the SmartHub has not answered its first host query.
+
+    ``Diagnostic``/``Sensor`` default to 0, which for a CPU load or a disk usage
+    is a plausible reading rather than an obvious placeholder, so the hub's own
+    diagnostics must report ``unknown`` until a query actually succeeded. Bus
+    modules carry no such flag and are never gated.
+    """
+    return not getattr(module, "host_diags_valid", True)
+
+
 class HbtnSensor(CoordinatorEntity[HbtnCoordinator], SensorEntity):
     """Base representation of a Habitron sensor."""
 
@@ -581,7 +592,10 @@ class HbtnDiagSensor(CoordinatorEntity[HbtnCoordinator], SensorEntity):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        self._attr_native_value = self._module.diags[self._diag_idx].value
+        if _host_diags_unavailable(self._module):
+            self._attr_native_value = None
+        else:
+            self._attr_native_value = self._module.diags[self._diag_idx].value
         self.async_write_ha_state()
 
 
@@ -710,7 +724,9 @@ class PercSensor(HbtnSensor):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        if abs(self.type) == TYPE_DIAG:
+        if _host_diags_unavailable(self._module):
+            self._attr_native_value = None
+        elif abs(self.type) == TYPE_DIAG:
             self._attr_native_value = self._module.diags[self._sensor_idx].value
         else:
             self._attr_native_value = self._module.sensors[self._sensor_idx].value
@@ -746,7 +762,9 @@ class FrequencySensor(HbtnSensor):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        if abs(self.type) == TYPE_DIAG:
+        if _host_diags_unavailable(self._module):
+            self._attr_native_value = None
+        elif abs(self.type) == TYPE_DIAG:
             self._attr_native_value = self._module.diags[self._sensor_idx].value
         else:
             self._attr_native_value = self._module.sensors[self._sensor_idx].value
