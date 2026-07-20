@@ -30,9 +30,11 @@ from homeassistant.helpers.service_info.ssdp import (
     SsdpServiceInfo,
 )
 
+from .conftest import fake_gethostbyname
 from .const import (
     MOCK_CONFIG_DATA,
     MOCK_HOST,
+    MOCK_HOST_HOSTNAME,
     MOCK_NAME,
     MOCK_SERIAL,
     MOCK_UDN,
@@ -211,6 +213,47 @@ async def test_ssdp_legacy_unique_id_migrated(
     assert legacy_entry.unique_id == MOCK_UDN
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "already_configured"
+
+
+async def test_ssdp_matches_entry_stored_under_host_name(
+    hass: HomeAssistant,
+    setup_homeassistant: None,
+    mock_habitron_client: MagicMock,
+) -> None:
+    """A hub added manually by name is recognised when SSDP reports its IP.
+
+    The manual step falls back to ``habitron_<host>`` when no serial can be
+    read, so the UDN from the discovery does not match. Without canonicalising
+    the *configured* host too, ``smarthub.local`` never matches the reported
+    ``192.168.1.50`` and the user is offered a duplicate of a hub that is
+    already set up.
+    """
+    named_entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=MOCK_NAME,
+        unique_id=f"habitron_{MOCK_HOST_HOSTNAME}",
+        data={**MOCK_CONFIG_DATA, KEY_HOST: MOCK_HOST_HOSTNAME},
+    )
+    named_entry.add_to_hass(hass)
+
+    discovery = SsdpServiceInfo(
+        ssdp_usn=f"{MOCK_UDN}::urn:habitron-com:device:SmartHub:1",
+        ssdp_st="urn:habitron-com:device:SmartHub:1",
+        ssdp_location=f"http://{MOCK_HOST}:80/desc.xml",
+        upnp={ATTR_UPNP_UDN: MOCK_UDN},
+    )
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_SSDP},
+        data=discovery,
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+    # The entry is adopted under the stable discovery id.
+    assert named_entry.unique_id == MOCK_UDN
 
 
 async def test_ssdp_no_host(
@@ -428,8 +471,12 @@ async def test_is_device_already_configured_host_match(hass: HomeAssistant) -> N
 
     flow = ConfigFlow()
     flow.hass = hass
-    assert flow._is_device_already_configured(MOCK_HOST) is True
-    assert flow._is_device_already_configured("other-host") is False
+    with patch(
+        "custom_components.habitron.config_flow.socket.gethostbyname",
+        fake_gethostbyname,
+    ):
+        assert await flow._is_device_already_configured(MOCK_HOST) is True
+        assert await flow._is_device_already_configured("other-host") is False
 
 
 async def test_is_device_already_configured_ip_match(hass: HomeAssistant) -> None:
@@ -444,7 +491,11 @@ async def test_is_device_already_configured_ip_match(hass: HomeAssistant) -> Non
 
     flow = ConfigFlow()
     flow.hass = hass
-    assert flow._is_device_already_configured("hub-x", ip="10.0.0.1") is True
+    with patch(
+        "custom_components.habitron.config_flow.socket.gethostbyname",
+        fake_gethostbyname,
+    ):
+        assert await flow._is_device_already_configured("hub-x", ip="10.0.0.1") is True
 
 
 # ---------- _discover_habitron OS-error fallback ----------

@@ -30,6 +30,7 @@ from .const import (  # noqa: E402
     MOCK_CONFIG_DATA,
     MOCK_CONFIG_OPTIONS,
     MOCK_HOST,
+    MOCK_HOST_HOSTNAME,
     MOCK_HWTYPE,
     MOCK_MAC,
     MOCK_NAME,
@@ -37,6 +38,20 @@ from .const import (  # noqa: E402
     MOCK_UID,
     MOCK_VERSION,
 )
+
+
+def fake_gethostbyname(host: str) -> str:
+    """Stand in for LAN name resolution.
+
+    An address literal must resolve to itself: a stub that maps *every* host to
+    one address makes any two hosts look like the same machine, which would
+    hide (or fake) the duplicate detection the config flow builds on.
+    """
+    if host == MOCK_HOST_HOSTNAME:
+        return MOCK_HOST
+    if host.count(".") == 3 and all(part.isdigit() for part in host.split(".")):
+        return host
+    return "192.168.1.10"
 
 
 @pytest.fixture(autouse=True)
@@ -95,7 +110,7 @@ def mock_habitron_client() -> Generator[MagicMock]:
         ),
         patch(
             "custom_components.habitron.config_flow.socket.gethostbyname",
-            return_value="192.168.1.10",
+            new=fake_gethostbyname,
         ),
         patch(
             "custom_components.habitron.communicate.get_own_ip",

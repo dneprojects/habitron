@@ -161,12 +161,40 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Create the options flow."""
         return MyOptionsFlowHandler()
 
-    def _is_device_already_configured(self, host: str, ip: str | None = None) -> bool:
+    async def _async_canonical_host(self, host: str) -> str:
+        """Return a comparable form of ``host``.
+
+        The same hub can be entered in more than one way, and comparing the raw
+        strings would miss that, adding a second entry -- and a second
+        connection -- to a hub that is already configured. Canonicalised here:
+        the ``local`` sentinel (a hub on Home Assistant's own machine, stored as
+        the sentinel rather than as that IP) and host names, which resolve to
+        the address a discovery reports.
+        """
+        if host == CONF_DEFAULT_HOST:
+            return await _get_local_ip(self.hass)
+        with contextlib.suppress(OSError):
+            return await self.hass.async_add_executor_job(socket.gethostbyname, host)
+        return host.casefold()
+
+    async def _is_device_already_configured(
+        self, host: str, ip: str | None = None
+    ) -> bool:
         """Check if a device with this host or IP is already configured."""
-        existing_entries = self.hass.config_entries.async_entries(DOMAIN)
-        for entry in existing_entries:
+        entries = self.hass.config_entries.async_entries(DOMAIN)
+        # Nothing configured yet: skip the canonicalisation (and its name
+        # lookups) entirely, there is nothing this could collide with.
+        if not entries:
+            return False
+        candidates = {value for value in (host, ip) if value}
+        canonical = {await self._async_canonical_host(value) for value in candidates}
+        for entry in entries:
             entry_host = entry.data.get(KEY_HOST)
-            if entry_host == host or (ip and entry_host == ip):
+            if not entry_host:
+                continue
+            if entry_host in candidates:
+                return True
+            if await self._async_canonical_host(entry_host) in canonical:
                 return True
         return False
 
@@ -262,6 +290,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             str(ip) in candidate_hosts
             for ip in await network.async_get_enabled_source_ips(self.hass)
         )
+        # The configured host has to be canonicalised too: an entry added
+        # manually as ``smarthub.local`` is the same hub as a discovery
+        # reporting ``192.168.1.50``, and comparing the raw strings misses it.
+        canonical_candidates = {
+            await self._async_canonical_host(host) for host in candidate_hosts if host
+        }
         for entry in self._async_current_entries(include_ignore=False):
             # Match the hub by any stable signal we have:
             #  * the hub MAC — a loaded entry exposes its SmartHub as
@@ -279,6 +313,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 host_conf in candidate_hosts
                 or (host_conf == CONF_DEFAULT_HOST and local_is_candidate)
                 or getattr(smhub, "host", None) in candidate_hosts
+                or (
+                    host_conf is not None
+                    and await self._async_canonical_host(host_conf)
+                    in canonical_candidates
+                )
             )
             if not (same_mac or same_host):
                 continue
@@ -351,7 +390,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             valid_devices = [
                 d
                 for d in discovered
-                if not self._is_device_already_configured(
+                if not await self._is_device_already_configured(
                     d.get("host", ""), d.get("ip")
                 )
             ]
