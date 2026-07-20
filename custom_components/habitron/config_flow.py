@@ -80,11 +80,7 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     if host_to_test == "local":
         host_to_test = own_ip
 
-    # 2. Basic Validation
-    if len(host_to_test) < 4:
-        raise InvalidHost
-
-    # 3. Connection Test
+    # 2. Connection Test
     try:
         # test_connection has been async since habitron_client 1.0.0.
         result, host_name = await test_connection(host_to_test)
@@ -322,7 +318,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             try:
                 info = await validate_input(self.hass, data)
                 return self.async_create_entry(title=info["title"], data=data)
-            except CannotConnect, HostNotFound, InvalidHost:
+            except CannotConnect, HostNotFound:
                 # A briefly-offline hub or an unresolved discovery host should be
                 # retryable via the confirmation form, not aborted.
                 errors["base"] = "cannot_connect"
@@ -370,8 +366,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             except CannotConnect:
                 errors["base"] = "cannot_connect"
             except HostNotFound:
-                errors["base"] = "host_not_found"
-            except InvalidHost:
                 errors["base"] = "host_not_found"
             except Exception:  # pylint: disable=broad-except
                 _LOGGER.exception("Unexpected exception")
@@ -432,8 +426,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             except CannotConnect:
                 errors["base"] = "cannot_connect"
             except HostNotFound:
-                errors["base"] = "host_not_found"
-            except InvalidHost:
                 errors["base"] = "host_not_found"
             except Exception:  # pylint: disable=broad-except
                 _LOGGER.exception("Unexpected reconfigure error")
@@ -506,10 +498,6 @@ class CannotConnect(exceptions.HomeAssistantError):
 
 class HostNotFound(exceptions.HomeAssistantError):
     """Error to indicate DNS name is not found."""
-
-
-class InvalidHost(exceptions.HomeAssistantError):
-    """Error to indicate there is an invalid hostname."""
 
 
 class AlreadyConfigured(exceptions.HomeAssistantError):
