@@ -92,7 +92,11 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
         raise HostNotFound from exc
     except ConnectionRefusedError as exc:
         raise CannotConnect from exc
-    except Exception as exc:
+    except (OSError, TimeoutError, HabitronError) as exc:
+        # Genuinely-expected connection failures. ``test_connection`` wraps DNS
+        # and socket problems into ``HabitronError``; anything else (e.g. a
+        # response-processing bug) propagates so the caller's ``unknown`` path
+        # surfaces the real fault instead of hiding it as a network error.
         _LOGGER.error("Connection error: %s", exc)
         raise CannotConnect from exc
 
@@ -306,6 +310,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.ConfigFlowResult:
         """Confirm discovery."""
+        errors: dict[str, str] = {}
         if user_input is not None:
             # Create entry with discovered data
             data = {
@@ -317,7 +322,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             try:
                 info = await validate_input(self.hass, data)
                 return self.async_create_entry(title=info["title"], data=data)
-            except Exception:  # noqa: BLE001
+            except CannotConnect, HostNotFound, InvalidHost:
+                # A briefly-offline hub or an unresolved discovery host should be
+                # retryable via the confirmation form, not aborted.
+                errors["base"] = "cannot_connect"
+            except Exception:
+                _LOGGER.exception("Unexpected exception")
                 return self.async_abort(reason="unknown")
 
         self._set_confirm_only()
@@ -326,6 +336,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             description_placeholders={
                 "name": self._discovered_device.get("host", "Habitron Hub")
             },
+            errors=errors,
         )
 
     async def async_step_user(

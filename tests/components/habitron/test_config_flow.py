@@ -592,6 +592,39 @@ async def test_ssdp_discovery_confirm_handles_validate_error(
     assert result["reason"] == "unknown"
 
 
+async def test_ssdp_discovery_confirm_connection_error_retries(
+    hass: HomeAssistant,
+    setup_homeassistant: None,
+    mock_habitron_client: MagicMock,
+) -> None:
+    """A hub that is briefly offline stays retryable on the confirm form.
+
+    Aborting would force the user to wait for the next discovery; showing the
+    error on the form lets them simply confirm again once the hub answers.
+    """
+    discovery = SsdpServiceInfo(
+        ssdp_usn=f"{MOCK_UDN}::urn:habitron-com:device:SmartHub:1",
+        ssdp_st="urn:habitron-com:device:SmartHub:1",
+        ssdp_location=f"http://{MOCK_HOST}:80/desc.xml",
+        upnp={ATTR_UPNP_UDN: MOCK_UDN},
+    )
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_SSDP},
+        data=discovery,
+    )
+    assert result["type"] is FlowResultType.FORM
+
+    mock_habitron_client.side_effect = TimeoutError("hub rebooting")
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], user_input={}
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "discovery_confirm"
+    assert result["errors"] == {"base": "cannot_connect"}
+
+
 # ---------- user flow exception mapping ----------
 
 
@@ -707,7 +740,12 @@ async def test_user_flow_unexpected_exception_maps_to_unknown(
     setup_homeassistant: None,
     mock_habitron_client: MagicMock,
 ) -> None:
-    """An unexpected error surfaces as ``unknown``."""
+    """An unexpected error surfaces as ``unknown``.
+
+    Only genuinely-expected connection failures are folded into
+    ``cannot_connect``; a bug in the response handling must stay visible
+    instead of being reported to the user as a network problem.
+    """
     mock_habitron_client.side_effect = RuntimeError("boom")
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
@@ -716,7 +754,7 @@ async def test_user_flow_unexpected_exception_maps_to_unknown(
         result["flow_id"], user_input=MOCK_CONFIG_DATA
     )
     assert result["type"] is FlowResultType.FORM
-    assert result["errors"] == {"base": "cannot_connect"}
+    assert result["errors"] == {"base": "unknown"}
 
 
 # ---------- reconfigure flow ----------
