@@ -1,6 +1,6 @@
 """Tests for the Habitron sensor platform."""
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from habitron_client import Area
 import pytest
@@ -163,6 +163,41 @@ def test_described_sensor_value_fn_timeout_from_chan_timeouts() -> None:
     entity.async_write_ha_state = MagicMock()
     entity._handle_coordinator_update()
     assert entity._attr_native_value == 7
+
+
+@pytest.mark.parametrize(
+    ("description", "source"),
+    [
+        (CURRENT_DESCRIPTION, "chan_currents"),
+        (VOLTAGE_DESCRIPTION, "voltages"),
+        (TIMEOUT_DESCRIPTION, "chan_timeouts"),
+    ],
+)
+async def test_router_sensor_subscribes_to_member(
+    description: object,
+    source: str,
+) -> None:
+    """Router telemetry push-subscribes to its member on add and removal.
+
+    The library refreshes router status on every poll independently of the
+    compact-status CRC, so a coordinator-only sensor (always_update=False)
+    would otherwise leave current/voltage/timeout stale.
+    """
+    module = _make_module()
+    getattr(module, source)[0] = MagicMock()
+    sensor_desc = _make_sensor_descriptor(type_=1)
+    coord = MagicMock(spec=DataUpdateCoordinator)
+    entity = HbtnDescribedSensor(module, sensor_desc, coord, 0, description)
+    with patch(
+        "homeassistant.helpers.update_coordinator."
+        "CoordinatorEntity.async_added_to_hass",
+        new=AsyncMock(),
+    ):
+        await entity.async_added_to_hass()
+    getattr(module, source)[0].add_listener.assert_called_once()
+
+    await entity.async_will_remove_from_hass()
+    getattr(module, source)[0].remove_listener.assert_called_once()
 
 
 def test_described_sensor_inherits_measurement_state_class() -> None:
@@ -438,7 +473,6 @@ def test_frequency_sensor_diag_branch() -> None:
 
 # ---------- Tests covering async_added/async_will_remove + setup_entry ----------
 
-from unittest.mock import AsyncMock, patch  # noqa: E402
 
 from habitron_client import SmartController  # noqa: E402
 

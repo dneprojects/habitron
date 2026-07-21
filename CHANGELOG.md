@@ -3,6 +3,9 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.1.6
+- Fixed: the router current, voltage and timeout sensors now actually refresh when their value changes on an otherwise quiet bus. v3.1.5 read the fresh values but the entities did not yet show them.
+
 ## v3.1.5
 - Fixed: the router's own sensors (currents, voltages, channel timeouts, system-OK) and the health repair could stay frozen while the bus was otherwise quiet — they now update on every poll.
 - Fixed: the eKey finger-number sensor now updates immediately on a finger event instead of lagging until the next poll.

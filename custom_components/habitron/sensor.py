@@ -345,9 +345,15 @@ class HbtnSensorEntityDescription(SensorEntityDescription):
     the same ``nmbr`` and would otherwise collide. Per-module sensors have a
     distinct ``nmbr`` and MUST keep the bare ``Mod_{uid}_snsr{nmbr}`` id so
     their entity_ids stay stable (see _async_restore_legacy_sensor_ids).
+
+    ``subscribe_fn`` returns the bus member to push-subscribe to (or ``None``
+    for coordinator-polled sensors). Router telemetry needs it: the library
+    refreshes it on every poll independently of the compact-status CRC, so a
+    coordinator that only fires on a CRC change would leave it stale.
     """
 
     value_fn: Callable[[Any, int], Any]
+    subscribe_fn: Callable[[Any, int], Any] | None = None
     diag_check: bool = False
     disambiguate: bool = False
 
@@ -379,6 +385,23 @@ class HbtnDescribedSensor(HbtnSensor):
         if description.diag_check and abs(sensor.type) == TYPE_DIAG:
             self._attr_entity_category = EntityCategory.DIAGNOSTIC
             self._attr_entity_registry_enabled_default = False
+
+    async def async_added_to_hass(self) -> None:
+        """Run when this Entity has been added to HA."""
+        await super().async_added_to_hass()
+        if (subscribe_fn := self.entity_description.subscribe_fn) is not None:
+            # Push subscription: keep HA state in sync whenever the member
+            # changes, independently of the coordinator's CRC-gated ticks.
+            subscribe_fn(self._module, self._sensor_idx).add_listener(
+                self._handle_coordinator_update
+            )
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Entity being removed from hass."""
+        if (subscribe_fn := self.entity_description.subscribe_fn) is not None:
+            subscribe_fn(self._module, self._sensor_idx).remove_listener(
+                self._handle_coordinator_update
+            )
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -420,6 +443,7 @@ CURRENT_DESCRIPTION = HbtnSensorEntityDescription(
     device_class=SensorDeviceClass.CURRENT,
     native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
     value_fn=lambda module, idx: module.chan_currents[idx].value,
+    subscribe_fn=lambda module, idx: module.chan_currents[idx],
     diag_check=True,
     disambiguate=True,
 )
@@ -428,6 +452,7 @@ VOLTAGE_DESCRIPTION = HbtnSensorEntityDescription(
     device_class=SensorDeviceClass.VOLTAGE,
     native_unit_of_measurement=UnitOfElectricPotential.VOLT,
     value_fn=lambda module, idx: module.voltages[idx].value,
+    subscribe_fn=lambda module, idx: module.voltages[idx],
     diag_check=True,
     disambiguate=True,
 )
@@ -436,6 +461,7 @@ TIMEOUT_DESCRIPTION = HbtnSensorEntityDescription(
     translation_key="time_out",
     native_unit_of_measurement="",
     value_fn=lambda module, idx: module.chan_timeouts[idx].value,
+    subscribe_fn=lambda module, idx: module.chan_timeouts[idx],
     diag_check=True,
     disambiguate=True,
 )

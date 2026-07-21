@@ -4,6 +4,21 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.1.6
+
+Completes the router-status fix shipped in 3.1.5 on the integration side.
+
+### Fixed
+- **Router telemetry push subscription (`sensor.py`).** 2.0.10 refreshes the
+  router status (currents, voltages, channel timeouts) on every poll, but the
+  `CURRENT`/`VOLTAGE`/`TIMEOUT` sensors were coordinator-only and the
+  coordinator runs `always_update=False`, keyed on the compact-module CRC. A
+  router-only change therefore never reached the entities. `HbtnDescribedSensor`
+  now supports a `subscribe_fn` (as the per-module and eKey sensors already
+  did); the three router descriptions subscribe to their bus member, whose
+  `notify()` the library fires on change. Without this, 3.1.5's fix was
+  ineffective for exactly these sensors.
+
 ## v3.1.5
 
 Bumps `habitron_client` from 2.0.8 to 2.0.10 (skips 2.0.9). No integration code
