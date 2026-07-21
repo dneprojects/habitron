@@ -4,9 +4,24 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
-## v3.1.4
+## v3.1.5
 
-Config-flow and setup hardening, back-ported from the Core review (PR #174185).
+Bumps `habitron_client` from 2.0.8 to 2.0.10 (skips 2.0.9). No integration code
+changed; both fixes live in the library.
+
+### Fixed
+- **Router status refresh (`habitron_client` 2.0.10).** `async_refresh_system`
+  now reads the router status on every poll instead of only when the module
+  compact-status CRC changes. Router currents, voltages, channel timeouts and
+  `sys_ok`/health change independently of the modules, so gating their read on
+  the module CRC left those sensors (and the health repair) stale on an
+  otherwise idle bus. The compact-status CRC still gates the per-module status
+  distribution; the mirror-down (hub reboot) edge is now also caught on a quiet
+  bus.
+- **eKey finger-number sensor (`habitron_client` 2.0.9).** The FINGER push event
+  now updates the finger-number member (`sensors[1]`), normalized like the
+  polled parser, so it no longer lags until the next poll. HACS was still on
+  2.0.8 and had not shipped this.
 
 ### Fixed
 - **Hostname resolution (`communicate.py`).** `get_host_ip` is `async` in

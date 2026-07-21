@@ -3,6 +3,10 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.1.5
+- Fixed: the router's own sensors (currents, voltages, channel timeouts, system-OK) and the health repair could stay frozen while the bus was otherwise quiet — they now update on every poll.
+- Fixed: the eKey finger-number sensor now updates immediately on a finger event instead of lagging until the next poll.
+
 ## v3.1.4
 - Fixed: a hub added by host name (rather than by IP) failed to connect on setup — name resolution was broken. IP-based hubs were unaffected.
 - Fixed: the SmartHub CPU, memory and disk sensors no longer briefly show 0 before the first reading; they stay "unknown" until real values arrive.

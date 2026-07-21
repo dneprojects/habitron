@@ -14,12 +14,12 @@
   "issue_tracker": "https://github.com/dneprojects/habitron/issues",
   "loggers": ["habitron_client"],
   "requirements": [
-    "habitron_client==2.0.8"
+    "habitron_client==2.0.10"
   ],
   "ssdp": [
     {
       "st": "urn:habitron-com:device:SmartHub:1"
     }
   ],
-  "version": "3.1.4"
+  "version": "3.1.5"
 }
