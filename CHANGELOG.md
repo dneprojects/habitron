@@ -3,6 +3,14 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.1.4
+- Fixed: a hub added by host name (rather than by IP) failed to connect on setup — name resolution was broken. IP-based hubs were unaffected.
+- Fixed: the SmartHub CPU, memory and disk sensors no longer briefly show 0 before the first reading; they stay "unknown" until real values arrive.
+- Fixed: a hub that answers but reports no name no longer creates an entry with a blank title — it falls back to the host address.
+- Fixed: short LAN host names such as `pi` or `hub` can now be entered; whether a host works is left to the connection test.
+- Fixed: a hub already added by name is no longer offered as a duplicate when it is later discovered by IP.
+- A briefly offline hub can now be retried from the discovery confirmation instead of aborting the whole flow.
+
 ## v3.1.3
 - Module-fault repairs can now be ignored in every case; unreachable room controllers no longer offer a channel power cycle.
 

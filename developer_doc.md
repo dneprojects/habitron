@@ -4,6 +4,47 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.1.4
+
+Config-flow and setup hardening, back-ported from the Core review (PR #174185).
+
+### Fixed
+- **Hostname resolution (`communicate.py`).** `get_host_ip` is `async` in
+  `habitron_client` ≥ 2.0.9; `async_setup` handed it to
+  `async_add_executor_job`, which only *builds* the coroutine and assigned that
+  (unrun) to `self._host`. Every hostname-based setup then passed a coroutine to
+  `async_get_source_ip`/`HabitronClient`. Now awaited directly. IP-based configs
+  set `_host` in `__init__` and the `local` sentinel uses the still-sync
+  `get_own_ip`, so only hostname setups were affected. The test doubles were
+  sync `return_value` mocks that hid this; they are now `AsyncMock`.
+- **Blank entry title (`config_flow.py`).** `test_connection` returns
+  `(True, "")` when the TCP probe succeeds but the metadata query is unanswered.
+  `validate_input` now falls back to the probed address (`host_name or
+  host_to_test`) so an entry is never created with an empty title.
+- **Minimum host length (`config_flow.py`).** Dropped the `len(host) < 4`
+  rejection (and the now-unreachable `InvalidHost` machinery). Valid short LAN
+  names like `pi`/`hub` are for the connection probe to accept or reject.
+- **SSDP duplicate detection (`config_flow.py`).** The SSDP step compared the
+  configured host raw while only canonicalising the discovered side, so a hub
+  added manually as `smarthub.local` was not matched against a discovery
+  reporting its IP. `_is_device_already_configured` is now async and
+  canonicalises both sides through `_async_canonical_host` (name resolution +
+  `local` sentinel), and the SSDP step reuses it. A test fixture that resolved
+  *every* host to one IP was replaced with a realistic resolver.
+
+### Changed
+- **Host diagnostics gating (`smart_hub.py`, `sensor.py`).** `Diagnostic`/
+  `Sensor` default to 0, a plausible reading for CPU load or disk usage. A
+  `host_diags_valid` flag now gates the SmartHub host sensors to `None`
+  (`unknown`) until the first successful `update()`, and that first success
+  notifies every member so entities whose value equals their placeholder still
+  publish.
+- **Discovery confirm (`config_flow.py`).** A briefly-offline hub
+  (`CannotConnect`/`HostNotFound`) is surfaced on the confirm form as
+  `cannot_connect` instead of aborting; unexpected errors are logged before the
+  `unknown` abort. `validate_input` narrows its swallow to
+  `(OSError, TimeoutError, HabitronError)` so a genuine bug still surfaces.
+
 ## v3.1.3
 
 Refines the `module_fault` repair flow (`repairs.py`).
