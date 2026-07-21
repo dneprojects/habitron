@@ -4,6 +4,19 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.1.8
+
+Bumps `habitron_client` to 2.0.12 and trims a needless host-diagnostics poll.
+
+### Fixed
+- **Blocking discovery (`habitron_client` 2.0.12).** `discover_smarthubs` called
+  the socket-opening `get_own_ip` inline on the event loop; it now runs in an
+  executor.
+- **Host-diagnostics poll (`smart_hub.py`).** `update()` now returns before
+  querying `get_smhub_update()` when the hub exposes no diagnostic members
+  (every non-Raspberry-Pi platform), instead of fetching and discarding the
+  response on every 10-second tick.
+
 ## v3.1.7
 
 Bumps `habitron_client` to 2.0.11. No integration code changed.
