@@ -4,6 +4,20 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.1.7
+
+Bumps `habitron_client` to 2.0.11. No integration code changed.
+
+### Fixed
+- **Module status diagnostics (`habitron_client` 2.0.11).** The library now
+  names `diags[0]` — where every `_status_*` writes `MODULE_STAT` — `Status`
+  for every module kind. Smart Controller / Mini / IO2 previously overrode the
+  diagnostics list without a `Status` name, so `sensor.py`'s name-based filter
+  never created their status entity; other modules bound the status sensor to a
+  slot that received no status value (dimmers showed the power temperature).
+  Member numbers are unchanged, so existing status/power-temp entity_ids stay
+  stable; Smart Controller / Mini / IO2 gain a status sensor.
+
 ## v3.1.6
 
 Completes the router-status fix shipped in 3.1.5 on the integration side.

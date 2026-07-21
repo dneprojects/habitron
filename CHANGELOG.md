@@ -3,6 +3,9 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.1.7
+- Fixed: Smart Controller, Mini and IO2 modules now expose their status sensor again (their status diagnostic had no internal name, so it was skipped). Other modules' status sensors now show the actual module status instead of an unrelated value.
+
 ## v3.1.6
 - Fixed: the router current, voltage and timeout sensors now actually refresh when their value changes on an otherwise quiet bus. v3.1.5 read the fresh values but the entities did not yet show them.
 
