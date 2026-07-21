@@ -361,6 +361,28 @@ async def test_validate_input_local_loopback_rewrites_host(
     assert info == {"title": MOCK_NAME, "mac": None}
 
 
+async def test_validate_input_falls_back_to_host_when_hub_unnamed(
+    hass: HomeAssistant,
+    mock_habitron_client: MagicMock,
+) -> None:
+    """A hub that answers the probe but reports no name gets a host title.
+
+    ``test_connection`` returns ``(True, "")`` when the TCP probe succeeds but
+    the metadata query is unanswered; the entry must not end up blank.
+    """
+    mock_habitron_client.return_value = (True, "")
+
+    with patch(
+        "custom_components.habitron.config_flow._get_local_ip",
+        return_value="10.0.0.5",
+    ):
+        info = await validate_input(
+            hass, {KEY_HOST: "192.168.1.77", "websock_token": ""}
+        )
+
+    assert info["title"] == "192.168.1.77"
+
+
 async def test_validate_input_accepts_short_hostname(
     hass: HomeAssistant,
     mock_habitron_client: MagicMock,

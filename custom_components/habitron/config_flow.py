@@ -99,7 +99,14 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     if not result:
         raise CannotConnect
 
-    return {"title": host_name, "mac": await _async_hub_mac(host_to_test)}
+    # ``test_connection`` returns an empty name when the TCP probe succeeds but
+    # the hub's metadata query gets no answer. Fall back to the probed address
+    # (the resolved own IP for the ``local`` sentinel) so the entry never ends
+    # up with a blank title.
+    return {
+        "title": host_name or host_to_test,
+        "mac": await _async_hub_mac(host_to_test),
+    }
 
 
 class UDPDiscoveryProtocol(asyncio.DatagramProtocol):
