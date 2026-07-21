@@ -120,16 +120,20 @@ async def test_setup_registers_hub_device(
 async def test_update_short_circuits_when_no_info(smart_hub_stub: SmartHub) -> None:
     """update() returns early when get_smhub_update yields no data."""
     smart_hub_stub.comm.get_smhub_update.return_value = None
-    smart_hub_stub.diags = []
+    smart_hub_stub.diags = [Diagnostic(name="Status", nmbr=0, type=1)]
     await smart_hub_stub.update()
     smart_hub_stub.comm.get_smhub_update.assert_awaited_once()
 
 
 async def test_update_short_circuits_when_no_diags(smart_hub_stub: SmartHub) -> None:
-    """update() returns early when self.diags is still empty."""
-    smart_hub_stub.comm.get_smhub_update.return_value = {"hardware": {}}
+    """update() skips the query entirely when self.diags is empty.
+
+    Non-Raspberry-Pi hubs have no host diagnostics, so it must not fetch and
+    discard a SmartHub update on every tick.
+    """
     smart_hub_stub.diags = []
-    await smart_hub_stub.update()  # no exception, just early return
+    await smart_hub_stub.update()
+    smart_hub_stub.comm.get_smhub_update.assert_not_awaited()
 
 
 async def test_update_writes_diag_sensor_and_log_levels(
@@ -233,7 +237,7 @@ async def test_async_update_delegates_to_update(
 ) -> None:
     """async_update is now a thin awaiter around update() directly."""
     smart_hub_stub.comm.get_smhub_update.return_value = None
-    smart_hub_stub.diags = []
+    smart_hub_stub.diags = [Diagnostic(name="Status", nmbr=0, type=1)]
     await smart_hub_stub.async_update()
     smart_hub_stub.comm.get_smhub_update.assert_awaited()
 
@@ -297,6 +301,7 @@ async def test_update_swallows_habitron_error(smart_hub_stub: SmartHub) -> None:
     library error and keeps the last values.
     """
     smart_hub_stub.comm.get_smhub_update.side_effect = HabitronError("boom")
+    smart_hub_stub.diags = [Diagnostic(name="Status", nmbr=0, type=1)]
     await smart_hub_stub.update()  # must not raise
     smart_hub_stub.comm.get_smhub_update.assert_awaited_once()
     # Nothing was read, so the host readings must stay unknown rather than
