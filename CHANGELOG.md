@@ -3,6 +3,9 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.1.9
+- Fixed: a manually set area on an analog input, dimmer, cover, output switch or button event is no longer reset on every reload/restart. The bus-provided area is now applied only when the entity is first created, so your own area choice sticks.
+
 ## v3.1.8
 - Fixed: hub discovery no longer briefly freezes Home Assistant while it looks up the local IP address.
 - Hubs without host diagnostics (anything other than a Raspberry-Pi-based SmartHub) no longer make a useless status request every 10 seconds.

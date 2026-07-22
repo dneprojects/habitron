@@ -12,7 +12,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from ._helpers import HabitronEntity, async_assign_entity_area, hbtn_device_info
+from ._helpers import HabitronEntity, HbtnAreaMixin, deviating_area_id, hbtn_device_info
 from .coordinator import HabitronConfigEntry, HbtnCoordinator
 
 if TYPE_CHECKING:
@@ -31,13 +31,29 @@ async def async_setup_entry(
     router = smhub.router
     coord = smhub.coordinator
 
+    area_reg = ar.async_get(hass)
+    area_ids = {
+        area.nmbr: area_reg.async_get_or_create(area.name).id for area in router.areas
+    }
+    # Snapshot before adding so an output's deviating area is stamped only at
+    # first creation and a reload never overwrites a later user area choice.
+    known_unique_ids = {
+        registered.unique_id
+        for registered in er.async_entries_for_config_entry(
+            er.async_get(hass), entry.entry_id
+        )
+    }
+
     new_devices: list[SwitchEntity] = []
     for module in router.modules:
         for output in module.outputs:
             if abs(output.type) == 1:  # standard relay output
-                new_devices.append(
-                    SwitchedOutput(coord, module, output, len(new_devices))
-                )
+                switched = SwitchedOutput(coord, module, output, len(new_devices))
+                if switched.unique_id not in known_unique_ids:
+                    switched._initial_area_id = deviating_area_id(  # noqa: SLF001
+                        output.area, module.area, area_ids
+                    )
+                new_devices.append(switched)
         for led in module.leds:
             if led.type != 0:
                 continue
@@ -77,27 +93,12 @@ async def async_setup_entry(
     if new_devices:
         async_add_entities(new_devices)
 
-    registry = er.async_get(hass)
-    area_reg = ar.async_get(hass)
-    area_ids = {
-        area.nmbr: area_reg.async_get_or_create(area.name).id for area in router.areas
-    }
-    for module in router.modules:
-        for output in module.outputs:
-            if abs(output.type) == 1:
-                async_assign_entity_area(
-                    registry,
-                    domain="switch",
-                    unique_id=f"Mod_{module.uid}_out{output.nmbr}",
-                    area_index=output.area,
-                    area_member=module.area,
-                    area_ids=area_ids,
-                    propagate_to_hidden_duplicates=True,
-                )
 
-
-class SwitchedOutput(HabitronEntity, SwitchEntity):
+class SwitchedOutput(HbtnAreaMixin, HabitronEntity, SwitchEntity):
     """Representation of a Habitron relay output as a switch."""
+
+    # Bus updates create hidden duplicate outputs; extend the area to them too.
+    _initial_area_propagate = True
 
     def __init__(
         self, coordinator: HbtnCoordinator, module: Module, output: Output, idx: int

@@ -354,18 +354,13 @@ async def test_async_setup_entry_assigns_external_area(hass: HomeAssistant) -> N
     router.areas = [Area(nmbr=5, name="Living Room")]
     entry = _entry_for(router)
 
+    captured: list = []
     with patch("custom_components.habitron.switch.er.async_get") as mock_get:
-        registry = MagicMock()
-        registry.async_get_entity_id = MagicMock(return_value="switch.fake")
-        reg_entry = MagicMock()
-        reg_entry.hidden = False
-        registry.async_get.return_value = reg_entry
-        mock_get.return_value = registry
-        await async_setup_entry(hass, entry, lambda es: None)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
+        mock_get.return_value = MagicMock()
+        await async_setup_entry(hass, entry, captured.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
 
-    registry.async_update_entity.assert_called_with(
-        "switch.fake", area_id="living_room"
-    )
+    output = next(e for e in captured if e.unique_id.endswith("_out0"))
+    assert output._initial_area_id == "living_room"
 
 
 async def test_async_setup_entry_unknown_area_clamped_to_default(
@@ -379,13 +374,10 @@ async def test_async_setup_entry_unknown_area_clamped_to_default(
     router.areas = [Area(nmbr=0, name="House")]
     entry = _entry_for(router)
 
+    captured: list = []
     with patch("custom_components.habitron.switch.er.async_get") as mock_get:
-        registry = MagicMock()
-        registry.async_get_entity_id = MagicMock(return_value="switch.fake")
-        reg_entry = MagicMock()
-        reg_entry.hidden = False
-        registry.async_get.return_value = reg_entry
-        mock_get.return_value = registry
-        await async_setup_entry(hass, entry, lambda es: None)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
+        mock_get.return_value = MagicMock()
+        await async_setup_entry(hass, entry, captured.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
 
-    registry.async_update_entity.assert_called_with("switch.fake", area_id=None)
+    output = next(e for e in captured if e.unique_id.endswith("_out0"))
+    assert output._initial_area_id is None

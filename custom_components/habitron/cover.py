@@ -18,7 +18,7 @@ from homeassistant.helpers import area_registry as ar, entity_registry as er
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from ._helpers import async_assign_entity_area, hbtn_device_info
+from ._helpers import HbtnAreaMixin, deviating_area_id, hbtn_device_info
 from .coordinator import HabitronConfigEntry, HbtnCoordinator
 
 PARALLEL_UPDATES = 1
@@ -37,45 +37,48 @@ async def async_setup_entry(
     hbtn_rt = smhub.router
     hbtn_cord = smhub.coordinator
 
-    new_devices: list[CoverEntity] = []
-    for hbt_module in hbtn_rt.modules:
-        for mod_cover in hbt_module.covers:
-            if mod_cover.nmbr >= 0:  # not disabled
-                if abs(mod_cover.type) == 1:  # shutter
-                    new_devices.append(
-                        HbtnShutter(mod_cover, hbt_module, hbtn_cord, len(new_devices))
-                    )
-                if abs(mod_cover.type) == 2:  # shutter with tilt
-                    new_devices.append(
-                        HbtnBlind(mod_cover, hbt_module, hbtn_cord, len(new_devices))
-                    )
-
-    if new_devices:
-        async_add_entities(new_devices)
-
-    registry: er.EntityRegistry = er.async_get(hass)
     area_reg = ar.async_get(hass)
     area_ids = {
         area.nmbr: area_reg.async_get_or_create(area.name).id for area in hbtn_rt.areas
     }
+    # Snapshot before adding so a cover's deviating area is stamped only at
+    # first creation and a reload never overwrites a later user area choice.
+    known_unique_ids = {
+        registered.unique_id
+        for registered in er.async_entries_for_config_entry(
+            er.async_get(hass), entry.entry_id
+        )
+    }
 
+    new_devices: list[CoverEntity] = []
     for hbt_module in hbtn_rt.modules:
         for mod_cover in hbt_module.covers:
-            if mod_cover.nmbr >= 0:
-                async_assign_entity_area(
-                    registry,
-                    domain="cover",
-                    unique_id=f"Mod_{hbt_module.uid}_cover{mod_cover.nmbr}",
-                    area_index=mod_cover.area,
-                    area_member=hbt_module.area,
-                    area_ids=area_ids,
-                )
+            if mod_cover.nmbr >= 0:  # not disabled
+                cover: HbtnShutter | None = None
+                if abs(mod_cover.type) == 1:  # shutter
+                    cover = HbtnShutter(
+                        mod_cover, hbt_module, hbtn_cord, len(new_devices)
+                    )
+                elif abs(mod_cover.type) == 2:  # shutter with tilt
+                    cover = HbtnBlind(
+                        mod_cover, hbt_module, hbtn_cord, len(new_devices)
+                    )
+                if cover is None:
+                    continue
+                if cover.unique_id not in known_unique_ids:
+                    cover._initial_area_id = deviating_area_id(  # noqa: SLF001
+                        mod_cover.area, hbt_module.area, area_ids
+                    )
+                new_devices.append(cover)
+
+    if new_devices:
+        async_add_entities(new_devices)
 
 
 # This entire class could be written to extend a base class to ensure common attributes
 # are kept identical/in sync. It's broken apart here between the Cover and Sensors to
 # be explicit about what is returned, and the comments outline where the overlap is.
-class HbtnShutter(CoordinatorEntity[HbtnCoordinator], CoverEntity):
+class HbtnShutter(HbtnAreaMixin, CoordinatorEntity[HbtnCoordinator], CoverEntity):
     """Representation of a shutter cover."""
 
     _attr_has_entity_name = True

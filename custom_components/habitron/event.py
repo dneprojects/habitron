@@ -8,7 +8,7 @@ from homeassistant.helpers import area_registry as ar, entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from ._helpers import async_assign_entity_area, hbtn_device_info
+from ._helpers import HbtnAreaMixin, deviating_area_id, hbtn_device_info
 from .coordinator import HabitronConfigEntry
 
 PARALLEL_UPDATES = 1
@@ -26,13 +26,29 @@ async def async_setup_entry(
     smhub = entry.runtime_data
     hbtn_rt = smhub.router
 
+    area_reg = ar.async_get(hass)
+    area_ids = {
+        area.nmbr: area_reg.async_get_or_create(area.name).id for area in hbtn_rt.areas
+    }
+    # Snapshot before adding so a pulse-switch event's deviating area is stamped
+    # only at first creation and a reload never overwrites a later user choice.
+    known_unique_ids = {
+        registered.unique_id
+        for registered in er.async_entries_for_config_entry(
+            er.async_get(hass), entry.entry_id
+        )
+    }
+
     new_devices: list[EventEntity] = []
     for hbt_module in hbtn_rt.modules:
         for mod_input in hbt_module.inputs:
             if abs(mod_input.type) == 1:  # pulse switch
-                new_devices.append(
-                    InputPressed(mod_input, hbt_module, len(new_devices))
-                )
+                pressed = InputPressed(mod_input, hbt_module, len(new_devices))
+                if pressed.unique_id not in known_unique_ids:
+                    pressed._initial_area_id = deviating_area_id(  # noqa: SLF001
+                        mod_input.area, hbt_module.area, area_ids
+                    )
+                new_devices.append(pressed)
         if hbt_module.mod_type == "Fanekey":
             new_devices.append(
                 FingerDetected(hbt_module.fingers[0], hbt_module, len(new_devices))
@@ -51,26 +67,8 @@ async def async_setup_entry(
     if new_devices:
         async_add_entities(new_devices)
 
-    registry: er.EntityRegistry = er.async_get(hass)
-    area_reg = ar.async_get(hass)
-    area_ids = {
-        area.nmbr: area_reg.async_get_or_create(area.name).id for area in hbtn_rt.areas
-    }
 
-    for hbt_module in hbtn_rt.modules:
-        for mod_input in hbt_module.inputs:
-            if abs(mod_input.type) == 1:  # pulse switch
-                async_assign_entity_area(
-                    registry,
-                    domain="event",
-                    unique_id=f"Mod_{hbt_module.uid}_evnt{mod_input.nmbr}",
-                    area_index=mod_input.area,
-                    area_member=hbt_module.area,
-                    area_ids=area_ids,
-                )
-
-
-class HbtnEvent(EventEntity):
+class HbtnEvent(HbtnAreaMixin, EventEntity):
     """Base representation of a Habitron event entity."""
 
     _attr_translation_key = "hbtn_event"

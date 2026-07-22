@@ -9,7 +9,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from ._helpers import async_assign_entity_area, hbtn_device_info
+from ._helpers import HbtnAreaMixin, deviating_area_id, hbtn_device_info
 from .coordinator import HabitronConfigEntry, HbtnCoordinator
 
 PARALLEL_UPDATES = 1
@@ -25,6 +25,19 @@ async def async_setup_entry(
     hbtn_rt = smhub.router
     hbtn_cord = smhub.coordinator
 
+    area_reg = ar.async_get(hass)
+    area_ids = {
+        area.nmbr: area_reg.async_get_or_create(area.name).id for area in hbtn_rt.areas
+    }
+    # Snapshot before adding so an analog output's deviating area is stamped
+    # only at first creation and a reload never overwrites a later user choice.
+    known_unique_ids = {
+        registered.unique_id
+        for registered in er.async_entries_for_config_entry(
+            er.async_get(hass), entry.entry_id
+        )
+    }
+
     new_devices: list[NumberEntity] = []
     for hbt_module in hbtn_rt.modules:
         for set_val in hbt_module.setvalues:
@@ -33,32 +46,17 @@ async def async_setup_entry(
             )
         for analog_out in hbt_module.analog_outputs:
             if abs(analog_out.type) == 8:  # analogue output
-                new_devices.append(
-                    HbtnAnalogOutput(
-                        analog_out, hbt_module, hbtn_cord, len(new_devices)
-                    )
+                analog = HbtnAnalogOutput(
+                    analog_out, hbt_module, hbtn_cord, len(new_devices)
                 )
+                if analog.unique_id not in known_unique_ids:
+                    analog._initial_area_id = deviating_area_id(  # noqa: SLF001
+                        analog_out.area, hbt_module.area, area_ids
+                    )
+                new_devices.append(analog)
 
     if new_devices:
         async_add_entities(new_devices)
-
-    registry: er.EntityRegistry = er.async_get(hass)
-    area_reg = ar.async_get(hass)
-    area_ids = {
-        area.nmbr: area_reg.async_get_or_create(area.name).id for area in hbtn_rt.areas
-    }
-
-    for hbt_module in hbtn_rt.modules:
-        for analog_out in hbt_module.analog_outputs:
-            if abs(analog_out.type) == 8:  # analogue output
-                async_assign_entity_area(
-                    registry,
-                    domain="number",
-                    unique_id=f"Mod_{hbt_module.uid}_out{analog_out.nmbr}",
-                    area_index=analog_out.area,
-                    area_member=hbt_module.area,
-                    area_ids=area_ids,
-                )
 
 
 class HbtnSetTemperature(CoordinatorEntity[HbtnCoordinator], NumberEntity):
@@ -110,7 +108,7 @@ class HbtnSetTemperature(CoordinatorEntity[HbtnCoordinator], NumberEntity):
         await self.coordinator.async_request_refresh()
 
 
-class HbtnAnalogOutput(CoordinatorEntity[HbtnCoordinator], NumberEntity):
+class HbtnAnalogOutput(HbtnAreaMixin, CoordinatorEntity[HbtnCoordinator], NumberEntity):
     """Representation of an analogue output number."""
 
     _attr_has_entity_name = True

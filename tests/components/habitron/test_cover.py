@@ -244,10 +244,10 @@ async def test_async_setup_entry_assigns_external_area(hass: HomeAssistant) -> N
     router.areas = [Area(nmbr=5, name="Living Room")]
     entry = _entry_for(router)
 
+    captured: list = []
     with patch("custom_components.habitron.cover.er.async_get") as mock_get:
-        registry = MagicMock()
-        registry.async_get_entity_id = MagicMock(return_value="cover.fake")
-        mock_get.return_value = registry
-        await async_setup_entry(hass, entry, lambda es: None)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
+        mock_get.return_value = MagicMock()
+        await async_setup_entry(hass, entry, captured.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
 
-    registry.async_update_entity.assert_called_with("cover.fake", area_id="living_room")
+    cover = next(e for e in captured if e.unique_id.endswith("_cover0"))
+    assert cover._initial_area_id == "living_room"

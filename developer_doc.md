@@ -4,6 +4,29 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.1.9
+
+Reworks area assignment so a deviating bus area is applied **once, at first
+creation**, instead of on every setup.
+
+### Fixed
+- **Area overwritten on every reload.** `async_assign_entity_area` was called
+  after `async_add_entities` and unconditionally (re-)applied the computed area
+  each setup, clobbering a later user area move -- and resetting non-deviating
+  entities to `None`. Because HA registers entities asynchronously
+  (`config_entry.async_create_task`), that post-add pass also ran before new
+  entities were registered, so the area only landed on a *later* run.
+
+### Changed
+- New `HbtnAreaMixin` + `deviating_area_id` in `_helpers.py`. Each platform
+  (sensor, cover, light, number, event, switch) snapshots the already-registered
+  unique ids *before* `async_add_entities`, sets `_initial_area_id` only on a
+  newly-created entity, and the mixin applies it from `async_added_to_hass`
+  (after registration). `switch` outputs keep the hidden-duplicate propagation
+  via `_initial_area_propagate`. The old `async_assign_entity_area` helper is
+  removed. Analog inputs are now derived from the model's `analogins` rather
+  than hard-coded module type codes.
+
 ## v3.1.8
 
 Bumps `habitron_client` to 2.0.12 and trims a needless host-diagnostics poll.

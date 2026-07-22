@@ -4,8 +4,9 @@
   Habitron entity: it links to the module device and binds a model member's
   change listener to ``async_write_ha_state`` (the v2 ``habitron_client`` model
   fires per-member listeners instead of the old descriptor callbacks).
-* ``async_assign_entity_area`` pushes an entity's HA area (derived from the
-  bus-side area index / module area / router area names) into the registry.
+* ``HbtnAreaMixin`` / ``deviating_area_id`` stamp an entity's deviating HA area
+  (derived from the bus-side area index / module / router area names) once, at
+  first creation, from ``async_added_to_hass``.
 * ``hbtn_device_info`` builds the ``DeviceInfo`` dict linking an entity to its
   module device.
 """
@@ -16,9 +17,64 @@ from habitron_client import BusMember, Module
 
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
+
+
+def deviating_area_id(
+    area_index: int, area_member: int, area_ids: dict[int, str]
+) -> str | None:
+    """Return the HA area id an entity deviates into, or ``None``.
+
+    ``area_index`` is the bus-side area number. It is a real deviation only when
+    it is known and differs from the module's own ``area_member``; otherwise the
+    entity inherits the device area (``None``).
+    """
+    if area_index in (0, area_member) or area_index not in area_ids:
+        return None
+    return area_ids[area_index]
+
+
+class HbtnAreaMixin(Entity):
+    """Stamp a deviating area onto the entity, once, at first creation.
+
+    The platform sets ``_initial_area_id`` only for a newly-created entity (it
+    snapshots the already-registered ids before adding). Applying it here in
+    ``async_added_to_hass`` -- which runs *after* the entity is registered,
+    unlike a pass right after ``async_add_entities`` -- means the area lands
+    reliably on first creation and is never re-stamped on a reload, so a later
+    user area move (or clearing it to the device area) survives.
+
+    ``_initial_area_propagate`` extends the area to every *hidden* entity on the
+    same device that shares the original name (bus updates create such duplicate
+    hidden entities on the ``switch`` platform).
+    """
+
+    _initial_area_id: str | None = None
+    _initial_area_propagate: bool = False
+
+    async def async_added_to_hass(self) -> None:
+        """Apply the first-creation area after the base registration."""
+        await super().async_added_to_hass()
+        entry = self.registry_entry
+        if self._initial_area_id is None or entry is None:
+            return
+        registry = er.async_get(self.hass)
+        registry.async_update_entity(entry.entity_id, area_id=self._initial_area_id)
+        if (
+            not self._initial_area_propagate
+            or not entry.hidden
+            or entry.device_id is None
+        ):
+            return
+        for dev_entity in er.async_entries_for_device(registry, entry.device_id):
+            if dev_entity.original_name == entry.original_name:
+                registry.async_update_entity(
+                    dev_entity.entity_id, area_id=self._initial_area_id
+                )
+
 
 if TYPE_CHECKING:
     from .communicate import HbtnComm
@@ -74,43 +130,3 @@ class HabitronEntity(CoordinatorEntity["HbtnCoordinator"]):
         """Unsubscribe the member listener."""
         self._member.remove_listener(self.async_write_ha_state)
         await super().async_will_remove_from_hass()
-
-
-def async_assign_entity_area(
-    registry: er.EntityRegistry,
-    *,
-    domain: str,
-    unique_id: str,
-    area_index: int,
-    area_member: int,
-    area_ids: dict[int, str],
-    propagate_to_hidden_duplicates: bool = False,
-) -> None:
-    """Push the entity identified by (domain, unique_id) into the right HA area.
-
-    ``area_index`` is the bus-side area number from the module description.
-    ``area_ids`` maps a bus area number to its HA area-registry id
-    (``AreaEntry.id``), resolved by the consumer from ``Area.name`` via the area
-    registry. When ``area_index`` is unknown or equals the module's own
-    ``area_member``, the entity is reset to the "no area" default; otherwise it
-    is moved into the matching area.
-
-    ``propagate_to_hidden_duplicates`` extends the same area to every *hidden*
-    entity on the same device that shares the original name — needed by platforms
-    (currently ``switch``) where bus updates create duplicate hidden entities.
-    """
-    entity_entry = registry.async_get_entity_id(domain, DOMAIN, unique_id)
-    if not entity_entry:
-        return
-    if area_index not in area_ids:
-        area_index = 0
-    target_area = None if area_index in (0, area_member) else area_ids[area_index]
-    registry.async_update_entity(entity_entry, area_id=target_area)
-    if not propagate_to_hidden_duplicates:
-        return
-    entity = registry.async_get(entity_entry)
-    if entity is None or not entity.hidden or entity.device_id is None:
-        return
-    for dev_entity in er.async_entries_for_device(registry, entity.device_id):
-        if dev_entity.original_name == entity.original_name:
-            registry.async_update_entity(dev_entity.entity_id, area_id=target_area)

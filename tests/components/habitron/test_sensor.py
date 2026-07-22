@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from habitron_client import Area
 import pytest
 
+from custom_components.habitron.const import DOMAIN
 from custom_components.habitron.sensor import (
     AIRQUALITY_DESCRIPTION,
     CURRENT_DESCRIPTION,
@@ -19,6 +20,7 @@ from custom_components.habitron.sensor import (
 )
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import area_registry as ar, entity_registry as er
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 
@@ -947,13 +949,13 @@ async def test_async_setup_entry_analog_area_assignment_external(
     entry.runtime_data = smhub
     entry.runtime_data.router = router
 
+    captured: list = []
     with patch("custom_components.habitron.sensor.er.async_get") as mock_get:
-        registry = MagicMock()
-        registry.async_get_entity_id = MagicMock(return_value="sensor.fake")
-        mock_get.return_value = registry
-        await async_setup_entry(hass, entry, lambda es: None)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
+        mock_get.return_value = MagicMock()
+        await async_setup_entry(hass, entry, captured.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
 
-    registry.async_update_entity.assert_called_with("sensor.fake", area_id="area_5_id")
+    analog = next(e for e in captured if e.unique_id.endswith("_adin0"))
+    assert analog._initial_area_id == "area_5_id"
 
 
 async def test_async_setup_entry_analog_area_overflow_falls_back(
@@ -991,10 +993,94 @@ async def test_async_setup_entry_analog_area_overflow_falls_back(
     entry.runtime_data = smhub
     entry.runtime_data.router = router
 
+    captured: list = []
     with patch("custom_components.habitron.sensor.er.async_get") as mock_get:
-        registry = MagicMock()
-        registry.async_get_entity_id = MagicMock(return_value="sensor.fake")
-        mock_get.return_value = registry
-        await async_setup_entry(hass, entry, lambda es: None)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
+        mock_get.return_value = MagicMock()
+        await async_setup_entry(hass, entry, captured.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
 
-    registry.async_update_entity.assert_called_with("sensor.fake", area_id=None)
+    analog = next(e for e in captured if e.unique_id.endswith("_adin0"))
+    assert analog._initial_area_id is None
+
+
+async def test_analog_mixin_applies_initial_area_on_add(
+    hass: HomeAssistant,
+    entity_registry: er.EntityRegistry,
+    area_registry: ar.AreaRegistry,
+) -> None:
+    """A newly created analog input stamps its deviating area on add.
+
+    The area is applied from ``async_added_to_hass`` (after registration), not a
+    pass right after ``async_add_entities`` when the entity is not yet
+    registered.
+    """
+    kitchen = area_registry.async_get_or_create("Kitchen")
+    module = _make_module()
+    module.analogins = {0: MagicMock()}
+    sensor = MagicMock()
+    sensor.nmbr = 0
+    sensor.name = "AIn 1"
+    coord = MagicMock(spec=DataUpdateCoordinator)
+    entity = AnalogSensor(module, sensor, coord, 0)
+    entity._initial_area_id = kitchen.id
+    reg_entry = entity_registry.async_get_or_create("sensor", DOMAIN, entity.unique_id)
+    entity.hass = hass
+    entity.entity_id = reg_entry.entity_id
+    entity.registry_entry = reg_entry
+    entity.async_write_ha_state = MagicMock()
+    with patch(
+        "homeassistant.helpers.update_coordinator."
+        "CoordinatorEntity.async_added_to_hass",
+        new=AsyncMock(),
+    ):
+        await entity.async_added_to_hass()
+
+    assert entity_registry.async_get(reg_entry.entity_id).area_id == kitchen.id
+
+
+async def test_analog_area_not_restamped_on_reload(hass: HomeAssistant) -> None:
+    """On reload a deviating analog input carries no ``_initial_area_id``.
+
+    The setup snapshots the already-registered ids, so an entity that existed on
+    a prior run is never re-stamped -- a later user area choice survives.
+    """
+    ain = MagicMock()
+    ain.name = "AIn 1"
+    ain.nmbr = 0
+    ain.type = 3
+    ain.area = 5
+    mod = MagicMock()
+    mod.uid = "MOD-A"
+    mod.mod_type = "Other"
+    mod.typ = b"\x01\x03"
+    mod.area = 0
+    mod.sensors = []
+    mod.analogins = [ain]
+    mod.logic = []
+    mod.diags = []
+    smhub = MagicMock()
+    smhub.sensors = []
+    smhub.diags = []
+    smhub.uid = "HUB-1"
+    router = MagicMock()
+    router.modules = [mod]
+    router.chan_timeouts = []
+    router.chan_currents = []
+    router.voltages = []
+    router.areas = [Area(nmbr=5, name="area_5_id")]
+    entry = MagicMock()
+    entry.runtime_data = smhub
+    entry.runtime_data.router = router
+
+    captured: list = []
+    with (
+        patch("custom_components.habitron.sensor.er.async_get") as mock_get,
+        patch(
+            "custom_components.habitron.sensor.er.async_entries_for_config_entry",
+            return_value=[MagicMock(unique_id="Mod_MOD-A_adin0")],
+        ),
+    ):
+        mock_get.return_value = MagicMock()
+        await async_setup_entry(hass, entry, captured.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
+
+    analog = next(e for e in captured if e.unique_id.endswith("_adin0"))
+    assert analog._initial_area_id is None

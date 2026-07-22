@@ -28,7 +28,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from ._helpers import async_assign_entity_area, hbtn_device_info
+from ._helpers import HbtnAreaMixin, deviating_area_id, hbtn_device_info
 from .coordinator import HabitronConfigEntry, HbtnCoordinator
 
 if TYPE_CHECKING:
@@ -47,6 +47,20 @@ async def async_setup_entry(  # noqa: C901
     smhub = entry.runtime_data
     hbtn_rt = smhub.router
     hbtn_cord = smhub.coordinator
+
+    area_reg = ar.async_get(hass)
+    area_ids = {
+        area.nmbr: area_reg.async_get_or_create(area.name).id for area in hbtn_rt.areas
+    }
+    # Snapshot the already-registered ids *before* adding, so an analog input's
+    # deviating area is stamped only at first creation and a reload never
+    # overwrites a later user area choice.
+    known_unique_ids = {
+        registered.unique_id
+        for registered in er.async_entries_for_config_entry(
+            er.async_get(hass), entry.entry_id
+        )
+    }
 
     new_devices: list[SensorEntity] = []
     for smhub_sensor in smhub.sensors:
@@ -146,12 +160,14 @@ async def async_setup_entry(  # noqa: C901
                     )
                 )
 
-        if hbt_module.typ in [b"\x01\x03", b"\x0b\x1f"]:
-            for ain in hbt_module.analogins:
-                if ain.type == 3:
-                    new_devices.append(
-                        AnalogSensor(hbt_module, ain, hbtn_cord, len(new_devices))
+        for ain in hbt_module.analogins:
+            if ain.type == 3:
+                analog = AnalogSensor(hbt_module, ain, hbtn_cord, len(new_devices))
+                if analog.unique_id not in known_unique_ids:
+                    analog._initial_area_id = deviating_area_id(  # noqa: SLF001
+                        ain.area, hbt_module.area, area_ids
                     )
+                new_devices.append(analog)
         for mod_sensor in hbt_module.sensors:
             if mod_sensor.name[0:11] == "Temperature":
                 new_devices.append(
@@ -254,26 +270,6 @@ async def async_setup_entry(  # noqa: C901
 
     if new_devices:
         async_add_entities(new_devices)
-
-    # --- Area Registry Handling ---
-    registry: er.EntityRegistry = er.async_get(hass)
-    area_reg = ar.async_get(hass)
-    area_ids = {
-        area.nmbr: area_reg.async_get_or_create(area.name).id for area in hbtn_rt.areas
-    }
-
-    for hbt_module in hbtn_rt.modules:
-        if hbt_module.typ in [b"\x01\x03", b"\x0b\x1f"]:
-            for ain in hbt_module.analogins:
-                if ain.type == 3:  # analog input
-                    async_assign_entity_area(
-                        registry,
-                        domain="sensor",
-                        unique_id=f"Mod_{hbt_module.uid}_adin{ain.nmbr}",
-                        area_index=ain.area,
-                        area_member=hbt_module.area,
-                        area_ids=area_ids,
-                    )
 
 
 def _host_diags_unavailable(module: Module) -> bool:
@@ -467,7 +463,7 @@ TIMEOUT_DESCRIPTION = HbtnSensorEntityDescription(
 )
 
 
-class AnalogSensor(HbtnSensor):
+class AnalogSensor(HbtnAreaMixin, HbtnSensor):
     """Representation of a Sensor."""
 
     _attr_native_unit_of_measurement = PERCENTAGE
