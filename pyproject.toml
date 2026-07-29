@@ -40,7 +40,7 @@ exclude_lines = [
 # core's pyproject.toml; only the per-file-ignores paths are adapted to
 # the HACS layout (custom_components/habitron instead of
 # homeassistant/components/<domain>).
-required-version = ">=0.15.15"
+required-version = ">=0.15.14"  # keep in lockstep with HA core
 line-length = 88
 target-version = "py314"
 extend-exclude = ["custom_components/habitron/data"]

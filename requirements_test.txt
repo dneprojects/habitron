@@ -41,7 +41,9 @@ home-assistant-intents==2026.6.1
 pymicro-vad==1.0.1
 pyspeex-noise==1.0.2
 
-# Lint + type-check tooling. Pinned only loosely; CI uses whatever
-# the resolver lands on for the current Python version.
-ruff>=0.13
+# Lint + type-check tooling. ruff is pinned to the exact version HA core
+# pins (requirements_test_pre_commit.txt) so that "clean here" == "clean in
+# core": an unpinned ruff lets CI drift onto a release that enables rules
+# core does not run yet (PLR0917 did exactly that).
+ruff==0.15.14
 mypy>=1.13

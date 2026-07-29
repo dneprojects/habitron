@@ -26,6 +26,14 @@ Fixes the colour-LED brightness latch in `HbtnColorLight`.
   never visible while the LED is off -- `LightEntity.state_attributes` reports
   `brightness` as `None` whenever `is_on` is `False`.
 
+### Tooling
+- **ruff pinned to 0.15.14.** `requirements_test.txt` asked for `ruff>=0.13`, so
+  CI drifted onto a release that enables `PLR0917` ("Too many positional
+  arguments") -- a rule HA core does not run -- and 17 pre-existing findings
+  turned the `Tests` workflow red. ruff is now pinned to the exact version core
+  pins in `requirements_test_pre_commit.txt`, and `required-version` in
+  `pyproject.toml` moves from `>=0.15.15` back to core's `>=0.15.14`.
+
 ## v3.1.9
 
 Reworks area assignment so a deviating bus area is applied **once, at first
