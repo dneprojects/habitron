@@ -3,6 +3,9 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.1.10
+- Fixed: the colour LEDs of the Smart Controller Touch and Mini (ambient and the four corners) no longer come back almost black after being switched off. Turning one on without picking a colour now restores the colour and brightness it had before.
+
 ## v3.1.9
 - Fixed: a manually set area on an analog input, dimmer, cover, output switch or button event is no longer reset on every reload/restart. The bus-provided area is now applied only when the entity is first created, so your own area choice sticks.
 

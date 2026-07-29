@@ -193,14 +193,39 @@ def test_color_light_handle_update_derives_color_and_brightness() -> None:
     assert entity.rgb_color == (255, 128, 0)
 
 
-def test_color_light_handle_update_all_off_zero_brightness() -> None:
-    """When all channels are zero the brightness drops to 0."""
+def test_color_light_handle_update_all_off_keeps_last_state() -> None:
+    """When all channels are zero the last colour and brightness are kept."""
     cled = _cled()
-    cled.rgb = [0, 0, 0, 0]
+    cled.is_on = True
+    cled.rgb = [128, 64, 0, 0]
     entity = HbtnColorLight(cled, _module(), _coord(), 0)
     _stub_write(entity)
     entity._handle_coordinator_update()
-    assert entity.brightness == 0
+
+    cled.is_on = False
+    cled.rgb = [0, 0, 0, 0]
+    entity._handle_coordinator_update()
+    assert entity.brightness == 128
+    assert entity.rgb_color == (255, 128, 0)
+
+
+async def test_color_light_plain_turn_on_restores_last_brightness() -> None:
+    """A turn_on without attributes relights the last colour and brightness."""
+    coord = _coord()
+    cled = _cled()
+    cled.is_on = True
+    cled.rgb = [128, 64, 0, 0]
+    entity = HbtnColorLight(cled, cled_module := _module(), coord, 0)
+    _stub_write(entity)
+    entity._handle_coordinator_update()
+
+    # The LED is switched off and the module reports all channels zero.
+    await entity.async_turn_off()
+    cled.rgb = [0, 0, 0, 0]
+    entity._handle_coordinator_update()
+
+    await entity.async_turn_on()
+    coord.comm.async_set_rgbval.assert_awaited_with(cled_module.addr, 1, [128, 64, 1])
 
 
 async def test_color_light_turn_on_sets_rgb() -> None:

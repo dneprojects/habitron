@@ -267,9 +267,11 @@ class HbtnColorLight(CoordinatorEntity[HbtnCoordinator], LightEntity):
                 min(round((g_dimmed / max_channel) * 255), 255),
                 min(round((b_dimmed / max_channel) * 255), 255),
             )
-        else:
-            # All channels off — keep the last colour, drop brightness to 0.
-            self._brightness = 0
+        # All channels off: keep both the last colour and the last brightness so
+        # a plain turn_on restores what was lit before. Home Assistant reports
+        # brightness as None while the light is off, so the retained value never
+        # shows up in the state — but zeroing it would make the next turn_on
+        # send an all-black colour.
         self.async_write_ha_state()
 
     async def async_turn_on(self, **kwargs: Any) -> None:

@@ -4,6 +4,28 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.1.10
+
+Fixes the colour-LED brightness latch in `HbtnColorLight`.
+
+### Fixed
+- **Colour LED relit black (`light.py`).** `_handle_coordinator_update` reset
+  `_brightness` to `0` whenever the module reported all three channels as zero,
+  i.e. every time the LED was off. A following attribute-less `light.turn_on`
+  then computed `bright_factor = 0` and -- because of the per-channel
+  `max(..., 1)` floor -- wrote `[1, 1, 1]` to the bus: nominally on, visually
+  black. The next poll read that back as `max_channel == 1`, so `_brightness`
+  became `1` and `_rgb_color` was rescaled to `(255, 255, 255)`, destroying the
+  previous colour and latching the LED at "on and black" for every further
+  toggle. Both the last colour and the last brightness are now retained while
+  the LED is off, so a plain `turn_on` relights what was there before.
+  No guard is needed in `async_turn_on`: `_brightness` starts at `255` and is
+  only ever assigned `max_channel > 0` or a service value, and the light service
+  routes `turn_on` with `brightness == 0` to `turn_off`
+  (`homeassistant/components/light/__init__.py`). The retained value is also
+  never visible while the LED is off -- `LightEntity.state_attributes` reports
+  `brightness` as `None` whenever `is_on` is `False`.
+
 ## v3.1.9
 
 Reworks area assignment so a deviating bus area is applied **once, at first
