@@ -120,7 +120,7 @@ class HbtnShutter(HbtnAreaMixin, CoordinatorEntity[HbtnCoordinator], CoverEntity
             self._out_down = self._nmbr * 2
         self._position: int = 0
         self._moving: int = 0
-        self.stop_delay: int = coord.comm.router.cover_autostop_del
+        self.stop_delay: int | None = coord.comm.router.cover_autostop_del
         self._stop_task: asyncio.Task[None] | None = None
         self._attr_unique_id: str | None = f"Mod_{self._module.uid}_cover{cover.nmbr}"
         self._attr_device_info = hbtn_device_info(self._module.uid)
@@ -196,12 +196,13 @@ class HbtnShutter(HbtnAreaMixin, CoordinatorEntity[HbtnCoordinator], CoverEntity
             self._moving = -1
         else:
             self._moving = 0
-        if self._moving == 1:
-            if (self._position == 100) and (self.stop_delay >= 0):
-                self._schedule_stop(self.stop_delay)
-        elif self._moving == -1:
-            if (self._position == 0) and (self.stop_delay >= 0):
-                self._schedule_stop(self.stop_delay)
+        # A delay of ``None`` means the router has the automatic switch-off
+        # disabled; a delay of 0 is valid and stops the output immediately.
+        if self.stop_delay is not None and (
+            (self._moving == 1 and self._position == 100)
+            or (self._moving == -1 and self._position == 0)
+        ):
+            self._schedule_stop(self.stop_delay)
         self.async_write_ha_state()
 
     async def _stop_cover_after_delay(self, delay_time: int) -> None:
@@ -324,12 +325,13 @@ class HbtnBlind(HbtnShutter):
         else:
             self._moving = 0
         self._position = 100 - int(self._cover.position)
-        if self._moving == 1:
-            if (self._position == 100) and (self.stop_delay >= 0):
-                self._schedule_stop(self.stop_delay)
-        elif self._moving == -1:
-            if (self._position == 0) and (self.stop_delay >= 0):
-                self._schedule_stop(self.stop_delay)
+        # A delay of ``None`` means the router has the automatic switch-off
+        # disabled; a delay of 0 is valid and stops the output immediately.
+        if self.stop_delay is not None and (
+            (self._moving == 1 and self._position == 100)
+            or (self._moving == -1 and self._position == 0)
+        ):
+            self._schedule_stop(self.stop_delay)
         self.async_write_ha_state()
 
     async def async_set_cover_tilt_position(self, **kwargs: Any) -> None:

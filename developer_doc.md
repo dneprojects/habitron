@@ -4,6 +4,33 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.1.11
+
+Decodes the cover autostop counter's "off" marker; needs `habitron_client` 2.0.13.
+
+### Fixed
+- **A disabled autostop switched the cover output off after 255 seconds
+  (`cover.py`).** The router transmits the delay for switching a cover output
+  off after the end position as a single byte (`FF 0B` description record) and
+  uses `255` for "no automatic switch-off". The library passed the byte through
+  raw, and both `HbtnShutter._handle_coordinator_update` and the `HbtnBlind`
+  override guarded on `self.stop_delay >= 0` -- a condition an unsigned byte can
+  never fail. So instead of skipping the switch-off, the entity scheduled it
+  with a 255 second delay, and `_schedule_stop` held that task against further
+  ticks. The `>= 0` looks like it was written for exactly this intent, but no
+  negative value ever reaches it.
+- **Fix in the library, not here.** `habitron_client` 2.0.13 decodes the marker
+  (`_parse_router.py`), so `Router.cover_autostop_del` is `int | None` with
+  `None` for "disabled" -- protocol knowledge stays out of the integration, the
+  line the core review asked for. Both entities now guard on
+  `stop_delay is not None`, and the two endpoint branches collapsed into one
+  condition. `0` remains a valid delay ("stop immediately") and is covered by a
+  test, since a truthiness check would have quietly broken it.
+
+### Not done here
+- The core PR keeps its `habitron_client==2.0.12` pin; the bump goes in with the
+  next round.
+
 ## v3.1.10
 
 Fixes the colour-LED brightness latch in `HbtnColorLight`.

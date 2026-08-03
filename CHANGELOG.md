@@ -3,6 +3,9 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.1.11
+- Fixed: covers whose automatic switch-off is turned off at the router no longer get switched off anyway, 255 seconds after reaching the end position.
+
 ## v3.1.10
 - Fixed: the colour LEDs of the Smart Controller Touch and Mini (ambient and the four corners) no longer come back almost black after being switched off. Turning one on without picking a colour now restores the colour and brightness it had before.
 

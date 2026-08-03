@@ -15,7 +15,7 @@ from homeassistant.core import HomeAssistant
 from .conftest import class_attr
 
 
-def _coord(autostop: int = 5) -> MagicMock:
+def _coord(autostop: int | None = 5) -> MagicMock:
     """Build a mock coordinator with comm stubs and the autostop delay."""
     coord = MagicMock()
     coord.comm = MagicMock()
@@ -125,6 +125,44 @@ def test_shutter_schedules_stop_at_endpoint() -> None:
     module.outputs[0].is_on = True  # moving up
     entity._handle_coordinator_update()
     entity.hass.async_create_task.assert_called()
+
+
+def test_shutter_schedules_stop_without_delay() -> None:
+    """A delay of 0 is a valid setting, not a disabled switch-off."""
+    module = _module()
+    entity = HbtnShutter(
+        Cover(name="Sh", nmbr=0, type=1, position=0), module, _coord(autostop=0), 0
+    )
+    entity.hass = MagicMock()
+    entity.async_write_ha_state = MagicMock()
+    module.outputs[0].is_on = True  # moving up
+    entity._handle_coordinator_update()
+    entity.hass.async_create_task.assert_called()
+
+
+def test_shutter_autostop_disabled_schedules_nothing() -> None:
+    """The router can switch the automatic stop off (255 on the bus -> None)."""
+    module = _module()
+    entity = HbtnShutter(
+        Cover(name="Sh", nmbr=0, type=1, position=0), module, _coord(autostop=None), 0
+    )
+    entity.hass = MagicMock()
+    entity.async_write_ha_state = MagicMock()
+    module.outputs[0].is_on = True  # moving up, at the endpoint
+    entity._handle_coordinator_update()
+    entity.hass.async_create_task.assert_not_called()
+
+
+def test_blind_autostop_disabled_schedules_nothing() -> None:
+    """The blind subclass honours the disabled switch-off just as well."""
+    module = _module(typ=b"\x0a\x1e")
+    module.covers = [Cover(name="Bl", nmbr=0, type=2, position=0, tilt=0)]
+    entity = HbtnBlind(module.covers[0], module, _coord(autostop=None), 0)
+    entity.hass = MagicMock()
+    entity.async_write_ha_state = MagicMock()
+    module.outputs[0].is_on = True
+    entity._handle_coordinator_update()
+    entity.hass.async_create_task.assert_not_called()
 
 
 async def test_stop_cover_after_delay_resets_moving() -> None:
