@@ -5,6 +5,7 @@ User-facing release notes. For the detailed technical changelog see
 
 ## v3.2.0
 - The hub address is now stored under Home Assistant's standard `host` key instead of an integration-specific one, matching what the Home Assistant core version of this integration expects. Existing configurations are converted automatically — nothing to re-enter.
+- Removed a leftover `update_interval` value from the stored configuration; the polling interval has been a fixed value for a long time and this entry was no longer read.
 
 ## v3.1.11
 - Fixed: covers whose automatic switch-off is turned off at the router no longer get switched off anyway, 255 seconds after reaching the end position.

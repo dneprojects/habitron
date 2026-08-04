@@ -27,6 +27,10 @@ that makes it non-breaking.
   websocket token stays: unlike the core PR (which drops it, having no consumer
   for it yet), this integration really uses it for SmartController Touch and
   Assist.
+- **`update_interval` dropped from the entry data.** The key predates the move
+  to a fixed `SCAN_INTERVAL`; neither this integration nor core has read it
+  since, so the v1 -> v2 step removes it rather than carrying it forward. Found
+  on a real installation while checking the migration result.
 - **`KEY_TOKEN` moved to `const.py`.** `smart_hub.py` read
   `config.data["websock_token"]` as a raw string, bypassing the constant that
   `config_flow.py` defined; `diagnostics.py` repeated the literal in its redact

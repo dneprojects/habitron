@@ -43,6 +43,9 @@ async def test_migrate_v1_entry_renames_the_host_key(
 ) -> None:
     """A v1 entry keeps working: the host key is renamed, the token stays.
 
+    ``update_interval`` goes: the coordinator has used a fixed SCAN_INTERVAL
+    since long before this, so the key is dead weight in the entry.
+
     Entries created before 3.2.0 store the host under the integration-specific
     ``habitron_host`` key; core expects ``CONF_HOST``. Nobody should have to set
     the hub up again for that. The websocket token is untouched -- it is still
@@ -53,7 +56,7 @@ async def test_migrate_v1_entry_renames_the_host_key(
         title="Habitron",
         unique_id="hub-1",
         version=1,
-        data={"habitron_host": MOCK_HOST, KEY_TOKEN: "tok"},
+        data={"habitron_host": MOCK_HOST, KEY_TOKEN: "tok", "update_interval": 10},
     )
     entry.add_to_hass(hass)
 

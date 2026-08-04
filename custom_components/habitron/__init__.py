@@ -61,6 +61,10 @@ async def async_migrate_entry(hass: HomeAssistant, entry: HabitronConfigEntry) -
         data = {**entry.data}
         if "habitron_host" in data:
             data[CONF_HOST] = data.pop("habitron_host")
+        # ``update_interval`` was dropped when the coordinator moved to a fixed
+        # SCAN_INTERVAL; nothing has read it since, so it does not need to be
+        # carried along.
+        data.pop("update_interval", None)
         hass.config_entries.async_update_entry(entry, data=data, version=2)
     return True
 
