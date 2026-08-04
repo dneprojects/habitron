@@ -6,10 +6,11 @@ from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceEntry
 
+from .const import KEY_TOKEN
 from .coordinator import HabitronConfigEntry
 
 REDACT_KEYS = {
-    "websock_token",
+    KEY_TOKEN,
     "mac",
     "lan mac",
     "serial",

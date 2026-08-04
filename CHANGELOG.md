@@ -3,6 +3,9 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.2.0b1 (beta)
+- The hub address is now stored under Home Assistant's standard `host` key instead of an integration-specific one, matching what the Home Assistant core version of this integration expects. Existing configurations are converted automatically — nothing to re-enter.
+
 ## v3.1.11
 - Fixed: covers whose automatic switch-off is turned off at the router no longer get switched off anyway, 255 seconds after reaching the end position.
 

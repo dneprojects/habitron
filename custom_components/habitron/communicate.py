@@ -22,6 +22,7 @@ from habitron_client import (
 
 from homeassistant.components import network
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant
 
 if TYPE_CHECKING:
@@ -44,7 +45,7 @@ class HbtnComm:
     ) -> None:
         """Init CommTest for connection test."""
         self._name: str = "HbtnComm"
-        self._host_conf: str = config.data.__getitem__("habitron_host")
+        self._host_conf: str = config.data[CONF_HOST]
         self.smhub: SmartHub = smhub
         self.logger = logging.getLogger(__name__)
 

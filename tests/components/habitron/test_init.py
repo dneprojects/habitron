@@ -10,11 +10,14 @@ from custom_components.habitron import (
     async_remove_config_entry_device,
     async_unload_entry,
 )
-from custom_components.habitron.const import DOMAIN
+from custom_components.habitron.const import DOMAIN, KEY_TOKEN
 from custom_components.habitron.services import SERVICE_HUB_RESTART
 from homeassistant.config_entries import ConfigEntryState
+from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
+
+from .const import MOCK_HOST
 
 
 async def test_setup_entry(
@@ -28,6 +31,38 @@ async def test_setup_entry(
     assert entry.runtime_data is not None
     # Services are registered globally on the domain
     assert hass.services.has_service(DOMAIN, SERVICE_HUB_RESTART)
+
+
+async def test_migrate_v1_entry_renames_the_host_key(
+    hass: HomeAssistant,
+    setup_homeassistant: None,
+    mock_habitron_client: MagicMock,
+    mock_smart_hub_setup: None,
+    mock_ws_provider: MagicMock,
+    mock_coordinator_refresh: AsyncMock,
+) -> None:
+    """A v1 entry keeps working: the host key is renamed, the token stays.
+
+    Entries created before 3.2.0 store the host under the integration-specific
+    ``habitron_host`` key; core expects ``CONF_HOST``. Nobody should have to set
+    the hub up again for that. The websocket token is untouched -- it is still
+    used for the SmartController Touch and Assist connection.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Habitron",
+        unique_id="hub-1",
+        version=1,
+        data={"habitron_host": MOCK_HOST, KEY_TOKEN: "tok"},
+    )
+    entry.add_to_hass(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert entry.version == 2
+    assert entry.data == {CONF_HOST: MOCK_HOST, KEY_TOKEN: "tok"}
+    assert entry.state is ConfigEntryState.LOADED
 
 
 async def test_unload_entry(

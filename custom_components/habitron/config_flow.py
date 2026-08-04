@@ -14,6 +14,7 @@ import voluptuous as vol
 
 from homeassistant import config_entries, exceptions
 from homeassistant.components import network
+from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.service_info.ssdp import (
     ATTR_UPNP_SERIAL,
@@ -21,7 +22,7 @@ from homeassistant.helpers.service_info.ssdp import (
     SsdpServiceInfo,
 )
 
-from .const import CONF_DEFAULT_HOST, DOMAIN
+from .const import CONF_DEFAULT_HOST, DOMAIN, KEY_TOKEN
 from .coordinator import HabitronConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
@@ -29,9 +30,6 @@ _LOGGER = logging.getLogger(__name__)
 DISCOVERY_PORT = 7777
 DISCOVERY_TIMEOUT = 3.0
 DISCOVERY_MESSAGE = b"habitron_discovery"
-
-KEY_HOST = "habitron_host"
-KEY_TOKEN = "websock_token"
 
 
 async def _get_local_ip(hass: HomeAssistant) -> str:
@@ -69,12 +67,12 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     own_ip = await _get_local_ip(hass)
     _LOGGER.debug("Smart Center own IP: %s", own_ip)
 
-    host_input = data[KEY_HOST]
+    host_input = data[CONF_HOST]
 
     # If the entered IP matches our own IP, save as 'local'
     if host_input == own_ip:
         host_input = "local"
-        data[KEY_HOST] = "local"
+        data[CONF_HOST] = "local"
 
     host_to_test = host_input
     if host_to_test == "local":
@@ -154,7 +152,7 @@ class UDPDiscoveryProtocol(asyncio.DatagramProtocol):
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for habitron."""
 
-    VERSION = 1
+    VERSION = 2
 
     def __init__(self) -> None:
         """Initialize the config flow."""
@@ -196,7 +194,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         candidates = {value for value in (host, ip) if value}
         canonical = {await self._async_canonical_host(value) for value in candidates}
         for entry in entries:
-            entry_host = entry.data.get(KEY_HOST)
+            entry_host = entry.data.get(CONF_HOST)
             if not entry_host:
                 continue
             if entry_host in candidates:
@@ -271,7 +269,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         _LOGGER.debug("SSDP discovery at %s -> unique_id %s", host_str, unique_id)
         await self.async_set_unique_id(unique_id)
-        self._abort_if_unique_id_configured(updates={KEY_HOST: host_str})
+        self._abort_if_unique_id_configured(updates={CONF_HOST: host_str})
 
         # The unique_id did not match an existing entry. The same SmartHub
         # may already be configured under a host-based fallback id — the
@@ -315,7 +313,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             #    to the SSDP UDN and a plain id comparison would miss.
             smhub = getattr(entry, "runtime_data", None)
             same_mac = bool(unique_id) and getattr(smhub, "uid", None) == unique_id
-            host_conf = entry.data.get(KEY_HOST)
+            host_conf = entry.data.get(CONF_HOST)
             same_host = (
                 host_conf in candidate_hosts
                 or (host_conf == CONF_DEFAULT_HOST and local_is_candidate)
@@ -339,7 +337,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 _LOGGER.debug(
                     "adopting stable id %s for existing entry at %s (%s match)",
                     unique_id,
-                    entry.data.get(KEY_HOST),
+                    entry.data.get(CONF_HOST),
                     "MAC" if same_mac else "host",
                 )
                 self.hass.config_entries.async_update_entry(entry, unique_id=unique_id)
@@ -356,7 +354,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             # Create entry with discovered data
             data = {
-                KEY_HOST: self._discovered_device.get(
+                CONF_HOST: self._discovered_device.get(
                     "host", self._discovered_device.get("ip")
                 ),
                 KEY_TOKEN: "",
@@ -406,7 +404,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 default_host = device.get("host", device.get("ip", CONF_DEFAULT_HOST))
 
         if user_input is not None:
-            host_input = user_input[KEY_HOST]
+            host_input = user_input[CONF_HOST]
             try:
                 info = await validate_input(self.hass, user_input)
             except CannotConnect:
@@ -440,13 +438,13 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 self._abort_if_unique_id_configured()
                 return self.async_create_entry(title=info["title"], data=user_input)
 
-            default_host = user_input[KEY_HOST]
+            default_host = user_input[CONF_HOST]
 
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema(
                 {
-                    vol.Required(KEY_HOST, default=default_host): str,
+                    vol.Required(CONF_HOST, default=default_host): str,
                     vol.Optional(KEY_TOKEN, default=""): str,
                 }
             ),
@@ -485,7 +483,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="reconfigure",
             data_schema=vol.Schema(
                 {
-                    vol.Required(KEY_HOST, default=existing.data.get(KEY_HOST)): str,
+                    vol.Required(CONF_HOST, default=existing.data.get(CONF_HOST)): str,
                     vol.Optional(
                         KEY_TOKEN, default=existing.data.get(KEY_TOKEN, "")
                     ): str,
@@ -528,7 +526,7 @@ class MyOptionsFlowHandler(config_entries.OptionsFlow):
             step_id="init",
             data_schema=vol.Schema(
                 {
-                    vol.Required(KEY_HOST, default=current_config.get(KEY_HOST)): str,
+                    vol.Required(CONF_HOST, default=current_config.get(CONF_HOST)): str,
                     vol.Optional(
                         KEY_TOKEN, default=current_config.get(KEY_TOKEN, "")
                     ): str,

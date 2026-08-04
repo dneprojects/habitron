@@ -2,6 +2,8 @@
 
 from typing import Final
 
+from homeassistant.const import CONF_HOST
+
 MOCK_HOST: Final = "192.168.1.50"
 MOCK_HOST_HOSTNAME: Final = "smarthub.local"
 MOCK_PORT: Final = 7777
@@ -15,12 +17,12 @@ MOCK_UDN: Final = "uuid:12345678-1234-1234-1234-123456789abc"
 MOCK_WEBSOCK_TOKEN: Final = "test-token-not-real"
 
 MOCK_CONFIG_DATA: Final = {
-    "habitron_host": MOCK_HOST,
+    CONF_HOST: MOCK_HOST,
     "websock_token": MOCK_WEBSOCK_TOKEN,
 }
 
 MOCK_CONFIG_OPTIONS: Final = {
-    "habitron_host": MOCK_HOST,
+    CONF_HOST: MOCK_HOST,
     "websock_token": MOCK_WEBSOCK_TOKEN,
 }
 

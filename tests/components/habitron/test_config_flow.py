@@ -12,7 +12,6 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.habitron.config_flow import (
     DISCOVERY_MESSAGE,
     DISCOVERY_PORT,
-    KEY_HOST,
     ConfigFlow,
     HostNotFound,
     UDPDiscoveryProtocol,
@@ -22,6 +21,7 @@ from custom_components.habitron.config_flow import (
 )
 from custom_components.habitron.const import DOMAIN
 from homeassistant import config_entries
+from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers.service_info.ssdp import (
@@ -232,7 +232,7 @@ async def test_ssdp_matches_entry_stored_under_host_name(
         domain=DOMAIN,
         title=MOCK_NAME,
         unique_id=f"habitron_{MOCK_HOST_HOSTNAME}",
-        data={**MOCK_CONFIG_DATA, KEY_HOST: MOCK_HOST_HOSTNAME},
+        data={**MOCK_CONFIG_DATA, CONF_HOST: MOCK_HOST_HOSTNAME},
     )
     named_entry.add_to_hass(hass)
 
@@ -323,7 +323,7 @@ async def test_options_flow(
     assert result["step_id"] == "init"
 
     new_input = {
-        "habitron_host": MOCK_HOST,
+        CONF_HOST: MOCK_HOST,
         "websock_token": "test-token-not-real",
     }
     with patch.object(hass.config_entries, "async_reload", return_value=True):
@@ -354,9 +354,9 @@ async def test_validate_input_local_loopback_rewrites_host(
 ) -> None:
     """A host equal to the local IP is rewritten to the literal ``local``."""
 
-    data = {KEY_HOST: "192.168.1.10", "websock_token": ""}
+    data = {CONF_HOST: "192.168.1.10", "websock_token": ""}
     info = await validate_input(hass, data)
-    assert data[KEY_HOST] == "local"
+    assert data[CONF_HOST] == "local"
     # validate_input also returns the probed MAC (stubbed to None here).
     assert info == {"title": MOCK_NAME, "mac": None}
 
@@ -377,7 +377,7 @@ async def test_validate_input_falls_back_to_host_when_hub_unnamed(
         return_value="10.0.0.5",
     ):
         info = await validate_input(
-            hass, {KEY_HOST: "192.168.1.77", "websock_token": ""}
+            hass, {CONF_HOST: "192.168.1.77", "websock_token": ""}
         )
 
     assert info["title"] == "192.168.1.77"
@@ -397,7 +397,7 @@ async def test_validate_input_accepts_short_hostname(
         "custom_components.habitron.config_flow._get_local_ip",
         return_value="10.0.0.5",
     ):
-        info = await validate_input(hass, {KEY_HOST: "pi", "websock_token": ""})
+        info = await validate_input(hass, {CONF_HOST: "pi", "websock_token": ""})
 
     assert info["title"] == MOCK_NAME
 
@@ -420,7 +420,7 @@ async def test_validate_input_host_not_found_for_dns_failure(
     ):
         await validate_input(
             hass,
-            {KEY_HOST: MOCK_HOST, "websock_token": ""},
+            {CONF_HOST: MOCK_HOST, "websock_token": ""},
         )
 
 
@@ -488,7 +488,7 @@ async def test_is_device_already_configured_host_match(hass: HomeAssistant) -> N
         domain=DOMAIN,
         title=MOCK_NAME,
         unique_id="existing-id",
-        data={"habitron_host": MOCK_HOST},
+        data={CONF_HOST: MOCK_HOST},
     ).add_to_hass(hass)
 
     flow = ConfigFlow()
@@ -508,7 +508,7 @@ async def test_is_device_already_configured_ip_match(hass: HomeAssistant) -> Non
         domain=DOMAIN,
         title=MOCK_NAME,
         unique_id="existing-id",
-        data={"habitron_host": "10.0.0.1"},
+        data={CONF_HOST: "10.0.0.1"},
     ).add_to_hass(hass)
 
     flow = ConfigFlow()
@@ -856,7 +856,7 @@ async def test_reconfigure_flow_updates_entry_on_success(
 
     result = await entry.start_reconfigure_flow(hass)
     new_input = {
-        "habitron_host": "10.0.0.99",
+        CONF_HOST: "10.0.0.99",
         "websock_token": "",
     }
     with patch.object(hass.config_entries, "async_reload", return_value=True):
@@ -936,7 +936,7 @@ async def test_options_flow_surfaces_cannot_connect(
     mock_habitron_client.return_value = (False, "")
     result = await hass.config_entries.options.async_init(mock_config_entry.entry_id)
     new_input = {
-        "habitron_host": MOCK_HOST,
+        CONF_HOST: MOCK_HOST,
         "websock_token": "",
     }
     result = await hass.config_entries.options.async_configure(
@@ -969,7 +969,7 @@ async def test_options_flow_surfaces_unknown_exception(
         result = await hass.config_entries.options.async_configure(
             result["flow_id"],
             user_input={
-                "habitron_host": MOCK_HOST,
+                CONF_HOST: MOCK_HOST,
                 "websock_token": "",
             },
         )
@@ -997,10 +997,10 @@ async def test_user_step_prefills_host_from_udp_discovery(
     assert result["step_id"] == "user"
     # The form's data-schema default should now reflect the discovered host.
     schema = result["data_schema"].schema
-    # Find the KEY_HOST default by walking the schema vol.Required keys.
+    # Find the CONF_HOST default by walking the schema vol.Required keys.
     default = None
     for key in schema:
-        if getattr(key, "schema", None) == "habitron_host":
+        if getattr(key, "schema", None) == CONF_HOST:
             default = key.default()
             break
     assert default == "udp-host"
@@ -1067,7 +1067,7 @@ async def test_ssdp_skips_non_matching_entry_then_confirms(
         domain=DOMAIN,
         title="Other hub",
         unique_id="habitron_9.9.9.9",
-        data={KEY_HOST: "9.9.9.9", "websock_token": ""},
+        data={CONF_HOST: "9.9.9.9", "websock_token": ""},
     ).add_to_hass(hass)
 
     discovery = SsdpServiceInfo(

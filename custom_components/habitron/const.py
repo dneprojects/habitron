@@ -12,6 +12,9 @@ from typing import Final
 
 DOMAIN = "habitron"  # internal name of the integration, matches the directory
 CONF_DEFAULT_HOST = "local"  # default host string of SmartCenter, uses own ip
+# Long-lived access token the hub uses for its Home Assistant websocket
+# connection (SmartController Touch and Assist).
+KEY_TOKEN: Final = "websock_token"
 
 # Heartbeat interval used by the coordinator. Not user-configurable per
 # Home Assistant integration guidelines — the bus protocol itself is

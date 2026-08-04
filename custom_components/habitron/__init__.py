@@ -5,7 +5,7 @@ import re
 
 from habitron_client import HabitronError, HabitronTimeoutError
 
-from homeassistant.const import Platform
+from homeassistant.const import CONF_HOST, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr, entity_registry as er
@@ -46,6 +46,23 @@ PLATFORMS: list[Platform] = [
     Platform.TEXT,
     Platform.UPDATE,
 ]
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: HabitronConfigEntry) -> bool:
+    """Migrate an old config entry.
+
+    Version 1 stored the host under the integration-specific ``habitron_host``
+    key; version 2 uses Home Assistant's shared ``CONF_HOST``, matching what the
+    core integration expects. Rename it in place so nobody has to set the hub
+    up again -- the websocket token stays, it is still used for the
+    SmartController Touch and Assist connection.
+    """
+    if entry.version == 1:
+        data = {**entry.data}
+        if "habitron_host" in data:
+            data[CONF_HOST] = data.pop("habitron_host")
+        hass.config_entries.async_update_entry(entry, data=data, version=2)
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: HabitronConfigEntry) -> bool:

@@ -6,6 +6,7 @@ from habitron_client import HabitronClient, HabitronTimeoutError, Module, Router
 import pytest
 
 from custom_components.habitron.communicate import HbtnComm
+from homeassistant.const import CONF_HOST
 
 
 def _make_comm(host: str = "192.168.1.50") -> HbtnComm:
@@ -14,7 +15,7 @@ def _make_comm(host: str = "192.168.1.50") -> HbtnComm:
     hass.data = {"integrations": {"habitron": MagicMock(manifest={"version": "9.9.9"})}}
     hass.async_add_executor_job = AsyncMock()
     config = MagicMock()
-    config.data = {"habitron_host": host}
+    config.data = {CONF_HOST: host}
     smhub = MagicMock()
     comm = HbtnComm(hass, config, smhub)
     comm._client = AsyncMock(spec=HabitronClient)

@@ -4,6 +4,37 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.2.0b1
+
+Config-entry key alignment ahead of the core migration, plus the entry migration
+that makes it non-breaking.
+
+### Changes
+- **`habitron_host` -> `CONF_HOST`.** Core review asked for the shared
+  `homeassistant.const.CONF_HOST` (value `"host"`) instead of the
+  integration-specific key; the core PR carries the same change. Since both
+  share the `habitron` domain, a user moving from HACS to core keeps the very
+  same config entries -- so the two sides have to agree on the key.
+- **`async_migrate_entry` + `VERSION = 2`.** A v1 entry is renamed in place. The
+  websocket token stays: unlike the core PR (which drops it, having no consumer
+  for it yet), this integration really uses it for SmartController Touch and
+  Assist.
+- **`KEY_TOKEN` moved to `const.py`.** `smart_hub.py` read
+  `config.data["websock_token"]` as a raw string, bypassing the constant that
+  `config_flow.py` defined; `diagnostics.py` repeated the literal in its redact
+  list. All three now share one definition.
+
+### Ordering (important)
+- This has to reach users **before** the core integration ships. Once an entry
+  is on version 2, an older HACS build (`VERSION = 1`) refuses it as "created by
+  a newer version" -- so a user stepping back from core to HACS 3.1.x would find
+  a broken entry. Beta first for exactly that reason.
+
+### Tests
+- `test_migrate_v1_entry_renames_the_host_key` sets up a real v1 entry and
+  asserts the rename, the retained token and a loaded entry. Verified to fail
+  with the rename removed.
+
 ## v3.1.11
 
 Decodes the cover autostop counter's "off" marker; needs `habitron_client` 2.0.13.

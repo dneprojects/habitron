@@ -21,7 +21,7 @@ from homeassistant.helpers import area_registry as ar, device_registry as dr
 from homeassistant.util import slugify
 
 from .communicate import HbtnComm as hbtn_com
-from .const import DOMAIN
+from .const import DOMAIN, KEY_TOKEN
 from .coordinator import HbtnCoordinator
 from .ws_provider import HabitronWebRTCProvider
 
@@ -153,7 +153,7 @@ class SmartHub:
 
         # 4. Build the bus model (router + modules), register their devices.
         await self.comm.reinit_hub(0)
-        await self.comm.send_network_info(self.config.data["websock_token"])
+        await self.comm.send_network_info(self.config.data[KEY_TOKEN])
         self.router = await async_build_system(self.comm.client, b_uid=self.uid)
         self.comm.set_router(self.router)
         # Seed the WebRTC stream name for Touch modules (used by camera /
