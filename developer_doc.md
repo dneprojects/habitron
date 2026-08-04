@@ -4,7 +4,15 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
-## v3.2.0b1
+## v3.2.0
+
+Promotion of v3.2.0b1, code unchanged.
+
+### Verified on hardware
+- A Raspberry Pi installation migrated a real v1 entry: `version: 2`,
+  `habitron_host` -> `host`, `websock_token` preserved, integration loaded with
+  all entities and a working hub connection.
+
 
 Config-entry key alignment ahead of the core migration, plus the entry migration
 that makes it non-breaking.
