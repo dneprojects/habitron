@@ -13,7 +13,7 @@ from custom_components.habitron.system_health import async_register, system_heal
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
-from .const import MOCK_HOST, MOCK_SMHUB_INFO
+from .const import MOCK_HOST, MOCK_SMHUB_INFO, MOCK_UID
 
 
 def test_logging_levels_enum_values() -> None:
@@ -110,7 +110,7 @@ async def test_setup_registers_hub_device(
     router.modules = []
     await real_setup(router, supervisor_token=supervisor_token)
 
-    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, "AABBCCDDEEFF")})
+    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, MOCK_UID)})
     assert device is not None
     assert device.manufacturer == "Habitron GmbH"
     assert device.sw_version == MOCK_SMHUB_INFO["software"]["version"]

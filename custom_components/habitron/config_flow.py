@@ -55,7 +55,9 @@ async def _async_hub_mac(host: str) -> str | None:
     except (HabitronError, OSError, KeyError, TypeError) as err:
         _LOGGER.debug("could not read MAC from hub at %s: %s", host, err)
         return None
-    cleaned = mac.replace(":", "").replace("-", "")
+    # Same spelling as ``SmartHub.uid`` and the core integration, so the
+    # entry id and the device identifiers cannot drift apart.
+    cleaned = mac.replace(":", "").replace("-", "").lower()
     _LOGGER.debug("hub at %s reports MAC %s", host, cleaned)
     return cleaned or None
 

@@ -107,7 +107,13 @@ class SmartHub:
         await self.comm.get_smhub_info()
 
         self._mac = self.comm.com_mac
-        self.uid = self._mac.replace(":", "")
+        # Separators and case are firmware-dependent, but the uid becomes the
+        # device identifier and prefixes every entity unique id -- a hub that
+        # starts reporting a different notation must not produce a second set.
+        # Lower case matches what has always been stored (hubs report the MAC
+        # lower case) and what the core integration derives, so existing
+        # installations keep their devices and entities.
+        self.uid = self._mac.replace(":", "").replace("-", "").lower()
         self._version = self.comm.com_version
         self._type = self.comm.com_hwtype
         self.host = self.comm.com_ip

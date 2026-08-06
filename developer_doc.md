@@ -6,6 +6,18 @@ rationale and implementation detail for each release.
 
 ## Unreleased
 
+### Fixed
+- **The hub uid is now normalised the same way on both sides.** It was
+  `mac.replace(":", "")` here and, after a core-review suggestion,
+  `.replace("-", "").upper()` in the core integration. The uid prefixes every
+  device identifier *and* every entity unique id (`rt_<uid>`, `<uid><addr>`,
+  `Mod_<uid>_...`), and both integrations share this domain's registry -- so the
+  divergence would have handed every installation migrating to core a fresh set
+  of devices and entities and orphaned its history. Both now strip `:` and `-`
+  and lower-case, which is what hubs report anyway, so nothing changes for
+  existing installations. `_async_hub_mac` in the config flow uses the same
+  spelling, so the entry id cannot drift from the device identifiers either.
+
 ### Changes
 - **The platforms no longer poke a private entity attribute for the first-creation
   area.** `cover`, `event`, `light`, `number`, `sensor` and `switch` each assigned

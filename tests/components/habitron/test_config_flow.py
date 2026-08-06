@@ -1031,7 +1031,11 @@ async def test_user_flow_picks_up_serial_from_udp_probe(
 
 
 async def test_async_hub_mac_returns_cleaned_mac() -> None:
-    """_async_hub_mac reads the hub info and returns the colon-stripped MAC."""
+    """_async_hub_mac returns the MAC without separators, in lower case.
+
+    The same spelling ``SmartHub.uid`` uses, so the entry id and the device
+    identifiers cannot drift apart.
+    """
     client = AsyncMock()
     client.get_smhub_info = AsyncMock(
         return_value={"hardware": {"network": {"lan mac": "AA:BB:CC:DD:EE:FF"}}}
@@ -1042,7 +1046,7 @@ async def test_async_hub_mac_returns_cleaned_mac() -> None:
     with patch(
         "custom_components.habitron.config_flow.HabitronClient", return_value=ctx
     ):
-        assert await _async_hub_mac("1.2.3.4") == "AABBCCDDEEFF"
+        assert await _async_hub_mac("1.2.3.4") == "aabbccddeeff"
 
 
 async def test_async_hub_mac_returns_none_on_error() -> None:
