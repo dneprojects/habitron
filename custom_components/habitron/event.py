@@ -45,8 +45,8 @@ async def async_setup_entry(
             if abs(mod_input.type) == 1:  # pulse switch
                 pressed = InputPressed(mod_input, hbt_module, len(new_devices))
                 if pressed.unique_id not in known_unique_ids:
-                    pressed._initial_area_id = deviating_area_id(  # noqa: SLF001
-                        mod_input.area, hbt_module.area, area_ids
+                    pressed.set_initial_area(
+                        deviating_area_id(mod_input.area, hbt_module.area, area_ids)
                     )
                 new_devices.append(pressed)
         if hbt_module.mod_type == "Fanekey":

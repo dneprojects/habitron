@@ -50,8 +50,8 @@ async def async_setup_entry(
             if abs(output.type) == 1:  # standard relay output
                 switched = SwitchedOutput(coord, module, output, len(new_devices))
                 if switched.unique_id not in known_unique_ids:
-                    switched._initial_area_id = deviating_area_id(  # noqa: SLF001
-                        output.area, module.area, area_ids
+                    switched.set_initial_area(
+                        deviating_area_id(output.area, module.area, area_ids)
                     )
                 new_devices.append(switched)
         for led in module.leds:

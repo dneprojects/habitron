@@ -53,8 +53,8 @@ async def async_setup_entry(
                     mod_output, hbt_module, hbtn_cord, len(new_devices)
                 )
                 if dimmer.unique_id not in known_unique_ids:
-                    dimmer._initial_area_id = deviating_area_id(  # noqa: SLF001
-                        mod_output.area, hbt_module.area, area_ids
+                    dimmer.set_initial_area(
+                        deviating_area_id(mod_output.area, hbt_module.area, area_ids)
                     )
                 new_devices.append(dimmer)
 

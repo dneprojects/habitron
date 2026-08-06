@@ -40,7 +40,7 @@ def deviating_area_id(
 class HbtnAreaMixin(Entity):
     """Stamp a deviating area onto the entity, once, at first creation.
 
-    The platform sets ``_initial_area_id`` only for a newly-created entity (it
+    The platform calls ``set_initial_area`` only for a newly-created entity (it
     snapshots the already-registered ids before adding). Applying it here in
     ``async_added_to_hass`` -- which runs *after* the entity is registered,
     unlike a pass right after ``async_add_entities`` -- means the area lands
@@ -54,6 +54,15 @@ class HbtnAreaMixin(Entity):
 
     _initial_area_id: str | None = None
     _initial_area_propagate: bool = False
+
+    def set_initial_area(self, area_id: str | None) -> None:
+        """Stamp the area to apply once, when this entity is first created.
+
+        The unique id only exists once the entity is built, so the platform
+        cannot decide "newly created" before construction -- hence a setter
+        rather than a constructor argument.
+        """
+        self._initial_area_id = area_id
 
     async def async_added_to_hass(self) -> None:
         """Apply the first-creation area after the base registration."""

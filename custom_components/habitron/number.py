@@ -50,8 +50,8 @@ async def async_setup_entry(
                     analog_out, hbt_module, hbtn_cord, len(new_devices)
                 )
                 if analog.unique_id not in known_unique_ids:
-                    analog._initial_area_id = deviating_area_id(  # noqa: SLF001
-                        analog_out.area, hbt_module.area, area_ids
+                    analog.set_initial_area(
+                        deviating_area_id(analog_out.area, hbt_module.area, area_ids)
                     )
                 new_devices.append(analog)
 

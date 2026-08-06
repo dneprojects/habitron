@@ -66,8 +66,8 @@ async def async_setup_entry(
                 if cover is None:
                     continue
                 if cover.unique_id not in known_unique_ids:
-                    cover._initial_area_id = deviating_area_id(  # noqa: SLF001
-                        mod_cover.area, hbt_module.area, area_ids
+                    cover.set_initial_area(
+                        deviating_area_id(mod_cover.area, hbt_module.area, area_ids)
                     )
                 new_devices.append(cover)
 

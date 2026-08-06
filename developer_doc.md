@@ -4,6 +4,18 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## Unreleased
+
+### Changes
+- **The platforms no longer poke a private entity attribute for the first-creation
+  area.** `cover`, `event`, `light`, `number`, `sensor` and `switch` each assigned
+  `entity._initial_area_id` from outside, every one of them silencing `SLF001`.
+  `HbtnAreaMixin` now offers `set_initial_area()`, which removes all six
+  suppressions -- the last ones of that kind in the integration. A setter rather
+  than a constructor argument because the unique id only exists once the entity is
+  built, and that id is what decides "newly created"; core's sensor platform can
+  use a constructor parameter only because it derives the id as a string there.
+
 ## v3.2.0
 
 Promotion of v3.2.0b1, code unchanged.
