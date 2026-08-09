@@ -4,19 +4,34 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
-## Unreleased
+## v3.2.1
 
 ### Fixed
 - **The hub uid is now normalised the same way on both sides.** It was
   `mac.replace(":", "")` here and, after a core-review suggestion,
-  `.replace("-", "").upper()` in the core integration. The uid prefixes every
-  device identifier *and* every entity unique id (`rt_<uid>`, `<uid><addr>`,
-  `Mod_<uid>_...`), and both integrations share this domain's registry -- so the
-  divergence would have handed every installation migrating to core a fresh set
-  of devices and entities and orphaned its history. Both now strip `:` and `-`
-  and lower-case, which is what hubs report anyway, so nothing changes for
-  existing installations. `_async_hub_mac` in the config flow uses the same
-  spelling, so the entry id cannot drift from the device identifiers either.
+  `.replace("-", "").upper()` in the core integration. Both integrations share
+  this domain's registry, so the divergence would have orphaned the devices and
+  entities keyed by the uid for every installation migrating to core. Both now
+  strip `:` and `-` and lower-case. `_async_hub_mac` in the config flow uses the
+  same spelling, so the entry id cannot drift from the device identifiers.
+
+  **Why lower case is the safe spelling** (measured 2026-08-09 on a live
+  installation, replacing the earlier hand-wave "which is what hubs report
+  anyway"): the SmartHub runs on a Raspberry Pi, and `lan mac` comes from the
+  Linux network stack, which renders MACs lower-case and colon-separated
+  (`/sys/class/net/*/address`). The library passes the value through verbatim --
+  it normalises nothing -- so the notation is decided there, not by us. The
+  registry of a real installation stores `e45f0131c84b` for a hub reporting
+  `e4:5f:01:31:c8:4b`, i.e. the new spelling is byte-identical to the old one
+  and the change is a no-op. Note the hub *does* upper-case the MAC elsewhere
+  (the device name is `SmartHub_E45F0131C84B`), which is the argument for
+  keeping the normalisation rather than relying on the current behaviour.
+
+  **Blast radius, if it ever were not a no-op:** the uid keys the hub device
+  (`<uid>`) and the router device (`rt_<uid>`) -- 2 of 13 devices on the
+  measured installation -- and 45 of its 345 entities. Module devices carry
+  their own bus ids (`0801012438800001`) and are unaffected. Earlier notes in
+  this file claimed the uid prefixes *every* device and entity; that was wrong.
 
 ### Changes
 - **The platforms no longer poke a private entity attribute for the first-creation
