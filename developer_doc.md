@@ -34,6 +34,18 @@ rationale and implementation detail for each release.
   `_area_name` keeps that fallback: with the update call gone it can only ever
   affect devices at first creation.
 
+### Changed
+- **`_async_dispatch_sc_command_for_device` takes the identifiers, not the
+  `DeviceEntry`.** CI broke on this without any change to the function: newer
+  Home Assistant versions added `ChildDeviceEntry`, so `dev_reg.async_get()`
+  now returns `DeviceEntry | ChildDeviceEntry | None` and mypy rejected the
+  narrower parameter. `requirements_test.txt` pins
+  `pytest-homeassistant-custom-component>=0.13` unpinned, so CI picks that up
+  while the local core checkout (2026.6.0) has no `ChildDeviceEntry` and stays
+  green -- the failure is only reproducible in CI. The function only ever read
+  `device.identifiers`, so it now takes those directly and no longer names a
+  type whose spelling moves upstream.
+
 ### Tests
 - `test_setup_suggests_module_area_on_first_creation` asserts a new module device
   lands in its bus area, and `test_reload_keeps_user_area_when_router_area_list_is_lost`

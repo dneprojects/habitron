@@ -155,7 +155,9 @@ async def test_dispatch_sc_command_to_touch_module() -> None:
     """A Touch module device is dispatched the system command."""
     hub = _touch_hub()
     device = _device({(DOMAIN, "MOD-T")})
-    ok = await _async_dispatch_sc_command_for_device(device, [hub], "restart", None)
+    ok = await _async_dispatch_sc_command_for_device(
+        device.identifiers, [hub], "restart", None
+    )
     assert ok is True
     hub.ws_provider.async_send_system_command.assert_awaited_with(
         "touch_1", "restart", None
@@ -166,7 +168,9 @@ async def test_dispatch_sc_command_no_match() -> None:
     """A device with no matching module returns False."""
     hub = _touch_hub()
     device = _device({(DOMAIN, "OTHER")})
-    ok = await _async_dispatch_sc_command_for_device(device, [hub], "restart", None)
+    ok = await _async_dispatch_sc_command_for_device(
+        device.identifiers, [hub], "restart", None
+    )
     assert ok is False
 
 
@@ -176,7 +180,9 @@ async def test_dispatch_sc_command_ws_provider_missing() -> None:
     hub.ws_provider = None
     device = _device({(DOMAIN, "MOD-T")})
     with pytest.raises(ServiceValidationError):
-        await _async_dispatch_sc_command_for_device(device, [hub], "restart", None)
+        await _async_dispatch_sc_command_for_device(
+            device.identifiers, [hub], "restart", None
+        )
 
 
 async def test_sc_system_command_no_target_devices() -> None:

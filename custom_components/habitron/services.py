@@ -29,8 +29,6 @@ from .const import (
 )
 
 if TYPE_CHECKING:
-    from homeassistant.helpers.device_registry import DeviceEntry
-
     from .smart_hub import SmartHub
 
 _LOGGER = logging.getLogger(__name__)
@@ -198,18 +196,23 @@ async def _async_update_entity(call: ServiceCall) -> None:
 
 
 async def _async_dispatch_sc_command_for_device(
-    device: DeviceEntry,
+    identifiers: set[tuple[str, str]],
     hubs: list[SmartHub],
     command: str,
     new_ip: str | None,
 ) -> bool:
-    """Send a system command to the SC Touch module owning ``device``.
+    """Send a system command to the SC Touch module owning the device.
 
     Returns True when a matching module was found and dispatched to.
     Walks the device identifiers and tries each loaded hub — works
     with multiple configured SmartHubs.
+
+    Takes the identifiers rather than the ``DeviceEntry`` they came from:
+    that is all this needs, and the registry's return type is spelled
+    differently across Home Assistant versions (it gained
+    ``ChildDeviceEntry``).
     """
-    for identifier in device.identifiers:
+    for identifier in identifiers:
         if identifier[0] != DOMAIN:
             continue
         mod_uid = str(identifier[1])
@@ -261,7 +264,7 @@ async def _async_sc_system_command(call: ServiceCall) -> None:
         if device is None:
             continue
         dispatched = await _async_dispatch_sc_command_for_device(
-            device, hubs, command, new_ip
+            device.identifiers, hubs, command, new_ip
         )
         if not dispatched:
             raise ServiceValidationError(
