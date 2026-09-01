@@ -6,10 +6,19 @@
 #   pip install -r requirements_test.txt
 
 # Pytest framework + HA test harness for custom components.
+#
+# ``pytest-homeassistant-custom-component`` is pinned exactly: it pins HA core
+# in turn (0.13.357 -> homeassistant==2026.8.3), so leaving it open let CI walk
+# onto a newer HA -- including pre-releases -- while the transitive pins below
+# stayed on the old one. That drift broke CI twice in a row with failures that
+# were not reproducible locally: a mypy error from a widened registry return
+# type, and a missing ``gazetteer_matcher`` that only 2026.9 pulls in. Bump
+# this deliberately, and re-derive the versions below from the new HA's
+# component manifests in the same commit.
 pytest>=8.0
 pytest-asyncio>=0.23
 pytest-cov>=5.0
-pytest-homeassistant-custom-component>=0.13
+pytest-homeassistant-custom-component==0.13.357
 
 # Snapshot testing (used by HA-style integration tests).
 syrupy>=4.6
@@ -30,14 +39,16 @@ habitron_client>=1.0.0
 #   homeassistant.components.conversation  -> hassil + home-assistant-intents
 #                                             (pulled via assist_pipeline)
 #
-# Versions pinned to whatever the corresponding HA-core component manifest
-# currently requires; the wheel-only install (no system libs) is enough
-# because tests mock the actual codec / NLU surfaces.
+# Versions are taken verbatim from the component manifests of the HA version
+# pinned above -- read them out of the installed wheel rather than guessing:
+#   python -c "import homeassistant,pathlib,json; ...components/<c>/manifest.json"
+# The wheel-only install (no system libs) is enough because tests mock the
+# actual codec / NLU surfaces.
 PyTurboJPEG==1.8.3
-mutagen==1.47.0
+mutagen==1.48.1
 ha-ffmpeg==3.2.2
-hassil==3.5.0
-home-assistant-intents==2026.6.1
+hassil==3.11.0
+home-assistant-intents==2026.7.30
 pymicro-vad==1.0.1
 pyspeex-noise==1.0.2
 

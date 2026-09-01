@@ -46,6 +46,21 @@ rationale and implementation detail for each release.
   `device.identifiers`, so it now takes those directly and no longer names a
   type whose spelling moves upstream.
 
+- **The test harness is pinned, and the transitive pins are derived from it.**
+  `requirements_test.txt` had `pytest-homeassistant-custom-component>=0.13`
+  while pinning HA's component requirements by hand. The harness pins HA core,
+  so the open range walked CI onto 2026.9.0b4 -- a pre-release -- while the
+  hand-written pins stayed on the 2026.6 line. Both CI failures in this release
+  came from that gap and neither reproduced locally against the 2026.6.0
+  checkout. Now pinned to `==0.13.357` (HA 2026.8.3, the newest stable), with
+  `mutagen`, `hassil` and `home-assistant-intents` re-read from that version's
+  component manifests (1.48.1 / 3.11.0 / 2026.7.30). 2026.8.3 needs no
+  `gazetteer_matcher`; that requirement appears only in 2026.9.
+
+  Verified by rebuilding a venv from the file and running all three CI jobs
+  against it -- ruff, mypy and the full 624-test suite -- rather than pushing
+  and watching, which is how the two previous attempts were spent.
+
 ### Tests
 - `test_setup_suggests_module_area_on_first_creation` asserts a new module device
   lands in its bus area, and `test_reload_keeps_user_area_when_router_area_list_is_lost`
