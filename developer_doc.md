@@ -4,6 +4,44 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.2.2
+
+### Fixed
+- **The bus area is no longer written onto module devices on every setup.**
+  `_register_bus_devices` passed `suggested_area=area_name` to
+  `async_get_or_create` *and* then followed up with
+  `dev_reg.async_update_device(dev.id, area_id=area.id)`. The suggestion alone
+  is the correct mechanism -- HA honours it when it first creates the device and
+  ignores it afterwards -- but the explicit update re-applied the bus area
+  unconditionally on every setup and reload, so a user's own device-to-area
+  assignment was discarded every time. Removing the update call (and with it the
+  now-unused `area_registry` lookup, which was only there to resolve the
+  `area.id`) leaves `suggested_area` as the single path.
+
+  This is the **device** counterpart of the per-entity fix shipped in v3.1.9;
+  that round covered entities only, so devices kept the clobbering behaviour for
+  another three releases.
+
+  **Field report that triggered this** (customer installation, 2026-08-15): after
+  a reload, all devices appeared in a newly created area "House" and the manual
+  assignment was gone, while explicitly assigned *entity* areas survived -- the
+  exact signature of an entity-side fix without the device-side one. Root cause
+  on the bus side was a router that had lost its area list (its global flags were
+  gone as well, so the loss was in the router's own configuration, not something
+  this integration writes -- it only ever sends `send_devregid` and flag
+  *values*). With an empty `router.areas`, `_area_name` falls back to `"House"`
+  for every module, and the unconditional update then moved every device there.
+  `_area_name` keeps that fallback: with the update call gone it can only ever
+  affect devices at first creation.
+
+### Tests
+- `test_setup_suggests_module_area_on_first_creation` asserts a new module device
+  lands in its bus area, and `test_reload_keeps_user_area_when_router_area_list_is_lost`
+  reproduces the field report: a user-moved module keeps its area and an untouched
+  one keeps the area it was created in, after re-registering with `router.areas`
+  emptied. `_register_bus_devices` had no test coverage at all before, which is
+  how the clobbering survived the v3.1.9 round.
+
 ## v3.2.1
 
 ### Fixed

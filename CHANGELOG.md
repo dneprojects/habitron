@@ -3,6 +3,9 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.2.2
+- Fixed: a manually assigned area on a Habitron *device* is no longer overwritten on every reload/restart. The area from the router is now only suggested when a device is first created, so your own assignment sticks -- the same behaviour the entities already had since v3.1.9. If the router's area list is incomplete or missing, your devices are left alone instead of all being moved into a new "House" area.
+
 ## v3.2.1
 - Internal preparation for the Home Assistant core version of this integration: both now derive the hub's internal id in exactly the same way, so a future switch keeps your devices, entities and their history. Nothing changes in this release — no entity is renamed, removed or re-created.
 

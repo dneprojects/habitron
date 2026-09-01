@@ -3,7 +3,7 @@
 from collections.abc import Awaitable, Callable
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from habitron_client import Diagnostic, HabitronError, Router, Sensor
+from habitron_client import Area, Diagnostic, HabitronError, Module, Router, Sensor
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -11,7 +11,7 @@ from custom_components.habitron.const import DOMAIN
 from custom_components.habitron.smart_hub import LoggingLevels, SmartHub
 from custom_components.habitron.system_health import async_register, system_health_info
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import area_registry as ar, device_registry as dr
 
 from .const import MOCK_HOST, MOCK_SMHUB_INFO, MOCK_UID
 
@@ -307,3 +307,69 @@ async def test_update_swallows_habitron_error(smart_hub_stub: SmartHub) -> None:
     # Nothing was read, so the host readings must stay unknown rather than
     # publishing the zero defaults as if they were measurements.
     assert smart_hub_stub.host_diags_valid is False
+
+
+async def test_setup_suggests_module_area_on_first_creation(
+    hass: HomeAssistant,
+    real_setup: Callable[..., Awaitable[tuple[MockConfigEntry, AsyncMock]]],
+) -> None:
+    """A newly created module device lands in its bus area."""
+    router = Router(uid="rt_1")
+    router.areas = [Area(nmbr=1, name="Living Room")]
+    router.modules = [
+        Module(uid="MOD-1", addr=105, typ=b"\x01\x02", name="Mod 1", area=1)
+    ]
+    await real_setup(router)
+
+    dev_reg = dr.async_get(hass)
+    device = dev_reg.async_get_device(identifiers={(DOMAIN, "MOD-1")})
+    assert device is not None
+    area_reg = ar.async_get(hass)
+    assert device.area_id is not None
+    assert area_reg.async_get_area(device.area_id).name == "Living Room"
+
+
+async def test_reload_keeps_user_area_when_router_area_list_is_lost(
+    hass: HomeAssistant,
+    real_setup: Callable[..., Awaitable[tuple[MockConfigEntry, AsyncMock]]],
+) -> None:
+    """A user's own area assignment survives re-registration.
+
+    Regression test: the bus area used to be re-applied with
+    ``async_update_device`` on every setup. When the router lost its area list,
+    ``_area_name`` fell back to "House" for every module, so a reload moved all
+    devices into a fresh "House" area and discarded the user's assignment.
+    """
+    router = Router(uid="rt_1")
+    router.areas = [Area(nmbr=1, name="Living Room")]
+    router.modules = [
+        Module(uid="MOD-1", addr=105, typ=b"\x01\x02", name="Mod 1", area=1),
+        Module(uid="MOD-2", addr=106, typ=b"\x01\x02", name="Mod 2", area=1),
+    ]
+    entry, _client = await real_setup(router)
+
+    dev_reg = dr.async_get(hass)
+    area_reg = ar.async_get(hass)
+    device = dev_reg.async_get_device(identifiers={(DOMAIN, "MOD-1")})
+    assert device is not None
+
+    # The user moves the module into an area of their own.
+    kitchen = area_reg.async_get_or_create("Kitchen")
+    dev_reg.async_update_device(device.id, area_id=kitchen.id)
+
+    # The router comes back without its area list -- every module now resolves
+    # to the "House" fallback.
+    router.areas = []
+    await entry.runtime_data._register_bus_devices()
+    await hass.async_block_till_done()
+
+    # The moved module keeps the user's area, the untouched one keeps the area
+    # it was created in -- neither is dragged into the "House" fallback.
+    device = dev_reg.async_get_device(identifiers={(DOMAIN, "MOD-1")})
+    assert device is not None
+    assert device.area_id == kitchen.id
+
+    other = dev_reg.async_get_device(identifiers={(DOMAIN, "MOD-2")})
+    assert other is not None
+    assert other.area_id is not None
+    assert area_reg.async_get_area(other.area_id).name == "Living Room"

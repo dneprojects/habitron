@@ -17,7 +17,7 @@ from homeassistant.components.frontend import add_extra_js_url
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import area_registry as ar, device_registry as dr
+from homeassistant.helpers import device_registry as dr
 from homeassistant.util import slugify
 
 from .communicate import HbtnComm as hbtn_com
@@ -197,7 +197,6 @@ class SmartHub:
     async def _register_bus_devices(self) -> None:
         """Register the router + module devices and push their registry ids."""
         dev_reg = dr.async_get(self.hass)
-        area_reg = ar.async_get(self.hass)
         router = self.router
 
         dev_reg.async_get_or_create(
@@ -217,6 +216,13 @@ class SmartHub:
 
         for module in router.modules:
             raddr = module.addr - router.id
+            # The bus area is only ever *suggested*, never written: HA applies
+            # ``suggested_area`` when it first creates the device and ignores it
+            # afterwards, so a user's own area assignment survives every reload.
+            # Do not "fix this up" with async_update_device(area_id=...) -- that
+            # re-applied the bus area on every setup and silently reassigned all
+            # modules whenever the router's area list came back empty or changed
+            # (``_area_name`` then falls back to "House" for every module).
             area_name = _area_name(router, module.area)
             dev_reg.async_get_or_create(
                 config_entry_id=self.config.entry_id,
@@ -233,10 +239,8 @@ class SmartHub:
                 via_device=(DOMAIN, router.uid),
             )
             dev = dev_reg.async_get_device(identifiers={(DOMAIN, module.uid)})
-            area = area_reg.async_get_or_create(area_name)
             if dev is not None:
                 await self.comm.send_devregid(raddr, dev.id)
-                dev_reg.async_update_device(dev.id, area_id=area.id)
 
     async def update(self) -> None:
         """Refresh the hub-level diagnostics from the SmartHub info query.
