@@ -14,9 +14,10 @@ import base64
 from collections import deque
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from habitron_client import HabitronProtocolError
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from homeassistant.config_entries import ConfigEntryState
@@ -58,6 +59,15 @@ class _ReplayClient:
     async def get_smhub_update(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         """Skip host diagnostics in the replay (returns no data)."""
         return {}
+
+    async def get_host_diagnostics(self, *args: Any, **kwargs: Any) -> NoReturn:
+        """Skip host diagnostics in the replay.
+
+        The recorded hub is a Raspberry Pi, so update() does reach this; the
+        recording carries no host readings, which the library reports as a
+        protocol error and SmartHub.update swallows.
+        """
+        raise HabitronProtocolError("no host readings in the replay")
 
     async def reinit_hub(self, *args: Any, **kwargs: Any) -> None:
         """No-op control call."""

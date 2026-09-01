@@ -258,25 +258,21 @@ class SmartHub:
             # instead of fetching and discarding it every tick.
             return
         try:
-            info = await self.comm.get_smhub_update()
+            host = await self.comm.get_host_diagnostics()
         except HabitronError as err:
+            # Covers an unreadable reading too: the library raises a protocol
+            # error rather than handing out a string that would blow up here.
             _LOGGER.debug("SmartHub diagnostics update skipped: %s", err)
             return
-        if not info:
-            return
-        hardware = info["hardware"]
-        software = info["software"]
         was_valid = self.host_diags_valid
         self.host_diags_valid = True
-        self._set(
-            self.diags[0], float(hardware["cpu"]["frequency current"].rstrip("MHz"))
-        )
-        self._set(self.diags[1], float(hardware["cpu"]["load"].rstrip("%")))
-        self._set(self.diags[2], float(hardware["cpu"]["temperature"].rstrip("°C")))
-        self._set(self.sensors[0], float(hardware["memory"]["percent"].rstrip("%")))
-        self._set(self.sensors[1], float(hardware["disk"]["percent"].rstrip("%")))
-        self._set(self.loglvl[0], int(software["loglevel"]["console"]))
-        self._set(self.loglvl[1], int(software["loglevel"]["file"]))
+        self._set(self.diags[0], host.cpu_frequency)
+        self._set(self.diags[1], host.cpu_load)
+        self._set(self.diags[2], host.cpu_temperature)
+        self._set(self.sensors[0], host.memory_usage)
+        self._set(self.sensors[1], host.disk_usage)
+        self._set(self.loglvl[0], host.log_level_console)
+        self._set(self.loglvl[1], host.log_level_file)
         if not was_valid:
             # First successful read after setup-time failures: ``_set`` only
             # notifies on a change, so members that happen to match their

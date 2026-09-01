@@ -11,6 +11,7 @@ import anyio
 from habitron_client import (
     HabitronClient,
     HabitronTimeoutError,
+    HostDiagnostics,
     Module,
     Router,
     apply_event,
@@ -262,6 +263,14 @@ class HbtnComm:
             "dict[str, Any]",
             await self.client.get_smhub_update(self._hbtn_version),
         )
+
+    async def get_host_diagnostics(self) -> HostDiagnostics:
+        """Get the hub's host readings as typed values.
+
+        The hub sends them as strings carrying their unit ("1500MHz", "12%");
+        undoing that is wire format and stays in the library.
+        """
+        return await self.client.get_host_diagnostics(self._hbtn_version)
 
     async def get_smr(self) -> bytes:
         """Get router SMR information."""

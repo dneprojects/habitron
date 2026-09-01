@@ -3,7 +3,16 @@
 from collections.abc import Awaitable, Callable
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from habitron_client import Area, Diagnostic, HabitronError, Module, Router, Sensor
+from habitron_client import (
+    Area,
+    Diagnostic,
+    HabitronError,
+    HabitronProtocolError,
+    HostDiagnostics,
+    Module,
+    Router,
+    Sensor,
+)
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -45,6 +54,7 @@ def smart_hub_stub() -> SmartHub:
         comm.async_close = AsyncMock()
         comm.get_smhub_info = AsyncMock()
         comm.get_smhub_update = AsyncMock()
+        comm.get_host_diagnostics = AsyncMock()
         comm.get_smhub_version = AsyncMock()
         comm.reinit_hub = AsyncMock()
         comm.send_network_info = AsyncMock()
@@ -117,12 +127,21 @@ async def test_setup_registers_hub_device(
     assert device.configuration_url == expected_conf_url
 
 
-async def test_update_short_circuits_when_no_info(smart_hub_stub: SmartHub) -> None:
-    """update() returns early when get_smhub_update yields no data."""
-    smart_hub_stub.comm.get_smhub_update.return_value = None
+async def test_update_survives_an_unreadable_reading(smart_hub_stub: SmartHub) -> None:
+    """A reading that is not a number must not fail the coordinator tick.
+
+    The unit stripping used to happen here, so a malformed value raised a bare
+    ValueError out of update() and took the whole tick (and with it every
+    entity) down. The library now reports it as a protocol error, which lands
+    in the same handler as a dropped response.
+    """
+    smart_hub_stub.comm.get_host_diagnostics.side_effect = HabitronProtocolError(
+        "SmartHub update: 'cpu.load' is not a number: 'n/a'"
+    )
     smart_hub_stub.diags = [Diagnostic(name="Status", nmbr=0, type=1)]
-    await smart_hub_stub.update()
-    smart_hub_stub.comm.get_smhub_update.assert_awaited_once()
+    await smart_hub_stub.update()  # must not raise
+    smart_hub_stub.comm.get_host_diagnostics.assert_awaited_once()
+    assert smart_hub_stub.host_diags_valid is False
 
 
 async def test_update_short_circuits_when_no_diags(smart_hub_stub: SmartHub) -> None:
@@ -133,25 +152,22 @@ async def test_update_short_circuits_when_no_diags(smart_hub_stub: SmartHub) -> 
     """
     smart_hub_stub.diags = []
     await smart_hub_stub.update()
-    smart_hub_stub.comm.get_smhub_update.assert_not_awaited()
+    smart_hub_stub.comm.get_host_diagnostics.assert_not_awaited()
 
 
 async def test_update_writes_diag_sensor_and_log_levels(
     smart_hub_stub: SmartHub,
 ) -> None:
     """A fully-populated info dict is parsed into the descriptor lists."""
-    smart_hub_stub.comm.get_smhub_update.return_value = {
-        "hardware": {
-            "cpu": {
-                "frequency current": "1500MHz",
-                "load": "12%",
-                "temperature": "55.5°C",
-            },
-            "memory": {"percent": "60%"},
-            "disk": {"percent": "30%"},
-        },
-        "software": {"loglevel": {"console": "3", "file": "4"}},
-    }
+    smart_hub_stub.comm.get_host_diagnostics.return_value = HostDiagnostics(
+        cpu_frequency=1500.0,
+        cpu_load=12.0,
+        cpu_temperature=55.5,
+        memory_usage=60.0,
+        disk_usage=30.0,
+        log_level_console=3,
+        log_level_file=4,
+    )
     smart_hub_stub.diags = [MagicMock(), MagicMock(), MagicMock()]
     smart_hub_stub.sensors = [MagicMock(), MagicMock()]
     smart_hub_stub.loglvl = [MagicMock(), MagicMock()]
@@ -179,18 +195,15 @@ async def test_update_notifies_all_members_on_first_success(
     not notify on their own, and with an otherwise idle bus their entities
     would stay ``unknown`` indefinitely.
     """
-    smart_hub_stub.comm.get_smhub_update.return_value = {
-        "hardware": {
-            "cpu": {
-                "frequency current": "1500MHz",
-                "load": "12%",
-                "temperature": "55.5°C",
-            },
-            "memory": {"percent": "60%"},
-            "disk": {"percent": "30%"},
-        },
-        "software": {"loglevel": {"console": "0", "file": "0"}},
-    }
+    smart_hub_stub.comm.get_host_diagnostics.return_value = HostDiagnostics(
+        cpu_frequency=1500.0,
+        cpu_load=12.0,
+        cpu_temperature=55.5,
+        memory_usage=60.0,
+        disk_usage=30.0,
+        log_level_console=0,
+        log_level_file=0,
+    )
     # Seed every member with the value the read will return, so no _set() call
     # sees a change and none of them notifies by itself.
     smart_hub_stub.diags = [
@@ -236,10 +249,10 @@ async def test_async_update_delegates_to_update(
     smart_hub_stub: SmartHub,
 ) -> None:
     """async_update is now a thin awaiter around update() directly."""
-    smart_hub_stub.comm.get_smhub_update.return_value = None
+    smart_hub_stub.comm.get_host_diagnostics.side_effect = HabitronError("boom")
     smart_hub_stub.diags = [Diagnostic(name="Status", nmbr=0, type=1)]
     await smart_hub_stub.async_update()
-    smart_hub_stub.comm.get_smhub_update.assert_awaited()
+    smart_hub_stub.comm.get_host_diagnostics.assert_awaited()
 
 
 async def test_async_close_delegates_to_comm(
@@ -300,10 +313,10 @@ async def test_update_swallows_habitron_error(smart_hub_stub: SmartHub) -> None:
     must not fail the coordinator tick or abort setup, so update() catches the
     library error and keeps the last values.
     """
-    smart_hub_stub.comm.get_smhub_update.side_effect = HabitronError("boom")
+    smart_hub_stub.comm.get_host_diagnostics.side_effect = HabitronError("boom")
     smart_hub_stub.diags = [Diagnostic(name="Status", nmbr=0, type=1)]
     await smart_hub_stub.update()  # must not raise
-    smart_hub_stub.comm.get_smhub_update.assert_awaited_once()
+    smart_hub_stub.comm.get_host_diagnostics.assert_awaited_once()
     # Nothing was read, so the host readings must stay unknown rather than
     # publishing the zero defaults as if they were measurements.
     assert smart_hub_stub.host_diags_valid is False

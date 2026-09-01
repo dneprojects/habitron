@@ -4,6 +4,43 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.2.3
+
+### Changed
+- **The host readings come typed from the library now.**
+  `SmartHub.update` stripped the units itself (`float(...rstrip("MHz"))`,
+  `rstrip("%")`, `rstrip("°C")`) and cast the log levels. That is wire-format
+  knowledge, and `habitron_client` 2.0.15 offers `get_host_diagnostics()`,
+  which returns a typed `HostDiagnostics`. `HbtnComm` gained the matching
+  wrapper; the manifest pin moves 2.0.13 -> 2.0.16.
+
+  **The real gain is error handling, not tidiness.** The parsing sat *outside*
+  the `try/except HabitronError`, which only covered the query. A reading in an
+  unexpected form therefore raised a bare `ValueError` out of `update()` and
+  failed the coordinator tick -- marking every entity unavailable -- which is
+  exactly what that method's docstring promises never happens. The library
+  raises `HabitronProtocolError` instead, a `HabitronError`, so it lands in the
+  handler that was already there.
+
+  `if not info: return` went with it: the library validates the payload before
+  returning, so that branch was unreachable outside of a mock.
+
+- **Not adopted from 2.0.14-2.0.16:** `hub_mac_addresses()` would let the hub
+  device carry its WLAN MAC as a second registry connection (it currently
+  registers only `lan mac`, so a hub that moves interfaces is not recognised on
+  the other one). That touches device identity, which was settled deliberately
+  in 3.2.1, so it is left for its own round. `BusMember.is_diagnostic` is a
+  read-side accessor and this integration only ever *builds* `Diagnostic`
+  members with `type=10`; it would need a library-side factory to help here.
+
+### Tests
+- `test_update_short_circuits_when_no_info` is replaced by
+  `test_update_survives_an_unreadable_reading`, which pins the behaviour that
+  actually changed: a non-numeric reading must not take the tick down.
+- The replay in `test_real_setup.py` records a Raspberry Pi, so `update()` does
+  reach the new call; its fake client raises `HabitronProtocolError` to keep
+  skipping host diagnostics the way the empty payload used to.
+
 ## v3.2.2
 
 ### Fixed

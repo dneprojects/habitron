@@ -3,6 +3,9 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.2.3
+- The hub's own diagnostic values (CPU, memory, disk, log levels) are read more robustly: a value the hub reports in an unexpected form no longer interrupts the update cycle, so the other entities keep their values instead of all going unavailable for a moment.
+
 ## v3.2.2
 - Fixed: a manually assigned area on a Habitron *device* is no longer overwritten on every reload/restart. The area from the router is now only suggested when a device is first created, so your own assignment sticks -- the same behaviour the entities already had since v3.1.9. If the router's area list is incomplete or missing, your devices are left alone instead of all being moved into a new "House" area.
 
