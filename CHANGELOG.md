@@ -3,6 +3,10 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.2.4
+- Fixed: if Home Assistant has more than one network address (for example LAN and WLAN, or a VPN), entering any of them when adding the hub is now recognised as "this machine". Previously only one address was recognised, so the hub could be stored under an address that stops working when it changes, or be added a second time. Existing entries are unaffected.
+- Internal maintenance: adopted the current Home Assistant device API and moved a bus detail into the library. Nothing changes for you -- no entity is renamed, removed or re-created.
+
 ## v3.2.3
 - The hub's own diagnostic values (CPU, memory, disk, log levels) are read more robustly: a value the hub reports in an unexpected form no longer interrupts the update cycle, so the other entities keep their values instead of all going unavailable for a moment.
 

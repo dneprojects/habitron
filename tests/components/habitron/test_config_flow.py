@@ -16,10 +16,10 @@ from custom_components.habitron.config_flow import (
     HostNotFound,
     UDPDiscoveryProtocol,
     _async_hub_mac,
-    _get_local_ip,
+    _own_ips,
     validate_input,
 )
-from custom_components.habitron.const import DOMAIN
+from custom_components.habitron.const import CONF_DEFAULT_HOST, DOMAIN
 from homeassistant import config_entries
 from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant
@@ -338,14 +338,18 @@ async def test_options_flow(
 # ---------- unit tests for the helper layer ----------
 
 
-async def test_get_local_ip_falls_back_on_exception(hass: HomeAssistant) -> None:
-    """``_get_local_ip`` returns 127.0.0.1 when the network helper raises."""
+async def test_own_ips_returns_every_local_address(hass: HomeAssistant) -> None:
+    """``_own_ips`` collects all of HA's addresses, not just one source IP.
+
+    A single source IP is the one that routes towards the internet; a
+    multi-homed host reaches a local hub over any of its addresses.
+    """
 
     with patch(
-        "custom_components.habitron.config_flow.network.async_get_source_ip",
-        side_effect=RuntimeError("no source"),
+        "custom_components.habitron.config_flow.network.async_get_enabled_source_ips",
+        new=AsyncMock(return_value=["192.168.1.10", "10.0.0.5"]),
     ):
-        assert await _get_local_ip(hass) == "127.0.0.1"
+        assert await _own_ips(hass) == {"192.168.1.10", "10.0.0.5"}
 
 
 async def test_validate_input_local_loopback_rewrites_host(
@@ -373,8 +377,8 @@ async def test_validate_input_falls_back_to_host_when_hub_unnamed(
     mock_habitron_client.return_value = (True, "")
 
     with patch(
-        "custom_components.habitron.config_flow._get_local_ip",
-        return_value="10.0.0.5",
+        "custom_components.habitron.config_flow._own_ips",
+        return_value={"10.0.0.5"},
     ):
         info = await validate_input(
             hass, {CONF_HOST: "192.168.1.77", "websock_token": ""}
@@ -394,8 +398,8 @@ async def test_validate_input_accepts_short_hostname(
     """
 
     with patch(
-        "custom_components.habitron.config_flow._get_local_ip",
-        return_value="10.0.0.5",
+        "custom_components.habitron.config_flow._own_ips",
+        return_value={"10.0.0.5"},
     ):
         info = await validate_input(hass, {CONF_HOST: "pi", "websock_token": ""})
 
@@ -409,8 +413,8 @@ async def test_validate_input_host_not_found_for_dns_failure(
 
     with (
         patch(
-            "custom_components.habitron.config_flow._get_local_ip",
-            return_value="10.0.0.5",
+            "custom_components.habitron.config_flow._own_ips",
+            return_value={"10.0.0.5"},
         ),
         patch(
             "custom_components.habitron.config_flow.test_connection",
@@ -1085,3 +1089,44 @@ async def test_ssdp_skips_non_matching_entry_then_confirms(
     )
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "discovery_confirm"
+
+
+async def test_validate_input_accepts_a_second_local_address(
+    hass: HomeAssistant,
+    mock_habitron_client: MagicMock,
+) -> None:
+    """Any of HA's own addresses is stored as the ``local`` sentinel.
+
+    Regression test for the single-source-IP lookup: on a multi-homed host it
+    only knew the address routing towards the internet, so entering another of
+    the machine's own addresses was stored verbatim -- an entry that breaks as
+    soon as that address changes, and that does not match one already stored
+    under the sentinel.
+    """
+    with patch(
+        "custom_components.habitron.config_flow.network.async_get_enabled_source_ips",
+        new=AsyncMock(return_value=["192.168.1.10", "10.0.0.5"]),
+    ):
+        data = {CONF_HOST: "10.0.0.5", "websock_token": ""}
+        await validate_input(hass, data)
+
+    assert data[CONF_HOST] == CONF_DEFAULT_HOST
+
+
+async def test_canonical_host_collapses_local_addresses(
+    hass: HomeAssistant,
+    mock_habitron_client: MagicMock,
+) -> None:
+    """Every local address canonicalises to the sentinel, and vice versa."""
+    flow = ConfigFlow()
+    flow.hass = hass
+
+    with patch(
+        "custom_components.habitron.config_flow.network.async_get_enabled_source_ips",
+        new=AsyncMock(return_value=["192.168.1.10", "10.0.0.5"]),
+    ):
+        assert await flow._async_canonical_host("10.0.0.5") == CONF_DEFAULT_HOST
+        assert await flow._async_canonical_host("192.168.1.10") == CONF_DEFAULT_HOST
+        assert await flow._async_canonical_host(CONF_DEFAULT_HOST) == CONF_DEFAULT_HOST
+        # A remote address is unaffected.
+        assert await flow._async_canonical_host("172.16.0.9") == "172.16.0.9"

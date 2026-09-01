@@ -35,7 +35,6 @@ if TYPE_CHECKING:
     from .smart_hub import SmartHub
 
 PARALLEL_UPDATES = 0
-TYPE_DIAG = 10  # diagnostic entity, hidden by default (was interfaces.TYPE_DIAG)
 
 
 async def async_setup_entry(  # noqa: C901
@@ -378,7 +377,7 @@ class HbtnDescribedSensor(HbtnSensor):
         # entity_id (the 3.1.0b1 rename regression).
         if description.disambiguate:
             self._attr_unique_id = f"{self._attr_unique_id}_{description.key}"
-        if description.diag_check and abs(sensor.type) == TYPE_DIAG:
+        if description.diag_check and sensor.is_diagnostic:
             self._attr_entity_category = EntityCategory.DIAGNOSTIC
             self._attr_entity_registry_enabled_default = False
 
@@ -726,7 +725,7 @@ class PercSensor(HbtnSensor):
     ) -> None:
         """Initialize the sensor."""
         super().__init__(cast("Module", module), perctg, coord, idx)
-        self.type = perctg.type
+        self._is_diag = perctg.is_diagnostic
         self._attr_unique_id = f"Mod_{self._module.uid}_perc{perctg.nmbr}"
         if self._attr_name[:6].lower() == "memory":  # type: ignore[index]
             self._attr_icon = "mdi:memory"
@@ -736,7 +735,7 @@ class PercSensor(HbtnSensor):
             self._attr_icon = "mdi:timer-alert-outline"
         else:
             self._attr_icon = "mdi:percent-circle-outline"
-        if abs(perctg.type) == TYPE_DIAG:
+        if self._is_diag:
             self._attr_entity_category = EntityCategory.DIAGNOSTIC
             self._attr_unique_id = f"Mod_{self._module.uid}_dperc{perctg.nmbr}"
             self._attr_entity_registry_enabled_default = (
@@ -748,7 +747,7 @@ class PercSensor(HbtnSensor):
         """Handle updated data from the coordinator."""
         if _host_diags_unavailable(self._module):
             self._attr_native_value = None
-        elif abs(self.type) == TYPE_DIAG:
+        elif self._is_diag:
             self._attr_native_value = self._module.diags[self._sensor_idx].value
         else:
             self._attr_native_value = self._module.sensors[self._sensor_idx].value
@@ -770,12 +769,12 @@ class FrequencySensor(HbtnSensor):
     ) -> None:
         """Initialize the sensor."""
         super().__init__(cast("Module", module), freq, coord, idx)
-        self.type = freq.type
+        self._is_diag = freq.is_diagnostic
         if self._attr_name.lower() == "cpu frequency":  # type: ignore[union-attr]
             self._attr_icon = "mdi:clock-fast"
         else:
             self._attr_icon = "mdi:sine-wave"
-        if abs(self.type) == TYPE_DIAG:
+        if self._is_diag:
             self._attr_entity_category = EntityCategory.DIAGNOSTIC
             self._attr_entity_registry_enabled_default = (
                 False  # Entity will initially be disabled
@@ -786,7 +785,7 @@ class FrequencySensor(HbtnSensor):
         """Handle updated data from the coordinator."""
         if _host_diags_unavailable(self._module):
             self._attr_native_value = None
-        elif abs(self.type) == TYPE_DIAG:
+        elif self._is_diag:
             self._attr_native_value = self._module.diags[self._sensor_idx].value
         else:
             self._attr_native_value = self._module.sensors[self._sensor_idx].value

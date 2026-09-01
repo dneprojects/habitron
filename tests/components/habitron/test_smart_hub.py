@@ -386,3 +386,28 @@ async def test_reload_keeps_user_area_when_router_area_list_is_lost(
     assert other is not None
     assert other.area_id is not None
     assert area_reg.async_get_area(other.area_id).name == "Living Room"
+
+
+async def test_setup_links_modules_via_router_to_hub(
+    hass: HomeAssistant,
+    real_setup: Callable[..., Awaitable[tuple[MockConfigEntry, AsyncMock]]],
+) -> None:
+    """Modules hang under the router, which hangs under the hub.
+
+    The link is registered through ``via_device_id`` (the registry id) rather
+    than the deprecated ``via_device`` identifier tuple, so this pins that the
+    hierarchy still comes out the same.
+    """
+    router = Router(uid="rt_1")
+    router.modules = [
+        Module(uid="MOD-1", addr=105, typ=b"\x01\x02", name="Mod 1", area=0)
+    ]
+    await real_setup(router)
+
+    dev_reg = dr.async_get(hass)
+    hub = dev_reg.async_get_device(identifiers={(DOMAIN, MOCK_UID)})
+    rt = dev_reg.async_get_device(identifiers={(DOMAIN, "rt_1")})
+    mod = dev_reg.async_get_device(identifiers={(DOMAIN, "MOD-1")})
+    assert hub is not None and rt is not None and mod is not None
+    assert rt.via_device_id == hub.id
+    assert mod.via_device_id == rt.id

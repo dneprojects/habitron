@@ -12,7 +12,6 @@ from custom_components.habitron.sensor import (
     HUMIDITY_DESCRIPTION,
     ILLUMINANCE_DESCRIPTION,
     TIMEOUT_DESCRIPTION,
-    TYPE_DIAG,
     VOLTAGE_DESCRIPTION,
     WIND_DESCRIPTION,
     HbtnDescribedSensor,
@@ -38,12 +37,24 @@ def _make_module(uid: str = "MOD-1") -> MagicMock:
     return mod
 
 
+# Raw bus role code for a diagnostic member. The integration asks the library
+# (``BusMember.is_diagnostic``) instead of comparing against this; here it is
+# test data, building descriptors that the code under test must classify.
+TYPE_DIAG_CODE = 10
+
+
 def _make_sensor_descriptor(name: str = "Humidity", type_: int = 1) -> MagicMock:
-    """Build a stub IfDescriptor."""
+    """Build a stub IfDescriptor.
+
+    ``is_diagnostic`` mirrors what ``BusMember`` derives from ``type``. A bare
+    MagicMock would hand back a truthy attribute for every descriptor, so every
+    sensor would look diagnostic.
+    """
     desc = MagicMock()
     desc.nmbr = 0
     desc.name = name
     desc.type = type_
+    desc.is_diagnostic = abs(type_) == TYPE_DIAG_CODE
     return desc
 
 
@@ -101,7 +112,7 @@ def test_diag_check_flagged_descriptions() -> None:
 def test_described_sensor_marks_diagnostic_entity_when_flagged() -> None:
     """A sensor whose descriptor type is DIAG is hidden by default."""
     module = _make_module()
-    sensor_desc = _make_sensor_descriptor(name="Iload", type_=TYPE_DIAG)
+    sensor_desc = _make_sensor_descriptor(name="Iload", type_=TYPE_DIAG_CODE)
     coord = MagicMock(spec=DataUpdateCoordinator)
     entity = HbtnDescribedSensor(module, sensor_desc, coord, 0, CURRENT_DESCRIPTION)
     assert entity.entity_description is CURRENT_DESCRIPTION
@@ -436,7 +447,7 @@ def test_perc_sensor_icon_by_name(name: str, expected_icon: str) -> None:
 def test_perc_sensor_diag_branch() -> None:
     """A diagnostic PercSensor reads from diags rather than sensors."""
     mod = _make_hbtnsensor_module()
-    desc = _make_sensor_descriptor(name="cpu load", type_=TYPE_DIAG)
+    desc = _make_sensor_descriptor(name="cpu load", type_=TYPE_DIAG_CODE)
     coord = MagicMock(spec=DataUpdateCoordinator)
     entity = PercSensor(mod, desc, coord, 0)
     entity.async_write_ha_state = MagicMock()
@@ -465,7 +476,7 @@ def test_frequency_sensor_icon_by_name(name: str, expected_icon: str) -> None:
 def test_frequency_sensor_diag_branch() -> None:
     """A diagnostic FrequencySensor reads from diags rather than sensors."""
     mod = _make_hbtnsensor_module()
-    desc = _make_sensor_descriptor(name="cpu frequency", type_=TYPE_DIAG)
+    desc = _make_sensor_descriptor(name="cpu frequency", type_=TYPE_DIAG_CODE)
     coord = MagicMock(spec=DataUpdateCoordinator)
     entity = FrequencySensor(mod, desc, coord, 0)
     entity.async_write_ha_state = MagicMock()

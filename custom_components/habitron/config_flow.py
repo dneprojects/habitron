@@ -32,12 +32,17 @@ DISCOVERY_TIMEOUT = 3.0
 DISCOVERY_MESSAGE = b"habitron_discovery"
 
 
-async def _get_local_ip(hass: HomeAssistant) -> str:
-    """Get the local IP address using HA network utilities."""
-    try:
-        return await network.async_get_source_ip(hass, target_ip="8.8.8.8")
-    except Exception:  # noqa: BLE001
-        return "127.0.0.1"
+async def _own_ips(hass: HomeAssistant) -> set[str]:
+    """Return every local address of this Home Assistant host.
+
+    A multi-homed host -- LAN plus WLAN, a VPN, a container bridge -- has more
+    than one, and a SmartHub running on this machine is reachable over any of
+    them. Asking for a single source IP (the address that happens to route
+    towards the internet) missed the others, so entering one of them was not
+    recognised as "this machine" and the entry was stored under a bare address
+    that breaks as soon as it changes.
+    """
+    return {str(ip) for ip in await network.async_get_enabled_source_ips(hass)}
 
 
 async def _async_hub_mac(host: str) -> str | None:
@@ -66,19 +71,21 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     """Validate the user input allows us to connect."""
 
     # 1. Local IP Check
-    own_ip = await _get_local_ip(hass)
-    _LOGGER.debug("Smart Center own IP: %s", own_ip)
+    own_ips = await _own_ips(hass)
+    _LOGGER.debug("Smart Center own IPs: %s", own_ips)
 
     host_input = data[CONF_HOST]
 
-    # If the entered IP matches our own IP, save as 'local'
-    if host_input == own_ip:
-        host_input = "local"
-        data[CONF_HOST] = "local"
+    # Any of our own addresses means the hub runs on this machine: store the
+    # sentinel rather than the address, which may change.
+    if host_input in own_ips:
+        host_input = CONF_DEFAULT_HOST
+        data[CONF_HOST] = CONF_DEFAULT_HOST
 
     host_to_test = host_input
-    if host_to_test == "local":
-        host_to_test = own_ip
+    if host_to_test == CONF_DEFAULT_HOST:
+        # Resolve the sentinel to a concrete address for the probe.
+        host_to_test = await network.async_get_source_ip(hass)
 
     # 2. Connection Test
     try:
@@ -178,10 +185,21 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         the sentinel rather than as that IP) and host names, which resolve to
         the address a discovery reports.
         """
-        if host == CONF_DEFAULT_HOST:
-            return await _get_local_ip(self.hass)
+        # Collapse every local address onto the sentinel, rather than resolving
+        # the sentinel to one address: an entry stored under one local address
+        # still matches another, and the comparison survives an address change.
+        own_ips = await _own_ips(self.hass)
+        if host == CONF_DEFAULT_HOST or host in own_ips:
+            return CONF_DEFAULT_HOST
         with contextlib.suppress(OSError):
-            return await self.hass.async_add_executor_job(socket.gethostbyname, host)
+            resolved = await self.hass.async_add_executor_job(
+                socket.gethostbyname, host
+            )
+            # A name resolving to one of our own addresses is this machine too;
+            # returning the bare IP would make it differ from a stored sentinel.
+            if resolved in own_ips:
+                return CONF_DEFAULT_HOST
+            return resolved
         return host.casefold()
 
     async def _is_device_already_configured(

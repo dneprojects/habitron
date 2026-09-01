@@ -4,6 +4,60 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.2.4
+
+Three Core-alignment ports. Picked because each is small and verifiable; the
+sensor description-map rewrite was deliberately **not** taken (see below).
+
+### Fixed
+- **All of HA's local addresses count as "this machine", not just one.**
+  `_get_local_ip` asked for a single source IP (`target_ip="8.8.8.8"`, i.e. the
+  address routing towards the internet) and fell back to `127.0.0.1`. On a
+  multi-homed host -- LAN plus WLAN, a VPN, a container bridge -- entering any
+  other own address was not recognised, so the entry was stored under a bare
+  address instead of the `local` sentinel: it breaks when that address changes,
+  and it does not match an entry already stored under the sentinel, allowing a
+  duplicate. Replaced by `_own_ips` over `network.async_get_enabled_source_ips`.
+
+  `_async_canonical_host` also **reverses direction**: it used to resolve the
+  sentinel *to* an address, it now collapses every local address *onto* the
+  sentinel (including a host name that resolves to one). That is stable across
+  an address change, where the old direction was not. Only new and reconfigured
+  entries go through this; stored entries are untouched.
+
+### Changed
+- **`via_device` -> `via_device_id`.** The identifier-tuple form is deprecated
+  (removal 2027.8). The registry ids now come from the `async_get_or_create`
+  return values instead of a second `async_get_device` lookup, which also
+  retires the `if dev is not None` branches. The hierarchy is unchanged;
+  `test_setup_links_modules_via_router_to_hub` pins it.
+- **`BusMember.is_diagnostic` instead of `TYPE_DIAG = 10` in `sensor.py`.**
+  Five comparisons, all previously `abs(...) == TYPE_DIAG`, which is exactly
+  what the library property evaluates -- behaviour is identical. The two
+  classes that copied `self.type = <member>.type` now store
+  `self._is_diag = <member>.is_diagnostic`.
+
+  **`binary_sensor.py` keeps its own constant, on purpose.** Its comparison is
+  `state.type == TYPE_DIAG` **without** `abs()`, so switching it would be a
+  behaviour change: a flag of type `-10` is not diagnostic today and would
+  become so, moving it into the diagnostic block for anyone who enabled it
+  manually (both variants are disabled by default). Whether `-10` occurs on the
+  bus at all could not be established from the code -- that `sensor.py` uses
+  `abs()` throughout suggests it does. Needs checking against real hardware
+  before this one moves.
+
+### Not done
+- **The sensor description-map rewrite is not portable as-is.** Core's
+  `sensor.py` is 610 lines against 984 here and only builds `_snsr{n}`,
+  `_snsr{n}_{key}` and `_logic{n}`; `_adin`, `_ekey_*`, `_module_status`,
+  `_perc`/`_dperc`, `_client_{key}` and the per-diagnostic ids have no Core
+  counterpart yet, so adopting its setup would drop those entities. Core also
+  still appends the description key to *every* described sensor's unique_id,
+  which is the 3.1.0b1 rename regression this repo fixed in 3.1.1 by gating it
+  behind `disambiguate`. Harmless in Core (only router streams are described
+  there, and they genuinely collide), destructive here. Revisit once Core has
+  the remaining sensor types.
+
 ## v3.2.3
 
 ### Changed

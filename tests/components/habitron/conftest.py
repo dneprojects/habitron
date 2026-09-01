@@ -89,10 +89,6 @@ def mock_habitron_client() -> Generator[MagicMock]:
             new=AsyncMock(return_value=(True, MOCK_NAME)),
         ) as mock_test,
         patch(
-            "custom_components.habitron.config_flow._get_local_ip",
-            return_value="192.168.1.10",
-        ),
-        patch(
             "custom_components.habitron.config_flow.ConfigFlow._discover_habitron",
             new=AsyncMock(return_value=[]),
         ),
@@ -106,7 +102,7 @@ def mock_habitron_client() -> Generator[MagicMock]:
         ),
         patch(
             "custom_components.habitron.config_flow.network.async_get_enabled_source_ips",
-            new=AsyncMock(return_value=[]),
+            new=AsyncMock(return_value=["192.168.1.10"]),
         ),
         patch(
             "custom_components.habitron.config_flow.socket.gethostbyname",

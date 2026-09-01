@@ -198,8 +198,11 @@ class SmartHub:
         """Register the router + module devices and push their registry ids."""
         dev_reg = dr.async_get(self.hass)
         router = self.router
+        # ``via_device_id`` wants the parent's registry id, so the hub device
+        # (registered in async_setup) has to be looked up once here.
+        hub_dev = dev_reg.async_get_device(identifiers={(DOMAIN, self.uid)})
 
-        dev_reg.async_get_or_create(
+        rt_dev = dev_reg.async_get_or_create(
             config_entry_id=self.config.entry_id,
             configuration_url=f"{self.base_url}/router" if self.host else None,
             identifiers={(DOMAIN, router.uid)},
@@ -208,11 +211,9 @@ class SmartHub:
             model="Smart Router",
             sw_version=router.version,
             hw_version=router.serial,
-            via_device=(DOMAIN, self.uid),
+            via_device_id=hub_dev.id if hub_dev else None,
         )
-        rt_dev = dev_reg.async_get_device(identifiers={(DOMAIN, router.uid)})
-        if rt_dev is not None:
-            await self.comm.send_devregid(0, rt_dev.id)
+        await self.comm.send_devregid(0, rt_dev.id)
 
         for module in router.modules:
             raddr = module.addr - router.id
@@ -224,7 +225,7 @@ class SmartHub:
             # modules whenever the router's area list came back empty or changed
             # (``_area_name`` then falls back to "House" for every module).
             area_name = _area_name(router, module.area)
-            dev_reg.async_get_or_create(
+            dev = dev_reg.async_get_or_create(
                 config_entry_id=self.config.entry_id,
                 configuration_url=(
                     f"{self.base_url}/module-{raddr}" if self.host else None
@@ -236,11 +237,9 @@ class SmartHub:
                 model=module.mod_type,
                 sw_version=module.sw_version,
                 hw_version=module.hw_version,
-                via_device=(DOMAIN, router.uid),
+                via_device_id=rt_dev.id,
             )
-            dev = dev_reg.async_get_device(identifiers={(DOMAIN, module.uid)})
-            if dev is not None:
-                await self.comm.send_devregid(raddr, dev.id)
+            await self.comm.send_devregid(raddr, dev.id)
 
     async def update(self) -> None:
         """Refresh the hub-level diagnostics from the SmartHub info query.
