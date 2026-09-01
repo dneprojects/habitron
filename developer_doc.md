@@ -29,9 +29,20 @@ rationale and implementation detail for each release.
   device carry its WLAN MAC as a second registry connection (it currently
   registers only `lan mac`, so a hub that moves interfaces is not recognised on
   the other one). That touches device identity, which was settled deliberately
-  in 3.2.1, so it is left for its own round. `BusMember.is_diagnostic` is a
-  read-side accessor and this integration only ever *builds* `Diagnostic`
-  members with `type=10`; it would need a library-side factory to help here.
+  in 3.2.1, so it is left for its own round.
+
+  `BusMember.is_diagnostic` is likewise not adopted here, but it does apply --
+  **correcting what this entry first claimed.** The original note said the
+  integration only ever *builds* `Diagnostic` members with `type=10` and never
+  compares against the raw code, so a read-side accessor could not help. That
+  was wrong: `TYPE_DIAG = 10` is declared twice (`sensor.py`,
+  `binary_sensor.py`) and read in seven places, six of them as
+  `abs(...) == TYPE_DIAG` -- exactly what `is_diagnostic` evaluates. Adopting it
+  removes both duplicated constants. The three `Diagnostic(..., type=10)`
+  constructions in `smart_hub.py` do stay, since the accessor only covers the
+  read side; a library-side factory would be needed for those. Left out of this
+  release because it touches two platforms and belongs with the sensor-platform
+  port from Core, which rewrites that file anyway.
 
 ### Tests
 - `test_update_short_circuits_when_no_info` is replaced by
