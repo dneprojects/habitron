@@ -4,6 +4,23 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.2.5
+
+### Fixed
+- **An unreadable router list no longer builds an empty system.** SmartHub 3.5.7
+  answers `GET_GLOBAL_DESCRIPTIONS` with an empty payload when it could not read
+  the router's descriptions, instead of the 4-byte "no entries" header it sends
+  for a router that genuinely holds no lists. `habitron_client` 2.0.17 tells the
+  two apart and raises `HabitronProtocolError` on the short answer, which
+  `async_setup_entry` already maps to `ConfigEntryNotReady`
+  ([__init__.py:113](custom_components/habitron/__init__.py)) via the
+  `HabitronError` base class. Home Assistant therefore retries with backoff and
+  keeps the registered flag and collective-command entities plus their area
+  assignments, rather than completing setup with `router.flags`,
+  `router.coll_commands` and `router.areas` empty -- which created no entities
+  at all and orphaned the existing ones. No integration code change was needed;
+  only the pinned library version moves to 2.0.17.
+
 ## v3.2.4
 
 Three Core-alignment ports. Picked because each is small and verifiable; the
