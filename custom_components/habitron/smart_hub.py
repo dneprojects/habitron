@@ -199,8 +199,11 @@ class SmartHub:
         dev_reg = dr.async_get(self.hass)
         router = self.router
         # ``via_device_id`` wants the parent's registry id, so the hub device
-        # (registered in async_setup) has to be looked up once here.
-        hub_dev = dev_reg.async_get_device(identifiers={(DOMAIN, self.uid)})
+        # (registered in async_setup) has to be looked up once here. Scoped to
+        # our own entry: identifiers are only unique within a config entry.
+        hub_dev = dev_reg.async_get_device_by_identifier(
+            (DOMAIN, self.uid), self.config.entry_id
+        )
 
         rt_dev = dev_reg.async_get_or_create(
             config_entry_id=self.config.entry_id,

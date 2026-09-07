@@ -212,9 +212,11 @@ async def test_sc_system_command_service_dispatches_to_touch_module(
     router = Router(uid="rt_1", id=100)
     router.modules = [module]
 
-    await real_setup(router)
+    entry, _client = await real_setup(router)
 
-    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, "MOD-T")})
+    device = dr.async_get(hass).async_get_device_by_identifier(
+        (DOMAIN, "MOD-T"), entry.entry_id
+    )
     assert device is not None
 
     with patch.object(

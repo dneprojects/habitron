@@ -118,9 +118,11 @@ async def test_setup_registers_hub_device(
     """
     router = Router(uid="rt_1")
     router.modules = []
-    await real_setup(router, supervisor_token=supervisor_token)
+    entry, _client = await real_setup(router, supervisor_token=supervisor_token)
 
-    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, MOCK_UID)})
+    device = dr.async_get(hass).async_get_device_by_identifier(
+        (DOMAIN, MOCK_UID), entry.entry_id
+    )
     assert device is not None
     assert device.manufacturer == "Habitron GmbH"
     assert device.sw_version == MOCK_SMHUB_INFO["software"]["version"]
@@ -332,10 +334,10 @@ async def test_setup_suggests_module_area_on_first_creation(
     router.modules = [
         Module(uid="MOD-1", addr=105, typ=b"\x01\x02", name="Mod 1", area=1)
     ]
-    await real_setup(router)
+    entry, _client = await real_setup(router)
 
     dev_reg = dr.async_get(hass)
-    device = dev_reg.async_get_device(identifiers={(DOMAIN, "MOD-1")})
+    device = dev_reg.async_get_device_by_identifier((DOMAIN, "MOD-1"), entry.entry_id)
     assert device is not None
     area_reg = ar.async_get(hass)
     assert device.area_id is not None
@@ -363,7 +365,7 @@ async def test_reload_keeps_user_area_when_router_area_list_is_lost(
 
     dev_reg = dr.async_get(hass)
     area_reg = ar.async_get(hass)
-    device = dev_reg.async_get_device(identifiers={(DOMAIN, "MOD-1")})
+    device = dev_reg.async_get_device_by_identifier((DOMAIN, "MOD-1"), entry.entry_id)
     assert device is not None
 
     # The user moves the module into an area of their own.
@@ -378,11 +380,11 @@ async def test_reload_keeps_user_area_when_router_area_list_is_lost(
 
     # The moved module keeps the user's area, the untouched one keeps the area
     # it was created in -- neither is dragged into the "House" fallback.
-    device = dev_reg.async_get_device(identifiers={(DOMAIN, "MOD-1")})
+    device = dev_reg.async_get_device_by_identifier((DOMAIN, "MOD-1"), entry.entry_id)
     assert device is not None
     assert device.area_id == kitchen.id
 
-    other = dev_reg.async_get_device(identifiers={(DOMAIN, "MOD-2")})
+    other = dev_reg.async_get_device_by_identifier((DOMAIN, "MOD-2"), entry.entry_id)
     assert other is not None
     assert other.area_id is not None
     assert area_reg.async_get_area(other.area_id).name == "Living Room"
@@ -402,12 +404,12 @@ async def test_setup_links_modules_via_router_to_hub(
     router.modules = [
         Module(uid="MOD-1", addr=105, typ=b"\x01\x02", name="Mod 1", area=0)
     ]
-    await real_setup(router)
+    entry, _client = await real_setup(router)
 
     dev_reg = dr.async_get(hass)
-    hub = dev_reg.async_get_device(identifiers={(DOMAIN, MOCK_UID)})
-    rt = dev_reg.async_get_device(identifiers={(DOMAIN, "rt_1")})
-    mod = dev_reg.async_get_device(identifiers={(DOMAIN, "MOD-1")})
+    hub = dev_reg.async_get_device_by_identifier((DOMAIN, MOCK_UID), entry.entry_id)
+    rt = dev_reg.async_get_device_by_identifier((DOMAIN, "rt_1"), entry.entry_id)
+    mod = dev_reg.async_get_device_by_identifier((DOMAIN, "MOD-1"), entry.entry_id)
     assert hub is not None and rt is not None and mod is not None
     assert rt.via_device_id == hub.id
     assert mod.via_device_id == rt.id
