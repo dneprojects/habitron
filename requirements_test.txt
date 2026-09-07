@@ -56,5 +56,5 @@ pyspeex-noise==1.0.2
 # pins (requirements_test_pre_commit.txt) so that "clean here" == "clean in
 # core": an unpinned ruff lets CI drift onto a release that enables rules
 # core does not run yet (PLR0917 did exactly that).
-ruff==0.15.14
+ruff==0.16.5
 mypy>=1.13

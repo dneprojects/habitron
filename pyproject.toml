@@ -43,7 +43,10 @@ exclude_lines = [
 required-version = ">=0.16.5"  # keep in lockstep with HA core
 line-length = 88
 target-version = "py314"
-extend-exclude = ["custom_components/habitron/data"]
+# ``*.md``: ruff 0.16 formats Python blocks inside Markdown. Core scopes its
+# ruff-format hook to .py/.pyi, this CI runs ``ruff format .`` -- excluding
+# Markdown keeps the docs' hand-aligned code samples intact.
+extend-exclude = ["custom_components/habitron/data", "*.md"]
 
 [tool.ruff.lint]
 select = [
