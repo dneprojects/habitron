@@ -4,6 +4,32 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.2.6
+
+### Fixed
+- **`device_registry.async_get_device` warned on every setup.** Core deprecated
+  the lookup because identifiers and connections are no longer unique across
+  config entries (`c369f973abf`, first released in 2026.9.0).
+  `_register_bus_devices` used it to resolve the hub device for `via_device_id`
+  ([smart_hub.py:204](custom_components/habitron/smart_hub.py)); it now calls
+  `async_get_device_by_identifier((DOMAIN, self.uid), self.config.entry_id)`,
+  which scopes the lookup to our own entry and so cannot be ambiguous. The
+  replacement landed in 2026.8.0, so `hacs.json` raises its minimum to that --
+  the test harness pins 2026.8.3 anyway, so nothing below it was ever verified.
+- The nine test call sites moved too. For a custom integration the old call only
+  logged (`custom_integration_behavior` defaults to `ReportBehavior.LOG`, with
+  the break announced for 2027.8.0), but outside an integration frame
+  `report_usage` falls back to `core_behavior=ERROR` and *raises* -- the tests
+  would have failed the moment the harness moves to 2026.9.
+
+### Internal
+- ruff pinned to 0.16.5 in `pyproject.toml` and `requirements_test.txt`, the
+  version core `dev` pins, with `PLR0917`, `ISC004` and `LOG004` adopted from
+  core's ignore list -- 0.16 enables them, and `PLR0917` alone hit 18 places.
+- `*.md` excluded from ruff: 0.16 also formats Python blocks inside Markdown and
+  CI runs `ruff format .`, which would have rewritten the hand-aligned samples in
+  `ARCHITECTURE_v2.md`. Core avoids this by scoping its hook to `.py`/`.pyi`.
+
 ## v3.2.5
 
 ### Fixed

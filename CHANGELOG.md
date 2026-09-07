@@ -3,6 +3,11 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.2.6
+- Home Assistant 2026.8 or newer is now required. The integration looked up its own hub device through a call that Home Assistant has deprecated, which wrote a warning into the log on every start; it now uses the replacement introduced in 2026.8. Nothing changes for your devices or entities.
+- This version also carries the v3.2.5 fix listed below. v3.2.5 was prepared but never published as a release, so it reaches you here.
+- Internal maintenance: the linter is pinned to the version Home Assistant core uses. Nothing changes for you.
+
 ## v3.2.5
 - Fixed: if the hub cannot read the router's lists (areas, global flags, collective commands), Home Assistant now waits and retries instead of setting the system up without them. Previously an unreadable list was treated as an empty one, so the flag and collective-command entities silently disappeared until the next reload. Requires SmartHub 3.5.7.
 
