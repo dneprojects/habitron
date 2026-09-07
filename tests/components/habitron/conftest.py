@@ -227,7 +227,6 @@ def real_setup(
     setup_homeassistant: None,
     mock_ws_provider: MagicMock,
     mock_coordinator_refresh: AsyncMock,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> Callable[..., Awaitable[tuple[MockConfigEntry, AsyncMock]]]:
     """Return a factory that runs a *real* setup over a caller-supplied router.
 
@@ -239,12 +238,18 @@ def real_setup(
     """
 
     async def _setup(
-        router: Router, *, supervisor_token: str | None = None
+        router: Router, *, is_addon: bool = False
     ) -> tuple[MockConfigEntry, AsyncMock]:
-        if supervisor_token is None:
-            monkeypatch.delenv("SUPERVISOR_TOKEN", raising=False)
-        else:
-            monkeypatch.setenv("SUPERVISOR_TOKEN", supervisor_token)
+        # Whether the hub runs as an add-on is reported by the hub itself, in
+        # ``software.type`` ("Smart Hub App" vs "Smart Hub") - not taken from
+        # this machine's environment.
+        info = {
+            **MOCK_SMHUB_INFO,
+            "software": {
+                **MOCK_SMHUB_INFO["software"],
+                "type": "Smart Hub App" if is_addon else "Smart Hub",
+            },
+        }
 
         entry = MockConfigEntry(
             domain=DOMAIN,
@@ -257,7 +262,7 @@ def real_setup(
 
         client = AsyncMock(spec=HabitronClient)
         client.host = MOCK_HOST
-        client.get_smhub_info = AsyncMock(return_value=MOCK_SMHUB_INFO)
+        client.get_smhub_info = AsyncMock(return_value=info)
         client.get_smhub_update = AsyncMock(return_value=None)
 
         with (

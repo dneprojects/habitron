@@ -94,11 +94,11 @@ def test_smhub_version_property(smart_hub_stub: SmartHub) -> None:
 
 
 @pytest.mark.parametrize(
-    ("supervisor_token", "expected_conf_url"),
+    ("is_addon", "expected_conf_url"),
     [
-        (None, f"http://{MOCK_HOST}:7780/hub"),
+        (False, f"http://{MOCK_HOST}:7780/hub"),
         (
-            "token",
+            True,
             f"http://{MOCK_HOST}:8123/habitron_smarthub/ingress?index=/hub",
         ),
     ],
@@ -106,7 +106,7 @@ def test_smhub_version_property(smart_hub_stub: SmartHub) -> None:
 async def test_setup_registers_hub_device(
     hass: HomeAssistant,
     real_setup: Callable[..., Awaitable[tuple[MockConfigEntry, AsyncMock]]],
-    supervisor_token: str | None,
+    is_addon: bool,
     expected_conf_url: str,
 ) -> None:
     """Full config-entry setup registers the hub device in the registry.
@@ -118,7 +118,7 @@ async def test_setup_registers_hub_device(
     """
     router = Router(uid="rt_1")
     router.modules = []
-    entry, _client = await real_setup(router, supervisor_token=supervisor_token)
+    entry, _client = await real_setup(router, is_addon=is_addon)
 
     device = dr.async_get(hass).async_get_device_by_identifier(
         (DOMAIN, MOCK_UID), entry.entry_id

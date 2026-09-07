@@ -4,6 +4,25 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.2.7
+
+### Fixed
+- **The access token reached a standalone hub scrambled beyond use.** Both sides
+  have to agree on whether the token is scrambled in transit: the library sends
+  it scrambled unless `is_addon`, and the hub descrambles it unless its own
+  `is_app`. The hub derives `is_app` from `SUPERVISOR_TOKEN` on *its* machine,
+  which is right -- but `HbtnComm.get_smhub_info` derived `is_addon` from
+  `SUPERVISOR_TOKEN` in *this* process. That variable is set in every supervised
+  Home Assistant, regardless of where the hub runs, so the combination
+  "HA OS / supervised + standalone hub" sent the token unscrambled while the hub
+  descrambled it. The mangled token failed the websocket auth and no events were
+  delivered. It was the only value in that block not taken from the hub's own
+  info payload; `is_addon` now reads `software.type`, which the hub reports as
+  `"Smart Hub App"` when it runs as an add-on and `"Smart Hub"` otherwise
+  (`slug` is unusable for this: a standalone hub fills it with its hostname).
+  The `os` import is gone with it, and the `real_setup` fixture drives the
+  add-on case through the hub info rather than the environment.
+
 ## v3.2.6
 
 ### Fixed

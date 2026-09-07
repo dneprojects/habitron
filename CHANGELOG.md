@@ -3,6 +3,9 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.2.7
+- Fixed: with a SmartHub that does **not** run as an add-on of this Home Assistant, the access token sent to the hub was unusable, so the hub could not push any events. Whether the hub is an add-on is now taken from the hub's own report instead of from this machine, which got it wrong for every Home Assistant OS or supervised installation talking to a standalone hub.
+
 ## v3.2.6
 - Home Assistant 2026.8 or newer is now required. The integration looked up its own hub device through a call that Home Assistant has deprecated, which wrote a warning into the log on every start; it now uses the replacement introduced in 2026.8. Nothing changes for your devices or entities.
 - This version also carries the v3.2.5 fix listed below. v3.2.5 was prepared but never published as a release, so it reaches you here.

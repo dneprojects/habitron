@@ -219,23 +219,76 @@ async def test_get_compact_status_caches_new_crc() -> None:
 # ---------------------------------------------------------------------------
 
 
-async def test_get_smhub_info_populates_fields() -> None:
-    """get_smhub_info fills mac/version/host fields from the validated info."""
-    comm = _make_comm()
-    info = {
-        "software": {"version": "1.0", "slug": "habitron"},
+def _info(hub_type: str = "Smart Hub") -> dict:
+    """A SmartHub info payload; ``hub_type`` is what the hub reports."""
+    return {
+        "software": {"version": "1.0", "slug": "habitron", "type": hub_type},
         "hardware": {
             "platform": {"type": "Raspberry Pi 4"},
             "network": {"ip": "10.0.0.5", "host": "smarthub", "lan mac": "AA:BB"},
         },
     }
-    comm._client.get_smhub_info = AsyncMock(return_value=info)
-    with patch("custom_components.habitron.communicate.os.getenv", return_value=None):
-        out = await comm.get_smhub_info()
+
+
+async def test_get_smhub_info_populates_fields() -> None:
+    """get_smhub_info fills mac/version/host fields from the validated info."""
+    comm = _make_comm()
+    comm._client.get_smhub_info = AsyncMock(return_value=_info())
+    out = await comm.get_smhub_info()
     assert out["software"]["version"] == "1.0"
     assert comm.com_version == "1.0"
     assert comm.com_mac == "AA:BB"
     assert comm.com_ip == "10.0.0.5"
+
+
+@pytest.mark.parametrize(
+    ("hub_type", "expected_addon", "expected_slug"),
+    [
+        ("Smart Hub App", True, "habitron"),
+        ("Smart Hub", False, ""),
+    ],
+)
+async def test_is_addon_comes_from_the_hub(
+    hub_type: str, expected_addon: bool, expected_slug: str
+) -> None:
+    """The hub decides whether it is an add-on, not this machine."""
+    comm = _make_comm()
+    comm._client.get_smhub_info = AsyncMock(return_value=_info(hub_type))
+    await comm.get_smhub_info()
+    assert comm.is_addon is expected_addon
+    assert comm.slugname == expected_slug
+
+
+async def test_standalone_hub_is_not_an_addon_under_supervisor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """SUPERVISOR_TOKEN in *this* process must not mark the hub as an add-on.
+
+    It is set in every supervised Home Assistant, so a standalone hub talking
+    to an HA OS instance used to be taken for an add-on. The access token was
+    then sent unscrambled while the hub descrambled it, which destroyed it and
+    left the hub unable to open its websocket.
+    """
+    monkeypatch.setenv("SUPERVISOR_TOKEN", "supervised-ha")
+    comm = _make_comm()
+    comm._client.get_smhub_info = AsyncMock(return_value=_info("Smart Hub"))
+    await comm.get_smhub_info()
+    assert comm.is_addon is False
+
+
+async def test_send_network_info_scrambles_for_a_standalone_hub(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The flag the hub reported decides how the token goes over the wire."""
+    monkeypatch.setenv("SUPERVISOR_TOKEN", "supervised-ha")
+    comm = _make_comm()
+    comm._client.get_smhub_info = AsyncMock(return_value=_info("Smart Hub"))
+    comm._client.send_network_info = AsyncMock()
+    await comm.get_smhub_info()
+    await comm.send_network_info("a-token")
+    # The hub descrambles whenever it is not an add-on, so it must be told to
+    # expect a scrambled token.
+    assert comm._client.send_network_info.await_args.kwargs["is_addon"] is False
 
 
 # ---------------------------------------------------------------------------

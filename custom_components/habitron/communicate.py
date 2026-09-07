@@ -3,7 +3,6 @@
 import asyncio
 import ipaddress
 import logging
-import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -244,8 +243,14 @@ class HbtnComm:
             self._hostip = info["hardware"]["network"]["ip"]
             self._hostname = info["hardware"]["network"]["host"]
             self._mac = info["hardware"]["network"]["lan mac"]
-            self.is_addon = os.getenv("SUPERVISOR_TOKEN") is not None
             software = cast("dict[str, Any]", info["software"])
+            # Whether the *hub* runs as an add-on is the hub's own property, so
+            # it has to come from its info ("Smart Hub App" vs "Smart Hub").
+            # Reading SUPERVISOR_TOKEN here asked the wrong machine: it is set
+            # in every supervised Home Assistant, so a standalone hub talking
+            # to an HA OS instance was taken for an add-on. The token was then
+            # sent unscrambled while the hub descrambled it, which destroyed it.
+            self.is_addon = "App" in str(software.get("type", ""))
             self.slugname = software.get("slug", "") if self.is_addon else ""
             self.logger.debug("SmartHub slugname: %s", self.slugname)
         except HabitronTimeoutError as exc:
