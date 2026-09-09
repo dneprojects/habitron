@@ -450,7 +450,6 @@ class HbtnStoredMessageSelect(SelectEntity):
 
     _attr_has_entity_name = True
     _attr_translation_key = "stored_message"
-    _attr_entity_category = EntityCategory.CONFIG
 
     def __init__(self, module: Module) -> None:
         """Initialize the stored-message list."""

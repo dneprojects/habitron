@@ -283,10 +283,6 @@ _UID_REWRITES: Final = [
     (re.compile(r"^Hub_(?P<u>.+)_(?P<k>restart|reboot)$"), "{u}_{k}"),
     (re.compile(r"^mod_(?P<u>.+)_app_update$"), "{u}_app_update"),
     (re.compile(r"^Mod_(?P<u>.+)_update$"), "{u}_firmware_update"),
-    # The display notify was removed in v2.10.0 and is back; its entries have
-    # been orphaned ever since, so this revives them with whatever the user had
-    # named and customised rather than leaving a dead one beside a new one.
-    (re.compile(r"^Mod_(?P<u>.+)_msg$"), "{u}_message"),
     (re.compile(r"^Mod_(?P<u>.+)_mediaplayer$"), "{u}_media_player"),
     (re.compile(r"^Mod_(?P<u>.+)_assist_sat$"), "{u}_assist_satellite"),
     # anything else that only carried the prefix
@@ -330,6 +326,14 @@ def _uid_scheme_rule(smhub: SmartHub) -> UniqueIdRule:
 
     def rule(ent: er.RegistryEntry) -> str | None:
         uid = ent.unique_id or ""
+        if ent.domain == "notify" and uid.endswith("_msg"):
+            # The display notify removed in v2.10.0. Most of these entries were
+            # already stripped of their ``Mod_`` prefix by the v3.3.0 rename, so
+            # the bare form is what is actually out there -- and being bare, it
+            # is not something the unmapped-id warning would have caught. Both
+            # spellings are handled here so neither needs its own rule.
+            base = uid.removeprefix("Mod_").removesuffix("_msg")
+            return f"{base}_message"
         if (m := _SET_VALUE_RE.match(uid)) is not None:
             return f"{m['u']}_set_temperature_{int(m['n']) - 47}"
         if (m := re.match(r"^Mod_(?P<u>.+)_snsr(?P<n>\d+)$", uid)) is not None:

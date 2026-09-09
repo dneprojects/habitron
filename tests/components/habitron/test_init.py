@@ -563,11 +563,15 @@ async def test_the_old_display_notify_is_revived(hass: HomeAssistant) -> None:
     registry entries have been orphaned since. Mapping the old id onto the new
     one hands the user back the entity they had, with its name and
     customisations, instead of putting a fresh one beside a dead one.
+
+    The bare form is what is actually in the field: the v3.3.0 rename already
+    stripped the ``Mod_`` prefix off these, and looking only for the prefixed
+    spelling is what let the first attempt at this miss them entirely.
     """
     entry = MockConfigEntry(domain=DOMAIN)
     entry.add_to_hass(hass)
     ent_reg = er.async_get(hass)
-    existing = _register(ent_reg, entry, "Mod_MOD-1_msg", domain="notify")
+    existing = _register(ent_reg, entry, "MOD-1_msg", domain="notify")
 
     _async_migrate_unique_ids(hass, entry, (_uid_scheme_rule(_model_for_migration()),))
 

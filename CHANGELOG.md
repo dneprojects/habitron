@@ -3,6 +3,11 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.4.0b2
+- Beta. Fixed: the old, unused "Messages" entity was not replaced by the new one but left standing beside it. Both are matched up on the next start and the leftover is removed.
+- The messages list now sits with the module's normal entities instead of under "Configuration", where it was easy to miss.
+- The diagnostics download lists each module's stored messages by number and name, so it is possible to check what a module actually offers.
+
 ## v3.4.0b1
 - Beta. The messages stored in a module are visible again. Each module with stored messages gets a "Messages list" you can page through without sending anything, and the "Message" notify target is back -- it had been dropped when the free-text field arrived, and with it the only way to trigger a stored message.
 - The displayed-message field now takes a stored message's name or the number shown in front of it in the list, as well as free text, and afterwards shows what was actually sent. Two new actions, "Send selected message" and "Clear sent message", work on the notify target.

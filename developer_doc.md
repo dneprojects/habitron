@@ -4,6 +4,30 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.4.0b2
+
+### The revival rule looked for an id that no longer exists
+`Mod_{uid}_msg` was already stripped to `{uid}_msg` by the v3.3.0 rename, so a
+rule matching the prefixed spelling found nothing and the orphaned entity
+stayed beside the new one. Both spellings are handled in one branch now, scoped
+to the notify domain.
+
+Worth noting for the next time: the unmapped-id warning did **not** catch this,
+because it only fires on ids still carrying a `Mod_`/`Rt_`/`Hub_`/`mod_`
+prefix. An id that an earlier migration already stripped, but that no rule
+claims, still passes silently.
+
+### The messages list is a control, not configuration
+It carried `EntityCategory.CONFIG`, which put it in the device page's separate
+configuration block. It configures nothing on the device -- it is a chooser
+that feeds `habitron.send_selected_message` -- so the category is gone.
+
+### Diagnostics carry the stored messages
+`_module_summary` reported counts only. It now lists each module's stored
+messages by number and name: they are what a user has to type into the
+displayed-message field or an SMS, so "nothing happens" is answerable from a
+diagnostics download instead of guesswork.
+
 ## v3.4.0b1
 
 ### The stored messages are reachable again

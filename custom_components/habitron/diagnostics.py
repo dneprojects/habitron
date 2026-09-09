@@ -34,6 +34,12 @@ def _module_summary(module: Any) -> dict[str, Any]:
         "output_count": len(getattr(module, "outputs", []) or []),
         "sensor_count": len(getattr(module, "sensors", []) or []),
         "led_count": len(getattr(module, "leds", []) or []),
+        # The names, not just a count: they are what a user has to type into
+        # the displayed-message field or an SMS, so a report about "nothing
+        # happens" is answerable from here.
+        "stored_messages": {
+            msg.nmbr: msg.name for msg in getattr(module, "messages", []) or []
+        },
     }
 
 
