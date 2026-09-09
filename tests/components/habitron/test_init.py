@@ -554,3 +554,21 @@ async def test_both_climate_controller_spellings_migrate(
     assert (
         ent_reg.async_get(existing.entity_id).unique_id == "MOD-1_climate_controller_2"
     )
+
+
+async def test_the_old_display_notify_is_revived(hass: HomeAssistant) -> None:
+    """The "Messages" entity removed in v2.10.0 gets its entry back.
+
+    Its notify target was dropped when the text entity arrived, so those
+    registry entries have been orphaned since. Mapping the old id onto the new
+    one hands the user back the entity they had, with its name and
+    customisations, instead of putting a fresh one beside a dead one.
+    """
+    entry = MockConfigEntry(domain=DOMAIN)
+    entry.add_to_hass(hass)
+    ent_reg = er.async_get(hass)
+    existing = _register(ent_reg, entry, "Mod_MOD-1_msg", domain="notify")
+
+    _async_migrate_unique_ids(hass, entry, (_uid_scheme_rule(_model_for_migration()),))
+
+    assert ent_reg.async_get(existing.entity_id).unique_id == "MOD-1_message"

@@ -159,3 +159,14 @@ sc_system_command:
       required: false
       selector:
         text: null
+send_selected_message:
+  target:
+    entity:
+      integration: habitron
+      domain: notify
+
+clear_sent_message:
+  target:
+    entity:
+      integration: habitron
+      domain: notify

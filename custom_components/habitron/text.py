@@ -9,7 +9,7 @@ from homeassistant.components.text import TextEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from ._helpers import hbtn_device_info
+from ._helpers import hbtn_device_info, resolve_stored_message
 from .coordinator import HabitronConfigEntry
 
 if TYPE_CHECKING:
@@ -55,7 +55,19 @@ class HbtnDisplayText(TextEntity):
         self._attr_device_info = hbtn_device_info(module.uid)
 
     async def async_set_value(self, value: str) -> None:
-        """Show ``value`` on the module display (an empty string clears it)."""
-        await self._comm.send_message_text(self._module.addr, value)
-        self._attr_native_value = value
+        """Show ``value`` on the module display.
+
+        A stored message is triggered by its id when the text names one, or is
+        a number that matches one; anything else goes out as free text. An
+        empty value clears the display. What ends up as this entity's value is
+        the *resolved* text, so typing "3" leaves the message behind that id
+        standing here -- which is also the confirmation that it was understood
+        as an id rather than sent as the literal text.
+        """
+        nmbr, label = resolve_stored_message(self._module.messages, value)
+        if nmbr is not None:
+            await self._comm.send_message(self._module.addr, nmbr)
+        else:
+            await self._comm.send_message_text(self._module.addr, value)
+        self._attr_native_value = label
         self.async_write_ha_state()

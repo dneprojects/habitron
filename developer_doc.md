@@ -4,6 +4,40 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.4.0b1
+
+### The stored messages are reachable again
+`module.messages` has been parsed all along and `HbtnComm.send_message` has
+been there since the v1 rewrite, but nothing had called it since `c60f932`
+removed `HbtnMessage` (v2.10.0). That commit replaced the display notify with
+the text entity -- free text only -- so the stored messages became unreachable
+and invisible.
+
+Three parts now: `HbtnStoredMessageSelect` lists them (`{nmbr}: {name}`,
+`ATTR_MESSAGE_ID` as an attribute) and deliberately sends nothing on select, so
+the list can be paged through; `HbtnDisplayMessage` is the notify target again,
+under `{uid}_message`, and the old `Mod_{uid}_msg` entries are migrated onto it
+so users get their entity back rather than a second one; the text entity keeps
+being the only thing that writes to a display.
+
+### One resolver, one writer
+`resolve_stored_message` is shared by the display and SMS paths: name first
+(spacing ignored on both sides, as the removed display notify did), then a bare
+number as the id. Name before number on purpose -- a stored message may be
+called "3", and reading the number first would make it unreachable.
+
+Everything that writes to a display goes through the text entity via
+`async_show_on_display`, including `notify.send_message` and both new actions.
+That keeps its value honest: it is what was last sent, whichever route sent it.
+It remains an echo, not a read-back -- the bus offers no way to ask a display
+what it shows.
+
+`habitron.send_selected_message` sits on the notify entities, not on the list:
+for GSM, one module's messages can go to any of its numbers, so the list says
+*what* and the entity says *to whom*. `habitron.clear_sent_message` sits there
+too for symmetry and clears through the text entity; on an SMS target it
+refuses, since a sent message cannot be taken back.
+
 ## v3.3.1b2
 
 ### The misspelt climate-controller id

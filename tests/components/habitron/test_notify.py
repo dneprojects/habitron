@@ -1,7 +1,7 @@
 """Tests for the Habitron notify platform (GSM/SMS, v2 model)."""
 
 from collections.abc import Awaitable, Callable
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from habitron_client import HbtnCommand, Module, Router
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -61,7 +61,13 @@ async def test_async_setup_entry_builds_sms_entities(hass: HomeAssistant) -> Non
     entry.runtime_data.comm = _comm()
 
     added: list = []
-    await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
+    # The platform registers its two entity services on setup; called directly
+    # like this there is none, so stand one in.
+    with patch(
+        "custom_components.habitron.notify.entity_platform.async_get_current_platform",
+        return_value=MagicMock(),
+    ):
+        await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
     assert len(added) == 1
     assert isinstance(added[0], HbtnGSMMessage)
 

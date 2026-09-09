@@ -13,14 +13,16 @@
 
 from typing import TYPE_CHECKING
 
-from habitron_client import BusMember, Module
+from habitron_client import BusMember, HbtnCommand, Module
 
+from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import ATTR_MESSAGE_ID, DOMAIN
 
 
 def deviating_area_id(
@@ -139,3 +141,75 @@ class HabitronEntity(CoordinatorEntity["HbtnCoordinator"]):
         """Unsubscribe the member listener."""
         self._member.remove_listener(self.async_write_ha_state)
         await super().async_will_remove_from_hass()
+
+
+def resolve_stored_message(
+    messages: list[HbtnCommand], payload: str
+) -> tuple[int | None, str]:
+    """Resolve what the user typed against a module's stored messages.
+
+    Returns ``(nmbr, label)``: the id of the stored message to trigger, or
+    ``None`` when the payload matches none of them, plus the text to show as
+    the resolved value -- the stored message's name when one was found, the
+    payload itself otherwise.
+
+    The name is tried before the number on purpose. A stored message may well
+    be called "3", and reading that as an index would hide it behind the
+    message that happens to carry id 3. Spaces are ignored on both sides: the
+    display notify has always compared that way, and a name typed with one
+    space too few should still find its message.
+    """
+    stripped = payload.strip()
+    squashed = stripped.replace(" ", "")
+    for msg in messages:
+        if squashed == msg.name.replace(" ", ""):
+            return msg.nmbr, msg.name
+    if stripped.isdigit():
+        wanted = int(stripped)
+        for msg in messages:
+            if msg.nmbr == wanted:
+                return msg.nmbr, msg.name
+    return None, payload
+
+
+def selected_message_id(hass: HomeAssistant, module_uid: str) -> int:
+    """Return the stored-message id the module's message list currently holds.
+
+    The list entity is the only place this lives -- it is a select, and its
+    option *is* the choice, so keeping a second copy elsewhere would just be
+    another thing to get out of step. It is found by its unique_id, which is
+    stable whatever the user renames the entity to, and carries the id as an
+    attribute so nothing has to parse the label back apart.
+    """
+    entity_id = er.async_get(hass).async_get_entity_id(
+        "select", DOMAIN, f"{module_uid}_stored_message"
+    )
+    state = hass.states.get(entity_id) if entity_id else None
+    message_id = state.attributes.get(ATTR_MESSAGE_ID) if state else None
+    if message_id is None:
+        raise HomeAssistantError(
+            translation_domain=DOMAIN, translation_key="no_message_selected"
+        )
+    return int(message_id)
+
+
+async def async_show_on_display(
+    hass: HomeAssistant, module_uid: str, value: str
+) -> None:
+    """Put ``value`` on a module's display through its text entity.
+
+    Everything that writes to a display goes this way -- the notify target and
+    its actions included -- so the text entity stays the one place that knows
+    what was last sent there. Writing to the bus directly would leave its value
+    standing while the display already showed something else.
+    """
+    entity_id = er.async_get(hass).async_get_entity_id(
+        "text", DOMAIN, f"{module_uid}_message"
+    )
+    if entity_id is None:
+        raise HomeAssistantError(
+            translation_domain=DOMAIN, translation_key="no_display_entity"
+        )
+    await hass.services.async_call(
+        "text", "set_value", {"entity_id": entity_id, "value": value}, blocking=True
+    )

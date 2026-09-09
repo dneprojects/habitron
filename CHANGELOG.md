@@ -3,6 +3,11 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.4.0b1
+- Beta. The messages stored in a module are visible again. Each module with stored messages gets a "Messages list" you can page through without sending anything, and the "Message" notify target is back -- it had been dropped when the free-text field arrived, and with it the only way to trigger a stored message.
+- The displayed-message field now takes a stored message's name or the number shown in front of it in the list, as well as free text, and afterwards shows what was actually sent. Two new actions, "Send selected message" and "Clear sent message", work on the notify target.
+- SMS messages accept the same input: a name, ignoring spacing, or the number from the list. Previously only an exactly matching name worked.
+
 ## v3.3.1b2
 - Beta. Fixed: the second climate controller of a module kept an unused entity from an older version. Its identifier contained a misspelling that was corrected long ago, and since the identifier was built from the name back then, the correction left the old entity behind. It is cleaned up on the next start.
 

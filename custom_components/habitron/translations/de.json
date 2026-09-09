@@ -179,6 +179,16 @@
       }
     },
     "select": {
+      "habitron_loglevel": {
+        "state": {
+          "notset": "Nicht gesetzt",
+          "debug": "Debug",
+          "info": "Info",
+          "warning": "Warnung",
+          "error": "Fehler",
+          "critical": "Kritisch"
+        }
+      },
       "habitron_mode": {
         "state": {
           "on": "Aktiv",
@@ -193,15 +203,8 @@
           "vacation": "Urlaub"
         }
       },
-      "habitron_loglevel": {
-        "state": {
-          "notset": "Nicht gesetzt",
-          "debug": "Debug",
-          "info": "Info",
-          "warning": "Warnung",
-          "error": "Fehler",
-          "critical": "Kritisch"
-        }
+      "stored_message": {
+        "name": "Meldungsliste"
       }
     },
     "event": {
@@ -230,14 +233,23 @@
     },
     "text": {
       "message": {
+        "name": "Meldungsanzeige"
+      }
+    },
+    "notify": {
+      "display_message": {
         "name": "Meldung"
       }
     }
   },
   "services": {
-    "hub_restart": {
-      "name": "Hub Neustart",
-      "description": "Startet den SmartHub-Dienst weich neu.",
+    "clear_sent_message": {
+      "name": "Gesendete Meldung löschen",
+      "description": "Löscht die Anzeige des Moduls und damit die angezeigte Meldung."
+    },
+    "hub_reboot": {
+      "name": "Hub Reboot",
+      "description": "Startet den SmartHub-Host neu.",
       "fields": {
         "device_id": {
           "name": "Gerät",
@@ -245,9 +257,9 @@
         }
       }
     },
-    "hub_reboot": {
-      "name": "Hub Reboot",
-      "description": "Startet den SmartHub-Host neu.",
+    "hub_restart": {
+      "name": "Hub Neustart",
+      "description": "Startet den SmartHub-Dienst weich neu.",
       "fields": {
         "device_id": {
           "name": "Gerät",
@@ -307,16 +319,6 @@
         }
       }
     },
-    "save_router_smr": {
-      "name": "Router .smr-Datei speichern",
-      "description": "Liest Router-Einstellungen aus und speichert sie als .smr-Textdatei.",
-      "fields": {
-        "device_id": {
-          "name": "Gerät",
-          "description": "Ein Habitron-Gerät am Ziel-SmartHub (Hub, Router oder Modul). Bei nur einem Hub optional."
-        }
-      }
-    },
     "save_module_status": {
       "name": "Modulstatus speichern",
       "description": "Liest den Modulstatus aus und speichert ihn als .mstat-Textdatei.",
@@ -325,6 +327,16 @@
           "name": "Modul-Nummer",
           "description": "Habitron Modul-Adresse."
         },
+        "device_id": {
+          "name": "Gerät",
+          "description": "Ein Habitron-Gerät am Ziel-SmartHub (Hub, Router oder Modul). Bei nur einem Hub optional."
+        }
+      }
+    },
+    "save_router_smr": {
+      "name": "Router .smr-Datei speichern",
+      "description": "Liest Router-Einstellungen aus und speichert sie als .smr-Textdatei.",
+      "fields": {
         "device_id": {
           "name": "Gerät",
           "description": "Ein Habitron-Gerät am Ziel-SmartHub (Hub, Router oder Modul). Bei nur einem Hub optional."
@@ -340,6 +352,28 @@
           "description": "Ein Habitron-Gerät am Ziel-SmartHub (Hub, Router oder Modul). Bei nur einem Hub optional."
         }
       }
+    },
+    "sc_system_command": {
+      "name": "Smart Touch Systembefehl",
+      "description": "Führt einen Neustart oder Factory Reset der App eines spezifischen Smart Touch Moduls aus.",
+      "fields": {
+        "target_device": {
+          "name": "Module",
+          "description": "Auswahl der Ziel-Module."
+        },
+        "command": {
+          "name": "Befehl",
+          "description": "Der auszuführende Systembefehl."
+        },
+        "new_ip": {
+          "name": "Neue Home Assistant IP / Route",
+          "description": "(Optional) Ändert die gespeicherte IP/Route in der App VOR einem Neustart."
+        }
+      }
+    },
+    "send_selected_message": {
+      "name": "Ausgewählte Meldung senden",
+      "description": "Sendet die Meldung, die in der Meldungsliste des Moduls gewählt ist."
     },
     "update_entity": {
       "name": "Update-Event an Hub weiterleiten",
@@ -382,24 +416,6 @@
           "description": "Fünftes Event-Argument (optional)."
         }
       }
-    },
-    "sc_system_command": {
-      "name": "Smart Touch Systembefehl",
-      "description": "Führt einen Neustart oder Factory Reset der App eines spezifischen Smart Touch Moduls aus.",
-      "fields": {
-        "target_device": {
-          "name": "Module",
-          "description": "Auswahl der Ziel-Module."
-        },
-        "command": {
-          "name": "Befehl",
-          "description": "Der auszuführende Systembefehl."
-        },
-        "new_ip": {
-          "name": "Neue Home Assistant IP / Route",
-          "description": "(Optional) Ändert die gespeicherte IP/Route in der App VOR einem Neustart."
-        }
-      }
     }
   },
   "exceptions": {
@@ -412,17 +428,23 @@
     "connect_timeout": {
       "message": "Zeitüberschreitung beim Verbinden mit dem SmartHub."
     },
+    "no_display_entity": {
+      "message": "Für dieses Modul gibt es keine Meldungsanzeige."
+    },
     "no_hub_loaded": {
       "message": "Habitron-Service aufgerufen, aber kein SmartHub geladen."
     },
-    "websocket_provider_missing": {
-      "message": "WebSocket-Provider auf dem SmartHub nicht initialisiert."
+    "no_matching_module": {
+      "message": "Kein gültiges Smart-Touch-Modul für Gerät {device_id} gefunden."
+    },
+    "no_message_selected": {
+      "message": "In der Meldungsliste des Moduls ist keine Meldung ausgewählt."
     },
     "no_target_devices": {
       "message": "Keine Zielgeräte für den Systembefehl angegeben."
     },
-    "no_matching_module": {
-      "message": "Kein gültiges Smart-Touch-Modul für Gerät {device_id} gefunden."
+    "sms_cannot_be_cleared": {
+      "message": "Eine gesendete SMS lässt sich nicht zurücknehmen."
     },
     "update_apk_prep_failed": {
       "message": "Update-Datei für die Smart-Touch-App konnte nicht vorbereitet werden."
@@ -456,6 +478,9 @@
     },
     "webrtc_stream_source_unavailable": {
       "message": "Stream-Quelle nicht verfügbar."
+    },
+    "websocket_provider_missing": {
+      "message": "WebSocket-Provider auf dem SmartHub nicht initialisiert."
     }
   },
   "system_health": {

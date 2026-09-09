@@ -3,7 +3,8 @@
 from collections.abc import Awaitable, Callable
 from unittest.mock import AsyncMock, MagicMock
 
-from habitron_client import Module, Router
+from habitron_client import HbtnCommand, Module, Router
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.const import DOMAIN
@@ -19,6 +20,7 @@ def _module(typ: bytes = b"\x01\x02") -> Module:
 def _comm() -> MagicMock:
     comm = MagicMock()
     comm.send_message_text = AsyncMock()
+    comm.send_message = AsyncMock()
     return comm
 
 
@@ -83,3 +85,69 @@ async def test_set_value_service_reaches_bus_and_updates_state(
     state = hass.states.get(entity_id)
     assert state is not None
     assert state.state == "Hello"
+
+
+def _module_with_messages() -> Module:
+    """A display module carrying two stored messages."""
+    module = _module()
+    module.messages = [
+        HbtnCommand(name="Tor offen", nmbr=3),
+        HbtnCommand(name="Besuch", nmbr=5),
+    ]
+    return module
+
+
+@pytest.mark.parametrize(
+    ("typed", "sent_id", "shown"),
+    [
+        # The stored message by name, spacing ignored on both sides.
+        ("Tor offen", 3, "Tor offen"),
+        ("  Toroffen ", 3, "Tor offen"),
+        # ... and by the id printed in front of it in the messages list.
+        ("5", 5, "Besuch"),
+        # Anything else is free text, which this display understands.
+        ("Paket abgegeben", None, "Paket abgegeben"),
+        ("", None, ""),
+    ],
+)
+async def test_set_value_resolves_and_echoes(
+    typed: str, sent_id: int | None, shown: str
+) -> None:
+    """What is typed decides how it is sent, and the value shows the result.
+
+    Typing an id leaves the message behind it standing in the entity -- which
+    is the confirmation that it was read as an id and not sent as that text.
+    """
+    comm = _comm()
+    entity = HbtnDisplayText(_module_with_messages(), comm)
+    entity.async_write_ha_state = MagicMock()
+
+    await entity.async_set_value(typed)
+
+    if sent_id is None:
+        comm.send_message_text.assert_awaited_once_with(105, typed)
+        comm.send_message.assert_not_awaited()
+    else:
+        comm.send_message.assert_awaited_once_with(105, sent_id)
+        comm.send_message_text.assert_not_awaited()
+    assert entity.native_value == shown
+
+
+async def test_a_message_named_like_a_number_wins_over_that_id() -> None:
+    """A stored message called "5" is what "5" means, not the message with id 5.
+
+    Reading the number first would hide such a message behind another one, and
+    the user would have no way to reach it at all.
+    """
+    module = _module()
+    module.messages = [
+        HbtnCommand(name="5", nmbr=9),
+        HbtnCommand(name="Besuch", nmbr=5),
+    ]
+    comm = _comm()
+    entity = HbtnDisplayText(module, comm)
+    entity.async_write_ha_state = MagicMock()
+
+    await entity.async_set_value("5")
+
+    comm.send_message.assert_awaited_once_with(105, 9)

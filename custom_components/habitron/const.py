@@ -11,7 +11,16 @@ from enum import Enum
 from typing import Final
 
 DOMAIN = "habitron"  # internal name of the integration, matches the directory
-CONF_DEFAULT_HOST = "local"  # default host string of SmartCenter, uses own ip
+CONF_DEFAULT_HOST = "local"
+
+# The stored-message list carries the bus id of its current option, so an
+# action that sends "the selected one" does not have to parse the label.
+ATTR_MESSAGE_ID: Final = "message_id"
+
+SERVICE_SEND_SELECTED_MESSAGE: Final = "send_selected_message"
+SERVICE_CLEAR_SENT_MESSAGE: Final = (
+    "clear_sent_message"  # default host string of SmartCenter, uses own ip
+)
 # Long-lived access token the hub uses for its Home Assistant websocket
 # connection (SmartController Touch and Assist).
 KEY_TOKEN: Final = "websock_token"

@@ -283,6 +283,10 @@ _UID_REWRITES: Final = [
     (re.compile(r"^Hub_(?P<u>.+)_(?P<k>restart|reboot)$"), "{u}_{k}"),
     (re.compile(r"^mod_(?P<u>.+)_app_update$"), "{u}_app_update"),
     (re.compile(r"^Mod_(?P<u>.+)_update$"), "{u}_firmware_update"),
+    # The display notify was removed in v2.10.0 and is back; its entries have
+    # been orphaned ever since, so this revives them with whatever the user had
+    # named and customised rather than leaving a dead one beside a new one.
+    (re.compile(r"^Mod_(?P<u>.+)_msg$"), "{u}_message"),
     (re.compile(r"^Mod_(?P<u>.+)_mediaplayer$"), "{u}_media_player"),
     (re.compile(r"^Mod_(?P<u>.+)_assist_sat$"), "{u}_assist_satellite"),
     # anything else that only carried the prefix

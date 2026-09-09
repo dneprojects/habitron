@@ -13,7 +13,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from ._helpers import hbtn_device_info
-from .const import AlarmMode, DaytimeMode
+from .const import ATTR_MESSAGE_ID, AlarmMode, DaytimeMode
 from .coordinator import HabitronConfigEntry, HbtnCoordinator
 from .smart_hub import LoggingLevels, SmartHub
 
@@ -33,6 +33,8 @@ async def async_setup_entry(
 
     new_devices: list[SelectEntity] = []
     for hbt_module in hbtn_rt.modules:
+        if hbt_module.messages:
+            new_devices.append(HbtnStoredMessageSelect(hbt_module))
         if hbt_module.mod_type[:16] == "Smart Controller":
             # Mode setting is per group, entities linked to smart controllers only
             new_devices.append(
@@ -431,3 +433,45 @@ class HbtnSelectLoggingLevel(CoordinatorEntity[HbtnCoordinator], SelectEntity):
         self._value = self._enum[option].value
         # nmbr used to select console/file handler
         await self._smhub.comm.async_set_log_level(self._nmbr, self._value * 10)
+
+
+class HbtnStoredMessageSelect(SelectEntity):
+    """The messages stored in a module, as a list to look through.
+
+    Picking one does **not** send it. The list is meant to be paged through,
+    and a select that acted on every change could not be. What to do with the
+    choice belongs to the entity that sends -- the display notify or an SMS
+    target -- via ``habitron.send_selected_message``.
+
+    The option carries the bus id in front of the name, because that id is what
+    may also be typed into the sending entity; the id is repeated as an
+    attribute so an action does not have to take the label apart again.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "stored_message"
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(self, module: Module) -> None:
+        """Initialize the stored-message list."""
+        self._module = module
+        self._attr_unique_id = f"{module.uid}_stored_message"
+        self._attr_options = [f"{msg.nmbr}: {msg.name}" for msg in module.messages]
+        self._attr_current_option = None
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return information to link this entity with the correct device."""
+        return hbtn_device_info(self._module.uid)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, int] | None:
+        """Expose the bus id of the current option."""
+        if self._attr_current_option is None:
+            return None
+        return {ATTR_MESSAGE_ID: int(self._attr_current_option.split(":", 1)[0])}
+
+    async def async_select_option(self, option: str) -> None:
+        """Record the choice. Nothing is sent -- see the class docstring."""
+        self._attr_current_option = option
+        self.async_write_ha_state()
