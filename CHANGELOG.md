@@ -3,6 +3,9 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.3.1b2
+- Beta. Fixed: the second climate controller of a module kept an unused entity from an older version. Its identifier contained a misspelling that was corrected long ago, and since the identifier was built from the name back then, the correction left the old entity behind. It is cleaned up on the next start.
+
 ## v3.3.1b1
 - Beta. Fixed: SMS entities whose phone number is not purely numeric -- an international number with a "+", or a number stored under a name -- were not carried over by the 3.3.0 rename. The old entity stayed behind unused while a new one appeared next to it. They are matched up again on the next start, and the leftover is removed. If an entity from an older version is ever left behind again, the log now says so by name instead of passing over it quietly.
 

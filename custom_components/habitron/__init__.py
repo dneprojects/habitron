@@ -253,7 +253,14 @@ _UID_REWRITES: Final = [
     (re.compile(r"^Rt_(?P<u>.+)_restart_all$"), "{u}_restart_all_modules"),
     (re.compile(r"^Mod_(?P<u>.+)_Activate voice input$"), "{u}_activate_voice_input"),
     # switch / light / cover / number / binary_sensor
-    (re.compile(r"^Mod_(?P<u>.+)_Climate Controller 2$"), "{u}_climate_controller_2"),
+    # "Contoller" is not a typo in this pattern: that spelling shipped until the
+    # display name was corrected, and the id was built from that name at the
+    # time -- so the correction silently changed the id and every installation
+    # from before it still carries the misspelt one, dead ever since.
+    (
+        re.compile(r"^Mod_(?P<u>.+)_Climate Cont(?:r)?oller 2$"),
+        "{u}_climate_controller_2",
+    ),
     (re.compile(r"^Mod_(?P<u>.+)_Microphone Mode$"), "{u}_microphone_mode"),
     (re.compile(r"^Mod_(?P<u>.+)_out(?P<n>\d+)$"), "{u}_output_{n}"),
     (re.compile(r"^Mod_(?P<u>.+)_rgbled(?P<n>\d+)$"), "{u}_rgb_led_{n}"),

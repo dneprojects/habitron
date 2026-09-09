@@ -4,6 +4,19 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.3.1b2
+
+### The misspelt climate-controller id
+`ClimateCtlSwitch` shipped as `Climate Contoller 2` until `0bc1969` corrected
+the display name -- and since the id was `f"Mod_{uid}_{self._name}"` at the
+time, that correction silently changed the id. Installations from before it
+still carry the misspelt entity, dead ever since and invisible until the
+migration began reporting what it could not map. The rule now matches both
+spellings; where the current id already exists, the leftover is removed.
+
+This is what the unmapped-id warning was for, and it found this on its first
+run in the field.
+
 ## v3.3.1b1
 
 ### The SMS id suffix is a name, not a counter

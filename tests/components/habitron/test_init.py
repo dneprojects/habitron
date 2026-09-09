@@ -523,3 +523,34 @@ async def test_an_unmapped_old_id_is_reported(
         )
 
     assert "no id migration for Mod_MOD-1_SomethingNobodyMapped" in caplog.text
+
+
+@pytest.mark.parametrize(
+    "old",
+    [
+        "Mod_MOD-1_Climate Contoller 2",
+        "Mod_MOD-1_Climate Controller 2",
+    ],
+    ids=["as it shipped", "after the name was corrected"],
+)
+async def test_both_climate_controller_spellings_migrate(
+    hass: HomeAssistant, old: str
+) -> None:
+    """The misspelt id has to be carried over too.
+
+    ``Climate Contoller 2`` shipped until the display name was corrected. The
+    id was built from that name, so the correction silently changed it and
+    every installation from before still carries the misspelt one -- dead since
+    then, and invisible until the migration started reporting what it could not
+    map.
+    """
+    entry = MockConfigEntry(domain=DOMAIN)
+    entry.add_to_hass(hass)
+    ent_reg = er.async_get(hass)
+    existing = _register(ent_reg, entry, old, domain="switch")
+
+    _async_migrate_unique_ids(hass, entry, (_uid_scheme_rule(_model_for_migration()),))
+
+    assert (
+        ent_reg.async_get(existing.entity_id).unique_id == "MOD-1_climate_controller_2"
+    )
