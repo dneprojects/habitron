@@ -3,6 +3,9 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.3.0b1
+- Beta. Every entity's internal identifier moves to the scheme the upcoming Home Assistant core integration uses, so an installation can switch between the two without its entities being created a second time. Your entities, their names, history and automations are carried over unchanged -- nothing needs to be set up again. After the update the log shows once how many identifiers were rewritten; on the next start that number must be 0. Please report it if it is not.
+
 ## v3.2.7
 - Fixed: with a SmartHub that does **not** run as an add-on of this Home Assistant, the access token sent to the hub was unusable, so the hub could not push any events. Whether the hub is an add-on is now taken from the hub's own report instead of from this machine, which got it wrong for every Home Assistant OS or supervised installation talking to a standalone hub.
 

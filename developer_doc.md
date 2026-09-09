@@ -4,6 +4,37 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.3.0b1
+
+### Entity ids moved onto the core integration's scheme
+All 67 entity classes now write `{device uid}_{key}`. The ids had grown a
+`Mod_`/`Rt_`/`Hub_`/`mod_` prefix that claimed *module* even for the router and
+the hub, keys that were abbreviations (`adin`, `cntup`, `powcyc`, `dperc`),
+display names carrying spaces and capitals (`Activate voice input`,
+`CPU Temperature`, `Microphone Mode`), and one number offset by 48 -- an ASCII
+digit conversion that was never applied as one, while the bus and the hub's own
+screen count from 1.
+
+The core integration keeps its scheme and this one follows, rather than the
+other way round: core has no release yet, so its ids are still free, while
+carrying this integration's history into core would have meant an exception
+table on twelve descriptions there. With four known installations, all of which
+take updates, moving here is the cheaper side.
+
+### One migration for every form ever written
+`_uid_scheme_rule` maps each old id onto the new one and is handed to
+`_async_migrate_unique_ids`, which runs after the bus model is built and before
+the platforms are forwarded -- so an entity comes up under its final id and no
+duplicate is ever created. Two forms, `snsr<n>` and `perc<n>`, do not say which
+reading they are; the rule reads that from the model, which is why it runs where
+it does. A test pins 36 concrete mappings, and a second asserts that a repeat
+run rewrites nothing.
+
+### The count is logged as a warning on purpose
+`_async_migrate_unique_ids` reports how many ids it rewrote. Non-zero once, then
+0 on every start after -- anything else means a rule matches its own output.
+Drop it back to debug before the stable release.
+
 ## v3.2.7
 
 ### Fixed
