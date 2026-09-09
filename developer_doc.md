@@ -4,6 +4,47 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.4.0
+
+Stable for the 3.4.0b1-b3 line. Two further fixes on top of b3.
+
+### A GSM module's area label was listed as one of its messages
+`habitron_client` 2.0.19. A Smart GSM module keeps its messages in the type-255
+descriptor lines, and the branch collecting them took every such line it was
+offered -- including the `arg_code` 136 area label every module carries. It
+showed up as a phantom entry in the list, and `module.area` was left unset for
+GSM modules because the area case sat behind that branch, unreachable.
+
+### The messages list starts on an entry and keeps it
+`habitron.send_selected_message` acts on whatever the list has selected, so a
+list coming up as `unknown` made the action fail until someone opened it. The
+entity now defaults to the first message and restores the previous choice
+(`RestoreEntity`). A restored option that the module no longer offers -- the
+messages were renamed or removed -- gives way to the first rather than being
+kept as a label nothing can resolve.
+
+The entity had no test coverage at all; four now cover the default, both
+restore paths, and that picking an option sends nothing.
+
+## v3.4.0b3
+
+### Messages listed once per language (habitron_client 2.0.18)
+Label lines arrive repeated for every language a module is configured for, all
+carrying the same message id in `arg_code`. The library's two GSM paths already
+kept the german set only; the general message path did not, so
+`module.messages` held one entry per language and the new messages list offered
+each message two or more times.
+
+Fixed in the library rather than here: the duplicates were in the model, so
+every consumer of `module.messages` -- the list, the SMS resolver, the
+displayed-message field -- saw them.
+
+### Diagnostics list the messages instead of mapping them
+The `stored_messages` field added in b2 was a `{nmbr: name}` mapping, which
+would have collapsed exactly the duplicate ids this bug produced into a single
+clean-looking entry. It is a list of `"{nmbr}: {name}"` now: a diagnostic that
+hides the fault class it was added to expose is worse than none.
+
 ## v3.4.0b2
 
 ### The revival rule looked for an id that no longer exists

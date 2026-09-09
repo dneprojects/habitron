@@ -36,10 +36,12 @@ def _module_summary(module: Any) -> dict[str, Any]:
         "led_count": len(getattr(module, "leds", []) or []),
         # The names, not just a count: they are what a user has to type into
         # the displayed-message field or an SMS, so a report about "nothing
-        # happens" is answerable from here.
-        "stored_messages": {
-            msg.nmbr: msg.name for msg in getattr(module, "messages", []) or []
-        },
+        # happens" is answerable from here. A list, not a mapping by number:
+        # duplicate ids are exactly the kind of fault worth seeing here, and a
+        # mapping would silently collapse them into one.
+        "stored_messages": [
+            f"{msg.nmbr}: {msg.name}" for msg in getattr(module, "messages", []) or []
+        ],
     }
 
 

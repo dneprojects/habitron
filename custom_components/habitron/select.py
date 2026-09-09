@@ -10,6 +10,7 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from ._helpers import hbtn_device_info
@@ -435,7 +436,7 @@ class HbtnSelectLoggingLevel(CoordinatorEntity[HbtnCoordinator], SelectEntity):
         await self._smhub.comm.async_set_log_level(self._nmbr, self._value * 10)
 
 
-class HbtnStoredMessageSelect(SelectEntity):
+class HbtnStoredMessageSelect(SelectEntity, RestoreEntity):
     """The messages stored in a module, as a list to look through.
 
     Picking one does **not** send it. The list is meant to be paged through,
@@ -456,7 +457,23 @@ class HbtnStoredMessageSelect(SelectEntity):
         self._module = module
         self._attr_unique_id = f"{module.uid}_stored_message"
         self._attr_options = [f"{msg.nmbr}: {msg.name}" for msg in module.messages]
-        self._attr_current_option = None
+        self._attr_current_option = (
+            self._attr_options[0] if self._attr_options else None
+        )
+
+    async def async_added_to_hass(self) -> None:
+        """Restore the previous choice, falling back to the first message.
+
+        The choice is worth keeping across a restart, but it is a label that
+        may no longer exist: renaming or removing a message on the module
+        changes the option list under it. Rather than come back as ``unknown``
+        -- which ``habitron.send_selected_message`` could not act on -- an
+        option that is no longer offered gives way to the first one.
+        """
+        await super().async_added_to_hass()
+        last_state = await self.async_get_last_state()
+        if last_state is not None and last_state.state in self._attr_options:
+            self._attr_current_option = last_state.state
 
     @property
     def device_info(self) -> DeviceInfo:

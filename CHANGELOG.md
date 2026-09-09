@@ -3,6 +3,17 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.4.0
+- The messages stored in a module are visible again. Each module with stored messages gets a "Messages list" you can page through without sending anything, and the "Message" notify target is back -- it had been dropped when the free-text field arrived, and with it the only way to trigger a stored message. The list starts on its first entry, and remembers your choice across a restart.
+- The displayed-message field now takes a stored message's name or the number shown in front of it in the list, as well as free text, and afterwards shows what was actually sent. Two new actions, "Send selected message" and "Clear sent message", work on the notify target.
+- SMS messages accept the same input: a name, ignoring spacing, or the number from the list. Previously only an exactly matching name worked.
+- Fixed: a module's messages were listed once for every language configured on it, so each entry appeared two or more times. On a GSM module the area name appeared in the list as an extra message that does not exist.
+- Fixed: the old, unused "Messages" entity was not replaced by the new one but left standing beside it. Both are matched up on the next start and the leftover is removed.
+- The diagnostics download lists each module's stored messages by number and name, so it is possible to check what a module actually offers.
+
+## v3.4.0b3
+- Beta. Fixed: a module's messages were listed once per language configured on it, so every entry appeared twice or more. Requires habitron_client 2.0.18.
+
 ## v3.4.0b2
 - Beta. Fixed: the old, unused "Messages" entity was not replaced by the new one but left standing beside it. Both are matched up on the next start and the leftover is removed.
 - The messages list now sits with the module's normal entities instead of under "Configuration", where it was easy to miss.

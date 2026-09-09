@@ -2,15 +2,16 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from habitron_client import Module, Router, Sensor
+from habitron_client import HbtnCommand, Module, Router, Sensor
 
-from custom_components.habitron.const import AlarmMode, DaytimeMode
+from custom_components.habitron.const import ATTR_MESSAGE_ID, AlarmMode, DaytimeMode
 from custom_components.habitron.select import (
     HbtnMode,
     HbtnSelectAlarmModePush,
     HbtnSelectDaytimeModePush,
     HbtnSelectGroupModePush,
     HbtnSelectLoggingLevel,
+    HbtnStoredMessageSelect,
     async_setup_entry,
 )
 from custom_components.habitron.smart_hub import LoggingLevels
@@ -294,3 +295,67 @@ def test_group_mode_zero_value_hotfix() -> None:
     """A group sub-mode of 0 is hot-fixed to 'present' (32)."""
     entity = HbtnSelectGroupModePush(_module(mode=0x05), _router(), _coord(), 0)
     assert entity.current_option == "present"
+
+
+# ---------------------------------------------------------------------------
+# HbtnStoredMessageSelect
+# ---------------------------------------------------------------------------
+
+
+def _message_module() -> Module:
+    module = Module(uid="MOD-RC", addr=101, typ=b"\x01\x01", name="RC")
+    module.messages = [
+        HbtnCommand(name="Alarm", nmbr=3),
+        HbtnCommand(name="Doorbell", nmbr=7),
+    ]
+    return module
+
+
+def test_stored_message_select_starts_on_the_first_message() -> None:
+    """The list comes up on an option, not on "unknown".
+
+    ``habitron.send_selected_message`` acts on whatever is selected, so a list
+    that starts unselected would make the action fail until someone opened it.
+    """
+    entity = HbtnStoredMessageSelect(_message_module())
+    assert entity.options == ["3: Alarm", "7: Doorbell"]
+    assert entity.current_option == "3: Alarm"
+    assert entity.extra_state_attributes == {ATTR_MESSAGE_ID: 3}
+
+
+async def test_stored_message_select_restores_a_still_valid_choice() -> None:
+    """A choice that survives a restart is restored."""
+    entity = HbtnStoredMessageSelect(_message_module())
+    with patch.object(
+        HbtnStoredMessageSelect,
+        "async_get_last_state",
+        AsyncMock(return_value=MagicMock(state="7: Doorbell")),
+    ):
+        await entity.async_added_to_hass()
+    assert entity.current_option == "7: Doorbell"
+
+
+async def test_stored_message_select_drops_a_choice_that_no_longer_exists() -> None:
+    """A stored choice the module no longer offers gives way to the first.
+
+    Renaming or removing a message on the module changes the option list under
+    the entity; keeping the stale label would leave it in a state the sending
+    action cannot resolve.
+    """
+    entity = HbtnStoredMessageSelect(_message_module())
+    with patch.object(
+        HbtnStoredMessageSelect,
+        "async_get_last_state",
+        AsyncMock(return_value=MagicMock(state="9: Renamed away")),
+    ):
+        await entity.async_added_to_hass()
+    assert entity.current_option == "3: Alarm"
+
+
+async def test_stored_message_select_records_without_sending() -> None:
+    """Picking an option records it; nothing reaches the bus."""
+    entity = HbtnStoredMessageSelect(_message_module())
+    entity.async_write_ha_state = MagicMock()
+    await entity.async_select_option("7: Doorbell")
+    assert entity.current_option == "7: Doorbell"
+    assert entity.extra_state_attributes == {ATTR_MESSAGE_ID: 7}
