@@ -7,6 +7,8 @@ from habitron_client import Router, SmartController
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron import (
+    _async_migrate_unique_ids,
+    _legacy_suffixed_sensor_uid,
     async_remove_config_entry_device,
     async_unload_entry,
 )
@@ -273,3 +275,90 @@ async def test_touch_module_creates_webrtc_platform_entities(
         e.domain for e in er.async_entries_for_config_entry(ent_reg, entry.entry_id)
     }
     assert {"camera", "media_player", "assist_satellite"} <= domains
+
+
+def _register(
+    ent_reg: er.EntityRegistry,
+    entry: MockConfigEntry,
+    unique_id: str,
+    domain: str = "sensor",
+) -> er.RegistryEntry:
+    """Put an entity into the registry under ``unique_id``."""
+    return ent_reg.async_get_or_create(
+        domain, DOMAIN, unique_id, config_entry=entry, suggested_object_id=unique_id
+    )
+
+
+async def test_migrate_unique_ids_renames_a_matching_entity(
+    hass: HomeAssistant,
+) -> None:
+    """A rule's answer becomes the entity's unique_id, entity_id kept."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    entry.add_to_hass(hass)
+    ent_reg = er.async_get(hass)
+    existing = _register(ent_reg, entry, "Mod_MOD-1_snsr0_humidity")
+
+    _async_migrate_unique_ids(hass, entry, (_legacy_suffixed_sensor_uid,))
+
+    assert ent_reg.async_get(existing.entity_id).unique_id == "Mod_MOD-1_snsr0"
+
+
+async def test_migrate_unique_ids_removes_the_stale_duplicate(
+    hass: HomeAssistant,
+) -> None:
+    """When both ids exist, the one being migrated away from goes.
+
+    Home Assistant refuses a duplicate unique_id, and the entity already
+    carrying the target is the one the platform is about to claim -- so the
+    stale entry has to be removed rather than renamed onto it.
+    """
+    entry = MockConfigEntry(domain=DOMAIN)
+    entry.add_to_hass(hass)
+    ent_reg = er.async_get(hass)
+    target = _register(ent_reg, entry, "Mod_MOD-1_snsr0")
+    stale = _register(ent_reg, entry, "Mod_MOD-1_snsr0_humidity")
+
+    _async_migrate_unique_ids(hass, entry, (_legacy_suffixed_sensor_uid,))
+
+    assert ent_reg.async_get(stale.entity_id) is None
+    assert ent_reg.async_get(target.entity_id).unique_id == "Mod_MOD-1_snsr0"
+
+
+async def test_migrate_unique_ids_leaves_everything_else_alone(
+    hass: HomeAssistant,
+) -> None:
+    """An id no rule answers for is untouched, and a second pass is a no-op."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    entry.add_to_hass(hass)
+    ent_reg = er.async_get(hass)
+    # A router stream: the key suffix is what keeps it distinct, so it stays.
+    router = _register(ent_reg, entry, "Mod_RT-1_snsr0_current")
+    other = _register(ent_reg, entry, "Mod_MOD-1_out3", domain="switch")
+
+    for _ in range(2):
+        _async_migrate_unique_ids(hass, entry, (_legacy_suffixed_sensor_uid,))
+
+    assert ent_reg.async_get(router.entity_id).unique_id == "Mod_RT-1_snsr0_current"
+    assert ent_reg.async_get(other.entity_id).unique_id == "Mod_MOD-1_out3"
+
+
+async def test_migrate_unique_ids_takes_the_first_rule_that_answers(
+    hass: HomeAssistant,
+) -> None:
+    """Rules are tried in order; the first answer wins and the rest are skipped."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    entry.add_to_hass(hass)
+    ent_reg = er.async_get(hass)
+    existing = _register(ent_reg, entry, "Mod_MOD-1_snsr0_humidity")
+
+    _async_migrate_unique_ids(
+        hass,
+        entry,
+        (
+            lambda ent: None,
+            lambda ent: "Mod_MOD-1_first",
+            lambda ent: "Mod_MOD-1_second",
+        ),
+    )
+
+    assert ent_reg.async_get(existing.entity_id).unique_id == "Mod_MOD-1_first"

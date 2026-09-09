@@ -1,5 +1,6 @@
 """The Habitron integration."""
 
+from collections.abc import Callable, Iterable
 import logging
 import re
 
@@ -27,6 +28,11 @@ _LEGACY_SUFFIXED_KEYS = ("humidity", "illuminance", "wind", "airquality")
 _LEGACY_UID_RE = re.compile(
     r"^(Mod_.+_snsr\d+)_(?:" + "|".join(_LEGACY_SUFFIXED_KEYS) + r")$"
 )
+
+# A rule answers with the unique_id an existing entity should carry, or
+# ``None`` when it does not apply. Keeping them in a list means a later rename
+# is one rule plus its test, not another migration pass of its own.
+type UniqueIdRule = Callable[[er.RegistryEntry], str | None]
 
 PLATFORMS: list[Platform] = [
     Platform.ASSIST_SATELLITE,
@@ -86,9 +92,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: HabitronConfigEntry) -> 
 
         _async_cleanup_stale_devices(hass, entry, smhub)
 
-        # Undo the 3.1.0b1 per-module sensor unique_id churn before the sensor
-        # platform registers entities, so the original entity_ids are restored.
-        _async_restore_legacy_sensor_ids(hass, entry)
+        # Before the platforms register anything, so an entity comes up
+        # under its final id and no duplicate is ever created.
+        _async_migrate_unique_ids(hass, entry, _UNIQUE_ID_RULES)
 
         # Mirror per-module operate-mode faults (SYS_ERR) into repairs issues.
         async_setup_module_health_issues(hass, entry, smhub)
@@ -193,9 +199,7 @@ def _async_cleanup_stale_devices(
                 break
 
 
-def _async_restore_legacy_sensor_ids(
-    hass: HomeAssistant, entry: HabitronConfigEntry
-) -> None:
+def _legacy_suffixed_sensor_uid(ent: er.RegistryEntry) -> str | None:
     """Undo the Beta 3.1.0b1 per-module sensor unique_id churn.
 
     3.1.0b1 appended the description ``key`` to every described sensor's
@@ -203,36 +207,54 @@ def _async_restore_legacy_sensor_ids(
     ``nmbr`` was already unique. That changed their unique_id, so Home Assistant
     registered fresh entities and (under 2026.6) rewrote the entity_ids
     (``sensor.<area>_<device>_<name>``). The suffix is now restricted to the
-    colliding router streams (current/voltage/timeout); this one-time, idempotent
-    migration realigns the per-module sensors with the original
-    ``Mod_{uid}_snsr{nmbr}`` id:
+    colliding router streams (current/voltage/timeout), so realign the
+    per-module sensors with the original ``Mod_{uid}_snsr{nmbr}`` id.
+    """
+    if ent.domain != "sensor":
+        return None
+    match = _LEGACY_UID_RE.match(ent.unique_id or "")
+    return match.group(1) if match else None
 
-    - if the original bare-id entry still exists (upgrade case) the suffixed
-      duplicate is removed so the original — and its entity_id — takes over;
-    - otherwise (fresh 3.1.0b1 install) the suffixed entry's unique_id is
-      rewritten in place, keeping the entity and its entity_id.
+
+_UNIQUE_ID_RULES: tuple[UniqueIdRule, ...] = (_legacy_suffixed_sensor_uid,)
+
+
+def _async_migrate_unique_ids(
+    hass: HomeAssistant,
+    entry: HabitronConfigEntry,
+    rules: Iterable[UniqueIdRule],
+) -> None:
+    """Rewrite this entry's entity unique_ids, once and idempotently.
+
+    Each rule is handed a registry entry and returns the id that entry should
+    carry, or ``None`` to leave it alone; the first rule to answer wins. Runs
+    before the platforms are forwarded, so an entity comes up under its final
+    id and no duplicate is ever created.
+
+    Where the target id already exists -- an installation that ran under both
+    schemes and so has both entities -- the stale entry is removed rather than
+    renamed: Home Assistant refuses a duplicate unique_id, and the entity
+    already carrying the target is the one the platform is about to claim.
     """
     ent_reg = er.async_get(hass)
-    for ent in er.async_entries_for_config_entry(ent_reg, entry.entry_id):
-        if ent.domain != "sensor":
-            continue
-        match = _LEGACY_UID_RE.match(ent.unique_id or "")
-        if not match:
-            continue
-        base_uid = match.group(1)
-        if ent_reg.async_get_entity_id("sensor", DOMAIN, base_uid):
-            _LOGGER.info(
-                "Habitron: removing duplicate sensor %s (unique_id %s); "
-                "restoring original %s",
-                ent.entity_id,
-                ent.unique_id,
-                base_uid,
-            )
-            ent_reg.async_remove(ent.entity_id)
-        else:
-            _LOGGER.info(
-                "Habitron: migrating sensor unique_id %s -> %s",
-                ent.unique_id,
-                base_uid,
-            )
-            ent_reg.async_update_entity(ent.entity_id, new_unique_id=base_uid)
+    for ent in list(er.async_entries_for_config_entry(ent_reg, entry.entry_id)):
+        for rule in rules:
+            new_uid = rule(ent)
+            if new_uid is None or new_uid == ent.unique_id:
+                continue
+            if ent_reg.async_get_entity_id(ent.domain, DOMAIN, new_uid):
+                _LOGGER.info(
+                    "Habitron: removing %s (unique_id %s); %s already exists",
+                    ent.entity_id,
+                    ent.unique_id,
+                    new_uid,
+                )
+                ent_reg.async_remove(ent.entity_id)
+            else:
+                _LOGGER.info(
+                    "Habitron: migrating unique_id %s -> %s",
+                    ent.unique_id,
+                    new_uid,
+                )
+                ent_reg.async_update_entity(ent.entity_id, new_unique_id=new_uid)
+            break
