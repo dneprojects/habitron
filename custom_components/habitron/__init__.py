@@ -264,7 +264,9 @@ _UID_REWRITES: Final = [
     (re.compile(r"^Mod_(?P<u>.+)_in(?P<n>\d+)$"), "{u}_input_{n}"),
     (re.compile(r"^Mod_(?P<u>.+)_evnt(?P<n>\d+)$"), "{u}_event_{n}"),
     (re.compile(r"^Mod_(?P<u>.+)_u(?P<n>\d+)$"), "{u}_ekey_user_{n}"),
-    (re.compile(r"^Mod_(?P<u>.+)_sms(?P<n>\d+)$"), "{u}_sms_{n}"),
+    # Not ``\d+``: the suffix is the GSM number's name with spaces and hyphens
+    # stripped, so it can carry a "+" or be a plain label like "Chef".
+    (re.compile(r"^Mod_(?P<u>.+)_sms(?P<n>.+)$"), "{u}_sms_{n}"),
     # select / update / misc
     (re.compile(r"^Rt_(?P<u>.+)_group_0_(?P<k>.+)$"), "{u}_group_0_{k}"),
     (
@@ -329,6 +331,15 @@ def _uid_scheme_rule(smhub: SmartHub) -> UniqueIdRule:
         for pattern, template in _UID_REWRITES:
             if (m := pattern.match(uid)) is not None:
                 return template.format(**m.groupdict())
+        if uid.startswith(("Mod_", "Rt_", "Hub_", "mod_")):
+            # An id in the old shape that no rule claims. It would be left
+            # behind while the platform registers a new entity beside it, so
+            # say so rather than let it pass silently.
+            _LOGGER.warning(
+                "Habitron: no id migration for %s (%s); it will be left as it is",
+                uid,
+                ent.entity_id,
+            )
         return None
 
     return rule

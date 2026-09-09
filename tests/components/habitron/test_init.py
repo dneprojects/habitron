@@ -1,6 +1,7 @@
 """Setup / unload / migration tests for the Habitron integration."""
 
 from collections.abc import Awaitable, Callable
+import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from habitron_client import Router, SmartController
@@ -473,3 +474,52 @@ async def test_uid_scheme_rule_is_a_no_op_on_the_second_run(
         _async_migrate_unique_ids(hass, entry, (rule,))
 
     assert ent_reg.async_get(current.entity_id).unique_id == "MOD-1_temperature"
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    [
+        ("Mod_MOD-1_sms01701234", "MOD-1_sms_01701234"),
+        ("Mod_MOD-1_sms+491701234", "MOD-1_sms_+491701234"),
+        ("Mod_MOD-1_smsChef", "MOD-1_sms_Chef"),
+    ],
+)
+async def test_sms_ids_migrate_whatever_the_number_is_called(
+    hass: HomeAssistant, old: str, new: str
+) -> None:
+    """The SMS suffix is the number's name, not a counter.
+
+    It is the GSM number's label with spaces and hyphens stripped, so it can be
+    an international number with a "+" or a plain word. A rule expecting digits
+    left those entities behind while the platform registered new ones beside
+    them.
+    """
+    entry = MockConfigEntry(domain=DOMAIN)
+    entry.add_to_hass(hass)
+    ent_reg = er.async_get(hass)
+    existing = _register(ent_reg, entry, old, domain="notify")
+
+    _async_migrate_unique_ids(hass, entry, (_uid_scheme_rule(_model_for_migration()),))
+
+    assert ent_reg.async_get(existing.entity_id).unique_id == new
+
+
+async def test_an_unmapped_old_id_is_reported(
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
+) -> None:
+    """An id in the old shape that no rule claims must not pass silently.
+
+    It would stay behind while the platform registers a new entity next to it --
+    exactly the failure the SMS rule had, and one nothing else would reveal.
+    """
+    entry = MockConfigEntry(domain=DOMAIN)
+    entry.add_to_hass(hass)
+    ent_reg = er.async_get(hass)
+    _register(ent_reg, entry, "Mod_MOD-1_SomethingNobodyMapped", domain="sensor")
+
+    with caplog.at_level(logging.WARNING):
+        _async_migrate_unique_ids(
+            hass, entry, (_uid_scheme_rule(_model_for_migration()),)
+        )
+
+    assert "no id migration for Mod_MOD-1_SomethingNobodyMapped" in caplog.text
