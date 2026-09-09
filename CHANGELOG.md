@@ -3,6 +3,9 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.3.1b1
+- Beta. Fixed: SMS entities whose phone number is not purely numeric -- an international number with a "+", or a number stored under a name -- were not carried over by the 3.3.0 rename. The old entity stayed behind unused while a new one appeared next to it. They are matched up again on the next start, and the leftover is removed. If an entity from an older version is ever left behind again, the log now says so by name instead of passing over it quietly.
+
 ## v3.3.0
 - Every entity's internal identifier moves to the scheme the upcoming Home Assistant core integration uses, so an installation can switch between the two without its entities being created a second time. Your entities keep their names, history, customisations and automations -- nothing has to be set up again.
 - Fixed: the directory for the SC Touch app update is created automatically now. It previously had to be made by hand, and until then every check wrote "Firmware directory not found" into the log -- on installations that do not use that feature at all.

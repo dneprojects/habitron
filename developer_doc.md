@@ -4,6 +4,25 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.3.1b1
+
+### The SMS id suffix is a name, not a counter
+`HbtnGSMMessage` builds its id from `gsm_number.name` with spaces and hyphens
+stripped, so it is the phone number itself -- and it can carry a `+`, or be a
+plain label. The v3.3.0 rewrite rule expected `\d+`, and the catch-all accepts
+only lower case and digits, so anything else matched neither: those entities
+kept their old id while the platform registered new ones beside them. The rule
+now takes any suffix after `_sms`.
+
+Because 3.3.0 already shipped, affected installations have both entities. The
+migration's duplicate branch handles that on the next start: the target id
+exists, so the entry still on the old id is removed rather than renamed onto it.
+
+### An unmapped old id is now reported
+The failure above is silent by nature -- nothing breaks, an entity is simply
+left behind. `_uid_scheme_rule` therefore logs a warning when it sees an id
+still carrying `Mod_`/`Rt_`/`Hub_`/`mod_` that no rule claims.
+
 ## v3.3.0
 
 Ships what v3.3.0b1 carried -- the entity ids and their migration, described
