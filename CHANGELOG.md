@@ -3,6 +3,10 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.3.0
+- Every entity's internal identifier moves to the scheme the upcoming Home Assistant core integration uses, so an installation can switch between the two without its entities being created a second time. Your entities keep their names, history, customisations and automations -- nothing has to be set up again.
+- Fixed: the directory for the SC Touch app update is created automatically now. It previously had to be made by hand, and until then every check wrote "Firmware directory not found" into the log -- on installations that do not use that feature at all.
+
 ## v3.3.0b1
 - Beta. Every entity's internal identifier moves to the scheme the upcoming Home Assistant core integration uses, so an installation can switch between the two without its entities being created a second time. Your entities, their names, history and automations are carried over unchanged -- nothing needs to be set up again. After the update the log shows once how many identifiers were rewritten; on the next start that number must be 0. Please report it if it is not.
 

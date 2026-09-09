@@ -43,6 +43,10 @@ _FIRMWARE_URL_PREFIX = "/habitron-firmware"
 # Legacy firmware paths already logged, so the migration nudge appears only once.
 _LEGACY_FIRMWARE_LOGGED: set[str] = set()
 
+# Firmware directories that could not be created, so that failure is reported
+# once rather than on every poll.
+_FIRMWARE_DIR_LOGGED: set[str] = set()
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -136,12 +140,33 @@ class SCTouchAppUpdate(UpdateEntity):
     def scan_firmware_dir_blocking(self) -> tuple[str | None, str | None]:
         """Find the newest ``sctouch_*.apk`` in the firmware directory.
 
-        Returns ``(version, filename)`` of the highest version, or
-        ``(None, None)`` if the directory is missing, empty, or
-        contains no parseable APKs.
+        Creates the directory when it does not exist yet, so the user only has
+        to drop a file in. Returns ``(version, filename)`` of the highest
+        version, or ``(None, None)`` when the directory is empty or contains no
+        parseable APKs.
         """
         if not self.firmware_dir.is_dir():
-            _LOGGER.warning("Firmware directory not found: %s", self.firmware_dir)
+            # Create it instead of complaining about it. This is where the user
+            # drops an ``sctouch_*.apk``, and having to make the directory by
+            # hand first is a step nobody can guess from a log line. Empty is a
+            # valid state: the entity then simply offers nothing to install.
+            try:
+                self.firmware_dir.mkdir(parents=True, exist_ok=True)
+            except OSError as err:
+                # This one is worth a warning -- but once, not on every poll.
+                if str(self.firmware_dir) not in _FIRMWARE_DIR_LOGGED:
+                    _FIRMWARE_DIR_LOGGED.add(str(self.firmware_dir))
+                    _LOGGER.warning(
+                        "Cannot create the firmware directory %s: %s",
+                        self.firmware_dir,
+                        err,
+                    )
+            else:
+                _LOGGER.info(
+                    "Created the firmware directory %s; place an sctouch_*.apk "
+                    "there to offer the Touch app update",
+                    self.firmware_dir,
+                )
             return None, None
 
         latest_version = parse_version("0.0.0")

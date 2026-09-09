@@ -4,6 +4,22 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.3.0
+
+Ships what v3.3.0b1 carried -- the entity ids and their migration, described
+below -- confirmed on the known installations: non-zero on the update, 0 on
+every start after it. The migration count is a debug line again rather than a
+warning.
+
+### The Touch firmware directory is created, not reported missing
+`scan_firmware_dir_blocking` used to log a warning whenever the directory was
+absent. It runs on every poll and per Touch panel, so an installation that
+never wanted the app update repeated that line for its lifetime -- over a
+directory whose absence is the normal case. It is now created on the spot
+(inside the executor the scan already runs in), reported once at info with what
+belongs in it, and only a *failure* to create it -- a permission problem, a file
+in its place -- is a warning, once per path.
+
 ## v3.3.0b1
 
 ### Entity ids moved onto the core integration's scheme

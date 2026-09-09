@@ -375,8 +375,6 @@ def _async_migrate_unique_ids(
                 ent_reg.async_update_entity(ent.entity_id, new_unique_id=new_uid)
             migrated += 1
             break
-    # Deliberately a warning, and deliberately loud: this is the number to check
-    # after updating. It must be zero on the next start -- anything else means a
-    # rule is rewriting ids on every run instead of once. Drop this back to a
-    # debug line once the beta has confirmed it.
-    _LOGGER.warning("Habitron: migrated %d entity unique_ids", migrated)
+    # Confirmed by the 3.3.0b1 beta: non-zero once, zero on every start after.
+    # Kept as a debug line so a support log still shows whether a migration ran.
+    _LOGGER.debug("Habitron: migrated %d entity unique_ids", migrated)

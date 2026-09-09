@@ -1,6 +1,7 @@
 """Tests for the Habitron update platform (habitron_client v2 model)."""
 
 import hashlib
+import logging
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -176,3 +177,47 @@ async def test_async_setup_entry_emits_updates(hass: HomeAssistant) -> None:
         sum(isinstance(e, HbtnModuleUpdate) for e in added) == 3
     )  # router + 2 modules
     assert any(isinstance(e, SCTouchAppUpdate) for e in added)
+
+
+def _touch_app_entity() -> SCTouchAppUpdate:
+    """A Touch app update entity, detached from any hub."""
+    module = Module(uid="MOD-T", addr=104, typ=b"\x01\x04", name="Touch")
+    return SCTouchAppUpdate(module, _smhub())
+
+
+def test_scan_creates_the_firmware_directory(tmp_path: Path) -> None:
+    """A missing firmware directory is created, not complained about.
+
+    This is where the user drops the APK; making them create it by hand first
+    is a step no log line can convey. Empty is a valid state -- the entity then
+    simply offers nothing to install.
+    """
+    entity = _touch_app_entity()
+    entity.firmware_dir = tmp_path / "habitron" / "firmware"
+
+    assert entity.scan_firmware_dir_blocking() == (None, None)
+
+    assert entity.firmware_dir.is_dir()
+
+
+def test_scan_reports_a_directory_it_cannot_create_once(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A directory that cannot be created is worth saying -- once.
+
+    Unlike the missing directory, this one is a real fault, but the scan runs
+    on every poll, so repeating it would fill the log.
+    """
+    blocked = tmp_path / "not-a-dir"
+    blocked.write_text("")
+    entity = _touch_app_entity()
+    entity.firmware_dir = blocked / "firmware"
+
+    with caplog.at_level(logging.WARNING):
+        for _ in range(3):
+            assert entity.scan_firmware_dir_blocking() == (None, None)
+
+    assert (
+        sum("Cannot create the firmware directory" in r.message for r in caplog.records)
+        == 1
+    )
