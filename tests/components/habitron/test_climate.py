@@ -49,7 +49,7 @@ def _module(
 def test_climate_unique_id_and_readings() -> None:
     """The climate entity exposes a unique id and reads temp/target/humidity."""
     entity = HbtnClimate(_module(room=19.0, target=23.0), _coord(), 0)
-    assert entity.unique_id == "Mod_MOD-1_climate"
+    assert entity.unique_id == "MOD-1_climate"
     assert entity.current_temperature == 19.0
     assert entity.target_temperature == 23.0
     assert entity.current_humidity == 45
@@ -58,7 +58,7 @@ def test_climate_unique_id_and_readings() -> None:
 def test_climate_second_unit_unique_id() -> None:
     """The second controller climate gets a distinct unique id."""
     entity = HbtnClimate(_module(), _coord(), 1)
-    assert entity.unique_id == "Mod_MOD-1_climate_2"
+    assert entity.unique_id == "MOD-1_climate_2"
 
 
 def test_climate_hvac_mode_mapping() -> None:

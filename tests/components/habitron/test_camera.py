@@ -30,7 +30,7 @@ def test_hbtn_cam_unique_id_and_device_info() -> None:
     hass = MagicMock()
     mod = _make_touch_module()
     cam = HbtnCam(hass, mod, 0, _make_provider())
-    assert cam.unique_id == "Mod_MOD-T_camera"
+    assert cam.unique_id == "MOD-T_camera"
     assert ("habitron", "MOD-T") in cam._attr_device_info["identifiers"]
     assert cam.name == "HbtnCam 1"
     assert cam.has_entity_name is True

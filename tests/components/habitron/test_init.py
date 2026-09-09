@@ -4,11 +4,13 @@ from collections.abc import Awaitable, Callable
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from habitron_client import Router, SmartController
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron import (
     _async_migrate_unique_ids,
     _legacy_suffixed_sensor_uid,
+    _uid_scheme_rule,
     async_remove_config_entry_device,
     async_unload_entry,
 )
@@ -333,13 +335,13 @@ async def test_migrate_unique_ids_leaves_everything_else_alone(
     ent_reg = er.async_get(hass)
     # A router stream: the key suffix is what keeps it distinct, so it stays.
     router = _register(ent_reg, entry, "Mod_RT-1_snsr0_current")
-    other = _register(ent_reg, entry, "Mod_MOD-1_out3", domain="switch")
+    other = _register(ent_reg, entry, "MOD-1_output_3", domain="switch")
 
     for _ in range(2):
         _async_migrate_unique_ids(hass, entry, (_legacy_suffixed_sensor_uid,))
 
     assert ent_reg.async_get(router.entity_id).unique_id == "Mod_RT-1_snsr0_current"
-    assert ent_reg.async_get(other.entity_id).unique_id == "Mod_MOD-1_out3"
+    assert ent_reg.async_get(other.entity_id).unique_id == "MOD-1_output_3"
 
 
 async def test_migrate_unique_ids_takes_the_first_rule_that_answers(
@@ -362,3 +364,112 @@ async def test_migrate_unique_ids_takes_the_first_rule_that_answers(
     )
 
     assert ent_reg.async_get(existing.entity_id).unique_id == "Mod_MOD-1_first"
+
+
+def _model_for_migration() -> MagicMock:
+    """A hub whose members carry the names the id mapping keys on."""
+
+    def member(name: str, nmbr: int) -> MagicMock:
+        m = MagicMock()
+        m.name = name
+        m.nmbr = nmbr
+        return m
+
+    module = MagicMock()
+    module.uid = "MOD-1"
+    module.sensors = [member("Temperature", 0), member("Humidity", 1)]
+    router = MagicMock()
+    router.uid = "RT-1"
+    router.modules = [module]
+    smhub = MagicMock()
+    smhub.uid = "HUB-1"
+    smhub.router = router
+    smhub.sensors = [member("Memory free", 0), member("Disk free", 1)]
+    smhub.diags = [member("CPU Frequency", 0)]
+    return smhub
+
+
+@pytest.mark.parametrize(
+    ("old", "new", "domain"),
+    [
+        # the readings whose old id said nothing about what they were
+        ("Mod_MOD-1_snsr0", "MOD-1_temperature", "sensor"),
+        ("Mod_MOD-1_snsr1", "MOD-1_humidity", "sensor"),
+        ("Mod_HUB-1_snsr0", "HUB-1_cpu_frequency", "sensor"),
+        ("Mod_HUB-1_perc0", "HUB-1_memory_usage", "sensor"),
+        ("Mod_HUB-1_perc1", "HUB-1_disk_usage", "sensor"),
+        ("Mod_HUB-1_dperc0", "HUB-1_cpu_load", "sensor"),
+        # abbreviations and display names
+        ("Mod_MOD-1_adin0", "MOD-1_analog_in_0", "sensor"),
+        ("Mod_MOD-1_ekey_ident", "MOD-1_ekey_identifier", "sensor"),
+        ("Mod_MOD-1_ekey_ident_name", "MOD-1_ekey_user_name", "sensor"),
+        ("Mod_MOD-1_ekey_fngr", "MOD-1_ekey_finger", "sensor"),
+        ("Mod_MOD-1_ekey_fngr_ident", "MOD-1_ekey_finger_name", "sensor"),
+        ("Mod_MOD-1_PowerTemp", "MOD-1_power_temperature", "sensor"),
+        ("Mod_HUB-1_CPU Temperature", "HUB-1_cpu_temperature", "sensor"),
+        ("Mod_MOD-1_snsr0_current", "MOD-1_current_0", "sensor"),
+        ("Mod_MOD-1_logic0", "MOD-1_logic_0", "sensor"),
+        # the prefixes that said "module" for the router and the hub
+        ("Rt_RT-1_restart_all", "RT-1_restart_all_modules", "button"),
+        ("Rt_RT-1_powcyc2", "RT-1_power_cycle_2", "button"),
+        ("Hub_HUB-1_reboot", "HUB-1_reboot", "button"),
+        ("Hub_HUB-1_Logginglevelconsole", "HUB-1_log_level_console", "select"),
+        ("Rt_RT-1_group_0_alarm_mode", "RT-1_group_0_alarm_mode", "select"),
+        ("mod_MOD-1_app_update", "MOD-1_app_update", "update"),
+        ("Mod_MOD-1_update", "MOD-1_firmware_update", "update"),
+        # display names with spaces
+        ("Mod_MOD-1_Activate voice input", "MOD-1_activate_voice_input", "button"),
+        ("Mod_MOD-1_Climate Controller 2", "MOD-1_climate_controller_2", "switch"),
+        ("Mod_MOD-1_Microphone Mode", "MOD-1_microphone_mode", "switch"),
+        # the ASCII-digit offset that was never applied as one
+        ("Mod_MOD-1_number48", "MOD-1_set_temperature_1", "number"),
+        ("Mod_MOD-1_number49", "MOD-1_set_temperature_2", "number"),
+        # plain renames
+        ("Mod_MOD-1_out3", "MOD-1_output_3", "switch"),
+        ("Mod_MOD-1_rgbled1", "MOD-1_rgb_led_1", "light"),
+        ("Mod_MOD-1_cover2", "MOD-1_cover_2", "cover"),
+        ("Mod_MOD-1_in7", "MOD-1_input_7", "binary_sensor"),
+        ("Mod_MOD-1_evnt4", "MOD-1_event_4", "event"),
+        ("Mod_MOD-1_u12", "MOD-1_ekey_user_12", "event"),
+        ("Mod_MOD-1_mediaplayer", "MOD-1_media_player", "media_player"),
+        ("Mod_MOD-1_assist_sat", "MOD-1_assist_satellite", "assist_satellite"),
+        ("Mod_MOD-1_message", "MOD-1_message", "text"),
+    ],
+)
+async def test_uid_scheme_rule_maps_every_old_form(
+    hass: HomeAssistant, old: str, new: str, domain: str
+) -> None:
+    """Each id this integration ever wrote lands on the current scheme.
+
+    These are what the four known installations carry. A wrong mapping does not
+    fail loudly -- it registers a second entity and leaves the first orphaned,
+    taking its history and customisations with it.
+    """
+    entry = MockConfigEntry(domain=DOMAIN)
+    entry.add_to_hass(hass)
+    ent_reg = er.async_get(hass)
+    existing = _register(ent_reg, entry, old, domain=domain)
+
+    _async_migrate_unique_ids(hass, entry, (_uid_scheme_rule(_model_for_migration()),))
+
+    assert ent_reg.async_get(existing.entity_id).unique_id == new
+
+
+async def test_uid_scheme_rule_is_a_no_op_on_the_second_run(
+    hass: HomeAssistant,
+) -> None:
+    """Nothing is rewritten once the ids are already current.
+
+    This is what the warning's count reports: non-zero on the update, zero on
+    every start after it.
+    """
+    entry = MockConfigEntry(domain=DOMAIN)
+    entry.add_to_hass(hass)
+    ent_reg = er.async_get(hass)
+    current = _register(ent_reg, entry, "MOD-1_temperature")
+    rule = _uid_scheme_rule(_model_for_migration())
+
+    for _ in range(2):
+        _async_migrate_unique_ids(hass, entry, (rule,))
+
+    assert ent_reg.async_get(current.entity_id).unique_id == "MOD-1_temperature"

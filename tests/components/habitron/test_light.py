@@ -63,7 +63,7 @@ def test_switched_light_unique_id_and_state() -> None:
     """SwitchedLight exposes a stable unique id and reflects the output."""
     out = Output(name="Lamp", nmbr=0, type=2)
     entity = SwitchedLight(out, _module(), _coord(), 0)
-    assert entity.unique_id == "Mod_MOD-1_out0"
+    assert entity.unique_id == "MOD-1_output_0"
     assert entity.is_on is False
     out.is_on = True
     assert entity.is_on is True
@@ -162,7 +162,7 @@ def test_color_light_unique_id_and_is_on() -> None:
     """HbtnColorLight exposes a stable unique id and reflects is_on."""
     cled = _cled()
     entity = HbtnColorLight(cled, _module(), _coord(), 0)
-    assert entity.unique_id == "Mod_MOD-1_rgbled1"
+    assert entity.unique_id == "MOD-1_rgb_led_1"
     assert entity.is_on is False
     cled.is_on = True
     assert entity.is_on is True

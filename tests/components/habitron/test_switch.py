@@ -58,7 +58,7 @@ def test_switched_output_unique_id_and_state() -> None:
     """SwitchedOutput exposes a stable unique id and reflects member state."""
     out = Output(name="Out 1", nmbr=0, type=1)
     entity = SwitchedOutput(_coord(), _module(), out, 0)
-    assert entity.unique_id == "Mod_MOD-1_out0"
+    assert entity.unique_id == "MOD-1_output_0"
     assert entity.is_on is False
     out.is_on = True
     assert entity.is_on is True
@@ -125,7 +125,7 @@ def test_switched_led_naming_and_unique_id() -> None:
     """LED naming follows the white/red convention and a stable unique id."""
     white = SwitchedLed(_coord(), _module(), Led(name="", nmbr=0, type=0), 0)
     assert white._attr_name == "LED white "
-    assert white.unique_id == "Mod_MOD-1_led0"
+    assert white.unique_id == "MOD-1_led_0"
     red = SwitchedLed(_coord(), _module(), Led(name="Strip", nmbr=1, type=0), 0)
     assert red._attr_name == "LED red 1: Strip"
 
@@ -164,7 +164,7 @@ async def test_habitron_flag_module_path() -> None:
     coord = _coord()
     flag = Flag(name="F", nmbr=5, value=0)
     entity = HbtnFlag(coord, flag, device_uid="MOD-1", mod_addr=105, idx=0)
-    assert entity.unique_id == "Mod_MOD-1_flag5"
+    assert entity.unique_id == "MOD-1_flag_5"
     assert entity.is_on is False
     await entity.async_turn_on()
     coord.comm.async_set_flag.assert_awaited_with(105, 5, 1)
@@ -250,7 +250,7 @@ def test_microphone_switch_unique_id_and_device_info() -> None:
     """MicrophoneSwitch exposes a stable unique id and device info."""
     module = _module(uid="MOD-MIC", name="Touch 1")
     entity = MicrophoneSwitch(module, _mic_provider())
-    assert "Mod_MOD-MIC" in entity.unique_id
+    assert entity.unique_id == "MOD-MIC_microphone_mode"
     assert ("habitron", "MOD-MIC") in entity.device_info["identifiers"]
     assert entity.is_on is False
 
@@ -359,7 +359,7 @@ async def test_async_setup_entry_assigns_external_area(hass: HomeAssistant) -> N
         mock_get.return_value = MagicMock()
         await async_setup_entry(hass, entry, captured.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
 
-    output = next(e for e in captured if e.unique_id.endswith("_out0"))
+    output = next(e for e in captured if e.unique_id.endswith("_output_0"))
     assert output._initial_area_id == "living_room"
 
 
@@ -379,5 +379,5 @@ async def test_async_setup_entry_unknown_area_clamped_to_default(
         mock_get.return_value = MagicMock()
         await async_setup_entry(hass, entry, captured.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
 
-    output = next(e for e in captured if e.unique_id.endswith("_out0"))
+    output = next(e for e in captured if e.unique_id.endswith("_output_0"))
     assert output._initial_area_id is None

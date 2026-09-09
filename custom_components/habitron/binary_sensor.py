@@ -139,7 +139,7 @@ class InputSwitch(HbtnBinSensor):
     ) -> None:
         """Initialize an InputSwitch, pass coordinator to CoordinatorEntity."""
         super().__init__(inp, module, coord, idx)
-        self._attr_unique_id: str = f"Mod_{self._module.uid}_in{self._nmbr}"
+        self._attr_unique_id: str = f"{self._module.uid}_input_{self._nmbr}"
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -183,7 +183,7 @@ class MotionSensor(HbtnBinSensor):
     ) -> None:
         """Initialize motion sensor."""
         super().__init__(sensor, module, coord, idx)
-        self._attr_unique_id = f"Mod_{self._module.uid}_motion"
+        self._attr_unique_id = f"{self._module.uid}_motion"
         self._attr_name = "Motion"
 
     @callback
@@ -228,7 +228,7 @@ class RainSensor(HbtnBinSensor):
     ) -> None:
         """Initialize rain sensor."""
         super().__init__(sensor, module, coord, idx)
-        self._attr_unique_id: str = f"Mod_{self._module.uid}_rain"
+        self._attr_unique_id: str = f"{self._module.uid}_rain"
         self._attr_name: str = "Rain"
 
     @callback
@@ -258,7 +258,7 @@ class HbtnState(CoordinatorEntity[HbtnCoordinator], BinarySensorEntity):
         self._module: Module | Router = module
         self._nmb: int = state.nmbr
         self._on_state: bool = False
-        self._attr_unique_id: str = f"Mod_{self._module.uid}_state{state.nmbr}"
+        self._attr_unique_id: str = f"{self._module.uid}_state_{state.nmbr}"
         self._attr_name: str = state.name
         if state.type == TYPE_DIAG:
             self._attr_entity_category = EntityCategory.DIAGNOSTIC
@@ -316,7 +316,7 @@ class ModuleHealthSensor(CoordinatorEntity[HbtnCoordinator], BinarySensorEntity)
         self.idx: int = idx
         self._module: Module = module
         self._health: BusMember = module.health
-        self._attr_unique_id: str = f"Mod_{module.uid}_health"
+        self._attr_unique_id: str = f"{module.uid}_health"
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -364,7 +364,7 @@ class ListeningStatusSensor(BinarySensorEntity):
         # Note: No 'super().__init__(...)' call to a coordinator
         self._module: Module = module
         self._attr_is_on: bool = False  # Default state is off
-        self._attr_unique_id: str = f"Mod_{self._module.uid}_listening_status"
+        self._attr_unique_id: str = f"{self._module.uid}_listening_status"
         self._stream_name = module.name.lower().replace(" ", "_")
 
     @property

@@ -34,7 +34,7 @@ def test_set_temperature_unique_id_and_value() -> None:
     """The set-temperature number reflects the set value and a stable id."""
     setval = SetValue(name="Set temperature", nmbr=0, type=2, value=21.5)
     entity = HbtnSetTemperature(setval, _module(), _coord(), 0)
-    assert entity.unique_id == "Mod_MOD-1_number48"
+    assert entity.unique_id == "MOD-1_set_temperature_1"
     assert entity.native_value == 21.5
 
 
@@ -57,7 +57,7 @@ def test_analog_output_unique_id_and_value() -> None:
     """The analogue output number reflects the dimmer brightness."""
     analog = Dimmer(name="AOut", nmbr=15, type=8, brightness=50)
     entity = HbtnAnalogOutput(analog, _module(), _coord(), 0)
-    assert entity.unique_id == "Mod_MOD-1_out15"
+    assert entity.unique_id == "MOD-1_output_15"
     entity.async_write_ha_state = MagicMock()
     entity._handle_coordinator_update()
     assert entity.native_value == 50

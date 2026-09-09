@@ -38,7 +38,7 @@ def _module() -> Module:
 def test_module_update_unique_id_and_installed_version() -> None:
     """The firmware update entity reflects the module's installed version."""
     entity = HbtnModuleUpdate(_module(), _fw_coord(), 0)
-    assert entity.unique_id == "Mod_MOD-1_update"
+    assert entity.unique_id == "MOD-1_firmware_update"
     assert entity.installed_version == "1.2.0"
 
 
@@ -92,7 +92,7 @@ def test_sctouch_app_update_defaults() -> None:
     """The Touch app update entity exposes a stable id and default version."""
     module = Module(uid="MOD-T", addr=104, typ=b"\x01\x04", name="Touch")
     entity = SCTouchAppUpdate(module, _smhub())
-    assert entity.unique_id == "mod_MOD-T_app_update"
+    assert entity.unique_id == "MOD-T_app_update"
     assert entity.installed_version == "0.0.0"
     assert "Latest APK version" in (entity.release_notes() or "")
 

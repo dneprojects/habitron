@@ -90,7 +90,7 @@ class SCTouchAppUpdate(UpdateEntity):
         self._hass = smhub.hass
         self.firmware_dir = Path("")
 
-        self._attr_unique_id = f"mod_{self._module.uid}_app_update"
+        self._attr_unique_id = f"{self._module.uid}_app_update"
         self._attr_device_info = hbtn_device_info(module.uid)
 
         # Initial version sync from module property
@@ -346,7 +346,7 @@ class HbtnModuleUpdate(CoordinatorEntity[HbtnFirmwareCoordinator], UpdateEntity)
         super().__init__(coord)
         self.idx = idx
         self._module: Module | Router = module
-        self._attr_unique_id = f"Mod_{self._module.uid}_update"
+        self._attr_unique_id = f"{self._module.uid}_firmware_update"
         self.flash_in_progress = False
         # Installed version is known from setup; latest fills in once polled.
         self._attr_installed_version = getattr(module, "sw_version", None) or getattr(

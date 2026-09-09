@@ -53,7 +53,7 @@ def test_shutter_unique_id_and_position() -> None:
     """Position is reported inverted (100 - bus value)."""
     cover = Cover(name="Sh", nmbr=0, type=1, position=30)
     entity = _shutter(cover)
-    assert entity.unique_id == "Mod_MOD-1_cover0"
+    assert entity.unique_id == "MOD-1_cover_0"
     assert entity.current_cover_position == 70
 
 
@@ -287,5 +287,5 @@ async def test_async_setup_entry_assigns_external_area(hass: HomeAssistant) -> N
         mock_get.return_value = MagicMock()
         await async_setup_entry(hass, entry, captured.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
 
-    cover = next(e for e in captured if e.unique_id.endswith("_cover0"))
+    cover = next(e for e in captured if e.unique_id.endswith("_cover_0"))
     assert cover._initial_area_id == "living_room"

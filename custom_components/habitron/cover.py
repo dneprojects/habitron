@@ -122,7 +122,7 @@ class HbtnShutter(HbtnAreaMixin, CoordinatorEntity[HbtnCoordinator], CoverEntity
         self._moving: int = 0
         self.stop_delay: int | None = coord.comm.router.cover_autostop_del
         self._stop_task: asyncio.Task[None] | None = None
-        self._attr_unique_id: str | None = f"Mod_{self._module.uid}_cover{cover.nmbr}"
+        self._attr_unique_id: str | None = f"{self._module.uid}_cover_{cover.nmbr}"
         self._attr_device_info = hbtn_device_info(self._module.uid)
 
     async def async_added_to_hass(self) -> None:

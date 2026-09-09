@@ -101,7 +101,7 @@ class HbtnMediaPlayer(MediaPlayerEntity, RestoreEntity):
         self._provider = provider
         self._stream_name: str = module.stream_name
         self._hass = hass
-        self._attr_unique_id = f"Mod_{self._module.uid}_mediaplayer"
+        self._attr_unique_id = f"{self._module.uid}_media_player"
         self._attr_device_info = hbtn_device_info(self._module.uid)
         self._attr_state = MediaPlayerState.OFF
 

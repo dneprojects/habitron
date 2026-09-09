@@ -77,7 +77,7 @@ def test_queue_item_holds_passed_values() -> None:
 def test_player_init_seeds_stream_name_and_state() -> None:
     """The constructor wires up unique id, device info and the initial state."""
     player = _make_player()
-    assert player.unique_id == "Mod_MOD-T_mediaplayer"
+    assert player.unique_id == "MOD-T_media_player"
     assert player._stream_name == "touch_1_5"
     assert player.stream_name == "touch_1_5"
     assert ("habitron", "MOD-T") in player._attr_device_info["identifiers"]

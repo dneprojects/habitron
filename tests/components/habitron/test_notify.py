@@ -29,7 +29,7 @@ def test_gsm_message_unique_id() -> None:
     """The SMS entity exposes a stable unique id derived from the number."""
     module = _gsm_module()
     entity = HbtnGSMMessage(module, module.gsm_numbers[0], _comm())
-    assert entity.unique_id == "Mod_MOD-GSM_sms01701234"
+    assert entity.unique_id == "MOD-GSM_sms_01701234"
     assert entity.name == "SMS 0170 1234"
 
 
@@ -81,7 +81,7 @@ async def test_send_message_service_reaches_bus(
     _entry, client = await real_setup(router)
 
     entity_id = er.async_get(hass).async_get_entity_id(
-        "notify", DOMAIN, "Mod_MOD-GSM_sms01701234"
+        "notify", DOMAIN, "MOD-GSM_sms_01701234"
     )
     assert entity_id is not None
 

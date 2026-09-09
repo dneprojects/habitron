@@ -91,7 +91,7 @@ def test_ekey_user_event_matches_user() -> None:
     entity = EkeyUserEvent(finger, _module(), 0, 5, "Alice")
     entity._trigger_event = MagicMock()
     entity.async_write_ha_state = MagicMock()
-    assert entity.unique_id == "Mod_MOD-1_u5"
+    assert entity.unique_id == "MOD-1_ekey_user_5"
 
     finger.user = 5
     finger.value = 3

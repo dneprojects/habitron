@@ -110,7 +110,7 @@ class SwitchedOutput(HbtnAreaMixin, HabitronEntity, SwitchEntity):
         self._attr_name = (
             output.name if output.name.strip() else f"Out {output.nmbr + 1}"
         )
-        self._attr_unique_id = f"Mod_{module.uid}_out{output.nmbr}"
+        self._attr_unique_id = f"{module.uid}_output_{output.nmbr}"
         if output.type < 0:
             self._attr_entity_registry_enabled_default = False
 
@@ -148,7 +148,7 @@ class SwitchedLed(HabitronEntity, SwitchEntity):
             self._attr_name = f"{led_name} {led_no}"
         else:
             self._attr_name = f"{led_name} {led_no}: {led.name}"
-        self._attr_unique_id = f"Mod_{module.uid}_led{led.nmbr}"
+        self._attr_unique_id = f"{module.uid}_led_{led.nmbr}"
 
     @property
     def is_on(self) -> bool:
@@ -198,7 +198,7 @@ class HbtnFlag(CoordinatorEntity[HbtnCoordinator], SwitchEntity):
         self._mod_addr = mod_addr
         self._nmbr = flag.nmbr
         self._attr_name = flag.name
-        self._attr_unique_id = f"Mod_{device_uid}_flag{flag.nmbr}"
+        self._attr_unique_id = f"{device_uid}_flag_{flag.nmbr}"
         self._attr_device_info = hbtn_device_info(device_uid)
 
     async def async_added_to_hass(self) -> None:
@@ -239,7 +239,7 @@ class ClimateCtlSwitch(CoordinatorEntity[HbtnCoordinator], SwitchEntity):
         super().__init__(coordinator, context=idx)
         self.idx = idx
         self._module = module
-        self._attr_unique_id = f"Mod_{module.uid}_Climate Controller 2"
+        self._attr_unique_id = f"{module.uid}_climate_controller_2"
         self._attr_name = "Climate Controller 2"
         self._attr_entity_registry_enabled_default = False
         self._attr_device_info = hbtn_device_info(module.uid)
@@ -276,7 +276,7 @@ class MicrophoneSwitch(SwitchEntity):
         self._name = "Microphone Mode"
         self._stream_name = module.name.lower().replace(" ", "_")
         self._provider = provider
-        self._attr_unique_id = f"Mod_{module.uid}_{self._name}"
+        self._attr_unique_id = f"{module.uid}_microphone_mode"
         self._attr_name = "Microphone Mode"
         self._state = False
 

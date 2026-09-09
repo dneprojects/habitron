@@ -50,7 +50,7 @@ def test_input_switch_unique_id_and_state() -> None:
     module = _module()
     module.inputs = [Input(name="Sw", nmbr=0, type=2, value=0)]
     entity = InputSwitch(module.inputs[0], module, MagicMock(), 0)
-    assert entity.unique_id == "Mod_MOD-1_in0"
+    assert entity.unique_id == "MOD-1_input_0"
     _stub_write(entity)
     entity._handle_coordinator_update()
     assert entity.is_on is False
@@ -102,7 +102,7 @@ def test_motion_sensor_state() -> None:
     module = _module()
     module.sensors = [Sensor(name="Movement", nmbr=0, type=2, value=0)]
     entity = MotionSensor(module.sensors[0], module, MagicMock(), 0)
-    assert entity.unique_id == "Mod_MOD-1_motion"
+    assert entity.unique_id == "MOD-1_motion"
     _stub_write(entity)
     entity._handle_coordinator_update()
     assert entity.is_on is False
@@ -116,7 +116,7 @@ def test_rain_sensor_state() -> None:
     module = _module()
     module.sensors = [Sensor(name="Rain", nmbr=0, type=0, value=0)]
     entity = RainSensor(module.sensors[0], module, MagicMock(), 0)
-    assert entity.unique_id == "Mod_MOD-1_rain"
+    assert entity.unique_id == "MOD-1_rain"
     _stub_write(entity)
     module.sensors[0].value = 74
     entity._handle_coordinator_update()
@@ -137,7 +137,7 @@ def test_hbtn_state_reflects_flag_value() -> None:
     state = Flag(name="System OK", nmbr=0, idx=0, value=0)
     router.states = [state]
     entity = HbtnState(state, router, MagicMock(), 0)
-    assert entity.unique_id == "Mod_ROUTER-1_state0"
+    assert entity.unique_id == "ROUTER-1_state_0"
     assert ("habitron", "ROUTER-1") in entity.device_info["identifiers"]
     _stub_write(entity)
     entity._handle_coordinator_update()
@@ -156,7 +156,7 @@ def test_module_health_sensor_state_and_attributes() -> None:
     """ModuleHealthSensor reflects the fault mask and lists active faults."""
     module = _module()
     entity = ModuleHealthSensor(module, MagicMock(), 0)
-    assert entity.unique_id == "Mod_MOD-1_health"
+    assert entity.unique_id == "MOD-1_health"
     assert ("habitron", "MOD-1") in entity.device_info["identifiers"]
     # Healthy: off, no faults.
     assert entity.is_on is False
@@ -202,7 +202,7 @@ def test_listening_status_sensor_set_state() -> None:
     """ListeningStatusSensor toggles its state via set_listening_state."""
     module = _module(uid="MOD-MIC", name="Touch 1")
     entity = ListeningStatusSensor(module)
-    assert entity.unique_id == "Mod_MOD-MIC_listening_status"
+    assert entity.unique_id == "MOD-MIC_listening_status"
     assert entity.is_on is False
     _stub_write(entity)
     entity.set_listening_state(True)

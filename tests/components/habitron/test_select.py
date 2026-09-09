@@ -48,7 +48,7 @@ def test_daytime_options() -> None:
     """The daytime selector lists the DaytimeMode names."""
     entity = HbtnSelectDaytimeModePush(_module(), _router(), _coord(), 0)
     assert entity.options == [m.name for m in DaytimeMode]
-    assert entity.unique_id == "Mod_MOD-1_daytime_mode"
+    assert entity.unique_id == "MOD-1_daytime_mode"
 
 
 async def test_daytime_select_module_path() -> None:
@@ -65,7 +65,7 @@ async def test_daytime_select_router_path() -> None:
     entity = HbtnSelectDaytimeModePush(0, _router(), coord, 0)
     await entity.async_select_option("day")
     coord.comm.async_set_daytime_mode.assert_awaited_with(0, DaytimeMode["day"].value)
-    assert entity.unique_id == "Rt_ROUTER-1_group_0_daytime_mode"
+    assert entity.unique_id == "ROUTER-1_group_0_daytime_mode"
 
 
 async def test_alarm_select_module_path() -> None:

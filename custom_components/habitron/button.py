@@ -77,7 +77,7 @@ class CollCmdButton(ButtonEntity):
         self._smhub = smhub
         self._nmbr = coll_cmd.nmbr
         self._attr_name = f"Cmd {self._nmbr}: {coll_cmd.name}"
-        self._attr_unique_id = f"Mod_{smhub.uid}_ccmd{self._nmbr}"
+        self._attr_unique_id = f"{smhub.uid}_collective_command_{self._nmbr}"
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -100,7 +100,7 @@ class DirCmdButton(ButtonEntity):
         self._smhub = smhub
         self._nmbr = dir_cmd.nmbr
         self._attr_name = f"DirectCmd {self._nmbr}: {dir_cmd.name}"
-        self._attr_unique_id = f"Mod_{module.uid}_dcmd{self._nmbr}"
+        self._attr_unique_id = f"{module.uid}_direct_command_{self._nmbr}"
         self._attr_device_info = hbtn_device_info(module.uid)
 
     async def async_press(self) -> None:
@@ -121,7 +121,7 @@ class VisCmdButton(ButtonEntity):
         no_hi = int(self._nmbr / 256)
         no_lo = self._nmbr - no_hi * 256
         self._attr_name = f"VisCmd {no_hi}/{no_lo}: {vis_cmd.name}"
-        self._attr_unique_id = f"Mod_{module.uid}_vcmd{self._nmbr}"
+        self._attr_unique_id = f"{module.uid}_vis_command_{self._nmbr}"
         self._attr_device_info = hbtn_device_info(module.uid)
 
     async def async_press(self) -> None:
@@ -141,7 +141,7 @@ class RestartButton(ButtonEntity):
         """Initialize a restart button for a module or the router."""
         self._target = target
         self._smhub = smhub
-        self._attr_unique_id = f"Mod_{target.uid}_restart"
+        self._attr_unique_id = f"{target.uid}_restart"
         self._attr_device_info = hbtn_device_info(target.uid)
 
     async def async_press(self) -> None:
@@ -164,7 +164,7 @@ class RestartFwdTableButton(ButtonEntity):
     def __init__(self, router: Router, smhub: SmartHub) -> None:
         """Initialize the forward-table restart button."""
         self._smhub = smhub
-        self._attr_unique_id = f"Mod_{router.uid}_restartfwdtable"
+        self._attr_unique_id = f"{router.uid}_restart_forward_table"
         self._attr_device_info = hbtn_device_info(router.uid)
 
     async def async_press(self) -> None:
@@ -183,7 +183,7 @@ class RestartAllButton(ButtonEntity):
     def __init__(self, router: Router, smhub: SmartHub) -> None:
         """Initialize the reset-all button."""
         self._smhub = smhub
-        self._attr_unique_id = f"Rt_{router.uid}_restart_all"
+        self._attr_unique_id = f"{router.uid}_restart_all_modules"
         self._attr_device_info = hbtn_device_info(router.uid)
 
     async def async_press(self) -> None:
@@ -202,7 +202,7 @@ class RestartHubButton(ButtonEntity):
     def __init__(self, smhub: SmartHub) -> None:
         """Initialize the hub-restart button."""
         self._smhub = smhub
-        self._attr_unique_id = f"Hub_{smhub.uid}_restart"
+        self._attr_unique_id = f"{smhub.uid}_restart"
         self._attr_device_info = hbtn_device_info(smhub.uid)
 
     async def async_press(self) -> None:
@@ -221,7 +221,7 @@ class RebootHubButton(ButtonEntity):
     def __init__(self, smhub: SmartHub) -> None:
         """Initialize the hub-reboot button."""
         self._smhub = smhub
-        self._attr_unique_id = f"Hub_{smhub.uid}_reboot"
+        self._attr_unique_id = f"{smhub.uid}_reboot"
         self._attr_device_info = hbtn_device_info(smhub.uid)
 
     async def async_press(self) -> None:
@@ -241,7 +241,7 @@ class CountUpButton(ButtonEntity):
         self._smhub = smhub
         self._nmbr = counter.nmbr + 1
         self._attr_name = f"Count up {self._nmbr}: {counter.name}"
-        self._attr_unique_id = f"Mod_{module.uid}_cntup{self._nmbr}"
+        self._attr_unique_id = f"{module.uid}_counter_up_{self._nmbr}"
         self._attr_device_info = hbtn_device_info(module.uid)
 
     async def async_press(self) -> None:
@@ -261,7 +261,7 @@ class CountDownButton(ButtonEntity):
         self._smhub = smhub
         self._nmbr = counter.nmbr + 1
         self._attr_name = f"Count down {self._nmbr}: {counter.name}"
-        self._attr_unique_id = f"Mod_{module.uid}_cntdown{self._nmbr}"
+        self._attr_unique_id = f"{module.uid}_counter_down_{self._nmbr}"
         self._attr_device_info = hbtn_device_info(module.uid)
 
     async def async_press(self) -> None:
@@ -280,7 +280,7 @@ class ResetChannelPowerButton(ButtonEntity):
         self._smhub = smhub
         self._chan = channel
         self._attr_name = f"Power cycle router channel {self._chan}"
-        self._attr_unique_id = f"Rt_{router.uid}_powcyc{self._chan}"
+        self._attr_unique_id = f"{router.uid}_power_cycle_{self._chan}"
         self._attr_device_info = hbtn_device_info(router.uid)
 
     async def async_press(self) -> None:
@@ -300,7 +300,7 @@ class SpeechButton(ButtonEntity):
         self._module = module
         self._stream_name = module.stream_name
         self._provider = smhub.ws_provider
-        self._attr_unique_id = f"Mod_{module.uid}_Activate voice input"
+        self._attr_unique_id = f"{module.uid}_activate_voice_input"
         self._attr_device_info = hbtn_device_info(module.uid)
 
     async def async_press(self) -> None:

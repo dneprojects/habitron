@@ -81,7 +81,7 @@ class HbtnEvent(HbtnAreaMixin, EventEntity):
         self._module = module
         self._attr_name = f"{event_if.name}"
         self._nmbr = event_if.nmbr
-        self._attr_unique_id = f"Mod_{module.uid}_evnt{event_if.nmbr}"
+        self._attr_unique_id = f"{module.uid}_event_{event_if.nmbr}"
         if event_if.type < 0:
             self._attr_entity_registry_enabled_default = False
 
@@ -186,7 +186,7 @@ class EkeyUserEvent(HbtnEvent):
         self._u_id = u_id
         self._attr_event_types = list(self._FINGER_NAMES.values())
         self._attr_name = f"{u_name}"
-        self._attr_unique_id = f"Mod_{module.uid}_u{u_id}"
+        self._attr_unique_id = f"{module.uid}_ekey_user_{u_id}"
 
     @callback
     def _handle_member_update(self) -> None:

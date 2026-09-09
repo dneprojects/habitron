@@ -3,6 +3,7 @@
 from collections.abc import Callable, Iterable
 import logging
 import re
+from typing import Any, Final
 
 from habitron_client import HabitronError, HabitronTimeoutError
 
@@ -94,7 +95,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: HabitronConfigEntry) -> 
 
         # Before the platforms register anything, so an entity comes up
         # under its final id and no duplicate is ever created.
-        _async_migrate_unique_ids(hass, entry, _UNIQUE_ID_RULES)
+        _async_migrate_unique_ids(
+            hass, entry, (*_UNIQUE_ID_RULES, _uid_scheme_rule(smhub))
+        )
 
         # Mirror per-module operate-mode faults (SYS_ERR) into repairs issues.
         async_setup_module_health_issues(hass, entry, smhub)
@@ -219,6 +222,118 @@ def _legacy_suffixed_sensor_uid(ent: er.RegistryEntry) -> str | None:
 _UNIQUE_ID_RULES: tuple[UniqueIdRule, ...] = (_legacy_suffixed_sensor_uid,)
 
 
+# Every entity id this integration ever wrote, mapped onto the scheme the core
+# integration uses: ``{device uid}_{key}``, lower case, no prefix. The old ids
+# grew a ``Mod_``/``Rt_``/``Hub_`` prefix that said module even for the router
+# and the hub, and keys that were abbreviations or display names with spaces.
+_UID_REWRITES: Final = [
+    (re.compile(r"^Mod_(?P<u>.+)_ekey_ident_name$"), "{u}_ekey_user_name"),
+    (re.compile(r"^Mod_(?P<u>.+)_ekey_fngr_ident$"), "{u}_ekey_finger_name"),
+    (re.compile(r"^Mod_(?P<u>.+)_ekey_ident$"), "{u}_ekey_identifier"),
+    (re.compile(r"^Mod_(?P<u>.+)_ekey_fngr$"), "{u}_ekey_finger"),
+    (re.compile(r"^Mod_(?P<u>.+)_adin(?P<n>\d+)$"), "{u}_analog_in_{n}"),
+    (re.compile(r"^Mod_(?P<u>.+)_logic(?P<n>\d+)$"), "{u}_logic_{n}"),
+    (re.compile(r"^Mod_(?P<u>.+)_module_status$"), "{u}_module_status"),
+    (re.compile(r"^Mod_(?P<u>.+)_dperc\d+$"), "{u}_cpu_load"),
+    (re.compile(r"^Mod_(?P<u>.+)_CPU Temperature$"), "{u}_cpu_temperature"),
+    (re.compile(r"^Mod_(?P<u>.+)_PowerTemp$"), "{u}_power_temperature"),
+    (
+        re.compile(r"^Mod_(?P<u>.+)_snsr\d+_(?P<k>current|voltage|timeout)$"),
+        "{u}_{k}_0",
+    ),
+    (re.compile(r"^Mod_(?P<u>.+)_client_(?P<k>.+)$"), "{u}_client_{k}"),
+    # buttons
+    (re.compile(r"^Mod_(?P<u>.+)_ccmd(?P<n>\d+)$"), "{u}_collective_command_{n}"),
+    (re.compile(r"^Mod_(?P<u>.+)_dcmd(?P<n>\d+)$"), "{u}_direct_command_{n}"),
+    (re.compile(r"^Mod_(?P<u>.+)_vcmd(?P<n>\d+)$"), "{u}_vis_command_{n}"),
+    (re.compile(r"^Mod_(?P<u>.+)_cntup(?P<n>\d+)$"), "{u}_counter_up_{n}"),
+    (re.compile(r"^Mod_(?P<u>.+)_cntdown(?P<n>\d+)$"), "{u}_counter_down_{n}"),
+    (re.compile(r"^Rt_(?P<u>.+)_powcyc(?P<n>\d+)$"), "{u}_power_cycle_{n}"),
+    (re.compile(r"^Mod_(?P<u>.+)_restartfwdtable$"), "{u}_restart_forward_table"),
+    (re.compile(r"^Rt_(?P<u>.+)_restart_all$"), "{u}_restart_all_modules"),
+    (re.compile(r"^Mod_(?P<u>.+)_Activate voice input$"), "{u}_activate_voice_input"),
+    # switch / light / cover / number / binary_sensor
+    (re.compile(r"^Mod_(?P<u>.+)_Climate Controller 2$"), "{u}_climate_controller_2"),
+    (re.compile(r"^Mod_(?P<u>.+)_Microphone Mode$"), "{u}_microphone_mode"),
+    (re.compile(r"^Mod_(?P<u>.+)_out(?P<n>\d+)$"), "{u}_output_{n}"),
+    (re.compile(r"^Mod_(?P<u>.+)_rgbled(?P<n>\d+)$"), "{u}_rgb_led_{n}"),
+    (re.compile(r"^Mod_(?P<u>.+)_led(?P<n>\d+)$"), "{u}_led_{n}"),
+    (re.compile(r"^Mod_(?P<u>.+)_flag(?P<n>\d+)$"), "{u}_flag_{n}"),
+    (re.compile(r"^Mod_(?P<u>.+)_cover(?P<n>\d+)$"), "{u}_cover_{n}"),
+    (re.compile(r"^Mod_(?P<u>.+)_state(?P<n>\d+)$"), "{u}_state_{n}"),
+    (re.compile(r"^Mod_(?P<u>.+)_in(?P<n>\d+)$"), "{u}_input_{n}"),
+    (re.compile(r"^Mod_(?P<u>.+)_evnt(?P<n>\d+)$"), "{u}_event_{n}"),
+    (re.compile(r"^Mod_(?P<u>.+)_u(?P<n>\d+)$"), "{u}_ekey_user_{n}"),
+    (re.compile(r"^Mod_(?P<u>.+)_sms(?P<n>\d+)$"), "{u}_sms_{n}"),
+    # select / update / misc
+    (re.compile(r"^Rt_(?P<u>.+)_group_0_(?P<k>.+)$"), "{u}_group_0_{k}"),
+    (
+        re.compile(r"^Hub_(?P<u>.+)_Logginglevel(?P<k>console|file)$"),
+        "{u}_log_level_{k}",
+    ),
+    (re.compile(r"^Hub_(?P<u>.+)_(?P<k>restart|reboot)$"), "{u}_{k}"),
+    (re.compile(r"^mod_(?P<u>.+)_app_update$"), "{u}_app_update"),
+    (re.compile(r"^Mod_(?P<u>.+)_update$"), "{u}_firmware_update"),
+    (re.compile(r"^Mod_(?P<u>.+)_mediaplayer$"), "{u}_media_player"),
+    (re.compile(r"^Mod_(?P<u>.+)_assist_sat$"), "{u}_assist_satellite"),
+    # anything else that only carried the prefix
+    (re.compile(r"^Mod_(?P<u>.+)_(?P<k>[a-z0-9_]+)$"), "{u}_{k}"),
+]
+
+# The set-value number used ``48 + nmbr`` -- an ASCII digit offset that was
+# never applied as one -- while the bus and the hub's own screen count from 1.
+_SET_VALUE_RE: Final = re.compile(r"^Mod_(?P<u>.+)_number(?P<n>\d+)$")
+
+# ``snsr<n>`` and ``perc<n>`` do not say which reading they are; only the bus
+# model does. It is built by the time this runs.
+_MEMBER_KEYS: Final = {
+    "Temperature": "temperature",
+    "Temperature ext.": "temperature_external",
+    "Humidity": "humidity",
+    "Illuminance": "illuminance",
+    "Wind": "wind",
+    "Windpeak": "wind_peak",
+    "Airquality": "airquality",
+    "Memory free": "memory_usage",
+    "Disk free": "disk_usage",
+    "CPU Frequency": "cpu_frequency",
+    "CPU load": "cpu_load",
+    "CPU Temperature": "cpu_temperature",
+}
+
+
+def _uid_scheme_rule(smhub: SmartHub) -> UniqueIdRule:
+    """Return a rule mapping the grown ids onto the current scheme."""
+    by_uid: dict[str, Any] = {smhub.uid: smhub, smhub.router.uid: smhub.router}
+    for module in smhub.router.modules:
+        by_uid[module.uid] = module
+
+    def _member_key(uid: str, nmbr: int, *, diag: bool) -> str | None:
+        device = by_uid.get(uid)
+        members = getattr(device, "diags" if diag else "sensors", None)
+        if not members or nmbr >= len(members):
+            return None
+        return _MEMBER_KEYS.get(members[nmbr].name)
+
+    def rule(ent: er.RegistryEntry) -> str | None:
+        uid = ent.unique_id or ""
+        if (m := _SET_VALUE_RE.match(uid)) is not None:
+            return f"{m['u']}_set_temperature_{int(m['n']) - 47}"
+        if (m := re.match(r"^Mod_(?P<u>.+)_snsr(?P<n>\d+)$", uid)) is not None:
+            # On the hub this form was only ever the CPU frequency, a diag.
+            key = _member_key(m["u"], int(m["n"]), diag=m["u"] == smhub.uid)
+            return f"{m['u']}_{key}" if key else None
+        if (m := re.match(r"^Mod_(?P<u>.+)_perc(?P<n>\d+)$", uid)) is not None:
+            key = _member_key(m["u"], int(m["n"]), diag=False)
+            return f"{m['u']}_{key}" if key else None
+        for pattern, template in _UID_REWRITES:
+            if (m := pattern.match(uid)) is not None:
+                return template.format(**m.groupdict())
+        return None
+
+    return rule
+
+
 def _async_migrate_unique_ids(
     hass: HomeAssistant,
     entry: HabitronConfigEntry,
@@ -237,6 +352,7 @@ def _async_migrate_unique_ids(
     already carrying the target is the one the platform is about to claim.
     """
     ent_reg = er.async_get(hass)
+    migrated = 0
     for ent in list(er.async_entries_for_config_entry(ent_reg, entry.entry_id)):
         for rule in rules:
             new_uid = rule(ent)
@@ -257,4 +373,10 @@ def _async_migrate_unique_ids(
                     new_uid,
                 )
                 ent_reg.async_update_entity(ent.entity_id, new_unique_id=new_uid)
+            migrated += 1
             break
+    # Deliberately a warning, and deliberately loud: this is the number to check
+    # after updating. It must be zero on the next start -- anything else means a
+    # rule is rewriting ids on every run instead of once. Drop this back to a
+    # debug line once the beta has confirmed it.
+    _LOGGER.warning("Habitron: migrated %d entity unique_ids", migrated)

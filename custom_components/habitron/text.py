@@ -51,7 +51,7 @@ class HbtnDisplayText(TextEntity):
         """Initialize the display-text entity."""
         self._module = module
         self._comm = comm
-        self._attr_unique_id = f"Mod_{module.uid}_message"
+        self._attr_unique_id = f"{module.uid}_message"
         self._attr_device_info = hbtn_device_info(module.uid)
 
     async def async_set_value(self, value: str) -> None:

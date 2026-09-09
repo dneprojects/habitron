@@ -75,7 +75,7 @@ class HbtnAssistSat(AssistSatelliteEntity):
         self._module: SmartController = module
         self._provider = provider
         self._stream_name: str = module.stream_name
-        self._attr_unique_id = f"Mod_{self._module.uid}_assist_sat"
+        self._attr_unique_id = f"{self._module.uid}_assist_satellite"
         self._attr_device_info = hbtn_device_info(self._module.uid)
         self._attr_supported_features = (
             AssistSatelliteEntityFeature.ANNOUNCE

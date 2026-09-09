@@ -79,7 +79,7 @@ class HbtnSetTemperature(CoordinatorEntity[HbtnCoordinator], NumberEntity):
         self._module = module
         self._nmbr = setval.nmbr
         self._attr_name = setval.name
-        self._attr_unique_id = f"Mod_{module.uid}_number{48 + setval.nmbr}"
+        self._attr_unique_id = f"{module.uid}_set_temperature_{setval.nmbr + 1}"
         self._attr_native_value = setval.value
 
     @property
@@ -131,7 +131,7 @@ class HbtnAnalogOutput(HbtnAreaMixin, CoordinatorEntity[HbtnCoordinator], Number
             output.name if output.name.strip() else f"Out {output.nmbr + 1}"
         )
         self._nmbr: int = output.nmbr
-        self._attr_unique_id: str | None = f"Mod_{module.uid}_out{output.nmbr}"
+        self._attr_unique_id: str | None = f"{module.uid}_output_{output.nmbr}"
         if output.type < 0:
             self._attr_entity_registry_enabled_default = False
         self._attr_device_info = hbtn_device_info(module.uid)

@@ -76,7 +76,7 @@ class HbtnCam(Camera):
         self.idx: int = idx
         self._module: Module = module
         self._attr_name = f"HbtnCam {idx + 1}"
-        self._attr_unique_id = f"Mod_{self._module.uid}_camera"
+        self._attr_unique_id = f"{self._module.uid}_camera"
         self._attr_device_info = hbtn_device_info(self._module.uid)
         self.hass = hass
         self._provider = provider

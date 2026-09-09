@@ -97,7 +97,7 @@ class SwitchedLight(HbtnAreaMixin, CoordinatorEntity[HbtnCoordinator], LightEnti
         self._nmbr: int = output.nmbr
         self._brightness: int = 255
         self._out_offs = 0  # Dimm 1 = Out 1 + offs
-        self._attr_unique_id: str | None = f"Mod_{module.uid}_out{output.nmbr}"
+        self._attr_unique_id: str | None = f"{module.uid}_output_{output.nmbr}"
         self._attr_device_info = hbtn_device_info(module.uid)
 
     @property
@@ -210,7 +210,7 @@ class HbtnColorLight(CoordinatorEntity[HbtnCoordinator], LightEntity):
         self._nmbr: int = led.nmbr
         self._brightness: int = 255
         self._rgb_color: tuple[int, int, int] = (50, 50, 50)
-        self._attr_unique_id: str | None = f"Mod_{module.uid}_rgbled{led.nmbr}"
+        self._attr_unique_id: str | None = f"{module.uid}_rgb_led_{led.nmbr}"
         self._attr_device_info = hbtn_device_info(module.uid)
         if led.type < 0:
             self._attr_entity_registry_enabled_default = False

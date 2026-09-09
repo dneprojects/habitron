@@ -110,10 +110,10 @@ class HbtnClimate(CoordinatorEntity[HbtnCoordinator], ClimateEntity):
 
         # Unique ID must differ for the second entity
         if self._controller_idx == 0:
-            self._attr_unique_id = f"Mod_{self._module.uid}_climate"
+            self._attr_unique_id = f"{self._module.uid}_climate"
             self._attr_name = "Climate"
         else:
-            self._attr_unique_id = f"Mod_{self._module.uid}_climate_2"
+            self._attr_unique_id = f"{self._module.uid}_climate_2"
             self._attr_name = "Climate 2"
 
         self._curr_hvac_mode = HVACMode.HEAT

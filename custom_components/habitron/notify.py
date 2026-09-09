@@ -54,7 +54,7 @@ class HbtnGSMMessage(NotifyEntity):
         self.sms_id = gsm_number.nmbr
         self.sms_no = gsm_number.name.replace(" ", "").replace("-", "")
         self._attr_name = f"SMS {gsm_number.name}"
-        self._attr_unique_id = f"Mod_{self._module.uid}_sms{self.sms_no}"
+        self._attr_unique_id = f"{self._module.uid}_sms_{self.sms_no}"
 
     @property
     def device_info(self) -> DeviceInfo:

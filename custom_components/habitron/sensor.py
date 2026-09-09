@@ -201,7 +201,9 @@ async def async_setup_entry(  # noqa: C901
                         mod_sensor,
                         hbtn_cord,
                         len(new_devices),
-                        WIND_DESCRIPTION,
+                        WIND_DESCRIPTION
+                        if mod_sensor.name == "Wind"
+                        else WIND_PEAK_DESCRIPTION,
                     )
                 )
             elif mod_sensor.name == "Airquality":
@@ -301,7 +303,6 @@ class HbtnSensor(CoordinatorEntity[HbtnCoordinator], SensorEntity):
         self._module: Module = module
         self._sensor_idx = sensor.nmbr
         self._value = 0
-        self._attr_unique_id = f"Mod_{self._module.uid}_snsr{sensor.nmbr}"
         self._attr_name = sensor.name
 
     # To link this entity to its device, this property must return an
@@ -375,8 +376,12 @@ class HbtnDescribedSensor(HbtnSensor):
         # sensors have a distinct ``nmbr`` and keep the bare id, otherwise a
         # format change re-registers them and HA 2026.6 rewrites their
         # entity_id (the 3.1.0b1 rename regression).
+        # ``{device uid}_{key}``, matching the core integration entity for
+        # entity: users move between the two while both exist, and a differing
+        # id would register a second entity instead of adopting the first.
+        self._attr_unique_id = f"{module.uid}_{description.key}"
         if description.disambiguate:
-            self._attr_unique_id = f"{self._attr_unique_id}_{description.key}"
+            self._attr_unique_id = f"{self._attr_unique_id}_{sensor.nmbr}"
         if description.diag_check and sensor.is_diagnostic:
             self._attr_entity_category = EntityCategory.DIAGNOSTIC
             self._attr_entity_registry_enabled_default = False
@@ -422,6 +427,14 @@ ILLUMINANCE_DESCRIPTION = HbtnSensorEntityDescription(
 WIND_DESCRIPTION = HbtnSensorEntityDescription(
     key="wind",
     translation_key="wind",
+    device_class=SensorDeviceClass.WIND_SPEED,
+    native_unit_of_measurement=UnitOfSpeed.METERS_PER_SECOND,
+    suggested_display_precision=1,
+    value_fn=lambda module, idx: module.sensors[idx].value,
+)
+WIND_PEAK_DESCRIPTION = HbtnSensorEntityDescription(
+    key="wind_peak",
+    translation_key="wind_peak",
     device_class=SensorDeviceClass.WIND_SPEED,
     native_unit_of_measurement=UnitOfSpeed.METERS_PER_SECOND,
     suggested_display_precision=1,
@@ -477,7 +490,7 @@ class AnalogSensor(HbtnAreaMixin, HbtnSensor):
     ) -> None:
         """Initialize the sensor."""
         super().__init__(module, sensor, coord, idx)
-        self._attr_unique_id = f"Mod_{self._module.uid}_adin{sensor.nmbr}"
+        self._attr_unique_id = f"{self._module.uid}_analog_in_{sensor.nmbr}"
         self._attr_name = self._attr_name
         self.sensor = sensor
 
@@ -514,6 +527,11 @@ class TemperatureSensor(HbtnSensor):
     ) -> None:
         """Initialize the sensor."""
         super().__init__(module, sensor, coord, idx)
+        self._attr_unique_id = (
+            f"{module.uid}_temperature_external"
+            if sensor.name == "Temperature ext."
+            else f"{module.uid}_temperature"
+        )
         if sensor.name == "Temperature ext.":
             self._attr_entity_registry_enabled_default = (
                 False  # Entity will initially be disabled
@@ -535,7 +553,7 @@ class EKeySensorId(HbtnSensor):
         """Initialize the sensor."""
         super().__init__(module, sensor, coord, idx)
         self.sensor = sensor
-        self._attr_unique_id = f"Mod_{self._module.uid}_ekey_ident"
+        self._attr_unique_id = f"{self._module.uid}_ekey_identifier"
         self._attr_name = "Identifier Value"
 
     async def async_added_to_hass(self) -> None:
@@ -565,7 +583,7 @@ class EKeySensorFngr(HbtnSensor):
         """Initialize the sensor."""
         super().__init__(module, sensor, coord, idx)
         self.sensor = sensor
-        self._attr_unique_id = f"Mod_{self._module.uid}_ekey_fngr"
+        self._attr_unique_id = f"{self._module.uid}_ekey_finger"
         self._attr_name = "Finger Value"
 
     async def async_added_to_hass(self) -> None:
@@ -636,7 +654,10 @@ class TemperatureDSensor(HbtnDiagSensor):
     ) -> None:
         """Initialize the sensor."""
         super().__init__(module, diag, coord, idx)
-        self._attr_unique_id = f"Mod_{self._module.uid}_{diag.name}"
+        key = (
+            "cpu_temperature" if diag.name == "CPU Temperature" else "power_temperature"
+        )
+        self._attr_unique_id = f"{self._module.uid}_{key}"
         self._attr_name = diag.name
 
 
@@ -654,7 +675,7 @@ class StatusSensor(HbtnDiagSensor):
     ) -> None:
         """Initialize the sensor."""
         super().__init__(module, diag, coord, idx)
-        self._attr_unique_id = f"Mod_{self._module.uid}_module_status"
+        self._attr_unique_id = f"{self._module.uid}_module_status"
         self._attr_name = diag.name
 
     @callback
@@ -686,7 +707,7 @@ class LogicSensor(HbtnSensor):
         super().__init__(module, logic, coord, idx)
         self.idx = logic.idx
         self.logic = logic
-        self._attr_unique_id = f"Mod_{self._module.uid}_logic{logic.nmbr}"
+        self._attr_unique_id = f"{self._module.uid}_logic_{logic.nmbr}"
         self._attr_name = f"Cnt{logic.nmbr + 1}: {logic.name}"
 
     @callback
@@ -726,18 +747,23 @@ class PercSensor(HbtnSensor):
         """Initialize the sensor."""
         super().__init__(cast("Module", module), perctg, coord, idx)
         self._is_diag = perctg.is_diagnostic
-        self._attr_unique_id = f"Mod_{self._module.uid}_perc{perctg.nmbr}"
+        # One class serves three readings; the key has to say which, or they
+        # would share an id. Same keys as the core integration uses.
         if self._attr_name[:6].lower() == "memory":  # type: ignore[index]
             self._attr_icon = "mdi:memory"
+            key = "memory_usage"
         elif self._attr_name[:4].lower() == "disk":  # type: ignore[index]
             self._attr_icon = "mdi:harddisk"
+            key = "disk_usage"
         elif self._attr_name.lower() == "cpu load":  # type: ignore[union-attr]
             self._attr_icon = "mdi:timer-alert-outline"
+            key = "cpu_load"
         else:
             self._attr_icon = "mdi:percent-circle-outline"
+            key = f"percentage_{perctg.nmbr}"
+        self._attr_unique_id = f"{self._module.uid}_{key}"
         if self._is_diag:
             self._attr_entity_category = EntityCategory.DIAGNOSTIC
-            self._attr_unique_id = f"Mod_{self._module.uid}_dperc{perctg.nmbr}"
             self._attr_entity_registry_enabled_default = (
                 False  # Entity will initially be disabled
             )
@@ -772,8 +798,11 @@ class FrequencySensor(HbtnSensor):
         self._is_diag = freq.is_diagnostic
         if self._attr_name.lower() == "cpu frequency":  # type: ignore[union-attr]
             self._attr_icon = "mdi:clock-fast"
+            key = "cpu_frequency"
         else:
             self._attr_icon = "mdi:sine-wave"
+            key = f"frequency_{freq.nmbr}"
+        self._attr_unique_id = f"{module.uid}_{key}"
         if self._is_diag:
             self._attr_entity_category = EntityCategory.DIAGNOSTIC
             self._attr_entity_registry_enabled_default = (
@@ -831,7 +860,7 @@ class HabitronClientSensor(SensorEntity):
             self._attr_state_class = SensorStateClass.MEASUREMENT
 
         # Link to the specific module's Unique ID
-        self._attr_unique_id = f"Mod_{self._module.uid}_client_{json_key}"
+        self._attr_unique_id = f"{self._module.uid}_client_{json_key}"
 
         self._target_stream_name = getattr(module, "stream_name", None)
 
@@ -885,7 +914,7 @@ class EKeyUserNameSensor(CoordinatorEntity[HbtnCoordinator], SensorEntity):
         self.idx = idx
         self._module = module
         self._nmbr = nmbr
-        self._attr_unique_id = f"Mod_{self._module.uid}_ekey_ident_name"
+        self._attr_unique_id = f"{self._module.uid}_ekey_user_name"
         self._attr_device_info = hbtn_device_info(self._module.uid)
         self._attr_native_value = "None"
 
@@ -956,7 +985,7 @@ class EKeyFingerNameSensor(CoordinatorEntity[HbtnCoordinator], SensorEntity):
         self.idx = idx
         self._module = module
         self._nmbr = nmbr
-        self._attr_unique_id = f"Mod_{self._module.uid}_ekey_fngr_ident"
+        self._attr_unique_id = f"{self._module.uid}_ekey_finger_name"
         self._attr_device_info = hbtn_device_info(self._module.uid)
         self._attr_native_value = None
 

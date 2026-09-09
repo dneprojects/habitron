@@ -25,7 +25,7 @@ def _comm() -> MagicMock:
 def test_display_text_unique_id() -> None:
     """The display-text entity exposes a stable unique id and starts empty."""
     entity = HbtnDisplayText(_module(), _comm())
-    assert entity.unique_id == "Mod_MOD-1_message"
+    assert entity.unique_id == "MOD-1_message"
     assert entity.native_value == ""
 
 
@@ -69,9 +69,7 @@ async def test_set_value_service_reaches_bus_and_updates_state(
     router.modules = [_module()]
     _entry, client = await real_setup(router)
 
-    entity_id = er.async_get(hass).async_get_entity_id(
-        "text", DOMAIN, "Mod_MOD-1_message"
-    )
+    entity_id = er.async_get(hass).async_get_entity_id("text", DOMAIN, "MOD-1_message")
     assert entity_id is not None
 
     await hass.services.async_call(

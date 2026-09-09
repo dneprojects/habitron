@@ -248,7 +248,7 @@ def test_module_sensor_unique_id_has_no_key_suffix(
     coord = MagicMock(spec=DataUpdateCoordinator)
     entity = HbtnDescribedSensor(module, sensor_desc, coord, 0, description)
     assert description.disambiguate is False
-    assert entity.unique_id == f"Mod_{module.uid}_snsr0"
+    assert entity.unique_id == f"{module.uid}_{description.key}"
 
 
 @pytest.mark.parametrize(
@@ -258,13 +258,13 @@ def test_module_sensor_unique_id_has_no_key_suffix(
 def test_router_sensor_unique_id_keeps_key_suffix(
     description: HbtnSensorEntityDescription,
 ) -> None:
-    """Router streams share ``nmbr`` and so keep the disambiguating key suffix."""
+    """Router streams share a key, so the member number tells them apart."""
     module = _make_module()
     sensor_desc = _make_sensor_descriptor(type_=1)
     coord = MagicMock(spec=DataUpdateCoordinator)
     entity = HbtnDescribedSensor(module, sensor_desc, coord, 0, description)
     assert description.disambiguate is True
-    assert entity.unique_id == f"Mod_{module.uid}_snsr0_{description.key}"
+    assert entity.unique_id == f"{module.uid}_{description.key}_0"
 
 
 # Note: the full-integration setup smoke test lives in test_init once every
@@ -306,7 +306,8 @@ def test_hbtnsensor_base_init_and_update() -> None:
     coord = MagicMock(spec=DataUpdateCoordinator)
     entity = HbtnSensor(mod, desc, coord, 5)
     entity.async_write_ha_state = MagicMock()
-    assert entity.unique_id == "Mod_MOD-1_snsr0"
+    # The base class no longer names anything; each concrete class does.
+    assert entity.unique_id is None
     assert entity.name == "Temperature"
     assert entity._attr_state_class is SensorStateClass.MEASUREMENT
     entity._handle_coordinator_update()
@@ -339,7 +340,7 @@ def test_analog_sensor_unique_id_and_value() -> None:
     coord = MagicMock(spec=DataUpdateCoordinator)
     entity = AnalogSensor(mod, desc, coord, 0)
     entity.async_write_ha_state = MagicMock()
-    assert entity.unique_id == "Mod_MOD-1_adin0"
+    assert entity.unique_id == "MOD-1_analog_in_0"
     entity._handle_coordinator_update()
     assert entity._attr_native_value == 75
 
@@ -351,7 +352,7 @@ def test_ekey_sensor_id_unique_id_and_passthrough() -> None:
     coord = MagicMock(spec=DataUpdateCoordinator)
     entity = EKeySensorId(mod, desc, coord, 0)
     entity.async_write_ha_state = MagicMock()
-    assert entity.unique_id == "Mod_MOD-1_ekey_ident"
+    assert entity.unique_id == "MOD-1_ekey_identifier"
     assert entity._attr_name == "Identifier Value"
     entity._handle_coordinator_update()
     assert entity._attr_native_value == 23.5
@@ -364,7 +365,7 @@ def test_ekey_sensor_fngr_unique_id_and_passthrough() -> None:
     coord = MagicMock(spec=DataUpdateCoordinator)
     entity = EKeySensorFngr(mod, desc, coord, 0)
     entity.async_write_ha_state = MagicMock()
-    assert entity.unique_id == "Mod_MOD-1_ekey_fngr"
+    assert entity.unique_id == "MOD-1_ekey_finger"
     assert entity._attr_name == "Finger Value"
     entity._handle_coordinator_update()
     assert entity._attr_native_value == 23.5
@@ -389,7 +390,7 @@ def test_temperature_d_sensor_attributes() -> None:
     coord = MagicMock(spec=DataUpdateCoordinator)
     entity = TemperatureDSensor(mod, diag, coord, 0)
     assert entity._attr_device_class is SensorDeviceClass.TEMPERATURE
-    assert entity.unique_id == "Mod_MOD-1_PowerTemp"
+    assert entity.unique_id == "MOD-1_power_temperature"
 
 
 def test_status_sensor_icon_flips_on_value() -> None:
@@ -420,7 +421,7 @@ def test_logic_sensor_unique_id_and_update() -> None:
     coord = MagicMock(spec=DataUpdateCoordinator)
     entity = LogicSensor(mod, logic_desc, coord, 0)
     entity.async_write_ha_state = MagicMock()
-    assert entity.unique_id == "Mod_MOD-1_logic0"
+    assert entity.unique_id == "MOD-1_logic_0"
     assert entity._attr_name == "Cnt1: Counter"
     entity._handle_coordinator_update()
     assert entity._attr_native_value == 42
@@ -666,7 +667,7 @@ def test_habitron_client_sensor_init_battery_keys() -> None:
         None,
         0,
     )
-    assert entity.unique_id == "Mod_MOD-T_client_battery_level"
+    assert entity.unique_id == "MOD-T_client_battery_level"
     assert entity._attr_state_class is SensorStateClass.MEASUREMENT
     assert entity._target_stream_name == "touch_1"
 
@@ -965,7 +966,7 @@ async def test_async_setup_entry_analog_area_assignment_external(
         mock_get.return_value = MagicMock()
         await async_setup_entry(hass, entry, captured.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
 
-    analog = next(e for e in captured if e.unique_id.endswith("_adin0"))
+    analog = next(e for e in captured if e.unique_id.endswith("_analog_in_0"))
     assert analog._initial_area_id == "area_5_id"
 
 
@@ -1009,7 +1010,7 @@ async def test_async_setup_entry_analog_area_overflow_falls_back(
         mock_get.return_value = MagicMock()
         await async_setup_entry(hass, entry, captured.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
 
-    analog = next(e for e in captured if e.unique_id.endswith("_adin0"))
+    analog = next(e for e in captured if e.unique_id.endswith("_analog_in_0"))
     assert analog._initial_area_id is None
 
 
@@ -1087,11 +1088,11 @@ async def test_analog_area_not_restamped_on_reload(hass: HomeAssistant) -> None:
         patch("custom_components.habitron.sensor.er.async_get") as mock_get,
         patch(
             "custom_components.habitron.sensor.er.async_entries_for_config_entry",
-            return_value=[MagicMock(unique_id="Mod_MOD-A_adin0")],
+            return_value=[MagicMock(unique_id="MOD-A_analog_in_0")],
         ),
     ):
         mock_get.return_value = MagicMock()
         await async_setup_entry(hass, entry, captured.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
 
-    analog = next(e for e in captured if e.unique_id.endswith("_adin0"))
+    analog = next(e for e in captured if e.unique_id.endswith("_analog_in_0"))
     assert analog._initial_area_id is None

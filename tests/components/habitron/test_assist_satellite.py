@@ -48,7 +48,7 @@ def _make_sat(hass: HomeAssistant | None = None) -> HbtnAssistSat:
 def test_assist_sat_init_seeds_attrs() -> None:
     """__init__ wires unique id, device info and supported features."""
     sat = _make_sat()
-    assert sat.unique_id == "Mod_MOD-T_assist_sat"
+    assert sat.unique_id == "MOD-T_assist_satellite"
     assert ("habitron", "MOD-T") in sat._attr_device_info["identifiers"]
     assert sat.stream_name == "touch_1_5"
     assert sat.recognition_disabled is False

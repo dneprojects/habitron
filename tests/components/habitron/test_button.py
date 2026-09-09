@@ -51,7 +51,7 @@ async def test_coll_cmd_button() -> None:
     """A collective command button calls the router collective command."""
     smhub = _smhub()
     entity = CollCmdButton(HbtnCommand(name="All off", nmbr=5), smhub)
-    assert entity.unique_id == "Mod_HUB-1_ccmd5"
+    assert entity.unique_id == "HUB-1_collective_command_5"
     await entity.async_press()
     smhub.comm.async_call_coll_command.assert_awaited_with(5)
 
@@ -60,7 +60,7 @@ async def test_dir_cmd_button() -> None:
     """A direct command button targets the module address."""
     smhub = _smhub()
     entity = DirCmdButton(HbtnCommand(name="Scene", nmbr=2), _module(), smhub)
-    assert entity.unique_id == "Mod_MOD-1_dcmd2"
+    assert entity.unique_id == "MOD-1_direct_command_2"
     await entity.async_press()
     smhub.comm.async_call_dir_command.assert_awaited_with(105, 2)
 
@@ -114,7 +114,7 @@ async def test_power_cycle_button() -> None:
     """The power-cycle button cycles the given router channel."""
     smhub = _smhub()
     entity = ResetChannelPowerButton(smhub.router, smhub, 3)
-    assert entity.unique_id == "Rt_ROUTER-1_powcyc3"
+    assert entity.unique_id == "ROUTER-1_power_cycle_3"
     await entity.async_press()
     smhub.comm.async_power_cycle_channel.assert_awaited_with(3)
 
