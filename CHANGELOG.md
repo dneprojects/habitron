@@ -3,6 +3,10 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.4.1
+- A stored message reaches the display again. Picking one by name, or by the number in front of it in the messages list, now sends its text; the id command used before is acknowledged by the SmartHub but never carried out, so nothing appeared. Verified on the Smart Controllers.
+- The displayed-message field now carries the same icon as the "Message" notify target.
+
 ## v3.4.1b1
 - Beta. A stored message reaches the display again. Picking one by name, or by the number in front of it in the messages list, now sends its text; the id command used before is acknowledged by the SmartHub but never carried out, so nothing appeared.
 - The displayed-message field now carries the same icon as the "Message" notify target.

@@ -4,6 +4,13 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.4.1
+
+Stable for 3.4.1b1, unchanged. The display text path (`1E 11 01`) was confirmed
+on the Smart Controllers against a second hub; the bench's RC2 that the analysis
+started from turned out not to be reliably reachable on the bus, which is why
+nothing showed there for either command.
+
 ## v3.4.1b1
 
 ### A stored message never reached the display
