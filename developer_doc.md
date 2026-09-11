@@ -11,6 +11,39 @@ on the Smart Controllers against a second hub; the bench's RC2 that the analysis
 started from turned out not to be reliably reachable on the bus, which is why
 nothing showed there for either command.
 
+### Messages on a timer -- considered, not built
+The obvious follow-up to the fix above is "show this message for 30 seconds".
+It was worked through and dropped; this records why, so it is not re-derived.
+
+Nothing below the hub can time a message. The module command behind a display
+text is `0x21` with `act` 0 (reset), 2 (preload the first 16 chars) and 1
+(append up to 16 more and show the result) -- there is no time field anywhere in
+it. A timed message is therefore always "set text, wait, send reset", and the
+only open question is where the waiting happens:
+
+* **In the hub.** Survives a HA restart, and the hub is the only party that sees
+  all bus traffic, so it alone could tell whether the display still carries its
+  own message when the time is up -- and could even restore what was there
+  before. Costs a per-module timer table in the firmware plus a rule for what
+  happens when a new message arrives while one is running.
+* **In Home Assistant.** `async_call_later` plus `1E 11 00`, no firmware work,
+  and it covers free text and stored messages alike. It also has no 255 second
+  ceiling, because the one-byte `<tim>` field never comes into play. The timer
+  dies with a restart, and "is this still my message?" can only be answered
+  against the entity's own value.
+
+Decision (dneprojects, 2026-09-11): **neither, for now** -- too much machinery
+for how rarely it is wanted. A timed message that outlives a HA restart matters
+only if HA is away while it runs, and a message driven by a HA automation does
+not exist in that case anyway. If it is ever built, the shape is an entity
+action `habitron.show_message_for` (`message` + `duration`) on the text entity,
+reusing `resolve_stored_message`, with the timer handle on the entity so a new
+`set_value` cancels it and the clear only fires while `native_value` is still
+the text it set.
+
+`HbtnComm.send_message` and `client.send_message` (`1E 11 03`) are kept for that
+day, unused in the meantime.
+
 ## v3.4.1b1
 
 ### A stored message never reached the display

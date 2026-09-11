@@ -213,6 +213,7 @@ script:
 - **Habitron module discovery is configuration-time**, not bus-side hot-plug. New modules need to be registered in the SmartHub's web UI; afterwards a reload of the integration picks them up. Stale modules are removed from HA's device registry automatically on the next setup pass.
 - **Heavy operations take seconds.** Even with the fully async `habitron_client` library, firmware pushes and full SMC backups involve large device round-trips plus local file hashing (the latter offloaded to the executor). They run to completion in the background, but a single call can take several seconds.
 - **WebRTC and Voice handlers register WebSocket commands globally**. After the last SmartHub is removed those handlers stay registered for the lifetime of the HA process. The provider itself is unregistered on unload, so no stream is double-served.
+- **A display message has no duration.** What is written to a module's displayed-message field -- free text or a stored message picked by name or number -- stays until it is overwritten or cleared. The SmartHub's timed-message command is not carried out, and the module telegram behind it carries no time field at all, so a duration would have to be a timer on the Home Assistant side; see `developer_doc.md` (v3.4.1) for why that was not built.
 - **No re-authentication flow**. The optional WebSocket token can be edited via the Reconfigure flow, but the SmartHub does not push auth-fail states back into HA.
 
 ## Troubleshooting
