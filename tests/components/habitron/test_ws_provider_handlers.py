@@ -1013,6 +1013,55 @@ async def test_report_state_fires_bus_event_and_records_version() -> None:
     provider.hass.bus.async_fire.assert_called()
 
 
+async def test_report_state_without_version_keeps_the_reported_one() -> None:
+    """A report carrying no version leaves the known one standing.
+
+    The regular battery/temperature reports have no ``version`` field. Writing
+    a placeholder for them overwrote what the client named when it registered,
+    and the app update entity then showed "0.0.0" for a device whose version
+    was perfectly well known.
+    """
+    provider = _make_provider()
+    handlers = _registered_handlers(provider)
+    conn = _make_connection()
+    provider.active_ws_connections["touch_1"] = conn
+    mod = MagicMock()
+    mod.client_version = "1.2.9"
+    provider.module_by_stream = MagicMock(return_value=mod)
+
+    await handlers["report_state"](
+        provider.hass,
+        conn,
+        {"id": 1, "type": "habitron/report_state", "payload": {"battery_level": 80}},
+    )
+
+    assert mod.client_version == "1.2.9"
+    provider.hass.bus.async_fire.assert_called()
+
+
+async def test_register_stream_without_version_keeps_the_reported_one() -> None:
+    """Re-registering without a version does not wipe the known one either."""
+    provider = _make_provider()
+    handlers = _registered_handlers(provider)
+    conn = _make_connection()
+    mod = MagicMock()
+    mod.client_version = "1.2.9"
+    provider.module_by_stream = MagicMock(return_value=mod)
+
+    await handlers["register_stream"](
+        provider.hass,
+        conn,
+        {
+            "id": 1,
+            "type": "habitron/register_stream",
+            "stream_name": "touch_1",
+            "version": "",
+        },
+    )
+
+    assert mod.client_version == "1.2.9"
+
+
 async def test_report_state_without_matching_module_just_fires() -> None:
     """If get_module_by_stream returns None the bus event still fires."""
     provider = _make_provider()

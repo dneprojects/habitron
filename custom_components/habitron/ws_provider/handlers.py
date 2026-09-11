@@ -326,9 +326,12 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
     ) -> None:
         """Handle client registering its stream name."""
         stream_name = msg["stream_name"]
-        client_version = msg.get("version", "unknown")
+        client_version = msg.get("version") or "unknown"
         module = provider.module_by_stream(stream_name)
-        if module:
+        if module and client_version != "unknown":
+            # Only a version the client actually names is worth keeping: a
+            # re-registration that omits it must not wipe what an earlier one
+            # reported.
             module.client_version = client_version
         if existing_conn := provider.active_ws_connections.get(stream_name):
             if existing_conn != connection:
@@ -342,7 +345,11 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
             stream_name
         )
         connection.send_result(msg["id"])  # Acknowledge registration
-        _LOGGER.info("Client registered stream '%s'", stream_name)
+        _LOGGER.info(
+            "Client registered stream '%s', app version %s",
+            stream_name,
+            client_version,
+        )
 
     @websocket_api.websocket_command(
         {
@@ -639,8 +646,11 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
         _LOGGER.debug("Received device state report for %s: %s", stream_name, payload)
 
         module = provider.module_by_stream(stream_name)
-        if module:
-            fw_version = payload.get("version", "0.0.0")
+        if module and (fw_version := payload.get("version")):
+            # Only the reports that carry a version update it. The regular
+            # battery/temperature reports do not, and defaulting here used to
+            # overwrite the version the client gave at registration -- which is
+            # what left the app update entity sitting on "0.0.0".
             module.client_version = fw_version
 
         # Fire an event so sensors can listen to it and update their state

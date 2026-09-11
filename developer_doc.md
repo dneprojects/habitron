@@ -4,6 +4,36 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.4.2
+
+### The SC Touch app version fell back to "0.0.0"
+`SCTouchAppUpdate.installed_version` is `SmartController.client_version`, and
+the hub knows nothing about the Android app -- checked against the bench hub for
+`DNs A17`, whose settings block carries only `hw=0010042631800004` and
+`sw=SCT V6.0 08 07/2026` (the module firmware), with no app version anywhere in
+`SmhubInfo` either. The value can only come from the client over the HA
+websocket, and it arrives in two messages: `habitron/register_stream` (a
+required `version` field) and `habitron/report_state` (`payload["version"]`).
+
+`handle_report_state` took `payload.get("version", "0.0.0")` and assigned it
+unconditionally. The regular battery/temperature reports carry no version, so
+every one of them overwrote what the client had named at registration. The
+entity then sat on the `"0.0.0"` that `update.py` also uses when nothing was
+ever reported -- indistinguishable from "never heard from" -- and, with an
+`sctouch_*.apk` in the firmware directory, reported an update as available
+because any real version beats `0.0.0`.
+
+Both handlers now only store a version the client actually names, and the
+registration log line carries it, so the log tells a missing version apart from
+an overwritten one. Two regression tests cover it; the existing report_state
+test for an empty payload ran with `module_by_stream` returning `None` and never
+reached the assignment.
+
+Not changed: `update.py` still shows `"0.0.0"` when nothing was ever reported.
+Leaving `installed_version` at `None` would be more honest and would drop the
+false update offer, but it also takes away the install button for a Touch whose
+app has never checked in.
+
 ## v3.4.1
 
 Stable for 3.4.1b1, unchanged. The display text path (`1E 11 01`) was confirmed
