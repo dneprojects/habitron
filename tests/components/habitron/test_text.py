@@ -98,25 +98,25 @@ def _module_with_messages() -> Module:
 
 
 @pytest.mark.parametrize(
-    ("typed", "sent_id", "shown"),
+    ("typed", "shown"),
     [
         # The stored message by name, spacing ignored on both sides.
-        ("Tor offen", 3, "Tor offen"),
-        ("  Toroffen ", 3, "Tor offen"),
+        ("Tor offen", "Tor offen"),
+        ("  Toroffen ", "Tor offen"),
         # ... and by the id printed in front of it in the messages list.
-        ("5", 5, "Besuch"),
-        # Anything else is free text, which this display understands.
-        ("Paket abgegeben", None, "Paket abgegeben"),
-        ("", None, ""),
+        ("5", "Besuch"),
+        # Anything else is taken as it stands.
+        ("Paket abgegeben", "Paket abgegeben"),
+        ("", ""),
     ],
 )
-async def test_set_value_resolves_and_echoes(
-    typed: str, sent_id: int | None, shown: str
-) -> None:
-    """What is typed decides how it is sent, and the value shows the result.
+async def test_set_value_resolves_and_echoes(typed: str, shown: str) -> None:
+    """What is typed is resolved first, and the resolved text is what is sent.
 
     Typing an id leaves the message behind it standing in the entity -- which
     is the confirmation that it was read as an id and not sent as that text.
+    Everything reaches the display as text: the id command the stored message
+    would otherwise use is not carried out by the SmartHub.
     """
     comm = _comm()
     entity = HbtnDisplayText(_module_with_messages(), comm)
@@ -124,12 +124,8 @@ async def test_set_value_resolves_and_echoes(
 
     await entity.async_set_value(typed)
 
-    if sent_id is None:
-        comm.send_message_text.assert_awaited_once_with(105, typed)
-        comm.send_message.assert_not_awaited()
-    else:
-        comm.send_message.assert_awaited_once_with(105, sent_id)
-        comm.send_message_text.assert_not_awaited()
+    comm.send_message_text.assert_awaited_once_with(105, shown)
+    comm.send_message.assert_not_awaited()
     assert entity.native_value == shown
 
 
@@ -150,4 +146,5 @@ async def test_a_message_named_like_a_number_wins_over_that_id() -> None:
 
     await entity.async_set_value("5")
 
-    comm.send_message.assert_awaited_once_with(105, 9)
+    comm.send_message_text.assert_awaited_once_with(105, "5")
+    assert entity.native_value == "5"

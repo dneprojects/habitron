@@ -3,6 +3,10 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.4.1b1
+- Beta. A stored message reaches the display again. Picking one by name, or by the number in front of it in the messages list, now sends its text; the id command used before is acknowledged by the SmartHub but never carried out, so nothing appeared.
+- The displayed-message field now carries the same icon as the "Message" notify target.
+
 ## v3.4.0
 - The messages stored in a module are visible again. Each module with stored messages gets a "Messages list" you can page through without sending anything, and the "Message" notify target is back -- it had been dropped when the free-text field arrived, and with it the only way to trigger a stored message. The list starts on its first entry, and remembers your choice across a restart.
 - The displayed-message field now takes a stored message's name or the number shown in front of it in the list, as well as free text, and afterwards shows what was actually sent. Two new actions, "Send selected message" and "Clear sent message", work on the notify target.

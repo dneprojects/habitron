@@ -4,6 +4,44 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.4.1b1
+
+### A stored message never reached the display
+`text.set_value` resolved what was typed against `module.messages` and then
+triggered the match by its id (`comm.send_message` -> `1E 11 03`). Measured
+against hub 3.5.8 on the bench and confirmed by a second hub's log, that command
+is answered on the bus with `OK` while the hub logs `Meldung auf Zeit setzen
+noch nicht implementiert` and passes nothing to the module -- with `tim=15` as
+the library sends it, and with `tim=0` as well, where the hub does resolve the
+id to its text first and then aborts in the same routine.
+
+There is no second opcode to reach for: `1E 11 02` and `1E 11 04` answer
+`Unknown API data command: 30 17 2/4`, and `1E 11 03` with a one-byte data
+length (id only, no time byte) makes the hub drop the connection. What the hub
+does carry out is `1E 11 01` (set display text) and `1E 11 00` (clear).
+
+So `HbtnDisplayText.async_set_value` keeps the resolution and sends the
+*resolved text* through `send_message_text`. That is not a workaround around the
+model: the hub's own id branch resolves the message to exactly this text before
+handing it on, so the only thing that moves is where the lookup happens. The
+visible difference is the display time -- text stands until it is overwritten or
+cleared, instead of timing out after 15 seconds.
+
+`HbtnComm.send_message` and `client.send_message` stay as they are. When the hub
+implements the routine, the id path is one line away again, and a later
+"show message for a time" action would want exactly that call with the duration
+as its parameter.
+
+The notify target and both message actions route through `async_show_on_display`
+into this entity, so they are fixed by the same line. Three tests in
+`test_text.py` moved from "which command was sent" to "what text was sent".
+
+### Displayed message carries the message icon
+`text.message` used the `text` domain default (`mdi:form-textbox`) while the
+`notify` target beside it showed `mdi:message`; two entities for the same thing
+looked unrelated in a list. `icons.json` now pins `mdi:message` on the text
+entity.
+
 ## v3.4.0
 
 Stable for the 3.4.0b1-b3 line. Two further fixes on top of b3.

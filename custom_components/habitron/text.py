@@ -57,17 +57,21 @@ class HbtnDisplayText(TextEntity):
     async def async_set_value(self, value: str) -> None:
         """Show ``value`` on the module display.
 
-        A stored message is triggered by its id when the text names one, or is
-        a number that matches one; anything else goes out as free text. An
-        empty value clears the display. What ends up as this entity's value is
-        the *resolved* text, so typing "3" leaves the message behind that id
-        standing here -- which is also the confirmation that it was understood
-        as an id rather than sent as the literal text.
+        What is typed is resolved against the module's stored messages first --
+        by name, or by the number printed in front of it in the list, spacing
+        ignored either way -- and it is that *resolved* text which goes to the
+        display and stays in this entity, so typing "3" leaves the message
+        behind that id standing here. Anything matching no stored message goes
+        out unchanged. An empty value clears the display.
+
+        Everything is sent as display text (``1E 11 01``). Triggering a stored
+        message by its id (``1E 11 03``) is not an option: the SmartHub
+        acknowledges that command on the bus with ``OK`` but logs "Meldung auf
+        Zeit setzen noch nicht implementiert" and never passes it on to the
+        module -- with any display time, the id's own text included. Resolving
+        here does what the hub would have done anyway.
         """
-        nmbr, label = resolve_stored_message(self._module.messages, value)
-        if nmbr is not None:
-            await self._comm.send_message(self._module.addr, nmbr)
-        else:
-            await self._comm.send_message_text(self._module.addr, value)
+        _nmbr, label = resolve_stored_message(self._module.messages, value)
+        await self._comm.send_message_text(self._module.addr, label)
         self._attr_native_value = label
         self.async_write_ha_state()

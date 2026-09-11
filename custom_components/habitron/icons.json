@@ -120,6 +120,9 @@
       }
     },
     "text": {
+      "message": {
+        "default": "mdi:message"
+      },
       "ekey_user": {
         "default": "mdi:fingerprint"
       },

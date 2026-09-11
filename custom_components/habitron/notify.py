@@ -144,8 +144,8 @@ class HbtnDisplayMessage(NotifyEntity):
     async def async_send_message(self, message: str, title: str | None = None) -> None:
         """Show ``message`` on the display.
 
-        A stored message is triggered by its id; anything else goes out as free
-        text, which this display understands. An empty message clears it.
+        A stored message is resolved to its text; anything else goes out
+        unchanged. An empty message clears the display.
         """
         del title
         await async_show_on_display(self.hass, self._module.uid, message)
