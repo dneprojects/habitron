@@ -14,7 +14,7 @@ from homeassistant.helpers import entity_registry as er
 
 
 def _module(typ: bytes = b"\x01\x02") -> Module:
-    return Module(uid="MOD-1", addr=105, typ=typ, name="SC")
+    return Module(uid="MOD-1", addr=5, typ=typ, name="SC")
 
 
 def _comm() -> MagicMock:
@@ -37,7 +37,7 @@ async def test_display_text_set_value_forwards_to_bus() -> None:
     entity = HbtnDisplayText(_module(), comm)
     entity.async_write_ha_state = MagicMock()
     await entity.async_set_value("Hello")
-    comm.send_message_text.assert_awaited_with(105, "Hello")
+    comm.send_message_text.assert_awaited_with(5, "Hello")
     assert entity.native_value == "Hello"
 
 
@@ -67,7 +67,7 @@ async def test_set_value_service_reaches_bus_and_updates_state(
     module, then a real service call writes the value to the bus client and the
     entity state mirrors it.
     """
-    router = Router(uid="rt_1", id=100)
+    router = Router(uid="rt_1")
     router.modules = [_module()]
     _entry, client = await real_setup(router)
 
@@ -124,7 +124,7 @@ async def test_set_value_resolves_and_echoes(typed: str, shown: str) -> None:
 
     await entity.async_set_value(typed)
 
-    comm.send_message_text.assert_awaited_once_with(105, shown)
+    comm.send_message_text.assert_awaited_once_with(5, shown)
     comm.send_message.assert_not_awaited()
     assert entity.native_value == shown
 
@@ -146,5 +146,5 @@ async def test_a_message_named_like_a_number_wins_over_that_id() -> None:
 
     await entity.async_set_value("5")
 
-    comm.send_message_text.assert_awaited_once_with(105, "5")
+    comm.send_message_text.assert_awaited_once_with(5, "5")
     assert entity.native_value == "5"

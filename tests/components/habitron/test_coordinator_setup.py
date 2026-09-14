@@ -223,7 +223,7 @@ async def test_get_version_returns_zero_default_when_marker_missing(
 
 async def test_restart_forwards_to_comm(coordinator_stub: HbtnCoordinator) -> None:
     """``restart`` accepts a router id (forward-compat) but forwards a no-arg call."""
-    await coordinator_stub.restart(7)
+    await coordinator_stub.restart()
     coordinator_stub.comm.hub_restart.assert_awaited_with()
 
 
@@ -250,7 +250,7 @@ async def test_setup_suggests_module_area_on_first_creation(
     router = Router(uid="rt_1")
     router.areas = [Area(nmbr=1, name="Living Room")]
     router.modules = [
-        Module(uid="MOD-1", addr=105, typ=b"\x01\x02", name="Mod 1", area=1)
+        Module(uid="MOD-1", addr=5, typ=b"\x01\x02", name="Mod 1", area=1)
     ]
     entry, _client = await real_setup(router)
 
@@ -276,8 +276,8 @@ async def test_reload_keeps_user_area_when_router_area_list_is_lost(
     router = Router(uid="rt_1")
     router.areas = [Area(nmbr=1, name="Living Room")]
     router.modules = [
-        Module(uid="MOD-1", addr=105, typ=b"\x01\x02", name="Mod 1", area=1),
-        Module(uid="MOD-2", addr=106, typ=b"\x01\x02", name="Mod 2", area=1),
+        Module(uid="MOD-1", addr=5, typ=b"\x01\x02", name="Mod 1", area=1),
+        Module(uid="MOD-2", addr=6, typ=b"\x01\x02", name="Mod 2", area=1),
     ]
     entry, _client = await real_setup(router)
 
@@ -320,7 +320,7 @@ async def test_setup_links_modules_via_router_to_hub(
     """
     router = Router(uid="rt_1")
     router.modules = [
-        Module(uid="MOD-1", addr=105, typ=b"\x01\x02", name="Mod 1", area=0)
+        Module(uid="MOD-1", addr=5, typ=b"\x01\x02", name="Mod 1", area=0)
     ]
     entry, _client = await real_setup(router)
 

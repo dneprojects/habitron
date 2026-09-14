@@ -263,12 +263,12 @@ async def test_touch_module_creates_webrtc_platform_entities(
     """
     module = SmartController(
         uid="MOD-T",
-        addr=104,
+        addr=4,
         typ=b"\x01\x04",
         name="Touch",
         mod_type="Smart Controller Touch",
     )
-    router = Router(uid="rt_1", id=100)
+    router = Router(uid="rt_1")
     router.modules = [module]
 
     entry, _client = await real_setup(router)

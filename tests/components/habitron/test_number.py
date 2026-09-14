@@ -13,7 +13,7 @@ from homeassistant.core import HomeAssistant
 
 
 def _module(uid: str = "MOD-1", **kwargs) -> Module:
-    return Module(uid=uid, addr=105, typ=b"\x01\x02", name="Mod", **kwargs)
+    return Module(uid=uid, addr=5, typ=b"\x01\x02", name="Mod", **kwargs)
 
 
 def _coord() -> MagicMock:
@@ -44,7 +44,7 @@ async def test_set_temperature_set_value_forwards_setpoint() -> None:
     setval = SetValue(name="Set temperature", nmbr=1, type=2, value=20.0)
     entity = HbtnSetTemperature(setval, _module(), coord, 0)
     await entity.async_set_native_value(22.0)
-    coord.comm.async_set_setpoint.assert_awaited_with(105, 2, 220)
+    coord.comm.async_set_setpoint.assert_awaited_with(5, 2, 220)
     coord.async_request_refresh.assert_awaited()
 
 
@@ -77,7 +77,7 @@ async def test_analog_output_set_value() -> None:
     entity = HbtnAnalogOutput(analog, _module(), coord, 0)
     await entity.async_set_native_value(42.0)
     assert analog.brightness == 42
-    coord.comm.async_set_analog_val.assert_awaited_with(105, 16, 42)
+    coord.comm.async_set_analog_val.assert_awaited_with(5, 16, 42)
     coord.async_request_refresh.assert_awaited()
 
 

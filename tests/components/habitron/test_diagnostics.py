@@ -30,7 +30,7 @@ from .const import (
 def _module(uid: str = "MOD-1", name: str = "Living room") -> Module:
     return Module(
         uid=uid,
-        addr=105,
+        addr=5,
         typ=b"\x01\x04",
         name=name,
         mod_type="Smart Controller Touch",
@@ -72,7 +72,7 @@ def _entry(hass: HomeAssistant, router: Router) -> MockConfigEntry:
 
 async def test_config_entry_diagnostics(hass: HomeAssistant) -> None:
     """Config-entry diagnostics dump hub, router, coordinator and modules."""
-    router = Router(uid="rt_1", id=100, name="Home", version="1.0", max_group=2)
+    router = Router(uid="rt_1", name="Home", version="1.0", max_group=2)
     router.modules = [_module()]
     entry = _entry(hass, router)
 
@@ -92,7 +92,7 @@ async def test_config_entry_diagnostics(hass: HomeAssistant) -> None:
 
 async def test_device_diagnostics_for_module(hass: HomeAssistant) -> None:
     """A device matching a module reports its module summary."""
-    router = Router(uid="rt_1", id=100, name="Home")
+    router = Router(uid="rt_1", name="Home")
     router.modules = [_module(uid="MOD-XYZ", name="Kitchen")]
     entry = _entry(hass, router)
 
@@ -110,7 +110,7 @@ async def test_device_diagnostics_for_module(hass: HomeAssistant) -> None:
 
 async def test_device_diagnostics_for_hub(hass: HomeAssistant) -> None:
     """A device matching the hub UID reports the hub summary."""
-    entry = _entry(hass, Router(uid="rt_1", id=100, name="Home"))
+    entry = _entry(hass, Router(uid="rt_1", name="Home"))
     device = dr.async_get(hass).async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, MOCK_UID)},
@@ -122,7 +122,7 @@ async def test_device_diagnostics_for_hub(hass: HomeAssistant) -> None:
 
 async def test_device_diagnostics_for_router(hass: HomeAssistant) -> None:
     """A device whose UID matches the router reports the router summary."""
-    router = Router(uid="rt_1", id=100, name="Home")
+    router = Router(uid="rt_1", name="Home")
     entry = _entry(hass, router)
     device = dr.async_get(hass).async_get_or_create(
         config_entry_id=entry.entry_id,
@@ -135,7 +135,7 @@ async def test_device_diagnostics_for_router(hass: HomeAssistant) -> None:
 
 async def test_device_diagnostics_unknown_identifier(hass: HomeAssistant) -> None:
     """A device whose UID is not in the router returns target=None."""
-    entry = _entry(hass, Router(uid="rt_1", id=100, name="Home"))
+    entry = _entry(hass, Router(uid="rt_1", name="Home"))
     device = dr.async_get(hass).async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, "ghost-uid")},
@@ -155,7 +155,7 @@ async def test_config_entry_diagnostics_over_real_setup(
     ``runtime_data``, so the dump reads live hub/router/module state instead of
     a hand-built mock — while secrets stay redacted.
     """
-    router = Router(uid="rt_1", id=100, name="Home", version="1.0", max_group=2)
+    router = Router(uid="rt_1", name="Home", version="1.0", max_group=2)
     router.modules = [_module()]
     entry, _client = await real_setup(router)
 

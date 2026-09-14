@@ -85,7 +85,9 @@ async def async_setup_entry(
                 coord,
                 flag,
                 device_uid=router.uid,
-                mod_addr=router.id,
+                # The router answers as address 0 on the bus, like it does
+                # for a device-registry push or a restart.
+                mod_addr=0,
                 idx=len(new_devices),
             )
         )

@@ -130,7 +130,7 @@ async def _async_restart_module(call: ServiceCall) -> None:
     """Restart a single Habitron module."""
     mod_nmbr = call.data.get(RESTART_KEY_NMBR, RESTART_ALL)
     for hub in await _targeted_hubs(call):
-        await hub.comm.module_restart(100 + mod_nmbr)
+        await hub.comm.module_restart(mod_nmbr)
 
 
 async def _async_restart_router(call: ServiceCall) -> None:
@@ -143,7 +143,7 @@ async def _async_save_module_smc(call: ServiceCall) -> None:
     """Persist a module's .smc file."""
     mod_nmbr = call.data.get(FILE_MOD_NMBR, 1)
     for hub in await _targeted_hubs(call):
-        await hub.comm.save_smc_file(100 + mod_nmbr)
+        await hub.comm.save_smc_file(mod_nmbr)
 
 
 async def _async_save_module_smg(call: ServiceCall) -> None:

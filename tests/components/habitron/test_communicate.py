@@ -45,13 +45,6 @@ def test_is_valid_ipv4() -> None:
     assert comm.is_valid_ipv4("not-an-ip") is False
 
 
-def test_convert_mod_id_subtracts_hundred() -> None:
-    """_convert_mod_id maps the bus address back to a raw module address."""
-    comm = _make_comm()
-    assert comm._convert_mod_id(105) == 5
-    assert comm._convert_mod_id(100) == 0
-
-
 def test_property_accessors() -> None:
     """Public properties expose the cached fields."""
     comm = _make_comm("10.0.0.5")
@@ -78,10 +71,10 @@ def test_module_by_addr() -> None:
     """_module_by_addr finds a module by its full address."""
     comm = _make_comm()
     router = Router()
-    mod = Module(uid="M", addr=105, typ=b"\x0a\x01", name="x")
+    mod = Module(uid="M", addr=5, typ=b"\x0a\x01", name="x")
     router.modules = [mod]
     comm.set_router(router)
-    assert comm._module_by_addr(105) is mod
+    assert comm._module_by_addr(5) is mod
     assert comm._module_by_addr(999) is None
 
 
@@ -93,23 +86,23 @@ def test_module_by_addr() -> None:
 async def test_set_output_converts_addr() -> None:
     """set_output converts the address and forwards a bool value."""
     comm = _make_comm()
-    await comm.async_set_output(105, 2, 1)
+    await comm.async_set_output(5, 2, 1)
     comm._client.set_output.assert_awaited_with(5, 2, True)
 
 
 async def test_set_dimmval_and_flag() -> None:
     """Dim/flag setters forward converted addresses."""
     comm = _make_comm()
-    await comm.async_set_dimmval(105, 1, 50)
+    await comm.async_set_dimmval(5, 1, 50)
     comm._client.set_dimmval.assert_awaited_with(5, 1, 50)
-    await comm.async_set_flag(105, 3, 1)
+    await comm.async_set_flag(5, 3, 1)
     comm._client.set_flag.assert_awaited_with(5, 3, True)
 
 
 async def test_set_analog_val_uses_dimm_channel_3() -> None:
     """The analogue output maps to dimm channel 3."""
     comm = _make_comm()
-    await comm.async_set_analog_val(105, 1, 42)
+    await comm.async_set_analog_val(5, 1, 42)
     comm._client.set_dimmval.assert_awaited_with(5, 3, 42)
 
 
@@ -117,11 +110,11 @@ async def test_set_led_outp_offsets_by_output_count() -> None:
     """LED output number is offset by the module's output count."""
     comm = _make_comm()
     router = Router()
-    mod = Module(uid="M", addr=105, typ=b"\x01\x02", name="x")
+    mod = Module(uid="M", addr=5, typ=b"\x01\x02", name="x")
     mod.outputs = [object()] * 16  # 16 outputs
     router.modules = [mod]
     comm.set_router(router)
-    await comm.async_set_led_outp(105, 0, 1)
+    await comm.async_set_led_outp(5, 0, 1)
     comm._client.set_output.assert_awaited_with(5, 16, True)
 
 
@@ -130,7 +123,7 @@ async def test_set_group_mode_and_climate() -> None:
     comm = _make_comm()
     await comm.async_set_group_mode(2, 32)
     comm._client.set_group_mode.assert_awaited_with(2, 32)
-    await comm.async_set_climate_mode(105, 1, 2)
+    await comm.async_set_climate_mode(5, 1, 2)
     comm._client.set_climate_mode.assert_awaited_with(5, 1, 2)
 
 
@@ -385,20 +378,20 @@ async def test_stream_crcs_are_independent() -> None:
 @pytest.mark.parametrize(
     ("method", "args", "client_method", "expected"),
     [
-        ("async_set_rgb_output", (105, 2, 1), "set_rgb_output", (5, 2, True)),
-        ("async_set_rgbval", (105, 1, [1, 2, 3]), "set_rgbval", (5, 1, [1, 2, 3])),
-        ("async_set_shutterpos", (105, 1, 40), "set_shutterpos", (5, 1, 40)),
-        ("async_set_blindtilt", (105, 1, 30), "set_blindtilt", (5, 1, 30)),
-        ("async_inc_dec_counter", (105, 2, 1), "inc_dec_counter", (5, 2, 1)),
-        ("async_set_setpoint", (105, 1, 210), "set_setpoint", (5, 1, 210)),
-        ("async_set_climate_mode", (105, 1, 2), "set_climate_mode", (5, 1, 2)),
-        ("async_call_dir_command", (105, 7), "call_dir_command", (5, 7)),
-        ("async_call_vis_command", (105, 7), "call_vis_command", (5, 7)),
-        ("async_get_module_definitions", (105,), "get_module_definitions", (5,)),
-        ("async_get_module_settings", (105,), "get_module_settings", (5,)),
-        ("send_message", (105, 3), "send_message", (5, 3)),
-        ("send_message_text", (105, "hi"), "send_message_text", (5, "hi")),
-        ("send_sms", (105, 3, 9), "send_sms", (5, 3, 9)),
+        ("async_set_rgb_output", (5, 2, 1), "set_rgb_output", (5, 2, True)),
+        ("async_set_rgbval", (5, 1, [1, 2, 3]), "set_rgbval", (5, 1, [1, 2, 3])),
+        ("async_set_shutterpos", (5, 1, 40), "set_shutterpos", (5, 1, 40)),
+        ("async_set_blindtilt", (5, 1, 30), "set_blindtilt", (5, 1, 30)),
+        ("async_inc_dec_counter", (5, 2, 1), "inc_dec_counter", (5, 2, 1)),
+        ("async_set_setpoint", (5, 1, 210), "set_setpoint", (5, 1, 210)),
+        ("async_set_climate_mode", (5, 1, 2), "set_climate_mode", (5, 1, 2)),
+        ("async_call_dir_command", (5, 7), "call_dir_command", (5, 7)),
+        ("async_call_vis_command", (5, 7), "call_vis_command", (5, 7)),
+        ("async_get_module_definitions", (5,), "get_module_definitions", (5,)),
+        ("async_get_module_settings", (5,), "get_module_settings", (5,)),
+        ("send_message", (5, 3), "send_message", (5, 3)),
+        ("send_message_text", (5, "hi"), "send_message_text", (5, "hi")),
+        ("send_sms", (5, 3, 9), "send_sms", (5, 3, 9)),
     ],
 )
 async def test_mod_id_converting_passthroughs(
@@ -536,10 +529,9 @@ async def test_save_smc_file_writes_library_formatted_text() -> None:
     comm = _make_comm()
     comm._client.get_module_definitions_smc = AsyncMock(return_value="0;1;2;\r")
     comm.save_config_data = AsyncMock()
-    await comm.save_smc_file(105)
-    # mod_id 105 -> bus address 5; filename keeps the mod_id.
+    await comm.save_smc_file(5)
     comm._client.get_module_definitions_smc.assert_awaited_once_with(5)
-    assert comm.save_config_data.call_args.args == ("Module_105.smc", "0;1;2;\r")
+    assert comm.save_config_data.call_args.args == ("Module_5.smc", "0;1;2;\r")
 
 
 async def test_save_config_data_writes_via_anyio() -> None:

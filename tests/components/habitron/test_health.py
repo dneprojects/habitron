@@ -16,7 +16,7 @@ from homeassistant.helpers import issue_registry as ir
 
 def _module(uid: str = "MOD-1", name: str = "Mod") -> Module:
     """Build a v2 model module with a default (healthy) health member."""
-    return Module(uid=uid, addr=105, typ=b"\x01\x02", name=name)
+    return Module(uid=uid, addr=5, typ=b"\x01\x02", name=name)
 
 
 async def test_fault_raises_then_clears_issue(hass: HomeAssistant) -> None:

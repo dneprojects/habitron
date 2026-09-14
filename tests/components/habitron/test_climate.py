@@ -26,7 +26,7 @@ def _module(
     """Build a Smart Controller module with climate sensors/setvalues."""
     module = Module(
         uid="MOD-1",
-        addr=105,
+        addr=5,
         typ=b"\x01\x02",
         name="SC",
         mod_type="Smart Controller XL-2",
@@ -101,7 +101,7 @@ async def test_climate_set_temperature() -> None:
     coord = _coord()
     entity = HbtnClimate(_module(), coord, 0)
     await entity.async_set_temperature(**{ATTR_TEMPERATURE: 21.5})
-    coord.comm.async_set_setpoint.assert_awaited_with(105, 1, 215)
+    coord.comm.async_set_setpoint.assert_awaited_with(5, 1, 215)
     coord.async_request_refresh.assert_awaited()
 
 
@@ -112,7 +112,7 @@ async def test_climate_set_hvac_mode() -> None:
     entity = HbtnClimate(module, coord, 0)
     await entity.async_set_hvac_mode(HVACMode.COOL)
     assert module.climate_settings == 2
-    coord.comm.async_set_climate_mode.assert_awaited_with(105, 2, 1)
+    coord.comm.async_set_climate_mode.assert_awaited_with(5, 2, 1)
 
 
 async def test_async_setup_entry_emits_two_units_for_controller(

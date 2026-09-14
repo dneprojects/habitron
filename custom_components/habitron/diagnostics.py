@@ -69,7 +69,6 @@ async def async_get_config_entry_diagnostics(
         },
         "router": {
             "uid": router.uid,
-            "id": router.id,
             "name": router.name,
             "version": router.version,
             "sys_ok": router.sys_ok,

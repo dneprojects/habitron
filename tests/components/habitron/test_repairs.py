@@ -9,8 +9,8 @@ from custom_components.habitron.repairs import ModuleFaultRepairFlow, _channel_a
 from homeassistant.core import HomeAssistant
 
 
-def _module(uid: str = "MOD-1", name: str = "Mod", addr: int = 105) -> Module:
-    """Build a v2 model module (mod_id = addr - router.id)."""
+def _module(uid: str = "MOD-1", name: str = "Mod", addr: int = 5) -> Module:
+    """Build a v2 model module (mod_id = addr - 0)."""
     return Module(uid=uid, addr=addr, typ=b"\x01\x02", name=name)
 
 
@@ -30,9 +30,9 @@ def _flow(hass: HomeAssistant) -> ModuleFaultRepairFlow:
 
 def test_channel_and_peers_maps_module_to_channel() -> None:
     """The module's channel and the other modules on it are returned."""
-    router = Router(uid="R", id=100)
-    target = _module(uid="A", name="A", addr=105)  # mod_id 5
-    peer = _module(uid="B", name="B", addr=107)  # mod_id 7, same channel
+    router = Router(uid="R")
+    target = _module(uid="A", name="A", addr=5)  # mod_id 5
+    peer = _module(uid="B", name="B", addr=7)  # mod_id 7, same channel
     router.modules = [target, peer]
     router.chan_list = [[5, 7], [], [], []]
     channel, peers = _channel_and_peers(router, target)
@@ -42,8 +42,8 @@ def test_channel_and_peers_maps_module_to_channel() -> None:
 
 def test_channel_and_peers_unknown_channel() -> None:
     """A module not present in any channel yields (None, [])."""
-    router = Router(uid="R", id=100)
-    target = _module(addr=105)
+    router = Router(uid="R")
+    target = _module(addr=5)
     router.modules = [target]
     router.chan_list = [[], [], [], []]
     assert _channel_and_peers(router, target) == (None, [])
@@ -74,10 +74,10 @@ async def test_non_comm_fault_offers_and_runs_restart(hass: HomeAssistant) -> No
 
 async def test_comm_timeout_offers_and_runs_power_cycle(hass: HomeAssistant) -> None:
     """F1 offers a power-cycle/ignore menu, warns about peers, cycles the channel."""
-    module = _module(addr=105)  # mod_id 5
+    module = _module(addr=5)  # mod_id 5
     module.health.value = 0x01 | 0x10  # F1 dominates even with F16 present
-    peer = _module(uid="MOD-2", name="Neighbor", addr=106)  # mod_id 6
-    router = Router(uid="R", id=100)
+    peer = _module(uid="MOD-2", name="Neighbor", addr=6)  # mod_id 6
+    router = Router(uid="R")
     router.modules = [module, peer]
     router.chan_list = [[5, 6], [], [], []]
     coordinator = MagicMock()
@@ -98,7 +98,7 @@ async def test_comm_timeout_offers_and_runs_power_cycle(hass: HomeAssistant) -> 
 
 async def test_room_controller_comm_timeout_offers_ignore(hass: HomeAssistant) -> None:
     """F1 on a room controller shows an info step (no power cycle) and ignores."""
-    module = SmartController(uid="MOD-1", addr=105, typ=b"\x01\x02", name="Living")
+    module = SmartController(uid="MOD-1", addr=5, typ=b"\x01\x02", name="Living")
     module.health.value = 0x01  # F1
     coordinator = MagicMock()
     flow = _flow(hass)
@@ -149,9 +149,9 @@ async def test_missing_module_aborts(hass: HomeAssistant) -> None:
 
 async def test_power_cycle_unknown_channel_aborts(hass: HomeAssistant) -> None:
     """F1 on a module without a mapped channel aborts instead of guessing."""
-    module = _module(addr=105)
+    module = _module(addr=5)
     module.health.value = 0x01
-    router = Router(uid="R", id=100)
+    router = Router(uid="R")
     router.modules = [module]
     router.chan_list = [[], [], [], []]
     coordinator = MagicMock()

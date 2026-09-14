@@ -21,7 +21,7 @@ from .conftest import class_attr
 
 def _module(uid: str = "MOD-1", name: str = "Mod", **kwargs) -> Module:
     """Build a v2 model module."""
-    return Module(uid=uid, addr=105, typ=b"\x01\x02", name=name, **kwargs)
+    return Module(uid=uid, addr=5, typ=b"\x01\x02", name=name, **kwargs)
 
 
 def _stub_write(entity) -> None:
@@ -226,7 +226,7 @@ async def test_async_setup_entry_emits_entities(hass: HomeAssistant) -> None:
     """async_setup_entry creates input/motion/rain/listening + router state."""
     module = Module(
         uid="MOD-1",
-        addr=105,
+        addr=5,
         typ=b"\x01\x04",
         name="Touch 1",
         mod_type="Smart Controller Touch",
@@ -257,7 +257,7 @@ async def test_async_setup_entry_emits_entities(hass: HomeAssistant) -> None:
 
 async def test_async_setup_entry_assigns_switch_input_area(hass: HomeAssistant) -> None:
     """A switch input in a known non-module area is moved into that HA area."""
-    module = Module(uid="MOD-1", addr=105, typ=b"\x00\x00", name="In")
+    module = Module(uid="MOD-1", addr=5, typ=b"\x00\x00", name="In")
     module.inputs = [Input(name="Sw", nmbr=0, type=2, value=0, area=5)]
     router = Router(uid="ROUTER-1")
     router.modules = [module]

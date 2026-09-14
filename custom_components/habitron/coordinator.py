@@ -238,8 +238,7 @@ class HbtnCoordinator(DataUpdateCoordinator[int]):
         # media_player / assist / voice button to address the Flutter client).
         for module in self.router.modules:
             if isinstance(module, SmartController):
-                raddr = module.addr - self.router.id
-                module.stream_name = f"{slugify(module.name)}_{raddr}"
+                module.stream_name = f"{slugify(module.name)}_{module.addr}"
         await self._register_bus_devices()
         await self.comm.reinit_hub(1)
 
@@ -304,7 +303,6 @@ class HbtnCoordinator(DataUpdateCoordinator[int]):
         await self.comm.send_devregid(0, rt_dev.id)
 
         for module in router.modules:
-            raddr = module.addr - router.id
             # The bus area is only ever *suggested*, never written: HA applies
             # ``suggested_area`` when it first creates the device and ignores it
             # afterwards, so a user's own area assignment survives every reload.
@@ -315,7 +313,7 @@ class HbtnCoordinator(DataUpdateCoordinator[int]):
             area_name = _area_name(router, module.area)
             dev = dev_reg.async_get_or_create(
                 config_entry_id=self.entry.entry_id,
-                configuration_url=self._conf_url(f"/module-{raddr}"),
+                configuration_url=self._conf_url(f"/module-{module.addr}"),
                 identifiers={(DOMAIN, module.uid)},
                 manufacturer=MANUFACTURER,
                 suggested_area=area_name,
@@ -325,7 +323,7 @@ class HbtnCoordinator(DataUpdateCoordinator[int]):
                 hw_version=module.hw_version,
                 via_device_id=rt_dev.id,
             )
-            await self.comm.send_devregid(raddr, dev.id)
+            await self.comm.send_devregid(module.addr, dev.id)
 
     async def update(self) -> None:
         """Refresh the hub's own host readings.
@@ -363,14 +361,8 @@ class HbtnCoordinator(DataUpdateCoordinator[int]):
         ver_string = resp.decode("iso8859-1")
         return ver_string[9:] if ver_string.startswith("SmartIP") else "0.0.0"
 
-    async def restart(self, rt_id: int) -> None:
-        """Restart hub.
-
-        ``rt_id`` is accepted for forward compatibility with multi-router
-        setups but is unused today — the bus protocol exposes a single
-        ``hub_restart`` command without a target selector.
-        """
-        del rt_id
+    async def restart(self) -> None:
+        """Restart hub."""
         await self.comm.hub_restart()
 
     async def reboot(self) -> None:
@@ -453,8 +445,8 @@ class HbtnFirmwareCoordinator(DataUpdateCoordinator[dict[str, tuple[str, str]]])
 
     async def _read_target(self, target: Router | Module) -> None:
         """Read installed/latest firmware for a single target into data."""
-        # Module addr is raddr + 100; the router has no raddr (uses 0).
-        addr = (target.addr - 100) if isinstance(target, Module) else 0
+        # The router answers as address 0; a module by its own bus address.
+        addr = target.addr if isinstance(target, Module) else 0
         try:
             resp = await self.comm.handle_firmware(addr)
         except (OSError, ConnectionError, HabitronError) as err:

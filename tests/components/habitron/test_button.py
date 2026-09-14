@@ -44,7 +44,7 @@ def _hub_coord() -> MagicMock:
 
 
 def _module() -> Module:
-    return Module(uid="MOD-1", addr=105, typ=b"\x01\x02", name="SC")
+    return Module(uid="MOD-1", addr=5, typ=b"\x01\x02", name="SC")
 
 
 async def test_coll_cmd_button() -> None:
@@ -62,7 +62,7 @@ async def test_dir_cmd_button() -> None:
     entity = DirCmdButton(HbtnCommand(name="Scene", nmbr=2), _module(), coordinator)
     assert entity.unique_id == "MOD-1_direct_command_2"
     await entity.async_press()
-    coordinator.comm.async_call_dir_command.assert_awaited_with(105, 2)
+    coordinator.comm.async_call_dir_command.assert_awaited_with(5, 2)
 
 
 async def test_vis_cmd_button() -> None:
@@ -71,7 +71,7 @@ async def test_vis_cmd_button() -> None:
     entity = VisCmdButton(HbtnCommand(name="Vis", nmbr=258), _module(), coordinator)
     assert entity._attr_name == "VisCmd 1/2: Vis"
     await entity.async_press()
-    coordinator.comm.async_call_vis_command.assert_awaited_with(105, 258)
+    coordinator.comm.async_call_vis_command.assert_awaited_with(5, 258)
 
 
 async def test_restart_button_module_and_router() -> None:
@@ -79,7 +79,7 @@ async def test_restart_button_module_and_router() -> None:
     coordinator = _hub_coord()
     mod_btn = RestartButton(_module(), coordinator)
     await mod_btn.async_press()
-    coordinator.comm.module_restart.assert_awaited_with(5)  # 105 - 100
+    coordinator.comm.module_restart.assert_awaited_with(5)
     rt_btn = RestartButton(coordinator.router, coordinator)
     await rt_btn.async_press()
     coordinator.comm.module_restart.assert_awaited_with(0)
@@ -91,10 +91,10 @@ async def test_count_up_down_buttons() -> None:
     logic = Logic(name="Cnt", nmbr=0, idx=0, type=5)
     up = CountUpButton(logic, _module(), coordinator)
     await up.async_press()
-    coordinator.comm.async_inc_dec_counter.assert_awaited_with(105, 1, 1)
+    coordinator.comm.async_inc_dec_counter.assert_awaited_with(5, 1, 1)
     down = CountDownButton(logic, _module(), coordinator)
     await down.async_press()
-    coordinator.comm.async_inc_dec_counter.assert_awaited_with(105, 1, 2)
+    coordinator.comm.async_inc_dec_counter.assert_awaited_with(5, 1, 2)
 
 
 async def test_router_restart_buttons() -> None:
@@ -105,7 +105,7 @@ async def test_router_restart_buttons() -> None:
     await RestartAllButton(coordinator.router, coordinator).async_press()
     coordinator.comm.module_restart.assert_awaited_with(0xFF)
     await RestartHubButton(coordinator).async_press()
-    coordinator.restart.assert_awaited_with(coordinator.router.id)
+    coordinator.restart.assert_awaited_with()
     await RebootHubButton(coordinator).async_press()
     coordinator.reboot.assert_awaited()
 
@@ -131,7 +131,7 @@ async def test_speech_button_sends_activate() -> None:
     provider.assist_satellites = {"touch_1": satellite}
     coordinator.ws_provider = provider
 
-    module = SmartController(uid="MOD-T", addr=104, typ=b"\x01\x04", name="Touch")
+    module = SmartController(uid="MOD-T", addr=4, typ=b"\x01\x04", name="Touch")
     module.stream_name = "touch_1"
     entity = SpeechButton(module, coordinator)
     await entity.async_press()

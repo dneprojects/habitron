@@ -26,9 +26,7 @@ def _fw_coord() -> MagicMock:
 
 
 def _module() -> Module:
-    return Module(
-        uid="MOD-1", addr=105, typ=b"\x0a\x01", name="Out", sw_version="1.2.0"
-    )
+    return Module(uid="MOD-1", addr=5, typ=b"\x0a\x01", name="Out", sw_version="1.2.0")
 
 
 # ---------------------------------------------------------------------------
@@ -61,7 +59,7 @@ async def test_module_update_install_module() -> None:
     entity.async_write_ha_state = MagicMock()
     with patch("custom_components.habitron.update.sleep", new=AsyncMock()):
         await entity.async_install("1.3.0", backup=False)
-    coord.comm.update_firmware.assert_awaited_with(105)
+    coord.comm.update_firmware.assert_awaited_with(5)
     assert entity.installed_version == "1.3.0"
 
 
@@ -73,7 +71,7 @@ async def test_module_update_install_router() -> None:
     entity.async_write_ha_state = MagicMock()
     with patch("custom_components.habitron.update.sleep", new=AsyncMock()):
         await entity.async_install("2.1.0", backup=False)
-    coord.comm.update_firmware.assert_awaited_with(router.id)
+    coord.comm.update_firmware.assert_awaited_with(0)
 
 
 # ---------------------------------------------------------------------------
@@ -91,7 +89,7 @@ def _hub_coord() -> MagicMock:
 
 def test_sctouch_app_update_defaults() -> None:
     """The Touch app update entity exposes a stable id and default version."""
-    module = Module(uid="MOD-T", addr=104, typ=b"\x01\x04", name="Touch")
+    module = Module(uid="MOD-T", addr=4, typ=b"\x01\x04", name="Touch")
     entity = SCTouchAppUpdate(module, _hub_coord())
     assert entity.unique_id == "MOD-T_app_update"
     assert entity.installed_version == "0.0.0"
@@ -100,7 +98,7 @@ def test_sctouch_app_update_defaults() -> None:
 
 async def test_sctouch_app_install_without_version_raises() -> None:
     """Install raises when no latest APK version is known."""
-    module = Module(uid="MOD-T", addr=104, typ=b"\x01\x04", name="Touch")
+    module = Module(uid="MOD-T", addr=4, typ=b"\x01\x04", name="Touch")
     entity = SCTouchAppUpdate(module, _hub_coord())
     entity._attr_latest_version = None
     with pytest.raises(HomeAssistantError):
@@ -120,7 +118,7 @@ async def test_sctouch_app_install_sends_absolute_url(
     apk.write_bytes(b"payload")
     expected_checksum = hashlib.sha256(b"payload").hexdigest()
 
-    module = Module(uid="MOD-T", addr=104, typ=b"\x01\x04", name="Touch")
+    module = Module(uid="MOD-T", addr=4, typ=b"\x01\x04", name="Touch")
     coordinator = _hub_coord()
     coordinator.hass = hass
     provider = MagicMock()
@@ -154,7 +152,7 @@ async def test_sctouch_app_install_sends_absolute_url(
 async def test_async_setup_entry_emits_updates(hass: HomeAssistant) -> None:
     """Setup emits a router + per-module firmware update and a Touch app update."""
     module = _module()
-    touch = Module(uid="MOD-T", addr=104, typ=b"\x01\x04", name="Touch")
+    touch = Module(uid="MOD-T", addr=4, typ=b"\x01\x04", name="Touch")
     router = Router(uid="ROUTER-1", version="2.0.0")
     router.modules = [module, touch]
     coordinator = _hub_coord()
@@ -181,7 +179,7 @@ async def test_async_setup_entry_emits_updates(hass: HomeAssistant) -> None:
 
 def _touch_app_entity() -> SCTouchAppUpdate:
     """A Touch app update entity, detached from any hub."""
-    module = Module(uid="MOD-T", addr=104, typ=b"\x01\x04", name="Touch")
+    module = Module(uid="MOD-T", addr=4, typ=b"\x01\x04", name="Touch")
     return SCTouchAppUpdate(module, _hub_coord())
 
 

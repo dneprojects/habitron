@@ -13,7 +13,7 @@ from homeassistant.helpers import entity_registry as er
 
 
 def _gsm_module() -> Module:
-    module = Module(uid="MOD-GSM", addr=105, typ=b"\x1e\x03", name="GSM")
+    module = Module(uid="MOD-GSM", addr=5, typ=b"\x1e\x03", name="GSM")
     module.messages = [HbtnCommand(name="Alarm", nmbr=3)]
     module.gsm_numbers = [HbtnCommand(name="0170 1234", nmbr=1)]
     return module
@@ -39,7 +39,7 @@ async def test_gsm_message_sends_known_message() -> None:
     module = _gsm_module()
     entity = HbtnGSMMessage(module, module.gsm_numbers[0], comm)
     await entity.async_send_message("Alarm")
-    comm.send_sms.assert_awaited_with(105, 3, 1)
+    comm.send_sms.assert_awaited_with(5, 3, 1)
 
 
 async def test_gsm_message_unknown_text_skipped() -> None:
@@ -82,7 +82,7 @@ async def test_send_message_service_reaches_bus(
     then a real service call routes the (resolved) message id to the bus client.
     """
     module = _gsm_module()
-    router = Router(uid="rt_1", id=100)
+    router = Router(uid="rt_1")
     router.modules = [module]
     _entry, client = await real_setup(router)
 

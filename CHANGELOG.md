@@ -3,6 +3,11 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.4.3b3
+- Beta. A module is now addressed by its own address on the bus. It used to be that address plus 100, a leftover from a time when several routers were planned; every command had to undo it again. Nothing about your setup changes -- devices, entities and their history keep their ids -- but please report anything that stops reacting.
+- Fixed: the router firmware update addressed the wrong target. Reading a firmware version and installing one disagreed about how to address the router and the modules, so one of the two was always wrong.
+- Uses habitron_client 2.2.0.
+
 ## v3.4.3b2
 - Beta. Internal restructuring, no change in behaviour that you should notice: the integration's own SmartHub class is gone and the update coordinator now owns the connection and the device model, matching the version being prepared for Home Assistant core. Please report anything that stopped working.
 - The two hub percentage sensors are now labelled "Memory usage" and "Disk usage". They always reported *used* space, so the old "free" labels said the opposite of what the value means. Entity ids are unchanged, and a name you set yourself is kept.

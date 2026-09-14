@@ -130,7 +130,7 @@ def _make_fw_comm(resp: bytes = b"1.0.0\n2.0.0") -> MagicMock:
     """Stub comm with a router + one module, both reachable via handle_firmware."""
     comm = MagicMock()
     router = Router(uid="ROUTER-1", name="Router")
-    router.modules = [Module(uid="MOD-1", addr=105, typ=b"\x01\x02", name="Mod 1")]
+    router.modules = [Module(uid="MOD-1", addr=5, typ=b"\x01\x02", name="Mod 1")]
     comm.router = router
     comm.handle_firmware = AsyncMock(return_value=resp)
     return comm

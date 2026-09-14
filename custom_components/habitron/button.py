@@ -151,8 +151,7 @@ class RestartButton(ButtonEntity):
     async def async_press(self) -> None:
         """Handle the button press."""
         if isinstance(self._target, Module):
-            raddr = self._target.addr - self._smhub.router.id
-            await self._smhub.comm.module_restart(raddr)
+            await self._smhub.comm.module_restart(self._target.addr)
         else:
             await self._smhub.comm.module_restart(0)
 
@@ -211,7 +210,7 @@ class RestartHubButton(ButtonEntity):
 
     async def async_press(self) -> None:
         """Handle the button press."""
-        await self._smhub.restart(self._smhub.router.id)
+        await self._smhub.restart()
 
 
 class RebootHubButton(ButtonEntity):

@@ -398,7 +398,9 @@ class HbtnModuleUpdate(CoordinatorEntity[HbtnFirmwareCoordinator], UpdateEntity)
         await sleep(0.1)
         try:
             if isinstance(self._module, Router):
-                await self.coordinator.comm.update_firmware(self._module.id)
+                # The router answers as address 0, like it does for a
+                # firmware read or a restart.
+                await self.coordinator.comm.update_firmware(0)
                 self._module.version = version or ""
             else:
                 await self.coordinator.comm.update_firmware(self._module.addr)

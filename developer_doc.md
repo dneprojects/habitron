@@ -4,6 +4,43 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.4.3b3
+
+### `Module.addr` is the bus address
+`habitron_client` 2.2.0 stops offsetting module addresses by the router id. The
+parser built `raddr + 100`, and `async_build_system`, `apply_event` and
+`distribute_status` each subtracted it again -- as did this integration before
+every command, through `HbtnComm._convert_mod_id`. The offset carried no
+information: `build_router` hard-coded `id=100` and nothing ever read a router
+id off the bus. There is one router, and it answers as address 0.
+
+`_convert_mod_id` and its 19 call sites are gone. So are `router.id` in
+`switch.py` (the router flag target, which resolved to 0 via the subtraction and
+now says 0), `repairs.py` (channel/peer lookup), `button.py`, the firmware
+coordinator and `ws_provider/provider.py` (the Touch stream name).
+
+Identity is untouched: `Module.uid` was always built from the bus address and is
+replaced by the hardware version where one is reported, so device and entity ids
+are unchanged and nothing migrates.
+
+### Firmware addressing disagreed with itself
+`HbtnFirmwareCoordinator._read_target` addressed `target.addr - 100` for a module
+and `0` for the router; `update.py` addressed `module.addr` (i.e. `+100`) and
+`router.id` (i.e. `100`). Reading and installing therefore used different targets
+and only one of them can have been right. Both now use `module.addr`, and `0` for
+the router. **Worth verifying against real hardware** -- it is not clear from the
+code alone which of the two paths was the broken one.
+
+### The command layer, after the move
+`communicate.py` stays. With the conversions gone, most of its 33 command methods
+are plain forwards, but four still adapt: the daytime/alarm modes encode to
+`0x40`..`0x43`, the LED output is offset by the module's output count, and the
+analogue output maps to dimmer channel 3. The data-fetch half (CRC dedupe in
+`get_compact_status`, `get_module_status` and `handle_firmware`) and the config
+file writers hold real state and are not forwards at all. Moving the four
+remaining wire-semantics methods into the library would leave the integration
+free of bus protocol knowledge; the rest belongs where it is.
+
 ## v3.4.3b2
 
 ### The SmartHub class is gone; the coordinator owns the model

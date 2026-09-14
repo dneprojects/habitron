@@ -14,7 +14,7 @@ from homeassistant.core import HomeAssistant
 
 
 def _module(uid: str = "MOD-1", **kwargs) -> Module:
-    return Module(uid=uid, addr=105, typ=b"\x01\x02", name="Mod", **kwargs)
+    return Module(uid=uid, addr=5, typ=b"\x01\x02", name="Mod", **kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -114,7 +114,7 @@ async def test_async_setup_entry_emits_events(hass: HomeAssistant) -> None:
     btn_module = _module(uid="MOD-1")
     btn_module.inputs = [Input(name="Btn", nmbr=0, type=1, value=0)]
     ekey = Module(
-        uid="MOD-EK", addr=106, typ=b"\x1e\x01", name="eKey", mod_type="Fanekey"
+        uid="MOD-EK", addr=6, typ=b"\x1e\x01", name="eKey", mod_type="Fanekey"
     )
     ekey.fingers = [Finger(name="Finger", nmbr=0, type=2)]
     ekey.ids = [HbtnCommand(name="Alice", nmbr=5)]

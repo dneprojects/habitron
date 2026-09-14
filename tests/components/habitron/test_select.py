@@ -33,7 +33,7 @@ def _router() -> Router:
 
 def _module(mode: int = 0x21, group: int = 3) -> Module:
     module = Module(
-        uid="MOD-1", addr=105, typ=b"\x01\x02", name="SC", mod_type="Smart Controller"
+        uid="MOD-1", addr=5, typ=b"\x01\x02", name="SC", mod_type="Smart Controller"
     )
     module.mode.value = mode
     module.group = group
@@ -304,7 +304,7 @@ def test_group_mode_zero_value_hotfix() -> None:
 
 
 def _message_module() -> Module:
-    module = Module(uid="MOD-RC", addr=101, typ=b"\x01\x01", name="RC")
+    module = Module(uid="MOD-RC", addr=1, typ=b"\x01\x01", name="RC")
     module.messages = [
         HbtnCommand(name="Alarm", nmbr=3),
         HbtnCommand(name="Doorbell", nmbr=7),

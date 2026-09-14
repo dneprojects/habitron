@@ -79,8 +79,7 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
                 and module.mod_type == "Smart Controller Touch"
             ):
                 continue
-            raddr = module.addr - self.rtr.id
-            if f"{slugify(module.name)}_{raddr}" == stream_name:
+            if f"{slugify(module.name)}_{module.addr}" == stream_name:
                 return module
         return None
 

@@ -19,7 +19,7 @@ from .conftest import class_attr
 
 def _module(uid: str = "MOD-1", typ: bytes = b"\x0a\x14", **kwargs) -> Module:
     """Build a v2 model module (Smart Dimm by default, out_offs 0)."""
-    return Module(uid=uid, addr=105, typ=typ, name="Mod", **kwargs)
+    return Module(uid=uid, addr=5, typ=typ, name="Mod", **kwargs)
 
 
 def _coord() -> MagicMock:
@@ -82,9 +82,9 @@ async def test_switched_light_turn_on_off() -> None:
     coord = _coord()
     entity = SwitchedLight(Output(name="Lamp", nmbr=0, type=2), _module(), coord, 0)
     await entity.async_turn_on()
-    coord.comm.async_set_output.assert_awaited_with(105, 1, 1)
+    coord.comm.async_set_output.assert_awaited_with(5, 1, 1)
     await entity.async_turn_off()
-    coord.comm.async_set_output.assert_awaited_with(105, 1, 0)
+    coord.comm.async_set_output.assert_awaited_with(5, 1, 0)
 
 
 # ---------------------------------------------------------------------------
@@ -110,7 +110,7 @@ async def test_dimmed_output_turn_on_with_brightness() -> None:
     module.dimmers = [Dimmer(name="D", nmbr=0, type=2)]
     entity = DimmedOutput(Output(name="L", nmbr=0, type=2), module, coord, 0)
     await entity.async_turn_on(**{ATTR_BRIGHTNESS: 255})
-    coord.comm.async_set_dimmval.assert_awaited_with(105, 1, 100)
+    coord.comm.async_set_dimmval.assert_awaited_with(5, 1, 100)
 
 
 def test_dimmed_output_controller_offset() -> None:
@@ -236,7 +236,7 @@ async def test_color_light_turn_on_sets_rgb() -> None:
     await entity.async_turn_on(**{ATTR_RGB_COLOR: (200, 100, 0), ATTR_BRIGHTNESS: 255})
     assert cled.is_on is True
     assert cled.rgb == [200, 100, 1, 0]  # blue channel clamped to min 1
-    coord.comm.async_set_rgbval.assert_awaited_with(105, 1, [200, 100, 1])
+    coord.comm.async_set_rgbval.assert_awaited_with(5, 1, [200, 100, 1])
 
 
 async def test_color_light_turn_off() -> None:
@@ -247,7 +247,7 @@ async def test_color_light_turn_off() -> None:
     entity = HbtnColorLight(cled, _module(), coord, 0)
     await entity.async_turn_off()
     assert cled.is_on is False
-    coord.comm.async_set_rgb_output.assert_awaited_with(105, 1, 0)
+    coord.comm.async_set_rgb_output.assert_awaited_with(5, 1, 0)
 
 
 # ---------------------------------------------------------------------------
@@ -257,7 +257,7 @@ async def test_color_light_turn_off() -> None:
 
 async def test_async_setup_entry_emits_dimmer_and_color(hass: HomeAssistant) -> None:
     """async_setup_entry creates dimmed outputs and colour LEDs."""
-    module = Module(uid="MOD-1", addr=105, typ=b"\x01\x04", name="Touch")
+    module = Module(uid="MOD-1", addr=5, typ=b"\x01\x04", name="Touch")
     module.outputs = [Output(name="Dim", nmbr=0, type=2)]
     module.dimmers = [Dimmer(name="Dim", nmbr=0, type=2)]
     module.color_leds = [ColorLed(name="", nmbr=0, type=4, rgb=[0, 0, 0, 0])]

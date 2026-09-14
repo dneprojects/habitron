@@ -65,13 +65,13 @@ def _resolve_module(
 
 def _channel_and_peers(router: Router, module: Module) -> tuple[int | None, list[str]]:
     """Return the module's router channel (1..4) and the other modules on it."""
-    mod_id = module.addr - router.id
+    mod_id = module.addr
     for channel, mod_ids in enumerate(router.chan_list, start=1):
         if mod_id in mod_ids:
             peers = [
                 peer.name
                 for peer in router.modules
-                if peer.uid != module.uid and (peer.addr - router.id) in mod_ids
+                if peer.uid != module.uid and peer.addr in mod_ids
             ]
             return channel, peers
     return None, []

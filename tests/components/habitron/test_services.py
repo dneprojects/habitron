@@ -38,7 +38,7 @@ def _hub(host: str = "1.2.3.4") -> MagicMock:
         "update_entity",
     ):
         setattr(hub.comm, method, AsyncMock())
-    hub.router = Router(uid="rt_1", id=100)
+    hub.router = Router(uid="rt_1")
     hub.ws_provider = None
     return hub
 
@@ -82,7 +82,7 @@ async def test_restart_module_and_router() -> None:
     hub = _hub()
     with patch(_TARGETED, AsyncMock(return_value=[hub])):
         await _async_restart_module(_call(_hass([_entry(hub)]), {"mod_nmbr": 5}))
-        hub.comm.module_restart.assert_awaited_with(105)
+        hub.comm.module_restart.assert_awaited_with(5)
         await _async_restart_router(_call(_hass([_entry(hub)]), {}))
         hub.comm.module_restart.assert_awaited_with(0)
 
@@ -92,7 +92,7 @@ async def test_save_module_smc() -> None:
     hub = _hub()
     with patch(_TARGETED, AsyncMock(return_value=[hub])):
         await _async_save_module_smc(_call(_hass([_entry(hub)]), {"mod_nmbr": 3}))
-    hub.comm.save_smc_file.assert_awaited_with(103)
+    hub.comm.save_smc_file.assert_awaited_with(3)
 
 
 # ---------------------------------------------------------------------------
@@ -137,7 +137,7 @@ async def test_update_entity_unknown_host_ignored() -> None:
 
 def _touch_hub() -> MagicMock:
     hub = _hub()
-    module = Module(uid="MOD-T", addr=104, typ=b"\x01\x04", name="Touch")
+    module = Module(uid="MOD-T", addr=4, typ=b"\x01\x04", name="Touch")
     module.stream_name = "touch_1"
     hub.router.modules = [module]
     hub.ws_provider = MagicMock()
@@ -207,9 +207,9 @@ async def test_sc_system_command_service_dispatches_to_touch_module(
     Touch module (registered as a device), then a real ``hass.services.async_call``
     resolves that device and forwards the command to the module's ws provider.
     """
-    module = Module(uid="MOD-T", addr=104, typ=b"\x01\x04", name="Touch")
+    module = Module(uid="MOD-T", addr=4, typ=b"\x01\x04", name="Touch")
     module.stream_name = "touch_1"
-    router = Router(uid="rt_1", id=100)
+    router = Router(uid="rt_1")
     router.modules = [module]
 
     entry, _client = await real_setup(router)

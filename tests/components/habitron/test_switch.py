@@ -21,7 +21,7 @@ from .conftest import class_attr
 # ---------------------------------------------------------------------------
 
 
-def _module(uid: str = "MOD-1", addr: int = 105, name: str = "Mod", **kwargs) -> Module:
+def _module(uid: str = "MOD-1", addr: int = 5, name: str = "Mod", **kwargs) -> Module:
     """Build a v2 model module with sensible defaults."""
     return Module(uid=uid, addr=addr, typ=b"\x01\x02", name=name, **kwargs)
 
@@ -83,7 +83,7 @@ async def test_switched_output_turn_on_forwards_to_comm() -> None:
     coord = _coord()
     entity = SwitchedOutput(coord, _module(), Output(name="Out 1", nmbr=0, type=1), 0)
     await entity.async_turn_on()
-    coord.comm.async_set_output.assert_awaited_with(105, 1, 1)
+    coord.comm.async_set_output.assert_awaited_with(5, 1, 1)
 
 
 async def test_switched_output_turn_off_forwards_to_comm() -> None:
@@ -91,7 +91,7 @@ async def test_switched_output_turn_off_forwards_to_comm() -> None:
     coord = _coord()
     entity = SwitchedOutput(coord, _module(), Output(name="Out 1", nmbr=0, type=1), 0)
     await entity.async_turn_off()
-    coord.comm.async_set_output.assert_awaited_with(105, 1, 0)
+    coord.comm.async_set_output.assert_awaited_with(5, 1, 0)
 
 
 async def test_switched_output_listener_lifecycle() -> None:
@@ -149,9 +149,9 @@ async def test_switched_led_turn_on_off() -> None:
     coord = _coord()
     entity = SwitchedLed(coord, _module(), Led(name="r", nmbr=2, type=0), 0)
     await entity.async_turn_on()
-    coord.comm.async_set_led_outp.assert_awaited_with(105, 2, 1)
+    coord.comm.async_set_led_outp.assert_awaited_with(5, 2, 1)
     await entity.async_turn_off()
-    coord.comm.async_set_led_outp.assert_awaited_with(105, 2, 0)
+    coord.comm.async_set_led_outp.assert_awaited_with(5, 2, 0)
 
 
 # ---------------------------------------------------------------------------
@@ -163,15 +163,15 @@ async def test_habitron_flag_module_path() -> None:
     """A module flag uses the module address; is_on tracks the value."""
     coord = _coord()
     flag = Flag(name="F", nmbr=5, value=0)
-    entity = HbtnFlag(coord, flag, device_uid="MOD-1", mod_addr=105, idx=0)
+    entity = HbtnFlag(coord, flag, device_uid="MOD-1", mod_addr=5, idx=0)
     assert entity.unique_id == "MOD-1_flag_5"
     assert entity.is_on is False
     await entity.async_turn_on()
-    coord.comm.async_set_flag.assert_awaited_with(105, 5, 1)
+    coord.comm.async_set_flag.assert_awaited_with(5, 5, 1)
     flag.value = 1
     assert entity.is_on is True
     await entity.async_turn_off()
-    coord.comm.async_set_flag.assert_awaited_with(105, 5, 0)
+    coord.comm.async_set_flag.assert_awaited_with(5, 5, 0)
 
 
 async def test_habitron_flag_router_path() -> None:
@@ -186,7 +186,7 @@ async def test_habitron_flag_router_path() -> None:
 async def test_habitron_flag_listener_lifecycle() -> None:
     """HbtnFlag subscribes/unsubscribes its flag listener."""
     flag = Flag(name="F", nmbr=1, value=0)
-    entity = HbtnFlag(_coord(), flag, device_uid="MOD-1", mod_addr=105, idx=0)
+    entity = HbtnFlag(_coord(), flag, device_uid="MOD-1", mod_addr=5, idx=0)
     with (
         patch(
             "homeassistant.helpers.update_coordinator."
@@ -301,7 +301,7 @@ async def test_async_setup_entry_emits_all_entity_types(hass: HomeAssistant) -> 
     """async_setup_entry creates output/led/flag/climate/microphone + router flag."""
     module = Module(
         uid="MOD-MIC",
-        addr=105,
+        addr=5,
         typ=b"\x01\x05",
         name="Touch 1",
         mod_type="Smart Controller Touch",
@@ -309,7 +309,7 @@ async def test_async_setup_entry_emits_all_entity_types(hass: HomeAssistant) -> 
     module.outputs = [Output(name="Out", nmbr=0, type=1)]
     module.leds = [Led(name="white", nmbr=0, type=0), Led(name="", nmbr=1, type=0)]
     module.flags = [Flag(name="F", nmbr=1, value=0)]
-    router = Router(uid="ROUTER-1", id=7)
+    router = Router(uid="ROUTER-1")
     router.modules = [module]
     router.flags = [Flag(name="RF", nmbr=1, value=0)]
     router.areas = [Area(nmbr=0, name="House")]
@@ -331,7 +331,7 @@ async def test_async_setup_entry_emits_all_entity_types(hass: HomeAssistant) -> 
 
 async def test_async_setup_entry_skips_cled_zero_for_rgb(hass: HomeAssistant) -> None:
     """For typ b"\x01\x04" the CLED 0 (ambient) is skipped."""  # noqa: D301
-    module = Module(uid="MOD-RGB", addr=105, typ=b"\x01\x04", name="Touch")
+    module = Module(uid="MOD-RGB", addr=5, typ=b"\x01\x04", name="Touch")
     module.leds = [Led(name="w", nmbr=0, type=0), Led(name="r", nmbr=1, type=0)]
     router = Router(uid="ROUTER-1")
     router.modules = [module]
@@ -347,7 +347,7 @@ async def test_async_setup_entry_skips_cled_zero_for_rgb(hass: HomeAssistant) ->
 
 async def test_async_setup_entry_assigns_external_area(hass: HomeAssistant) -> None:
     """An output in a known, non-module area is moved into that HA area."""
-    module = Module(uid="MOD-AL", addr=105, typ=b"\x00\x00", name="Out")
+    module = Module(uid="MOD-AL", addr=5, typ=b"\x00\x00", name="Out")
     module.outputs = [Output(name="Out 1", nmbr=0, type=1, area=5)]
     router = Router(uid="ROUTER-1")
     router.modules = [module]
@@ -367,7 +367,7 @@ async def test_async_setup_entry_unknown_area_clamped_to_default(
     hass: HomeAssistant,
 ) -> None:
     """An out-of-range area index is reset to the no-area default."""
-    module = Module(uid="MOD-OV", addr=105, typ=b"\x00\x00", name="Out")
+    module = Module(uid="MOD-OV", addr=5, typ=b"\x00\x00", name="Out")
     module.outputs = [Output(name="Out 1", nmbr=0, type=1, area=99)]
     router = Router(uid="ROUTER-1")
     router.modules = [module]

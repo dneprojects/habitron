@@ -206,10 +206,6 @@ class HbtnComm:
         else:
             return True
 
-    def _convert_mod_id(self, mod_id: int) -> int:
-        """Helper to calculate module address."""
-        return int(mod_id - 100)
-
     async def send_network_info(self, tok: str) -> None:
         """Send home assistant ipv4."""
         await self.client.send_network_info(
@@ -350,7 +346,7 @@ class HbtnComm:
 
     async def async_set_output(self, mod_id: int, nmbr: int, val: int) -> None:
         """Send turn_on/turn_off command."""
-        await self.client.set_output(self._convert_mod_id(mod_id), nmbr, bool(val))
+        await self.client.set_output(mod_id, nmbr, bool(val))
 
     async def async_set_led_outp(self, mod_id: int, nmbr: int, val: int) -> None:
         """Translate led nmbr to output nmbr and send on/off command."""
@@ -362,35 +358,35 @@ class HbtnComm:
 
     async def async_set_dimmval(self, mod_id: int, nmbr: int, val: int) -> None:
         """Send value to dimm output."""
-        await self.client.set_dimmval(self._convert_mod_id(mod_id), nmbr, val)
+        await self.client.set_dimmval(mod_id, nmbr, val)
 
     async def async_set_rgb_output(self, mod_id: int, nmbr: int, val: int) -> None:
         """Turn RGB light on/off."""
-        await self.client.set_rgb_output(self._convert_mod_id(mod_id), nmbr, bool(val))
+        await self.client.set_rgb_output(mod_id, nmbr, bool(val))
 
     async def async_set_rgbval(self, mod_id: int, nmbr: int, val: list[int]) -> None:
         """Send value to dimm output."""
-        await self.client.set_rgbval(self._convert_mod_id(mod_id), nmbr, val)
+        await self.client.set_rgbval(mod_id, nmbr, val)
 
     async def async_set_shutterpos(self, mod_id: int, nmbr: int, val: int) -> None:
         """Send value to dimm output."""
-        await self.client.set_shutterpos(self._convert_mod_id(mod_id), nmbr, val)
+        await self.client.set_shutterpos(mod_id, nmbr, val)
 
     async def async_set_blindtilt(self, mod_id: int, nmbr: int, val: int) -> None:
         """Send value to dimm output."""
-        await self.client.set_blindtilt(self._convert_mod_id(mod_id), nmbr, val)
+        await self.client.set_blindtilt(mod_id, nmbr, val)
 
     async def async_set_flag(self, mod_id: int, nmbr: int, val: int) -> None:
         """Send flag on/flag off command."""
-        await self.client.set_flag(self._convert_mod_id(mod_id), nmbr, bool(val))
+        await self.client.set_flag(mod_id, nmbr, bool(val))
 
     async def async_inc_dec_counter(self, mod_id: int, nmbr: int, val: int) -> None:
         """Send flag on/flag off command."""
-        await self.client.inc_dec_counter(self._convert_mod_id(mod_id), nmbr, val)
+        await self.client.inc_dec_counter(mod_id, nmbr, val)
 
     async def async_set_setpoint(self, mod_id: int, nmbr: int, val: int) -> None:
         """Send two byte value for setpoint definition."""
-        await self.client.set_setpoint(self._convert_mod_id(mod_id), nmbr, val)
+        await self.client.set_setpoint(mod_id, nmbr, val)
 
     async def async_set_analog_val(self, mod_id: int, nmbr: int, val: int) -> None:
         """Send byte value for analog output definition."""
@@ -398,15 +394,15 @@ class HbtnComm:
 
     async def async_set_climate_mode(self, mod_id: int, cmode: int, ctl12: int) -> None:
         """Set climate mode for given module."""
-        await self.client.set_climate_mode(self._convert_mod_id(mod_id), cmode, ctl12)
+        await self.client.set_climate_mode(mod_id, cmode, ctl12)
 
     async def async_call_dir_command(self, mod_id: int, nmbr: int) -> None:
         """Call of direct command of nmbr."""
-        await self.client.call_dir_command(self._convert_mod_id(mod_id), nmbr)
+        await self.client.call_dir_command(mod_id, nmbr)
 
     async def async_call_vis_command(self, mod_id: int, nmbr: int) -> None:
         """Call of visualization command of nmbr."""
-        await self.client.call_vis_command(self._convert_mod_id(mod_id), nmbr)
+        await self.client.call_vis_command(mod_id, nmbr)
 
     async def async_call_coll_command(self, nmbr: int) -> None:
         """Call collective command of nmbr."""
@@ -422,9 +418,7 @@ class HbtnComm:
 
     async def get_module_status(self, mod_id: int) -> bytes:
         """Get compact status for all modules, if changed crc."""
-        resp_bytes, crc = await self.client.get_module_status(
-            self._convert_mod_id(mod_id)
-        )
+        resp_bytes, crc = await self.client.get_module_status(mod_id)
         key = f"modstat:{mod_id}"
         if crc == self._stream_crc.get(key):
             return b""
@@ -433,11 +427,11 @@ class HbtnComm:
 
     async def async_get_module_definitions(self, mod_id: int) -> bytes:
         """Get summary of Habitron module: names, commands, etc."""
-        return await self.client.get_module_definitions(self._convert_mod_id(mod_id))
+        return await self.client.get_module_definitions(mod_id)
 
     async def async_get_module_settings(self, mod_id: int) -> bytes:
         """Get settings of Habitron module."""
-        return await self.client.get_module_settings(self._convert_mod_id(mod_id))
+        return await self.client.get_module_settings(mod_id)
 
     async def save_module_status(self, mod_id: int) -> None:
         """Get module module status and saves it to file."""
@@ -457,7 +451,7 @@ class HbtnComm:
         The library formats the raw definition block (and validates its framing)
         so the integration only writes the resulting text.
         """
-        smc = await self.client.get_module_definitions_smc(self._convert_mod_id(mod_id))
+        smc = await self.client.get_module_definitions_smc(mod_id)
         await self.save_config_data(f"Module_{mod_id}.smc", smc)
 
     async def save_smg_file(self, mod_id: int) -> None:
@@ -485,15 +479,15 @@ class HbtnComm:
 
     async def send_message(self, mod_id: int, msg_id: int) -> None:
         """Send message to module."""
-        await self.client.send_message(self._convert_mod_id(mod_id), msg_id)
+        await self.client.send_message(mod_id, msg_id)
 
     async def send_message_text(self, mod_id: int, text: str) -> None:
         """Show a free-text message on a module (empty text clears it)."""
-        await self.client.send_message_text(self._convert_mod_id(mod_id), text)
+        await self.client.send_message_text(mod_id, text)
 
     async def send_sms(self, mod_id: int, msg_id: int, ct_id: int) -> None:
         """Send sms message to module."""
-        await self.client.send_sms(self._convert_mod_id(mod_id), msg_id, ct_id)
+        await self.client.send_sms(mod_id, msg_id, ct_id)
 
     async def hub_restart(self) -> None:
         """Restart hub."""
