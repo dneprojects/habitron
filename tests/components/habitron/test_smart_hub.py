@@ -97,10 +97,10 @@ def test_smhub_version_property(smart_hub_stub: SmartHub) -> None:
     ("is_addon", "expected_conf_url"),
     [
         (False, f"http://{MOCK_HOST}:7780/hub"),
-        (
-            True,
-            f"http://{MOCK_HOST}:8123/habitron_smarthub/ingress?index=/hub",
-        ),
+        # Relative to whatever base the viewer is on: the frontend rewrites
+        # ``homeassistant://`` to ``/``, so this one stored value resolves both
+        # on the LAN and behind a remote (Nabu Casa) URL.
+        (True, "homeassistant://habitron_smarthub/ingress?index=%2Fhub"),
     ],
 )
 async def test_setup_registers_hub_device(

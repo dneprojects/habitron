@@ -3,6 +3,7 @@
 from enum import Enum
 import logging
 from pathlib import Path
+from urllib.parse import quote
 
 from habitron_client import (
     Diagnostic,
@@ -100,6 +101,27 @@ class SmartHub:
         """Configured name of the SmartHub (the config entry title)."""
         return self._name
 
+    def _conf_url(self, path: str) -> str | None:
+        """Return the link to ``path`` in the hub's own web UI.
+
+        An add-on hub is reached through Home Assistant, so the link is stored
+        with the ``homeassistant://`` scheme: the frontend rewrites that to a
+        plain ``/`` against whatever base the viewer is currently on. One
+        stored value then works on the LAN and through a remote (Nabu Casa)
+        URL alike -- a hard-coded ``http://<hub ip>:8123`` only ever matches
+        the first, and breaks under HTTPS, a reverse proxy or a changed port.
+        The page inside the app travels as the ``index`` query, encoded.
+
+        A standalone hub serves its own UI, so that one keeps an absolute URL.
+        """
+        if not self.host:
+            return None
+        if self.comm.is_addon:
+            # ``safe=""``: the default leaves "/" alone, and the page is a
+            # query *value* -- the app's own links carry it encoded.
+            return f"{self.base_url}?index={quote(path, safe='')}"
+        return f"{self.base_url}{path}"
+
     async def async_setup(self) -> None:
         """Connect, register the hub device and build the bus model."""
         # 1. Open the client connection and fetch hub info (mac/version/host).
@@ -120,10 +142,10 @@ class SmartHub:
         self.addon_slug = self.comm.slugname
 
         if self.comm.is_addon:
-            self.base_url = f"http://{self.host}:8123/{self.addon_slug}/ingress?index="
+            self.base_url = f"homeassistant://{self.addon_slug}/ingress"
         else:
             self.base_url = f"http://{self.host}:7780"
-        conf_url = f"{self.base_url}/hub" if self.host else None
+        conf_url = self._conf_url("/hub")
 
         # 2. Register the hub device.
         device_registry = dr.async_get(self.hass)
@@ -212,7 +234,7 @@ class SmartHub:
 
         rt_dev = dev_reg.async_get_or_create(
             config_entry_id=self.config.entry_id,
-            configuration_url=f"{self.base_url}/router" if self.host else None,
+            configuration_url=self._conf_url("/router"),
             identifiers={(DOMAIN, router.uid)},
             manufacturer="Habitron GmbH",
             name=router.name,
@@ -235,9 +257,7 @@ class SmartHub:
             area_name = _area_name(router, module.area)
             dev = dev_reg.async_get_or_create(
                 config_entry_id=self.config.entry_id,
-                configuration_url=(
-                    f"{self.base_url}/module-{raddr}" if self.host else None
-                ),
+                configuration_url=(self._conf_url(f"/module-{raddr}")),
                 identifiers={(DOMAIN, module.uid)},
                 manufacturer="Habitron GmbH",
                 suggested_area=area_name,

@@ -4,6 +4,53 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.4.3b1
+
+### Device links pointed at one hard-coded Home Assistant address
+`SmartHub.async_setup` built the add-on link as
+`f"http://{self.host}:8123/{self.addon_slug}/ingress?index="` and appended
+`/hub`, `/router` or `/module-{raddr}` to it. Three things in that are assumed
+rather than known: the scheme (`http`), the port (`8123`) and the host -- and
+the host taken there is the *hub's* address, not Home Assistant's. They happen
+to coincide for an add-on deployment, which is why it worked locally, but the
+value ends up in the device registry and is therefore what every user sees,
+including one connected through Nabu Casa. The two URLs for the same page:
+
+    https://<instance>.ui.nabu.casa/e2f009d5_smart_hub/ingress?index=%2Fmodule-1
+    http://192.168.178.144:8123/e2f009d5_smart_hub/ingress?index=%2Fmodule-1
+
+`configuration_url` is stored once and cannot adapt, so `get_url(hass)` only
+moves the problem: whichever of the two it resolves to, the other is wrong.
+
+`homeassistant://` is the way out. `device_registry.CONFIGURATION_URL_SCHEMES`
+accepts it alongside `http`/`https`, and the frontend rewrites it -- literally
+`startsWith("homeassistant://")` followed by `.replace("homeassistant://", "/")`
+-- so the rest becomes a path against whatever base the viewer is on. Core uses
+the same form for add-ons (`homeassistant://hassio/addon/{slug}`), but with the
+slug in the path, which only reaches the Supervisor's add-on page; putting the
+slug where the host goes keeps the deep link into the app:
+
+    homeassistant://e2f009d5_smart_hub/ingress?index=%2Fmodule-1
+
+Verified against the registry's own rule: yarl parses it as
+`scheme='homeassistant'`, `host='e2f009d5_smart_hub'`, `path='/ingress'`,
+`query={'index': '/module-1'}` -- a non-empty host with an accepted scheme.
+
+The three call sites now go through `SmartHub._conf_url(path)`, which keeps the
+absolute `http://<host>:7780` form for a standalone hub, whose own web server
+serves the UI and whose address we do know. `quote(path, safe="")` is
+deliberate: the default `safe="/"` leaves the slash alone, and the page is a
+query *value* -- the app's own links carry it encoded.
+
+Not yet ported to the core integration; this beta is where the resolution gets
+tried on real installations first.
+
+### habitron_client 2.1.1
+Picks up the `SmartHub` model, `async_build_hub`/`async_refresh_hub` and the
+`normalise_mac`/`SmartHub.uid` identity helpers. Nothing in this integration
+uses them yet -- the core integration does -- but the pin moves so both repos
+build against the same library.
+
 ## v3.4.2
 
 ### The SC Touch app version fell back to "0.0.0"

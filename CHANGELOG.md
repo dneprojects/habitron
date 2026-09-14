@@ -3,6 +3,10 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.4.3b1
+- Beta. Links to the hub, the router and each module now work from outside the house as well. They were built with the local address and port of Home Assistant hard-coded, so opening a device page over a remote (Nabu Casa) URL -- or behind HTTPS, a reverse proxy or a changed port -- led nowhere. The link is now stored relative and resolved against whatever address you are using.
+- Uses habitron_client 2.1.1.
+
 ## v3.4.2
 - Fixed: the SC Touch app version showed as "0.0.0" even though the app had reported its version. The regular status reports a Smart Touch sends (battery, temperature) carry no version, and the placeholder written for them overwrote the version reported when the app connected -- which also made the app update entity claim an update was available.
 - The log line for a connecting Smart Touch now names the app version it reports, so a missing version can be told apart from an overwritten one.
