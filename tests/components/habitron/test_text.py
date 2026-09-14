@@ -116,7 +116,7 @@ async def test_set_value_resolves_and_echoes(typed: str, shown: str) -> None:
     Typing an id leaves the message behind it standing in the entity -- which
     is the confirmation that it was read as an id and not sent as that text.
     Everything reaches the display as text: the id command the stored message
-    would otherwise use is not carried out by the SmartHub.
+    would otherwise use is not carried out by the HbtnCoordinator.
     """
     comm = _comm()
     entity = HbtnDisplayText(_module_with_messages(), comm)

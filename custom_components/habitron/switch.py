@@ -27,9 +27,9 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add switches for passed config_entry in HA."""
-    smhub = entry.runtime_data
-    router = smhub.router
-    coord = smhub.coordinator
+    coordinator = entry.runtime_data
+    router = coordinator.router
+    coord = coordinator
 
     area_reg = ar.async_get(hass)
     area_ids = {
@@ -75,9 +75,9 @@ async def async_setup_entry(
             new_devices.append(ClimateCtlSwitch(coord, module, len(new_devices)))
         if (
             module.mod_type == "Smart Controller Touch"
-            and smhub.ws_provider is not None
+            and coordinator.ws_provider is not None
         ):
-            new_devices.append(MicrophoneSwitch(module, smhub.ws_provider))
+            new_devices.append(MicrophoneSwitch(module, coordinator.ws_provider))
 
     for flag in router.flags:
         new_devices.append(

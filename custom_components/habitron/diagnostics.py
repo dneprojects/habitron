@@ -49,9 +49,8 @@ async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: HabitronConfigEntry
 ) -> dict[str, Any]:
     """Return diagnostics for the given Habitron config entry."""
-    smhub = entry.runtime_data
-    router = smhub.router
-    coordinator = smhub.coordinator
+    coordinator = entry.runtime_data
+    router = coordinator.router
 
     return {
         "config_entry": {
@@ -61,12 +60,12 @@ async def async_get_config_entry_diagnostics(
             "title": entry.title,
         },
         "hub": {
-            "uid": smhub.uid,
-            "version": smhub.smhub_version,
-            "type": smhub.smhub_type,
-            "host": smhub.host,
-            "addon_slug": smhub.addon_slug,
-            "online": smhub.online,
+            "uid": coordinator.uid,
+            "version": coordinator.smhub_version,
+            "type": coordinator.smhub_type,
+            "host": coordinator.host,
+            "addon_slug": coordinator.addon_slug,
+            "online": coordinator.online,
         },
         "router": {
             "uid": router.uid,
@@ -97,8 +96,8 @@ async def async_get_device_diagnostics(
     device: DeviceEntry,
 ) -> dict[str, Any]:
     """Return diagnostics for a single Habitron device (module or hub)."""
-    smhub = entry.runtime_data
-    router = smhub.router
+    coordinator = entry.runtime_data
+    router = coordinator.router
 
     # Map the device's domain identifier back to a Habitron uid.
     target_uid: str | None = next(
@@ -111,10 +110,10 @@ async def async_get_device_diagnostics(
     )
 
     target: dict[str, Any] | None = None
-    if target_uid == smhub.uid:
+    if target_uid == coordinator.uid:
         target = {
             "kind": "hub",
-            "summary": {"uid": smhub.uid, "name": smhub.smhub_name},
+            "summary": {"uid": coordinator.uid, "name": coordinator.smhub_name},
         }
     elif target_uid == router.uid:
         target = {"kind": "router", "summary": {"uid": router.uid, "name": router.name}}

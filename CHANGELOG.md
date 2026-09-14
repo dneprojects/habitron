@@ -3,6 +3,10 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.4.3b2
+- Beta. Internal restructuring, no change in behaviour that you should notice: the integration's own SmartHub class is gone and the update coordinator now owns the connection and the device model, matching the version being prepared for Home Assistant core. Please report anything that stopped working.
+- The two hub percentage sensors are now labelled "Memory usage" and "Disk usage". They always reported *used* space, so the old "free" labels said the opposite of what the value means. Entity ids are unchanged, and a name you set yourself is kept.
+
 ## v3.4.3b1
 - Beta. Links to the hub, the router and each module now work from outside the house as well. They were built with the local address and port of Home Assistant hard-coded, so opening a device page over a remote (Nabu Casa) URL -- or behind HTTPS, a reverse proxy or a changed port -- led nowhere. The link is now stored relative and resolved against whatever address you are using.
 - Uses habitron_client 2.1.1.

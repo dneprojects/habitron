@@ -28,7 +28,7 @@ from .const import DOMAIN
 from .coordinator import HabitronConfigEntry, HbtnFirmwareCoordinator
 
 if TYPE_CHECKING:
-    from .smart_hub import SmartHub
+    from .coordinator import HbtnCoordinator
 
 PARALLEL_UPDATES = 1
 
@@ -54,9 +54,9 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add update entities for Habitron system."""
-    smhub = entry.runtime_data
-    hbtn_rt = smhub.router
-    fw_coord = HbtnFirmwareCoordinator(hass, entry, smhub.comm)
+    coordinator = entry.runtime_data
+    hbtn_rt = coordinator.router
+    fw_coord = HbtnFirmwareCoordinator(hass, entry, coordinator.comm)
 
     new_devices: list[UpdateEntity] = []
     # Add router update entity
@@ -69,7 +69,7 @@ async def async_setup_entry(
         # Check for Smart Controller Touch type
         if hbt_module.typ == b"\x01\x04":
             _LOGGER.info("Creating SCTouchAppUpdate for %s", hbt_module.uid)
-            new_devices.append(SCTouchAppUpdate(hbt_module, smhub))
+            new_devices.append(SCTouchAppUpdate(hbt_module, coordinator))
 
     if new_devices:
         # Prime firmware versions with one read before the entities go live.
@@ -87,11 +87,11 @@ class SCTouchAppUpdate(UpdateEntity):
     _attr_should_poll = True
     _attr_supported_features = UpdateEntityFeature.INSTALL
 
-    def __init__(self, module: Module, smhub: SmartHub) -> None:
+    def __init__(self, module: Module, coordinator: HbtnCoordinator) -> None:
         """Initialize the app update entity."""
         self._module = module
-        self._smhub = smhub
-        self._hass = smhub.hass
+        self._smhub = coordinator
+        self._hass = coordinator.hass
         self.firmware_dir = Path("")
 
         self._attr_unique_id = f"{self._module.uid}_app_update"
@@ -202,7 +202,7 @@ class SCTouchAppUpdate(UpdateEntity):
 
         Resolves to one of (in priority order):
 
-        1. ``/share/<addon_slug>/firmware`` when SmartHub runs as a HA OS
+        1. ``/share/<addon_slug>/firmware`` when HbtnCoordinator runs as a HA OS
            add-on. The add-on deposits APKs into ``/share`` by design.
         2. ``<HA-config>/<DOMAIN>/firmware`` for any other install. This is
            the path that works in Home Assistant Core; HACS users should

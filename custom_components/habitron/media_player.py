@@ -31,7 +31,7 @@ from .coordinator import HabitronConfigEntry
 PARALLEL_UPDATES = 1
 
 if TYPE_CHECKING:
-    from .smart_hub import SmartHub
+    from .coordinator import HbtnCoordinator
     from .ws_provider import HabitronWebRTCProvider
 
 _LOGGER = logging.getLogger(__name__)
@@ -61,8 +61,8 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up the Habitron media player entities."""
-    smhub: SmartHub = entry.runtime_data
-    provider = smhub.ws_provider
+    coordinator: HbtnCoordinator = entry.runtime_data
+    provider = coordinator.ws_provider
 
     if provider is None:
         _LOGGER.error("WebSocket provider not available for media player setup")
@@ -71,7 +71,7 @@ async def async_setup_entry(
     # Create a media player entity for each 'Smart Controller Touch' module.
     new_devices = [
         HbtnMediaPlayer(hbt_module, provider, hass)
-        for hbt_module in smhub.router.modules
+        for hbt_module in coordinator.router.modules
         if isinstance(hbt_module, SmartController)
         and hbt_module.mod_type == "Smart Controller Touch"
     ]

@@ -15,8 +15,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from ._helpers import hbtn_device_info
 from .const import ATTR_MESSAGE_ID, AlarmMode, DaytimeMode
-from .coordinator import HabitronConfigEntry, HbtnCoordinator
-from .smart_hub import LoggingLevels, SmartHub
+from .coordinator import HabitronConfigEntry, HbtnCoordinator, LoggingLevels
 
 PARALLEL_UPDATES = 1
 _LOGGER = logging.getLogger(__name__)
@@ -28,9 +27,9 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add input_select for passed config_entry in HA."""
-    smhub = entry.runtime_data
-    hbtn_rt = smhub.router
-    hbtn_cord = smhub.coordinator
+    coordinator = entry.runtime_data
+    hbtn_rt = coordinator.router
+    hbtn_cord = coordinator
 
     new_devices: list[SelectEntity] = []
     for hbt_module in hbtn_rt.modules:
@@ -58,9 +57,9 @@ async def async_setup_entry(
     )
     new_devices.append(HbtnSelectAlarmModePush(0, hbtn_rt, hbtn_cord, len(new_devices)))
     new_devices.append(HbtnSelectGroupModePush(0, hbtn_rt, hbtn_cord, len(new_devices)))
-    for log_level in smhub.loglvl:
+    for log_level in coordinator.loglvl:
         new_devices.append(
-            HbtnSelectLoggingLevel(smhub, log_level, hbtn_cord, len(new_devices))
+            HbtnSelectLoggingLevel(coordinator, log_level, hbtn_cord, len(new_devices))
         )
 
     # Fetch initial data so we have data when entities subscribe
@@ -375,7 +374,7 @@ class HbtnSelectLoggingLevel(CoordinatorEntity[HbtnCoordinator], SelectEntity):
 
     def __init__(
         self,
-        smhub: SmartHub,
+        coordinator: HbtnCoordinator,
         level: Sensor,
         coord: HbtnCoordinator,
         idx: int,
@@ -386,7 +385,7 @@ class HbtnSelectLoggingLevel(CoordinatorEntity[HbtnCoordinator], SelectEntity):
         self._level = level
         self._nmbr = level.nmbr
         self._value = int(level.value or 0)
-        self._smhub = smhub
+        self._smhub = coordinator
         self._current_option = ""
         self._enum = LoggingLevels
         self._attr_name = level.name

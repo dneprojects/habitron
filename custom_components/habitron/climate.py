@@ -32,9 +32,9 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add climate units for passed config_entry in HA."""
-    smhub = entry.runtime_data
-    hbtn_rt = smhub.router
-    hbtn_cord = smhub.coordinator
+    coordinator = entry.runtime_data
+    hbtn_rt = coordinator.router
+    hbtn_cord = coordinator
 
     new_devices = []
     for hbt_module in hbtn_rt.modules:

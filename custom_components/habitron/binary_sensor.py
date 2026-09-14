@@ -28,9 +28,9 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add binary sensors for Habitron inputs."""
-    smhub = entry.runtime_data
-    hbtn_rt = smhub.router
-    hbtn_cord = smhub.coordinator
+    coordinator = entry.runtime_data
+    hbtn_rt = coordinator.router
+    hbtn_cord = coordinator
 
     new_devices: list[BinarySensorEntity] = []
     for hbt_module in hbtn_rt.modules:
@@ -292,7 +292,7 @@ class HbtnState(CoordinatorEntity[HbtnCoordinator], BinarySensorEntity):
 
 
 class ModuleHealthSensor(CoordinatorEntity[HbtnCoordinator], BinarySensorEntity):
-    """Per-module operate-mode health, fed by SmartHub ``SYS_ERR`` events.
+    """Per-module operate-mode health, fed by HbtnCoordinator ``SYS_ERR`` events.
 
     Bound to ``module.health`` (a one-byte fault bitmask, 0 = healthy). The
     entity is a diagnostic ``problem`` sensor; the active fault codes/labels are

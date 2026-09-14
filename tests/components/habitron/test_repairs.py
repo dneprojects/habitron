@@ -58,17 +58,17 @@ async def test_non_comm_fault_offers_and_runs_restart(hass: HomeAssistant) -> No
     """A reachable fault offers a restart/ignore menu and restarts the module."""
     module = _module()
     module.health.value = 0x10  # F16 only -> module reachable
-    smhub = MagicMock()
-    smhub.comm.module_restart = AsyncMock()
+    coordinator = MagicMock()
+    coordinator.comm.module_restart = AsyncMock()
     flow = _flow(hass)
-    with patch.object(repairs, "_resolve_module", return_value=(smhub, module)):
+    with patch.object(repairs, "_resolve_module", return_value=(coordinator, module)):
         menu = await flow.async_step_init()
         assert menu["type"] == "menu"
         assert menu["step_id"] == "confirm_restart"
         assert set(menu["menu_options"]) == {"restart", "ignore"}
         assert "F16: Fehler Leistungsteil" in menu["description_placeholders"]["faults"]
         result = await flow.async_step_restart()
-    smhub.comm.module_restart.assert_awaited_once_with(module.addr)
+    coordinator.comm.module_restart.assert_awaited_once_with(module.addr)
     assert result["type"] == "create_entry"
 
 
@@ -80,11 +80,11 @@ async def test_comm_timeout_offers_and_runs_power_cycle(hass: HomeAssistant) -> 
     router = Router(uid="R", id=100)
     router.modules = [module, peer]
     router.chan_list = [[5, 6], [], [], []]
-    smhub = MagicMock()
-    smhub.router = router
-    smhub.comm.async_power_cycle_channel = AsyncMock()
+    coordinator = MagicMock()
+    coordinator.router = router
+    coordinator.comm.async_power_cycle_channel = AsyncMock()
     flow = _flow(hass)
-    with patch.object(repairs, "_resolve_module", return_value=(smhub, module)):
+    with patch.object(repairs, "_resolve_module", return_value=(coordinator, module)):
         menu = await flow.async_step_init()
         assert menu["type"] == "menu"
         assert menu["step_id"] == "confirm_power_cycle"
@@ -92,7 +92,7 @@ async def test_comm_timeout_offers_and_runs_power_cycle(hass: HomeAssistant) -> 
         assert menu["description_placeholders"]["channel"] == "1"
         assert "Neighbor" in menu["description_placeholders"]["others"]
         result = await flow.async_step_power_cycle()
-    smhub.comm.async_power_cycle_channel.assert_awaited_once_with(1)
+    coordinator.comm.async_power_cycle_channel.assert_awaited_once_with(1)
     assert result["type"] == "create_entry"
 
 
@@ -100,10 +100,10 @@ async def test_room_controller_comm_timeout_offers_ignore(hass: HomeAssistant) -
     """F1 on a room controller shows an info step (no power cycle) and ignores."""
     module = SmartController(uid="MOD-1", addr=105, typ=b"\x01\x02", name="Living")
     module.health.value = 0x01  # F1
-    smhub = MagicMock()
+    coordinator = MagicMock()
     flow = _flow(hass)
     with (
-        patch.object(repairs, "_resolve_module", return_value=(smhub, module)),
+        patch.object(repairs, "_resolve_module", return_value=(coordinator, module)),
         patch.object(repairs.ir, "async_ignore_issue") as ignore,
     ):
         form = await flow.async_step_init()
@@ -111,7 +111,7 @@ async def test_room_controller_comm_timeout_offers_ignore(hass: HomeAssistant) -
         assert form["step_id"] == "room_controller_unreachable"
         # No channel power cycle is offered for a 230 V-supplied room controller.
         assert "channel" not in form["description_placeholders"]
-        smhub.comm.async_power_cycle_channel.assert_not_called()
+        coordinator.comm.async_power_cycle_channel.assert_not_called()
         result = await flow.async_step_room_controller_unreachable({})
     ignore.assert_called_once_with(hass, repairs.DOMAIN, "module_fault_MOD-1", True)
     assert result["type"] == "abort"
@@ -154,10 +154,10 @@ async def test_power_cycle_unknown_channel_aborts(hass: HomeAssistant) -> None:
     router = Router(uid="R", id=100)
     router.modules = [module]
     router.chan_list = [[], [], [], []]
-    smhub = MagicMock()
-    smhub.router = router
+    coordinator = MagicMock()
+    coordinator.router = router
     flow = _flow(hass)
-    with patch.object(repairs, "_resolve_module", return_value=(smhub, module)):
+    with patch.object(repairs, "_resolve_module", return_value=(coordinator, module)):
         result = await flow.async_step_init()
     assert result["type"] == "abort"
     assert result["reason"] == "channel_unknown"

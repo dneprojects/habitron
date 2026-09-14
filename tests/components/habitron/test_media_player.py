@@ -895,12 +895,12 @@ async def test_async_setup_entry_adds_player_for_touch_module(
     touch = _make_touch_module()
     other = MagicMock()
     other.mod_type = "Smart Controller"
-    smhub = MagicMock()
-    smhub.router.modules = [touch, other]
-    smhub.ws_provider = _make_provider()
+    coordinator = MagicMock()
+    coordinator.router.modules = [touch, other]
+    coordinator.ws_provider = _make_provider()
 
     entry = MagicMock()
-    entry.runtime_data = smhub
+    entry.runtime_data = coordinator
 
     added: list = []
     await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
@@ -913,11 +913,11 @@ async def test_async_setup_entry_short_circuits_without_provider(
 ) -> None:
     """Without a WS provider, async_setup_entry logs and returns."""
     touch = _make_touch_module()
-    smhub = MagicMock()
-    smhub.router.modules = [touch]
-    smhub.ws_provider = None
+    coordinator = MagicMock()
+    coordinator.router.modules = [touch]
+    coordinator.ws_provider = None
     entry = MagicMock()
-    entry.runtime_data = smhub
+    entry.runtime_data = coordinator
 
     added: list = []
     await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry

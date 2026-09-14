@@ -1,6 +1,6 @@
-"""End-to-end setup against a recorded real SmartHub.
+"""End-to-end setup against a recorded real HbtnCoordinator.
 
-Most config-entry tests stub ``SmartHub.async_setup`` so they never touch the
+Most config-entry tests stub ``HbtnCoordinator.async_setup`` so they never touch the
 bus. This module instead replays an anonymised recording of a real 11-module
 installation (the exact bytes the hub returned, captured via the library's
 ``scripts/capture_hub.py``) through a full config-entry setup. It exercises the
@@ -65,7 +65,7 @@ class _ReplayClient:
 
         The recorded hub is a Raspberry Pi, so update() does reach this; the
         recording carries no host readings, which the library reports as a
-        protocol error and SmartHub.update swallows.
+        protocol error and HbtnCoordinator.update swallows.
         """
         raise HabitronProtocolError("no host readings in the replay")
 
@@ -130,7 +130,7 @@ async def test_real_recording_builds_devices_and_entities(
         # The frontend iconset registration needs the frontend component; it is
         # exercised separately in test_smart_hub.
         patch(
-            "custom_components.habitron.smart_hub.SmartHub._register_iconset",
+            "custom_components.habitron.coordinator.HbtnCoordinator._register_iconset",
             new=AsyncMock(),
         ),
     ):

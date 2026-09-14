@@ -15,7 +15,7 @@ from ._helpers import hbtn_device_info
 from .coordinator import HabitronConfigEntry
 
 if TYPE_CHECKING:
-    from .smart_hub import SmartHub
+    from .coordinator import HbtnCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 PARALLEL_UPDATES = 1
@@ -27,40 +27,40 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add button for passed config_entry in HA."""
-    smhub = entry.runtime_data
-    hbtn_rt = smhub.router
+    coordinator = entry.runtime_data
+    hbtn_rt = coordinator.router
 
     new_devices: list[ButtonEntity] = []
     for hbt_module in hbtn_rt.modules:
         new_devices.extend(
-            DirCmdButton(dir_cmd, hbt_module, smhub)
+            DirCmdButton(dir_cmd, hbt_module, coordinator)
             for dir_cmd in hbt_module.dir_commands
         )
         new_devices.extend(
-            VisCmdButton(vis_cmd, hbt_module, smhub)
+            VisCmdButton(vis_cmd, hbt_module, coordinator)
             for vis_cmd in hbt_module.vis_commands
         )
         for mod_logic in hbt_module.logic:
             if mod_logic.type == 5:
-                new_devices.append(CountUpButton(mod_logic, hbt_module, smhub))
-                new_devices.append(CountDownButton(mod_logic, hbt_module, smhub))
+                new_devices.append(CountUpButton(mod_logic, hbt_module, coordinator))
+                new_devices.append(CountDownButton(mod_logic, hbt_module, coordinator))
         if (
             isinstance(hbt_module, SmartController)
             and hbt_module.mod_type == "Smart Controller Touch"
         ):
-            new_devices.append(SpeechButton(hbt_module, smhub))
-        new_devices.append(RestartButton(hbt_module, smhub))
+            new_devices.append(SpeechButton(hbt_module, coordinator))
+        new_devices.append(RestartButton(hbt_module, coordinator))
     # Router-level commands as buttons
     new_devices.extend(
-        CollCmdButton(coll_cmd, smhub) for coll_cmd in hbtn_rt.coll_commands
+        CollCmdButton(coll_cmd, coordinator) for coll_cmd in hbtn_rt.coll_commands
     )
-    new_devices.append(RestartButton(hbtn_rt, smhub))
-    new_devices.append(RestartFwdTableButton(hbtn_rt, smhub))
-    new_devices.append(RestartAllButton(hbtn_rt, smhub))
-    new_devices.append(RestartHubButton(smhub))
-    new_devices.append(RebootHubButton(smhub))
+    new_devices.append(RestartButton(hbtn_rt, coordinator))
+    new_devices.append(RestartFwdTableButton(hbtn_rt, coordinator))
+    new_devices.append(RestartAllButton(hbtn_rt, coordinator))
+    new_devices.append(RestartHubButton(coordinator))
+    new_devices.append(RebootHubButton(coordinator))
     new_devices.extend(
-        ResetChannelPowerButton(hbtn_rt, smhub, ch + 1) for ch in range(4)
+        ResetChannelPowerButton(hbtn_rt, coordinator, ch + 1) for ch in range(4)
     )
 
     if new_devices:
@@ -72,12 +72,12 @@ class CollCmdButton(ButtonEntity):
 
     _attr_has_entity_name = True
 
-    def __init__(self, coll_cmd: HbtnCommand, smhub: SmartHub) -> None:
+    def __init__(self, coll_cmd: HbtnCommand, coordinator: HbtnCoordinator) -> None:
         """Initialize a collective-command button."""
-        self._smhub = smhub
+        self._smhub = coordinator
         self._nmbr = coll_cmd.nmbr
         self._attr_name = f"Cmd {self._nmbr}: {coll_cmd.name}"
-        self._attr_unique_id = f"{smhub.uid}_collective_command_{self._nmbr}"
+        self._attr_unique_id = f"{coordinator.uid}_collective_command_{self._nmbr}"
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -94,10 +94,12 @@ class DirCmdButton(ButtonEntity):
 
     _attr_has_entity_name = True
 
-    def __init__(self, dir_cmd: HbtnCommand, module: Module, smhub: SmartHub) -> None:
+    def __init__(
+        self, dir_cmd: HbtnCommand, module: Module, coordinator: HbtnCoordinator
+    ) -> None:
         """Initialize a direct-command button."""
         self._module = module
-        self._smhub = smhub
+        self._smhub = coordinator
         self._nmbr = dir_cmd.nmbr
         self._attr_name = f"DirectCmd {self._nmbr}: {dir_cmd.name}"
         self._attr_unique_id = f"{module.uid}_direct_command_{self._nmbr}"
@@ -113,10 +115,12 @@ class VisCmdButton(ButtonEntity):
 
     _attr_has_entity_name = True
 
-    def __init__(self, vis_cmd: HbtnCommand, module: Module, smhub: SmartHub) -> None:
+    def __init__(
+        self, vis_cmd: HbtnCommand, module: Module, coordinator: HbtnCoordinator
+    ) -> None:
         """Initialize a visualization-command button."""
         self._module = module
-        self._smhub = smhub
+        self._smhub = coordinator
         self._nmbr = vis_cmd.nmbr
         no_hi = int(self._nmbr / 256)
         no_lo = self._nmbr - no_hi * 256
@@ -137,10 +141,10 @@ class RestartButton(ButtonEntity):
     _attr_name = "Reset"
     _attr_entity_category = EntityCategory.CONFIG
 
-    def __init__(self, target: Module | Router, smhub: SmartHub) -> None:
+    def __init__(self, target: Module | Router, coordinator: HbtnCoordinator) -> None:
         """Initialize a restart button for a module or the router."""
         self._target = target
-        self._smhub = smhub
+        self._smhub = coordinator
         self._attr_unique_id = f"{target.uid}_restart"
         self._attr_device_info = hbtn_device_info(target.uid)
 
@@ -161,9 +165,9 @@ class RestartFwdTableButton(ButtonEntity):
     _attr_name = "Restart Forward Table"
     _attr_entity_category = EntityCategory.CONFIG
 
-    def __init__(self, router: Router, smhub: SmartHub) -> None:
+    def __init__(self, router: Router, coordinator: HbtnCoordinator) -> None:
         """Initialize the forward-table restart button."""
-        self._smhub = smhub
+        self._smhub = coordinator
         self._attr_unique_id = f"{router.uid}_restart_forward_table"
         self._attr_device_info = hbtn_device_info(router.uid)
 
@@ -180,9 +184,9 @@ class RestartAllButton(ButtonEntity):
     _attr_name = "Reset all modules"
     _attr_entity_category = EntityCategory.CONFIG
 
-    def __init__(self, router: Router, smhub: SmartHub) -> None:
+    def __init__(self, router: Router, coordinator: HbtnCoordinator) -> None:
         """Initialize the reset-all button."""
-        self._smhub = smhub
+        self._smhub = coordinator
         self._attr_unique_id = f"{router.uid}_restart_all_modules"
         self._attr_device_info = hbtn_device_info(router.uid)
 
@@ -199,11 +203,11 @@ class RestartHubButton(ButtonEntity):
     _attr_name = "Restart Hub"
     _attr_entity_category = EntityCategory.CONFIG
 
-    def __init__(self, smhub: SmartHub) -> None:
+    def __init__(self, coordinator: HbtnCoordinator) -> None:
         """Initialize the hub-restart button."""
-        self._smhub = smhub
-        self._attr_unique_id = f"{smhub.uid}_restart"
-        self._attr_device_info = hbtn_device_info(smhub.uid)
+        self._smhub = coordinator
+        self._attr_unique_id = f"{coordinator.uid}_restart"
+        self._attr_device_info = hbtn_device_info(coordinator.uid)
 
     async def async_press(self) -> None:
         """Handle the button press."""
@@ -218,11 +222,11 @@ class RebootHubButton(ButtonEntity):
     _attr_name = "Reboot Hub"
     _attr_entity_category = EntityCategory.CONFIG
 
-    def __init__(self, smhub: SmartHub) -> None:
+    def __init__(self, coordinator: HbtnCoordinator) -> None:
         """Initialize the hub-reboot button."""
-        self._smhub = smhub
-        self._attr_unique_id = f"{smhub.uid}_reboot"
-        self._attr_device_info = hbtn_device_info(smhub.uid)
+        self._smhub = coordinator
+        self._attr_unique_id = f"{coordinator.uid}_reboot"
+        self._attr_device_info = hbtn_device_info(coordinator.uid)
 
     async def async_press(self) -> None:
         """Handle the button press."""
@@ -235,10 +239,12 @@ class CountUpButton(ButtonEntity):
     _attr_has_entity_name = True
     _attr_translation_key = "count_up"
 
-    def __init__(self, counter: Logic, module: Module, smhub: SmartHub) -> None:
+    def __init__(
+        self, counter: Logic, module: Module, coordinator: HbtnCoordinator
+    ) -> None:
         """Initialize a count-up button."""
         self._module = module
-        self._smhub = smhub
+        self._smhub = coordinator
         self._nmbr = counter.nmbr + 1
         self._attr_name = f"Count up {self._nmbr}: {counter.name}"
         self._attr_unique_id = f"{module.uid}_counter_up_{self._nmbr}"
@@ -255,10 +261,12 @@ class CountDownButton(ButtonEntity):
     _attr_has_entity_name = True
     _attr_translation_key = "count_down"
 
-    def __init__(self, counter: Logic, module: Module, smhub: SmartHub) -> None:
+    def __init__(
+        self, counter: Logic, module: Module, coordinator: HbtnCoordinator
+    ) -> None:
         """Initialize a count-down button."""
         self._module = module
-        self._smhub = smhub
+        self._smhub = coordinator
         self._nmbr = counter.nmbr + 1
         self._attr_name = f"Count down {self._nmbr}: {counter.name}"
         self._attr_unique_id = f"{module.uid}_counter_down_{self._nmbr}"
@@ -275,9 +283,11 @@ class ResetChannelPowerButton(ButtonEntity):
     _attr_has_entity_name = True
     _attr_translation_key = "power_cycle"
 
-    def __init__(self, router: Router, smhub: SmartHub, channel: int) -> None:
+    def __init__(
+        self, router: Router, coordinator: HbtnCoordinator, channel: int
+    ) -> None:
         """Initialize a power-cycle button."""
-        self._smhub = smhub
+        self._smhub = coordinator
         self._chan = channel
         self._attr_name = f"Power cycle router channel {self._chan}"
         self._attr_unique_id = f"{router.uid}_power_cycle_{self._chan}"
@@ -295,11 +305,11 @@ class SpeechButton(ButtonEntity):
     _attr_translation_key = "voice_input"
     _attr_name = "Activate voice input"
 
-    def __init__(self, module: SmartController, smhub: SmartHub) -> None:
+    def __init__(self, module: SmartController, coordinator: HbtnCoordinator) -> None:
         """Initialize a speech button."""
         self._module = module
         self._stream_name = module.stream_name
-        self._provider = smhub.ws_provider
+        self._provider = coordinator.ws_provider
         self._attr_unique_id = f"{module.uid}_activate_voice_input"
         self._attr_device_info = hbtn_device_info(module.uid)
 

@@ -29,7 +29,7 @@ from .const import (
 )
 
 if TYPE_CHECKING:
-    from .smart_hub import SmartHub
+    from .coordinator import HbtnCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -87,8 +87,8 @@ _SC_SYSTEM_COMMAND_SCHEMA = vol.Schema(
 )
 
 
-async def _targeted_hubs(call: ServiceCall) -> list[SmartHub]:
-    """Return the loaded SmartHub(s) for the call.
+async def _targeted_hubs(call: ServiceCall) -> list[HbtnCoordinator]:
+    """Return the loaded HbtnCoordinator(s) for the call.
 
     A hub is selected by targeting any Habitron device (hub, router or module);
     the owning config entry is resolved via the target. When no device is
@@ -99,7 +99,7 @@ async def _targeted_hubs(call: ServiceCall) -> list[SmartHub]:
     loaded = call.hass.config_entries.async_loaded_entries(DOMAIN)
     entry_ids = await async_extract_config_entry_ids(call)
     if entry_ids:
-        hubs: list[SmartHub] = [
+        hubs: list[HbtnCoordinator] = [
             entry.runtime_data for entry in loaded if entry.entry_id in entry_ids
         ]
     elif len(loaded) == 1:
@@ -183,7 +183,7 @@ async def _async_update_entity(call: ServiceCall) -> None:
     arg4: int = call.data.get(EVNT_ARG4, 0)
     arg5: int = call.data.get(EVNT_ARG5, 0)
     for entry in call.hass.config_entries.async_loaded_entries(DOMAIN):
-        hub: SmartHub = entry.runtime_data
+        hub: HbtnCoordinator = entry.runtime_data
         if hub.host == hub_id:
             await hub.comm.update_entity(
                 hub_id, mod_id, evnt, arg1, arg2, arg3, arg4, arg5
@@ -197,7 +197,7 @@ async def _async_update_entity(call: ServiceCall) -> None:
 
 async def _async_dispatch_sc_command_for_device(
     identifiers: set[tuple[str, str]],
-    hubs: list[SmartHub],
+    hubs: list[HbtnCoordinator],
     command: str,
     new_ip: str | None,
 ) -> bool:
@@ -251,7 +251,7 @@ async def _async_sc_system_command(call: ServiceCall) -> None:
         )
 
     dev_reg = dr.async_get(call.hass)
-    hubs: list[SmartHub] = [
+    hubs: list[HbtnCoordinator] = [
         e.runtime_data for e in call.hass.config_entries.async_loaded_entries(DOMAIN)
     ]
     if not hubs:

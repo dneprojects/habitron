@@ -1,6 +1,6 @@
 """Tests for the Habitron coordinator."""
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from habitron_client import (
     HabitronConnectionError,
@@ -29,10 +29,25 @@ def _make_comm(hass: HomeAssistant) -> MagicMock:
     return comm
 
 
+def _make_coord(hass: HomeAssistant, comm: MagicMock) -> HbtnCoordinator:
+    """Build a coordinator with the transport swapped for ``comm``.
+
+    The coordinator constructs its own ``HbtnComm`` now, so the stub is
+    assigned afterwards. ``update`` (the hub host readings) is stubbed too: the
+    tick calls it, and it is not what these tests are about.
+    """
+    # Patched at construction: the real transport reads the integration
+    # manifest out of ``hass.data``, which a bare unit test has not loaded.
+    with patch("custom_components.habitron.coordinator.HbtnComm", return_value=comm):
+        coord = HbtnCoordinator(hass, MagicMock())
+    coord.update = AsyncMock()  # type: ignore[method-assign]
+    return coord
+
+
 async def test_coordinator_normal_update(hass: HomeAssistant) -> None:
     """``_async_update_data`` returns the compact status and forwards to comm."""
     comm = _make_comm(hass)
-    coord = HbtnCoordinator(hass, MagicMock(), comm)
+    coord = _make_coord(hass, comm)
     result = await coord._async_update_data()
     assert result == b"compact-status"
     comm.async_system_update.assert_awaited_once()
@@ -44,7 +59,7 @@ async def test_coordinator_timeout_raises_update_failed(
     """A timeout in ``async_system_update`` is wrapped in ``UpdateFailed``."""
     comm = _make_comm(hass)
     comm.async_system_update.side_effect = TimeoutError("hub silent")
-    coord = HbtnCoordinator(hass, MagicMock(), comm)
+    coord = _make_coord(hass, comm)
     with pytest.raises(UpdateFailed) as exc_info:
         await coord._async_update_data()
     assert exc_info.value.translation_key == "update_timeout"
@@ -53,21 +68,21 @@ async def test_coordinator_timeout_raises_update_failed(
 async def test_coordinator_change_detection(hass: HomeAssistant) -> None:
     """``always_update`` is False so the heartbeat only fans out on changes."""
     comm = _make_comm(hass)
-    coord = HbtnCoordinator(hass, MagicMock(), comm)
+    coord = _make_coord(hass, comm)
     assert coord.always_update is False
 
 
 async def test_coordinator_uses_fixed_scan_interval(hass: HomeAssistant) -> None:
     """The coordinator's interval is the integration's hard-coded SCAN_INTERVAL."""
     comm = _make_comm(hass)
-    coord = HbtnCoordinator(hass, MagicMock(), comm)
+    coord = _make_coord(hass, comm)
     assert coord.update_interval == SCAN_INTERVAL
 
 
 async def test_async_setup_runs_first_refresh(hass: HomeAssistant) -> None:
     """``_async_setup`` delegates to ``_async_update_data``."""
     comm = _make_comm(hass)
-    coord = HbtnCoordinator(hass, MagicMock(), comm)
+    coord = _make_coord(hass, comm)
     await coord._async_setup()
     comm.async_system_update.assert_awaited()
 
@@ -78,7 +93,7 @@ async def test_coordinator_network_error_raises_update_failed(
     """An OSError in ``async_system_update`` is wrapped in ``UpdateFailed``."""
     comm = _make_comm(hass)
     comm.async_system_update.side_effect = OSError("dns down")
-    coord = HbtnCoordinator(hass, MagicMock(), comm)
+    coord = _make_coord(hass, comm)
     with pytest.raises(UpdateFailed) as exc_info:
         await coord._async_update_data()
     assert exc_info.value.translation_key == "update_network_error"
@@ -90,7 +105,7 @@ async def test_coordinator_library_timeout_raises_update_failed(
     """A HabitronTimeoutError from the client maps to ``update_timeout``."""
     comm = _make_comm(hass)
     comm.async_system_update.side_effect = HabitronTimeoutError("no response")
-    coord = HbtnCoordinator(hass, MagicMock(), comm)
+    coord = _make_coord(hass, comm)
     with pytest.raises(UpdateFailed) as exc_info:
         await coord._async_update_data()
     assert exc_info.value.translation_key == "update_timeout"
@@ -102,7 +117,7 @@ async def test_coordinator_library_error_raises_update_failed(
     """Any other HabitronError maps to ``update_network_error``."""
     comm = _make_comm(hass)
     comm.async_system_update.side_effect = HabitronConnectionError("bus down")
-    coord = HbtnCoordinator(hass, MagicMock(), comm)
+    coord = _make_coord(hass, comm)
     with pytest.raises(UpdateFailed) as exc_info:
         await coord._async_update_data()
     assert exc_info.value.translation_key == "update_network_error"

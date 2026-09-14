@@ -14,10 +14,9 @@ from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.device_registry import DeviceEntry
 
 from .const import DOMAIN
-from .coordinator import HabitronConfigEntry
+from .coordinator import HabitronConfigEntry, HbtnCoordinator
 from .health import async_setup_module_health_issues
 from .services import async_remove_services, async_setup_services
-from .smart_hub import SmartHub
 from .system_health import system_health_info  # noqa: F401
 from .ws_provider import HabitronWebRTCProvider
 
@@ -79,28 +78,28 @@ async def async_migrate_entry(hass: HomeAssistant, entry: HabitronConfigEntry) -
 async def async_setup_entry(hass: HomeAssistant, entry: HabitronConfigEntry) -> bool:
     """Set up Habitron from a config entry."""
     try:
-        smhub = SmartHub(hass, entry)
-        await smhub.async_setup()
+        coordinator = HbtnCoordinator(hass, entry)
+        await coordinator.async_setup()
         # Central first refresh — done once here instead of per platform.
-        await smhub.coordinator.async_config_entry_first_refresh()
+        await coordinator.async_config_entry_first_refresh()
 
-        provider = HabitronWebRTCProvider(hass, smhub.router)
-        smhub.ws_provider = provider
+        provider = HabitronWebRTCProvider(hass, coordinator.router)
+        coordinator.ws_provider = provider
         provider.async_register_websocket_handlers()
 
-        entry.runtime_data = smhub
+        entry.runtime_data = coordinator
         entry.async_on_unload(entry.add_update_listener(update_listener))
 
-        _async_cleanup_stale_devices(hass, entry, smhub)
+        _async_cleanup_stale_devices(hass, entry, coordinator)
 
         # Before the platforms register anything, so an entity comes up
         # under its final id and no duplicate is ever created.
         _async_migrate_unique_ids(
-            hass, entry, (*_UNIQUE_ID_RULES, _uid_scheme_rule(smhub))
+            hass, entry, (*_UNIQUE_ID_RULES, _uid_scheme_rule(coordinator))
         )
 
         # Mirror per-module operate-mode faults (SYS_ERR) into repairs issues.
-        async_setup_module_health_issues(hass, entry, smhub)
+        async_setup_module_health_issues(hass, entry, coordinator)
 
         # Services live on the domain, not on the entry. The helper is
         # idempotent so subsequent entries are a no-op.
@@ -120,7 +119,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: HabitronConfigEntry) -> 
             translation_placeholders={"error": str(ex)},
         ) from ex
     except (OSError, ConnectionError, HabitronError) as ex:
-        # Any transient SmartHub problem at setup — a dropped connection or
+        # Any transient HbtnCoordinator problem at setup — a dropped connection or
         # incomplete data while the hub is (re)booting (HabitronConnectionError
         # / HabitronProtocolError), DNS/socket errors — must let HA retry the
         # entry. Otherwise a brief hub outage at setup leaves the integration
@@ -142,11 +141,11 @@ async def async_remove_config_entry_device(
     device_entry: DeviceEntry,
 ) -> bool:
     """Remove a config entry from a device."""
-    smhub = config_entry.runtime_data
+    coordinator = config_entry.runtime_data
     return not any(
         identifier
         for identifier in device_entry.identifiers
-        if identifier[0] == DOMAIN and identifier[1] == smhub.uid
+        if identifier[0] == DOMAIN and identifier[1] == coordinator.uid
     )
 
 
@@ -156,10 +155,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: HabitronConfigEntry) ->
     if not unload_ok:
         return False
 
-    smhub = entry.runtime_data
-    if smhub.ws_provider is not None:
-        smhub.ws_provider.async_close()
-    await smhub.async_close()
+    coordinator = entry.runtime_data
+    if coordinator.ws_provider is not None:
+        coordinator.ws_provider.async_close()
+    await coordinator.async_close()
 
     # Services are registered globally on DOMAIN, not per entry. Only
     # tear them down once the last loaded hub is gone, otherwise a
@@ -181,17 +180,19 @@ async def update_listener(hass: HomeAssistant, entry: HabitronConfigEntry) -> No
 def _async_cleanup_stale_devices(
     hass: HomeAssistant,
     entry: HabitronConfigEntry,
-    smhub: SmartHub,
+    coordinator: HbtnCoordinator,
 ) -> None:
     """Remove device-registry entries whose Habitron module is gone.
 
-    Run after ``smhub.async_setup`` populates ``router.modules``. The
+    Run after ``HbtnCoordinator.async_setup`` populates ``router.modules``. The
     hub device and the router device are kept; everything else identified
     by ``(DOMAIN, <some uid>)`` is removed if that uid is no longer in
     the router's current module list.
     """
-    keep_uids: set[str] = {smhub.uid, smhub.router.uid}
-    keep_uids.update(getattr(module, "uid", "") for module in smhub.router.modules)
+    keep_uids: set[str] = {coordinator.uid, coordinator.router.uid}
+    keep_uids.update(
+        getattr(module, "uid", "") for module in coordinator.router.modules
+    )
     keep_uids.discard("")
 
     dev_reg = dr.async_get(hass)
@@ -303,18 +304,26 @@ _MEMBER_KEYS: Final = {
     "Wind": "wind",
     "Windpeak": "wind_peak",
     "Airquality": "airquality",
+    # Both spellings: the reading is a *usage* percentage, and the library
+    # names it that way now. Entries grown under the old label still have
+    # to map onto the same key, or their ids would not migrate.
     "Memory free": "memory_usage",
+    "Memory usage": "memory_usage",
     "Disk free": "disk_usage",
+    "Disk usage": "disk_usage",
     "CPU Frequency": "cpu_frequency",
     "CPU load": "cpu_load",
     "CPU Temperature": "cpu_temperature",
 }
 
 
-def _uid_scheme_rule(smhub: SmartHub) -> UniqueIdRule:
+def _uid_scheme_rule(coordinator: HbtnCoordinator) -> UniqueIdRule:
     """Return a rule mapping the grown ids onto the current scheme."""
-    by_uid: dict[str, Any] = {smhub.uid: smhub, smhub.router.uid: smhub.router}
-    for module in smhub.router.modules:
+    by_uid: dict[str, Any] = {
+        coordinator.uid: coordinator,
+        coordinator.router.uid: coordinator.router,
+    }
+    for module in coordinator.router.modules:
         by_uid[module.uid] = module
 
     def _member_key(uid: str, nmbr: int, *, diag: bool) -> str | None:
@@ -338,7 +347,7 @@ def _uid_scheme_rule(smhub: SmartHub) -> UniqueIdRule:
             return f"{m['u']}_set_temperature_{int(m['n']) - 47}"
         if (m := re.match(r"^Mod_(?P<u>.+)_snsr(?P<n>\d+)$", uid)) is not None:
             # On the hub this form was only ever the CPU frequency, a diag.
-            key = _member_key(m["u"], int(m["n"]), diag=m["u"] == smhub.uid)
+            key = _member_key(m["u"], int(m["n"]), diag=m["u"] == coordinator.uid)
             return f"{m['u']}_{key}" if key else None
         if (m := re.match(r"^Mod_(?P<u>.+)_perc(?P<n>\d+)$", uid)) is not None:
             key = _member_key(m["u"], int(m["n"]), diag=False)

@@ -23,8 +23,8 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add event entities for Habitron system."""
-    smhub = entry.runtime_data
-    hbtn_rt = smhub.router
+    coordinator = entry.runtime_data
+    hbtn_rt = coordinator.router
 
     area_reg = ar.async_get(hass)
     area_ids = {

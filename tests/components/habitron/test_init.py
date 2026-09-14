@@ -32,7 +32,7 @@ async def test_setup_entry(
     """A successful setup loads the entry and registers services."""
     entry = setup_integration
     assert entry.state is ConfigEntryState.LOADED
-    # runtime_data is populated with the SmartHub instance
+    # runtime_data is populated with the HbtnCoordinator instance
     assert entry.runtime_data is not None
     # Services are registered globally on the domain
     assert hass.services.has_service(DOMAIN, SERVICE_HUB_RESTART)
@@ -42,7 +42,7 @@ async def test_migrate_v1_entry_renames_the_host_key(
     hass: HomeAssistant,
     setup_homeassistant: None,
     mock_habitron_client: MagicMock,
-    mock_smart_hub_setup: None,
+    mock_coordinator_setup: None,
     mock_ws_provider: MagicMock,
     mock_coordinator_refresh: AsyncMock,
 ) -> None:
@@ -90,7 +90,7 @@ async def test_services_kept_while_other_entry_loaded(
     hass: HomeAssistant,
     setup_integration: MockConfigEntry,
     mock_habitron_client: MagicMock,
-    mock_smart_hub_setup: None,
+    mock_coordinator_setup: None,
     mock_ws_provider: MagicMock,
     mock_coordinator_refresh: AsyncMock,
 ) -> None:
@@ -140,7 +140,7 @@ async def test_setup_entry_timeout_marks_retry(
     """A timeout during setup surfaces as SETUP_RETRY, not SETUP_ERROR."""
     mock_config_entry.add_to_hass(hass)
     with patch(
-        "custom_components.habitron.smart_hub.SmartHub.async_setup",
+        "custom_components.habitron.coordinator.HbtnCoordinator.async_setup",
         side_effect=TimeoutError("hub silent"),
     ):
         assert not await hass.config_entries.async_setup(mock_config_entry.entry_id)
@@ -155,16 +155,16 @@ async def test_async_remove_config_entry_device(
     """A device matching the hub UID cannot be removed standalone."""
 
     entry = setup_integration
-    smhub = entry.runtime_data
+    coordinator = entry.runtime_data
     dev_reg = dr.async_get(hass)
     hub_device = dev_reg.async_get_or_create(
         config_entry_id=entry.entry_id,
-        identifiers={(DOMAIN, smhub.uid)},
+        identifiers={(DOMAIN, coordinator.uid)},
         name="Hub",
     )
-    # Hub device identifies the smhub itself → must NOT be removable.
+    # Hub device identifies the coordinator itself → must NOT be removable.
     assert await async_remove_config_entry_device(hass, entry, hub_device) is False, (
-        f"Expected False; smhub.uid={smhub.uid!r}, identifiers={hub_device.identifiers!r}"
+        f"Expected False; coordinator.uid={coordinator.uid!r}, identifiers={hub_device.identifiers!r}"
     )
 
     other_device = dev_reg.async_get_or_create(
@@ -185,7 +185,7 @@ async def test_setup_entry_connection_refused_marks_retry(
     """A ``ConnectionRefusedError`` during setup surfaces as SETUP_RETRY."""
     mock_config_entry.add_to_hass(hass)
     with patch(
-        "custom_components.habitron.smart_hub.SmartHub.async_setup",
+        "custom_components.habitron.coordinator.HbtnCoordinator.async_setup",
         side_effect=ConnectionRefusedError("hub refused"),
     ):
         assert not await hass.config_entries.async_setup(mock_config_entry.entry_id)
@@ -203,7 +203,7 @@ async def test_setup_entry_oserror_marks_retry(
     """A network-level ``OSError`` during setup surfaces as SETUP_RETRY."""
     mock_config_entry.add_to_hass(hass)
     with patch(
-        "custom_components.habitron.smart_hub.SmartHub.async_setup",
+        "custom_components.habitron.coordinator.HbtnCoordinator.async_setup",
         side_effect=OSError("network down"),
     ):
         assert not await hass.config_entries.async_setup(mock_config_entry.entry_id)
@@ -231,7 +231,7 @@ async def test_setup_entry_removes_stale_device(
     setup_homeassistant: None,
     mock_config_entry: MockConfigEntry,
     mock_habitron_client: MagicMock,
-    mock_smart_hub_setup: None,
+    mock_coordinator_setup: None,
     mock_ws_provider: MagicMock,
     mock_coordinator_refresh: AsyncMock,
 ) -> None:
@@ -382,12 +382,12 @@ def _model_for_migration() -> MagicMock:
     router = MagicMock()
     router.uid = "RT-1"
     router.modules = [module]
-    smhub = MagicMock()
-    smhub.uid = "HUB-1"
-    smhub.router = router
-    smhub.sensors = [member("Memory free", 0), member("Disk free", 1)]
-    smhub.diags = [member("CPU Frequency", 0)]
-    return smhub
+    coordinator = MagicMock()
+    coordinator.uid = "HUB-1"
+    coordinator.router = router
+    coordinator.sensors = [member("Memory free", 0), member("Disk free", 1)]
+    coordinator.diags = [member("CPU Frequency", 0)]
+    return coordinator
 
 
 @pytest.mark.parametrize(

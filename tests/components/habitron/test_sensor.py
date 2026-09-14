@@ -2,7 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from habitron_client import Area
+from habitron_client import Area, async_build_hub
 import pytest
 
 from custom_components.habitron.const import DOMAIN
@@ -21,6 +21,8 @@ from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import area_registry as ar, entity_registry as er
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+
+from .const import MOCK_SMHUB_INFO
 
 
 def _make_module(uid: str = "MOD-1") -> MagicMock:
@@ -796,13 +798,13 @@ async def test_habitron_client_sensor_async_added_listens_for_bus_event(
 
 async def test_async_setup_entry_emits_all_sensor_types(hass: HomeAssistant) -> None:
     """async_setup_entry creates the broad mix of sensor entities."""
-    # SmartHub-level sensors
+    # HbtnCoordinator-level sensors
     mem = MagicMock()
-    mem.name = "Memory free"
+    mem.name = "Memory usage"
     mem.nmbr = 0
     mem.type = 1
     disk = MagicMock()
-    disk.name = "Disk free"
+    disk.name = "Disk usage"
     disk.nmbr = 1
     disk.type = 1
     cpu_freq = MagicMock()
@@ -877,10 +879,10 @@ async def test_async_setup_entry_emits_all_sensor_types(hass: HomeAssistant) -> 
     mod.diags = [status, power_temp]
     mod.stream_name = "touch_1"
 
-    smhub = MagicMock()
-    smhub.sensors = [mem, disk]
-    smhub.diags = [cpu_freq, cpu_load, cpu_temp]
-    smhub.uid = "HUB-1"
+    coordinator = MagicMock()
+    coordinator.sensors = [mem, disk]
+    coordinator.diags = [cpu_freq, cpu_load, cpu_temp]
+    coordinator.uid = "HUB-1"
 
     chan_to = MagicMock()
     chan_to.nmbr = 0
@@ -903,7 +905,7 @@ async def test_async_setup_entry_emits_all_sensor_types(hass: HomeAssistant) -> 
     router.areas = [Area(nmbr=0, name="House")]
 
     entry = MagicMock()
-    entry.runtime_data = smhub
+    entry.runtime_data = coordinator
     entry.runtime_data.router = router
 
     added: list = []
@@ -945,10 +947,10 @@ async def test_async_setup_entry_analog_area_assignment_external(
     mod.logic = []
     mod.diags = []
 
-    smhub = MagicMock()
-    smhub.sensors = []
-    smhub.diags = []
-    smhub.uid = "HUB-1"
+    coordinator = MagicMock()
+    coordinator.sensors = []
+    coordinator.diags = []
+    coordinator.uid = "HUB-1"
     router = MagicMock()
     router.modules = [mod]
     router.coord = MagicMock()
@@ -958,7 +960,7 @@ async def test_async_setup_entry_analog_area_assignment_external(
     router.areas = [Area(nmbr=5, name="area_5_id")]
 
     entry = MagicMock()
-    entry.runtime_data = smhub
+    entry.runtime_data = coordinator
     entry.runtime_data.router = router
 
     captured: list = []
@@ -989,10 +991,10 @@ async def test_async_setup_entry_analog_area_overflow_falls_back(
     mod.logic = []
     mod.diags = []
 
-    smhub = MagicMock()
-    smhub.sensors = []
-    smhub.diags = []
-    smhub.uid = "HUB-1"
+    coordinator = MagicMock()
+    coordinator.sensors = []
+    coordinator.diags = []
+    coordinator.uid = "HUB-1"
     router = MagicMock()
     router.modules = [mod]
     router.coord = MagicMock()
@@ -1002,7 +1004,7 @@ async def test_async_setup_entry_analog_area_overflow_falls_back(
     router.areas = [Area(nmbr=0, name="House")]
 
     entry = MagicMock()
-    entry.runtime_data = smhub
+    entry.runtime_data = coordinator
     entry.runtime_data.router = router
 
     captured: list = []
@@ -1069,10 +1071,10 @@ async def test_analog_area_not_restamped_on_reload(hass: HomeAssistant) -> None:
     mod.analogins = [ain]
     mod.logic = []
     mod.diags = []
-    smhub = MagicMock()
-    smhub.sensors = []
-    smhub.diags = []
-    smhub.uid = "HUB-1"
+    coordinator = MagicMock()
+    coordinator.sensors = []
+    coordinator.diags = []
+    coordinator.uid = "HUB-1"
     router = MagicMock()
     router.modules = [mod]
     router.chan_timeouts = []
@@ -1080,7 +1082,7 @@ async def test_analog_area_not_restamped_on_reload(hass: HomeAssistant) -> None:
     router.voltages = []
     router.areas = [Area(nmbr=5, name="area_5_id")]
     entry = MagicMock()
-    entry.runtime_data = smhub
+    entry.runtime_data = coordinator
     entry.runtime_data.router = router
 
     captured: list = []
@@ -1096,3 +1098,31 @@ async def test_analog_area_not_restamped_on_reload(hass: HomeAssistant) -> None:
 
     analog = next(e for e in captured if e.unique_id.endswith("_analog_in_0"))
     assert analog._initial_area_id is None
+
+
+async def test_hub_reading_names_match_what_the_platform_looks_for() -> None:
+    """The hub readings are matched by name, so a rename would drop them silently.
+
+    ``async_setup_entry`` picks the percentage and diagnostic sensors out of
+    ``coordinator.sensors``/``.diags`` by comparing names. Those members are
+    built by ``habitron_client`` now, so the two sets have to agree -- a
+    mismatch produces no error, just a hub without entities.
+    """
+    client = MagicMock()
+    client.get_smhub_info = AsyncMock(
+        return_value={
+            **MOCK_SMHUB_INFO,
+            "hardware": {
+                **MOCK_SMHUB_INFO["hardware"],
+                "platform": {"type": "Raspberry Pi 4 Model B"},
+            },
+        }
+    )
+    hub = await async_build_hub(client)
+
+    assert {member.name for member in hub.sensors} == {"Memory usage", "Disk usage"}
+    assert {member.name for member in hub.diags} == {
+        "CPU Frequency",
+        "CPU load",
+        "CPU Temperature",
+    }

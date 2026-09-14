@@ -4,6 +4,50 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.4.3b2
+
+### The SmartHub class is gone; the coordinator owns the model
+Ownership was inverted compared with the core integration: `entry.runtime_data`
+held a `SmartHub`, which constructed `HbtnComm`, constructed `HbtnCoordinator`
+and held `router`, `uid` and `ws_provider`. The core review asked what the role
+of `smart_hub` was as opposed to the coordinator, and the honest answer is that
+its `async_setup` is what `_async_setup` exists for. `HbtnCoordinator` now holds
+the transport, the hub and the bus model, and is what `runtime_data` carries.
+
+The hub model itself comes from `habitron_client` 2.1.1: `async_build_hub`
+builds it, `async_refresh_hub` fills its readings, and the uid is derived by the
+library's `normalise_mac`. That replaces the bare `.lower()` this integration
+used, which accepted anything -- a hub answering `00:00:00:00:00:00` got the
+shared id `000000000000` rather than falling back to the config entry.
+
+`communicate.py` stays. It is not the wrapper the core version was: 46 of its
+methods are the command surface the platforms call, and they adapt rather than
+forward -- `_convert_mod_id` turns the bus address into the relative one the
+library takes, the daytime/alarm modes encode to `0x40`..`0x43`, the LED output
+is offset by the module's output count, the analogue output maps to dimmer 3.
+Pushing that into twenty platform files, or into the coordinator, would be worse
+than leaving it. Moving the address arithmetic and the mode constants into the
+library is the next step, after which the layer can go.
+
+The host readings moved out of `HbtnComm.async_system_update`, which called back
+into the hub through a reference it held for that one purpose. The coordinator
+now refreshes them after the bus poll and outside its error guard, so a failed
+host read cannot fail the tick and mark every entity unavailable.
+
+### Hub percentage sensors renamed
+The library names them `Memory usage` / `Disk usage`; this integration called
+them `Memory free` / `Disk free` while reporting `memory.percent`, i.e. used.
+`sensor.py` matches those members by name, so the literals moved with them, and
+`_MEMBER_KEYS` now carries both spellings -- an entity grown under the old label
+still has to migrate onto the same key. The unique id is derived from the name
+*prefix* (`memory` -> `memory_usage`), so ids and history are unaffected; only
+the default display name changes.
+
+A test pins the contract: `async_build_hub` is driven with a Raspberry-Pi
+payload and the resulting member names are compared against what the platform
+looks for. A silent rename on either side would otherwise produce a hub with no
+entities and no error.
+
 ## v3.4.3b1
 
 ### Device links pointed at one hard-coded Home Assistant address

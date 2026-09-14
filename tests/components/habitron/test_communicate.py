@@ -10,14 +10,14 @@ from homeassistant.const import CONF_HOST
 
 
 def _make_comm(host: str = "192.168.1.50") -> HbtnComm:
-    """Build an HbtnComm with the client + smhub stubbed out."""
+    """Build an HbtnComm with the client + coordinator stubbed out."""
     hass = MagicMock()
     hass.data = {"integrations": {"habitron": MagicMock(manifest={"version": "9.9.9"})}}
     hass.async_add_executor_job = AsyncMock()
     config = MagicMock()
     config.data = {CONF_HOST: host}
-    smhub = MagicMock()
-    comm = HbtnComm(hass, config, smhub)
+    coordinator = MagicMock()
+    comm = HbtnComm(hass, config, coordinator)
     comm._client = AsyncMock(spec=HabitronClient)
     return comm
 
@@ -64,10 +64,10 @@ def test_property_accessors() -> None:
 
 
 def test_router_property_falls_back_to_smhub_router() -> None:
-    """``router`` returns smhub.router until set_router stores one."""
+    """``router`` returns coordinator.router until set_router stores one."""
     comm = _make_comm()
     rt = Router(uid="rt_x")
-    comm.smhub.router = rt
+    comm.coordinator.router = rt
     assert comm.router is rt
     other = Router(uid="rt_y")
     comm.set_router(other)
@@ -144,26 +144,31 @@ async def test_async_system_update_suspended_returns_crc() -> None:
     comm = _make_comm()
     comm.update_suspended = True
     comm.crc = 7
-    comm.smhub.update = AsyncMock()
+    comm.coordinator.update = AsyncMock()
     with patch(
         "custom_components.habitron.communicate.async_refresh_system",
         new=AsyncMock(),
     ) as refresh:
         assert await comm.async_system_update() == 7
         refresh.assert_not_called()
-        comm.smhub.update.assert_not_called()
+        comm.coordinator.update.assert_not_called()
 
 
 async def test_async_system_update_refreshes_and_returns_new_crc() -> None:
-    """A normal tick refreshes hub diagnostics + the bus, returning the new CRC."""
+    """A normal tick refreshes the bus and returns the new CRC.
+
+    The hub's own host readings are *not* refreshed here: the coordinator does
+    that after this call and outside its error guard, so a hiccup there cannot
+    fail the tick and mark every entity unavailable.
+    """
     comm = _make_comm()
-    comm.smhub.update = AsyncMock()
+    comm.coordinator.update = AsyncMock()
     with patch(
         "custom_components.habitron.communicate.async_refresh_system",
         new=AsyncMock(return_value=99),
     ) as refresh:
         assert await comm.async_system_update() == 99
-        comm.smhub.update.assert_awaited()
+        comm.coordinator.update.assert_not_awaited()
         refresh.assert_awaited()
         assert comm.crc == 99
 

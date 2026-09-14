@@ -106,7 +106,7 @@ class HabitronEntity(CoordinatorEntity["HbtnCoordinator"]):
 
     Holds the parsed :class:`~habitron_client.Module` and one of its members,
     links to the module device and—on add—subscribes the member's change
-    listener so the SmartHub's pushed updates write HA state immediately. The
+    listener so the HbtnCoordinator's pushed updates write HA state immediately. The
     transport is reached through ``self.comm`` (the coordinator owns it); the
     model itself carries no back-reference.
     """

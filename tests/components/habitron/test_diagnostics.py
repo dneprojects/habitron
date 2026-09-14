@@ -38,26 +38,26 @@ def _module(uid: str = "MOD-1", name: str = "Living room") -> Module:
     )
 
 
-def _smhub(router: Router) -> MagicMock:
-    smhub = MagicMock()
-    smhub.uid = MOCK_UID
-    smhub.smhub_name = MOCK_NAME
-    smhub.smhub_type = MOCK_HWTYPE
-    smhub.smhub_version = MOCK_VERSION
-    smhub.host = MOCK_HOST
-    smhub.addon_slug = ""
-    smhub.online = True
-    smhub.router = router
-    smhub.coordinator = MagicMock(
+def _coordinator(router: Router) -> MagicMock:
+    """The coordinator as diagnostics sees it: hub facts and poll state in one."""
+    coordinator = MagicMock(
         update_interval=timedelta(seconds=5),
         last_update_success=True,
         always_update=False,
     )
-    return smhub
+    coordinator.uid = MOCK_UID
+    coordinator.smhub_name = MOCK_NAME
+    coordinator.smhub_type = MOCK_HWTYPE
+    coordinator.smhub_version = MOCK_VERSION
+    coordinator.host = MOCK_HOST
+    coordinator.addon_slug = ""
+    coordinator.online = True
+    coordinator.router = router
+    return coordinator
 
 
 def _entry(hass: HomeAssistant, router: Router) -> MockConfigEntry:
-    """A real config entry (for a valid entry_id) with a mock SmartHub."""
+    """A real config entry (for a valid entry_id) with a mock coordinator."""
     entry = MockConfigEntry(
         domain=DOMAIN,
         title=MOCK_NAME,
@@ -66,7 +66,7 @@ def _entry(hass: HomeAssistant, router: Router) -> MockConfigEntry:
         options=MOCK_CONFIG_OPTIONS,
     )
     entry.add_to_hass(hass)
-    entry.runtime_data = _smhub(router)
+    entry.runtime_data = _coordinator(router)
     return entry
 
 
@@ -151,7 +151,7 @@ async def test_config_entry_diagnostics_over_real_setup(
 ) -> None:
     """Diagnostics over a real setup redact secrets and reflect the live model.
 
-    Public path: a full config-entry setup yields the real ``SmartHub`` in
+    Public path: a full config-entry setup yields the real ``HbtnCoordinator`` in
     ``runtime_data``, so the dump reads live hub/router/module state instead of
     a hand-built mock — while secrets stay redacted.
     """

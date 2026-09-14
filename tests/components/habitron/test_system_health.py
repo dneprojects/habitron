@@ -17,7 +17,7 @@ def _make_hub_entry(modules: int, sys_ok: bool) -> MagicMock:
 
     Avoids using ``MockConfigEntry`` + a real loaded state to keep the
     test isolated from HA's config_entries teardown machinery, which
-    hangs the event loop with a half-mocked SmartHub.
+    hangs the event loop with a half-mocked HbtnCoordinator.
     """
     hub = MagicMock()
     hub.router.sys_ok = sys_ok

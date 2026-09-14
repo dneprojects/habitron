@@ -2,7 +2,7 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
 from habitron_client import BusMember, Logic, Module, SmartController
 
@@ -31,9 +31,6 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from ._helpers import HbtnAreaMixin, deviating_area_id, hbtn_device_info
 from .coordinator import HabitronConfigEntry, HbtnCoordinator
 
-if TYPE_CHECKING:
-    from .smart_hub import SmartHub
-
 PARALLEL_UPDATES = 0
 
 
@@ -43,9 +40,9 @@ async def async_setup_entry(  # noqa: C901
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add sensors for passed config_entry in HA."""
-    smhub = entry.runtime_data
-    hbtn_rt = smhub.router
-    hbtn_cord = smhub.coordinator
+    coordinator = entry.runtime_data
+    hbtn_rt = coordinator.router
+    hbtn_cord = coordinator
 
     area_reg = ar.async_get(hass)
     area_ids = {
@@ -62,30 +59,30 @@ async def async_setup_entry(  # noqa: C901
     }
 
     new_devices: list[SensorEntity] = []
-    for smhub_sensor in smhub.sensors:
-        if smhub_sensor.name == "Memory free":
+    for smhub_sensor in coordinator.sensors:
+        if smhub_sensor.name == "Memory usage":
             new_devices.append(
-                PercSensor(smhub, smhub_sensor, hbtn_cord, len(new_devices))
+                PercSensor(coordinator, smhub_sensor, hbtn_cord, len(new_devices))
             )
-        if smhub_sensor.name == "Disk free":
+        if smhub_sensor.name == "Disk usage":
             new_devices.append(
-                PercSensor(smhub, smhub_sensor, hbtn_cord, len(new_devices))
+                PercSensor(coordinator, smhub_sensor, hbtn_cord, len(new_devices))
             )
-    for smhub_diag in smhub.diags:
+    for smhub_diag in coordinator.diags:
         if smhub_diag.name == "CPU Frequency":
             new_devices.append(
-                FrequencySensor(smhub, smhub_diag, hbtn_cord, len(new_devices))
+                FrequencySensor(coordinator, smhub_diag, hbtn_cord, len(new_devices))
             )
         if smhub_diag.name == "CPU load":
             new_devices.append(
-                PercSensor(smhub, smhub_diag, hbtn_cord, len(new_devices))
+                PercSensor(coordinator, smhub_diag, hbtn_cord, len(new_devices))
             )
 
         if smhub_diag.name == "CPU Temperature":
             new_devices.append(
-                # SmartHub stands in for an HbtnModule here (same lookup shape).
+                # HbtnCoordinator stands in for an HbtnModule here (same lookup shape).
                 TemperatureDSensor(
-                    cast("Module", smhub),
+                    cast("Module", coordinator),
                     smhub_diag,
                     hbtn_cord,
                     len(new_devices),
@@ -274,7 +271,7 @@ async def async_setup_entry(  # noqa: C901
 
 
 def _host_diags_unavailable(module: Module) -> bool:
-    """Return True while the SmartHub has not answered its first host query.
+    """Return True while the HbtnCoordinator has not answered its first host query.
 
     ``Diagnostic``/``Sensor`` default to 0, which for a CPU load or a disk usage
     is a plausible reading rather than an obvious placeholder, so the hub's own
@@ -739,7 +736,7 @@ class PercSensor(HbtnSensor):
 
     def __init__(
         self,
-        module: SmartHub,
+        module: HbtnCoordinator,
         perctg: BusMember,
         coord: HbtnCoordinator,
         idx: int,
@@ -788,7 +785,7 @@ class FrequencySensor(HbtnSensor):
 
     def __init__(
         self,
-        module: SmartHub,
+        module: HbtnCoordinator,
         freq: BusMember,
         coord: HbtnCoordinator,
         idx: int,

@@ -20,8 +20,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from ._helpers import hbtn_device_info
-from .coordinator import HabitronConfigEntry
-from .smart_hub import SmartHub
+from .coordinator import HabitronConfigEntry, HbtnCoordinator
 from .ws_provider import HabitronWebRTCProvider
 
 PARALLEL_UPDATES = 1
@@ -35,14 +34,16 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up Habitron assist satellite entities."""
-    smhub: SmartHub = entry.runtime_data
-    hbtn_rt = smhub.router
+    coordinator: HbtnCoordinator = entry.runtime_data
+    hbtn_rt = coordinator.router
 
-    if not smhub.ws_provider:
-        _LOGGER.error("WebRTC provider not available on SmartHub for assist_satellite")
+    if not coordinator.ws_provider:
+        _LOGGER.error(
+            "WebRTC provider not available on the coordinator for assist_satellite"
+        )
         return
 
-    provider: HabitronWebRTCProvider = smhub.ws_provider
+    provider: HabitronWebRTCProvider = coordinator.ws_provider
     new_devices = []
 
     for hbt_module in hbtn_rt.modules:

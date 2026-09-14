@@ -46,7 +46,7 @@ async def test_user_flow_success(
     hass: HomeAssistant,
     setup_homeassistant: None,
     mock_habitron_client: MagicMock,
-    mock_smart_hub_setup: None,
+    mock_coordinator_setup: None,
     mock_ws_provider: MagicMock,
     mock_coordinator_refresh,
 ) -> None:
@@ -120,7 +120,7 @@ async def test_ssdp_discovery_with_udn(
     hass: HomeAssistant,
     setup_homeassistant: None,
     mock_habitron_client: MagicMock,
-    mock_smart_hub_setup: None,
+    mock_coordinator_setup: None,
     mock_ws_provider: MagicMock,
     mock_coordinator_refresh,
 ) -> None:
@@ -154,7 +154,7 @@ async def test_ssdp_discovery_serial_fallback(
     hass: HomeAssistant,
     setup_homeassistant: None,
     mock_habitron_client: MagicMock,
-    mock_smart_hub_setup: None,
+    mock_coordinator_setup: None,
     mock_ws_provider: MagicMock,
     mock_coordinator_refresh,
 ) -> None:
@@ -309,7 +309,7 @@ async def test_options_flow(
     setup_homeassistant: None,
     mock_config_entry: MockConfigEntry,
     mock_habitron_client: MagicMock,
-    mock_smart_hub_setup: None,
+    mock_coordinator_setup: None,
     mock_ws_provider: MagicMock,
     mock_coordinator_refresh,
 ) -> None:
@@ -579,7 +579,7 @@ async def test_ssdp_discovery_falls_back_to_udp_serial(
     hass: HomeAssistant,
     setup_homeassistant: None,
     mock_habitron_client: MagicMock,
-    mock_smart_hub_setup: None,
+    mock_coordinator_setup: None,
     mock_ws_provider: MagicMock,
     mock_coordinator_refresh,
 ) -> None:
@@ -613,7 +613,7 @@ async def test_ssdp_discovery_no_udn_no_udp_falls_back_to_host_id(
     hass: HomeAssistant,
     setup_homeassistant: None,
     mock_habitron_client: MagicMock,
-    mock_smart_hub_setup: None,
+    mock_coordinator_setup: None,
     mock_ws_provider: MagicMock,
     mock_coordinator_refresh,
 ) -> None:
@@ -845,7 +845,7 @@ async def test_reconfigure_flow_updates_entry_on_success(
     hass: HomeAssistant,
     setup_homeassistant: None,
     mock_habitron_client: MagicMock,
-    mock_smart_hub_setup: None,
+    mock_coordinator_setup: None,
     mock_ws_provider: MagicMock,
     mock_coordinator_refresh,
 ) -> None:
@@ -928,7 +928,7 @@ async def test_options_flow_surfaces_cannot_connect(
     setup_homeassistant: None,
     mock_config_entry: MockConfigEntry,
     mock_habitron_client: MagicMock,
-    mock_smart_hub_setup: None,
+    mock_coordinator_setup: None,
     mock_ws_provider: MagicMock,
     mock_coordinator_refresh,
 ) -> None:
@@ -955,7 +955,7 @@ async def test_options_flow_surfaces_unknown_exception(
     setup_homeassistant: None,
     mock_config_entry: MockConfigEntry,
     mock_habitron_client: MagicMock,
-    mock_smart_hub_setup: None,
+    mock_coordinator_setup: None,
     mock_ws_provider: MagicMock,
     mock_coordinator_refresh,
 ) -> None:
@@ -1014,7 +1014,7 @@ async def test_user_flow_picks_up_serial_from_udp_probe(
     hass: HomeAssistant,
     setup_homeassistant: None,
     mock_habitron_client: MagicMock,
-    mock_smart_hub_setup: None,
+    mock_coordinator_setup: None,
     mock_ws_provider: MagicMock,
     mock_coordinator_refresh,
 ) -> None:
@@ -1037,7 +1037,7 @@ async def test_user_flow_picks_up_serial_from_udp_probe(
 async def test_async_hub_mac_returns_cleaned_mac() -> None:
     """_async_hub_mac returns the MAC without separators, in lower case.
 
-    The same spelling ``SmartHub.uid`` uses, so the entry id and the device
+    The same spelling ``HbtnCoordinator.uid`` uses, so the entry id and the device
     identifiers cannot drift apart.
     """
     client = AsyncMock()
@@ -1066,7 +1066,7 @@ async def test_ssdp_skips_non_matching_entry_then_confirms(
     hass: HomeAssistant,
     setup_homeassistant: None,
     mock_habitron_client: MagicMock,
-    mock_smart_hub_setup: None,
+    mock_coordinator_setup: None,
     mock_ws_provider: MagicMock,
     mock_coordinator_refresh,
 ) -> None:

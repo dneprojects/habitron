@@ -14,8 +14,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from ._helpers import hbtn_device_info
-from .coordinator import HabitronConfigEntry
-from .smart_hub import SmartHub
+from .coordinator import HabitronConfigEntry, HbtnCoordinator
 from .ws_provider import HabitronWebRTCProvider
 
 PARALLEL_UPDATES = 1
@@ -29,12 +28,12 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up Habitron cameras from a config entry."""
-    smhub: SmartHub = entry.runtime_data
-    hbtn_rt = smhub.router
-    if smhub.ws_provider is None:
-        _LOGGER.error("WebRTC provider not available on SmartHub instance")
+    coordinator: HbtnCoordinator = entry.runtime_data
+    hbtn_rt = coordinator.router
+    if coordinator.ws_provider is None:
+        _LOGGER.error("WebRTC provider not available on the coordinator")
         return
-    provider: HabitronWebRTCProvider = smhub.ws_provider
+    provider: HabitronWebRTCProvider = coordinator.ws_provider
 
     new_devices: list[Camera] = []
     for hbt_module in hbtn_rt.modules:

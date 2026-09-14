@@ -4,7 +4,7 @@ from collections.abc import Awaitable, Callable, Generator
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from habitron_client import HabitronClient, Router
+from habitron_client import HabitronClient, Router, SmartHub
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -128,28 +128,29 @@ def mock_habitron_client() -> Generator[MagicMock]:
 
 
 @pytest.fixture
-def mock_smart_hub_setup() -> Generator[MagicMock]:
-    """Stub ``SmartHub.async_setup`` so config-entry tests don't touch the bus.
+def mock_coordinator_setup() -> Generator[MagicMock]:
+    """Stub ``HbtnCoordinator.async_setup`` so config-entry tests don't touch the bus.
 
-    Populates the SmartHub instance with the field set the rest of the
+    Populates the HbtnCoordinator instance with the field set the rest of the
     integration expects after a real ``async_setup`` would have run.
     """
 
     async def _async_setup(self) -> None:
-        self._mac = MOCK_MAC
-        self.uid = MOCK_UID
-        self._version = MOCK_VERSION
-        self._type = MOCK_HWTYPE
+        self.hub = SmartHub(
+            uid=MOCK_UID,
+            lan_mac=MOCK_MAC,
+            macs=[MOCK_MAC],
+            platform=MOCK_HWTYPE,
+            version=MOCK_VERSION,
+        )
         self.host = MOCK_HOST
-        self.addon_slug = ""
         self.base_url = f"http://{MOCK_HOST}:7780"
-        self.router.b_uid = MOCK_UID
         self.router.modules = []
         self.router.states = []
 
     with (
         patch(
-            "custom_components.habitron.smart_hub.SmartHub.async_setup",
+            "custom_components.habitron.coordinator.HbtnCoordinator.async_setup",
             new=_async_setup,
         ),
         patch(
@@ -210,7 +211,7 @@ async def setup_integration(
     setup_homeassistant: None,
     mock_config_entry: MockConfigEntry,
     mock_habitron_client: MagicMock,
-    mock_smart_hub_setup: None,
+    mock_coordinator_setup: None,
     mock_ws_provider: MagicMock,
     mock_coordinator_refresh: AsyncMock,
 ) -> MockConfigEntry:
@@ -230,7 +231,7 @@ def real_setup(
 ) -> Callable[..., Awaitable[tuple[MockConfigEntry, AsyncMock]]]:
     """Return a factory that runs a *real* setup over a caller-supplied router.
 
-    Unlike ``setup_integration`` (which stubs ``SmartHub.async_setup``), this
+    Unlike ``setup_integration`` (which stubs ``HbtnCoordinator.async_setup``), this
     drives the real config-entry setup pipeline — only the ``habitron_client``
     boundary, the bus-model build and the frontend iconset JS are mocked. The
     factory returns the loaded entry plus the client mock, so callers can drive
@@ -279,10 +280,10 @@ def real_setup(
                 new=AsyncMock(return_value=MOCK_HOST),
             ),
             patch(
-                "custom_components.habitron.smart_hub.async_build_system",
+                "custom_components.habitron.coordinator.async_build_system",
                 new=AsyncMock(return_value=router),
             ),
-            patch("custom_components.habitron.smart_hub.add_extra_js_url"),
+            patch("custom_components.habitron.coordinator.add_extra_js_url"),
         ):
             assert await hass.config_entries.async_setup(entry.entry_id)
             await hass.async_block_till_done()

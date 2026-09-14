@@ -24,7 +24,7 @@ from .text import DISPLAY_TYPES
 
 if TYPE_CHECKING:
     from .communicate import HbtnComm
-    from .smart_hub import SmartHub
+    from .coordinator import HbtnCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,14 +37,14 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add notification entities for display and GSM modules."""
-    smhub = entry.runtime_data
+    coordinator = entry.runtime_data
     new_devices: list[NotifyEntity] = []
-    for hbt_module in smhub.router.modules:
+    for hbt_module in coordinator.router.modules:
         if hbt_module.typ in DISPLAY_TYPES:
-            new_devices.append(HbtnDisplayMessage(hbt_module, smhub))
+            new_devices.append(HbtnDisplayMessage(hbt_module, coordinator))
         if hbt_module.typ == b"\x1e\x03":
             new_devices.extend(
-                HbtnGSMMessage(hbt_module, sms, smhub.comm)
+                HbtnGSMMessage(hbt_module, sms, coordinator.comm)
                 for sms in hbt_module.gsm_numbers
             )
 
@@ -129,11 +129,11 @@ class HbtnDisplayMessage(NotifyEntity):
     _attr_has_entity_name = True
     _attr_translation_key = "display_message"
 
-    def __init__(self, module: Module, smhub: SmartHub) -> None:
+    def __init__(self, module: Module, coordinator: HbtnCoordinator) -> None:
         """Initialize the display notify target."""
         super().__init__()
         self._module = module
-        self._smhub = smhub
+        self._smhub = coordinator
         self._attr_unique_id = f"{module.uid}_message"
 
     @property

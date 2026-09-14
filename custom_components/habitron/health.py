@@ -1,6 +1,6 @@
 """Operate-mode health repairs issues for Habitron modules.
 
-The SmartHub reports per-module operate-mode faults via ``SYS_ERR`` events,
+The HbtnCoordinator reports per-module operate-mode faults via ``SYS_ERR`` events,
 which the library applies to ``module.health``. For every module we subscribe to
 that member and mirror its state into a repairs issue: an active fault bitmask
 raises (or refreshes) a per-module issue, a cleared mask deletes it. The
@@ -25,8 +25,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import issue_registry as ir
 
 from .const import DOMAIN
-from .coordinator import HabitronConfigEntry
-from .smart_hub import SmartHub
+from .coordinator import HabitronConfigEntry, HbtnCoordinator
 
 
 def _issue_id(module: Module) -> str:
@@ -37,14 +36,14 @@ def _issue_id(module: Module) -> str:
 def async_setup_module_health_issues(
     hass: HomeAssistant,
     entry: HabitronConfigEntry,
-    smhub: SmartHub,
+    coordinator: HbtnCoordinator,
 ) -> None:
     """Mirror each module's health member into a repairs issue.
 
     Registers one listener per module and an unloader so the subscriptions go
     away with the config entry.
     """
-    for module in smhub.router.modules:
+    for module in coordinator.router.modules:
         remove = _async_track_module_health(hass, entry.entry_id, module)
         entry.async_on_unload(remove)
 

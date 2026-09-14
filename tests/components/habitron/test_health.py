@@ -77,11 +77,11 @@ async def test_fault_mask_change_refreshes_issue(hass: HomeAssistant) -> None:
 async def test_setup_subscribes_each_module(hass: HomeAssistant) -> None:
     """async_setup_module_health_issues tracks every module and registers unloaders."""
     modules = [_module(uid="MOD-1"), _module(uid="MOD-2")]
-    smhub = MagicMock()
-    smhub.router.modules = modules
+    coordinator = MagicMock()
+    coordinator.router.modules = modules
     entry = MagicMock()
 
-    async_setup_module_health_issues(hass, entry, smhub)
+    async_setup_module_health_issues(hass, entry, coordinator)
 
     assert all(len(module.health._listeners) == 1 for module in modules)
     # One unloader registered per module.

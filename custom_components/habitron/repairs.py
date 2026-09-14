@@ -28,8 +28,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
 
 from .const import DOMAIN
-from .coordinator import HabitronConfigEntry
-from .smart_hub import SmartHub
+from .coordinator import HabitronConfigEntry, HbtnCoordinator
 
 # Communication-timeout bit (F1): the module cannot be reached on the bus.
 _FAULT_COMM_TIMEOUT = 0x01
@@ -37,7 +36,7 @@ _FAULT_COMM_TIMEOUT = 0x01
 
 def _resolve_module(
     hass: HomeAssistant, data: dict[str, str] | None
-) -> tuple[SmartHub, Module] | None:
+) -> tuple[HbtnCoordinator, Module] | None:
     """Return the (hub, module) referenced by an issue's ``data``, or None.
 
     None means the entry is gone/unloaded or the module no longer exists — the
@@ -50,14 +49,18 @@ def _resolve_module(
     )
     if entry is None or entry.state is not ConfigEntryState.LOADED:
         return None
-    smhub: SmartHub = entry.runtime_data
+    coordinator: HbtnCoordinator = entry.runtime_data
     module = next(
-        (mod for mod in smhub.router.modules if mod.uid == data.get("module_uid")),
+        (
+            mod
+            for mod in coordinator.router.modules
+            if mod.uid == data.get("module_uid")
+        ),
         None,
     )
     if module is None:
         return None
-    return smhub, module
+    return coordinator, module
 
 
 def _channel_and_peers(router: Router, module: Module) -> tuple[int | None, list[str]]:
@@ -134,8 +137,8 @@ class ModuleFaultRepairFlow(RepairsFlow):
         resolved = _resolve_module(self.hass, self._data)
         if resolved is None:
             return self.async_abort(reason="module_unavailable")
-        smhub, module = resolved
-        await smhub.comm.module_restart(module.addr)
+        coordinator, module = resolved
+        await coordinator.comm.module_restart(module.addr)
         return self.async_create_entry(title="", data={})
 
     async def async_step_confirm_power_cycle(
@@ -145,8 +148,8 @@ class ModuleFaultRepairFlow(RepairsFlow):
         resolved = _resolve_module(self.hass, self._data)
         if resolved is None:
             return self.async_abort(reason="module_unavailable")
-        smhub, module = resolved
-        channel, peers = _channel_and_peers(smhub.router, module)
+        coordinator, module = resolved
+        channel, peers = _channel_and_peers(coordinator.router, module)
         if channel is None:
             # Module not mapped to a channel — cannot power cycle.
             return self.async_abort(reason="channel_unknown")
@@ -172,11 +175,11 @@ class ModuleFaultRepairFlow(RepairsFlow):
         resolved = _resolve_module(self.hass, self._data)
         if resolved is None:
             return self.async_abort(reason="module_unavailable")
-        smhub, module = resolved
-        channel, _ = _channel_and_peers(smhub.router, module)
+        coordinator, module = resolved
+        channel, _ = _channel_and_peers(coordinator.router, module)
         if channel is None:
             return self.async_abort(reason="channel_unknown")
-        await smhub.comm.async_power_cycle_channel(channel)
+        await coordinator.comm.async_power_cycle_channel(channel)
         return self.async_create_entry(title="", data={})
 
     async def async_step_room_controller_unreachable(

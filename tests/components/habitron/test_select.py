@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from habitron_client import HbtnCommand, Module, Router, Sensor
 
 from custom_components.habitron.const import ATTR_MESSAGE_ID, AlarmMode, DaytimeMode
+from custom_components.habitron.coordinator import LoggingLevels
 from custom_components.habitron.select import (
     HbtnMode,
     HbtnSelectAlarmModePush,
@@ -14,7 +15,6 @@ from custom_components.habitron.select import (
     HbtnStoredMessageSelect,
     async_setup_entry,
 )
-from custom_components.habitron.smart_hub import LoggingLevels
 from homeassistant.core import HomeAssistant
 
 
@@ -129,18 +129,18 @@ async def test_daytime_push_listener_lifecycle() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _smhub() -> MagicMock:
-    smhub = MagicMock()
-    smhub.uid = "HUB-1"
-    smhub.comm = MagicMock()
-    smhub.comm.async_set_log_level = AsyncMock()
-    return smhub
+def _hub_coord() -> MagicMock:
+    """The coordinator in its hub role: it owns the uid and the log levels."""
+    coordinator = _coord()
+    coordinator.uid = "HUB-1"
+    coordinator.comm.async_set_log_level = AsyncMock()
+    return coordinator
 
 
 def test_logging_level_current_option() -> None:
     """The logging-level selector maps the raw value (x10) to a level name."""
     level = Sensor(name="Logging level console", nmbr=0, type=2, value=20)
-    entity = HbtnSelectLoggingLevel(_smhub(), level, _coord(), 0)
+    entity = HbtnSelectLoggingLevel(_hub_coord(), level, _coord(), 0)
     entity.async_write_ha_state = MagicMock()
     entity._handle_coordinator_update()
     assert entity.current_option == LoggingLevels(2).name  # info
@@ -149,11 +149,11 @@ def test_logging_level_current_option() -> None:
 
 async def test_logging_level_select_option() -> None:
     """Selecting a level forwards value x10 to the hub on the right handler."""
-    smhub = _smhub()
+    coordinator = _hub_coord()
     level = Sensor(name="Logging level file", nmbr=1, type=2, value=0)
-    entity = HbtnSelectLoggingLevel(smhub, level, _coord(), 0)
+    entity = HbtnSelectLoggingLevel(coordinator, level, _coord(), 0)
     await entity.async_select_option("warning")
-    smhub.comm.async_set_log_level.assert_awaited_with(
+    coordinator.comm.async_set_log_level.assert_awaited_with(
         1, LoggingLevels["warning"].value * 10
     )
 
@@ -170,12 +170,13 @@ async def test_async_setup_entry_emits_mode_and_log_selects(
     module = _module()
     router = _router()
     router.modules = [module]
-    smhub = _smhub()
-    smhub.router = router
-    smhub.coordinator = _coord()
-    smhub.loglvl = [Sensor(name="Logging level console", nmbr=0, type=2, value=20)]
+    coordinator = _hub_coord()
+    coordinator.router = router
+    coordinator.loglvl = [
+        Sensor(name="Logging level console", nmbr=0, type=2, value=20)
+    ]
     entry = MagicMock()
-    entry.runtime_data = smhub
+    entry.runtime_data = coordinator
 
     added: list = []
     await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry

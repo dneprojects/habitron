@@ -36,7 +36,7 @@ async def _own_ips(hass: HomeAssistant) -> set[str]:
     """Return every local address of this Home Assistant host.
 
     A multi-homed host -- LAN plus WLAN, a VPN, a container bridge -- has more
-    than one, and a SmartHub running on this machine is reachable over any of
+    than one, and a HbtnCoordinator running on this machine is reachable over any of
     them. Asking for a single source IP (the address that happens to route
     towards the internet) missed the others, so entering one of them was not
     recognised as "this machine" and the entry was stored under a bare address
@@ -46,7 +46,7 @@ async def _own_ips(hass: HomeAssistant) -> set[str]:
 
 
 async def _async_hub_mac(host: str) -> str | None:
-    """Return the SmartHub's colon-stripped MAC — its stable identity.
+    """Return the HbtnCoordinator's colon-stripped MAC — its stable identity.
 
     The MAC identifies the hub independently of the address it is reached at, so
     the same hub seen at a local IP and at a VPN-routed address cannot be added
@@ -60,7 +60,7 @@ async def _async_hub_mac(host: str) -> str | None:
     except (HabitronError, OSError, KeyError, TypeError) as err:
         _LOGGER.debug("could not read MAC from hub at %s: %s", host, err)
         return None
-    # Same spelling as ``SmartHub.uid`` and the core integration, so the
+    # Same spelling as ``HbtnCoordinator.uid`` and the core integration, so the
     # entry id and the device identifiers cannot drift apart.
     cleaned = mac.replace(":", "").replace("-", "").lower()
     _LOGGER.debug("hub at %s reports MAC %s", host, cleaned)
@@ -291,7 +291,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         await self.async_set_unique_id(unique_id)
         self._abort_if_unique_id_configured(updates={CONF_HOST: host_str})
 
-        # The unique_id did not match an existing entry. The same SmartHub
+        # The unique_id did not match an existing entry. The same HbtnCoordinator
         # may already be configured under a host-based fallback id — the
         # manual step falls back to ``habitron_<host>`` when no serial is
         # available, while SSDP yields a stable UDN/serial. Match on the
@@ -323,7 +323,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         }
         for entry in self._async_current_entries(include_ignore=False):
             # Match the hub by any stable signal we have:
-            #  * the hub MAC — a loaded entry exposes its SmartHub as
+            #  * the hub MAC — a loaded entry exposes its HbtnCoordinator as
             #    ``runtime_data`` whose ``uid`` is the MAC without separators,
             #    exactly the SSDP unique_id when the MAC probe succeeded;
             #  * the configured host, its runtime IP, or — for a ``local`` entry
@@ -331,13 +331,15 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             #    is unloaded and the hub is unreachable for a MAC probe (a reboot
             #    during startup), which is exactly when ``unique_id`` falls back
             #    to the SSDP UDN and a plain id comparison would miss.
-            smhub = getattr(entry, "runtime_data", None)
-            same_mac = bool(unique_id) and getattr(smhub, "uid", None) == unique_id
+            coordinator = getattr(entry, "runtime_data", None)
+            same_mac = (
+                bool(unique_id) and getattr(coordinator, "uid", None) == unique_id
+            )
             host_conf = entry.data.get(CONF_HOST)
             same_host = (
                 host_conf in candidate_hosts
                 or (host_conf == CONF_DEFAULT_HOST and local_is_candidate)
-                or getattr(smhub, "host", None) in candidate_hosts
+                or getattr(coordinator, "host", None) in candidate_hosts
                 or (
                     host_conf is not None
                     and await self._async_canonical_host(host_conf)
@@ -476,7 +478,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> config_entries.ConfigFlowResult:
         """Re-configure an existing Habitron entry.
 
-        Lets the user change the SmartHub host (e.g. after a hardware
+        Lets the user change the HbtnCoordinator host (e.g. after a hardware
         swap or static-IP migration) without removing the entry — the
         ``unique_id`` and device-registry mappings stay intact, the
         platforms reload after the update.

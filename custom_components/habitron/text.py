@@ -30,10 +30,10 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add a display-text entity for each display-capable module."""
-    smhub = entry.runtime_data
+    coordinator = entry.runtime_data
     new_devices = [
-        HbtnDisplayText(hbt_module, smhub.comm)
-        for hbt_module in smhub.router.modules
+        HbtnDisplayText(hbt_module, coordinator.comm)
+        for hbt_module in coordinator.router.modules
         if hbt_module.typ in DISPLAY_TYPES
     ]
     if new_devices:
@@ -65,7 +65,7 @@ class HbtnDisplayText(TextEntity):
         out unchanged. An empty value clears the display.
 
         Everything is sent as display text (``1E 11 01``). Triggering a stored
-        message by its id (``1E 11 03``) is not an option: the SmartHub
+        message by its id (``1E 11 03``) is not an option: the HbtnCoordinator
         acknowledges that command on the bus with ``OK`` but logs "Meldung auf
         Zeit setzen noch nicht implementiert" and never passes it on to the
         module -- with any display time, the id's own text included. Resolving

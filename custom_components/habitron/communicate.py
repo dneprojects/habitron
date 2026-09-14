@@ -26,7 +26,7 @@ from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant
 
 if TYPE_CHECKING:
-    from .smart_hub import SmartHub
+    from .coordinator import HbtnCoordinator
 
 DATA_FILES_ADDON_DIR = "/addon_configs/"
 DEF_TOKEN_FILE = "def_token.set"
@@ -41,12 +41,14 @@ class HbtnComm:
     """Habitron communication wrapper class mapping to Home Assistant."""
 
     def __init__(
-        self, hass: HomeAssistant, config: ConfigEntry, smhub: SmartHub
+        self, hass: HomeAssistant, config: ConfigEntry, coordinator: HbtnCoordinator
     ) -> None:
         """Init CommTest for connection test."""
         self._name: str = "HbtnComm"
         self._host_conf: str = config.data[CONF_HOST]
-        self.smhub: SmartHub = smhub
+        # Back-reference for the one thing the transport cannot hold itself:
+        # the bus model, which the coordinator owns and builds.
+        self.coordinator: HbtnCoordinator = coordinator
         self.logger = logging.getLogger(__name__)
 
         if self.is_valid_ipv4(self._host_conf):
@@ -115,7 +117,7 @@ class HbtnComm:
     def router(self) -> Router:
         """Return the parsed router model."""
         if not hasattr(self, "_rtr"):
-            return self.smhub.router
+            return self.coordinator.router
         return self._rtr
 
     def _module_by_addr(self, mod_addr: int) -> Module | None:
@@ -318,8 +320,9 @@ class HbtnComm:
         if self.update_suspended:
             # disable update to avoid conflict with SmartConfig or other communication
             return self.crc
-        # Refresh the hub-level diagnostics (CPU/memory/...) alongside the bus.
-        await self.smhub.update()
+        # The hub's own host readings are refreshed by the coordinator, after
+        # this call and outside its error guard: they are non-essential, and a
+        # hiccup there must not fail the tick and mark every entity unavailable.
         self.crc = await async_refresh_system(
             self.client, self.router, last_crc=self.crc
         )

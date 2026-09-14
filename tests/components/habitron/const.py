@@ -26,7 +26,7 @@ MOCK_CONFIG_OPTIONS: Final = {
     "websock_token": MOCK_WEBSOCK_TOKEN,
 }
 
-# A realistic SmartHub info payload as ``HabitronClient.get_smhub_info`` returns
+# A realistic HbtnCoordinator info payload as ``HabitronClient.get_smhub_info`` returns
 # it. Shared by the public-surface setup tests; treated read-only.
 MOCK_SMHUB_INFO: Final = {
     "software": {"version": "9.9.9", "slug": "habitron_smarthub"},
