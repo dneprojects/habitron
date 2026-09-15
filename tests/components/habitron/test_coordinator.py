@@ -1,9 +1,10 @@
 """Tests for the Habitron coordinator."""
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from habitron_client import (
     HabitronConnectionError,
+    HabitronError,
     HabitronTimeoutError,
     Module,
     Router,
@@ -43,8 +44,32 @@ async def test_coordinator_normal_update(hass: HomeAssistant) -> None:
     """``_async_update_data`` returns the compact status and forwards to the library."""
     coord = _make_coord(hass)
     result = await coord._async_update_data()
-    assert result == 4711
+    assert result.crc == 4711
     coord.async_system_update.assert_awaited_once()
+
+
+async def test_host_state_travels_in_the_coordinator_data(hass: HomeAssistant) -> None:
+    """A host failure has to change the data, or no entity hears about it.
+
+    ``always_update=False`` fans out to the entities only when the returned
+    data differs from the previous tick. On a quiet bus the status CRC does not
+    move, so a host state that lived outside the data would leave the hub's
+    readings showing a stale value as if it were live.
+    """
+    coord = _make_coord(hass)
+    healthy = await coord._async_update_data()
+    assert healthy.host_readings_ok is True
+
+    # The real host refresh, with the library failing: the flag is set by the
+    # production path, not by the test.
+    del coord.update
+    with patch(
+        "custom_components.habitron.coordinator.async_refresh_hub",
+        new=AsyncMock(side_effect=HabitronError("boom")),
+    ):
+        stale = await coord._async_update_data()
+    assert stale.host_readings_ok is False
+    assert stale != healthy, "same data despite a failed host poll: no fanout"
 
 
 async def test_coordinator_timeout_raises_update_failed(

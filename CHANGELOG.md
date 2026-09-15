@@ -3,6 +3,12 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.4.3b5
+- Beta. Fixed: the hub's own readings -- CPU load and frequency, memory, disk, CPU temperature -- kept showing their last value when the hub stopped answering the query behind them. Nothing said the value had gone stale, so it was indistinguishable from a live one. They now report themselves unavailable while that query fails, and come back on their own once it answers. Your modules are unaffected: their failures were always reported.
+- Fixed: a module list the hub could not read was taken for "these modules are gone", and the devices were removed -- with their entities -- until the next successful read. That could happen after a hub restart or while the bus was busy. Such an answer is now recognised and the setup is retried instead. Nothing is lost when it happens: Home Assistant restores the devices with their names, areas and history.
+- Fixed: every answer from the hub is now checked against its checksum. It was sent along all this time and never verified, and the two bytes were read in the wrong order -- so a garbled answer from the bus behind the hub could pass as data.
+- Uses habitron_client 2.3.1.
+
 ## v3.4.3b4
 - Beta. The last piece of the restructuring, and nothing about it should be visible: the integration no longer has a command layer of its own. Every command goes straight to `habitron_client`, which as of 2.3.0 knows the last few wire details the integration still had to encode itself. Please report anything that stopped reacting.
 - Removed: the five services that wrote configuration and status to file -- `save_module_smc`, `save_module_smg`, `save_router_smr`, `save_module_status` and `save_router_status`. They saved into a `data` folder inside the integration's own directory, which is replaced wholesale on every update, so nothing kept there survived for long. If you call one of them from an automation or script, that call now fails.

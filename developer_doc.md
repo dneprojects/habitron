@@ -4,6 +4,61 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.4.3b5
+
+### The hub's own readings say when they went stale
+`update()` swallows the errors of the host poll on purpose: those readings are
+decoupled from the bus status, and a hiccup there must not mark *every* entity
+of the entry unavailable. The cost was never paid, though -- the last CPU,
+memory or disk value simply stood, looking live. `SmartHub.host_diags_valid`
+cannot express it: it means "a host poll has ever succeeded" and only ever
+turns true.
+
+`HbtnCoordinator.host_readings_ok` now records the outcome of each host poll,
+and `HostReadingMixin` turns it into `available` for `PercSensor`,
+`FrequencySensor` and `TemperatureDSensor`. Two of those three also serve bus
+members, so the mixin decides per instance: a hub reading is one whose owner
+*is* the coordinator, while a bus member comes from the status poll, whose
+failure the coordinator reports on its own.
+
+The flag alone would have changed nothing. With `always_update=False` Home
+Assistant fans out to the entities only when the data returned by
+`_async_update_data` differs from the previous tick (`update_coordinator.py`:
+`always_update or last_update_success != previous or previous_data != data`).
+On a quiet bus the status CRC does not move, so the availability change would
+never have reached an entity. `_async_update_data` therefore returns an
+`HbtnData` carrying the CRC *and* the host state -- the rule being that
+everything an entity renders from has to be in the data the fanout is keyed on.
+
+### habitron_client 2.3.1
+Two answers from the hub that were taken at face value:
+
+- **Every response CRC is verified now, and read the way the hub writes it.**
+  The hub checks the one we send (`ApiMessage.check_CRC`) and writes one over
+  everything before the trailer, high byte first. This end never checked it --
+  and read the two bytes low-first, so `check_crc` could not even validate a
+  frame `wrap_command` had just built. TCP covers the hop to the hub; the serial
+  hop on to the router and the modules, where the payload comes from, has no
+  other protection.
+- **An unreadable module inventory is no longer read as "there are no
+  modules".** An empty list parsed cleanly, so `_async_cleanup_stale_devices`
+  took a failed read for a removal and deleted every module device. The compact
+  status is the second witness: a module it names that the inventory never
+  mentioned means the answer was incomplete, and the build fails for the entry
+  to retry. An installation that genuinely has no modules reports neither and
+  still sets up; a module type the library does not model is named and skipped
+  rather than missing; a status cut short inside a block names nothing rather
+  than something wrong.
+
+The real repair is in the hub, which now validates its own router read instead
+of passing an error response on as a module list. The guard here stays as the
+second line, for hubs in the field running older firmware.
+
+### Smaller
+`_async_cleanup_stale_devices` reads `module.uid` directly. The `getattr`
+fallback it had suggested a case that cannot occur -- the field is typed and
+always set -- and would have written a blank into the set of uids to keep.
+
 ## v3.4.3b4
 
 ### `communicate.py` is gone

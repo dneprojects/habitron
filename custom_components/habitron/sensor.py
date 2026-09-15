@@ -25,6 +25,7 @@ from homeassistant.const import (
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers import area_registry as ar, entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -268,6 +269,30 @@ async def async_setup_entry(  # noqa: C901
 
     if new_devices:
         async_add_entities(new_devices)
+
+
+class HostReadingMixin(Entity):
+    """Availability for an entity that renders the hub's own readings.
+
+    The host poll swallows its errors so a hub-diagnostics hiccup cannot mark
+    every bus entity unavailable; the cost is that the last CPU, memory or disk
+    value would stand forever, looking live. ``host_diags_valid`` cannot say
+    so -- it means "a host poll has ever succeeded" and only ever turns true.
+
+    Two of the classes below serve both roles, so the check is per instance:
+    the hub's readings are the ones whose owner *is* the coordinator, while a
+    bus member comes from the status poll, whose failure the coordinator
+    already reports on its own.
+    """
+
+    @property
+    def available(self) -> bool:
+        """Whether the source of this entity's value last answered."""
+        available = super().available
+        coordinator = getattr(self, "coordinator", None)
+        if getattr(self, "_module", None) is not coordinator:
+            return available
+        return available and coordinator.host_readings_ok
 
 
 def _host_diags_unavailable(module: Module) -> bool:
@@ -635,7 +660,7 @@ class HbtnDiagSensor(CoordinatorEntity[HbtnCoordinator], SensorEntity):
         self.async_write_ha_state()
 
 
-class TemperatureDSensor(HbtnDiagSensor):
+class TemperatureDSensor(HostReadingMixin, HbtnDiagSensor):
     """Representation of a Sensor."""
 
     _attr_device_class = SensorDeviceClass.TEMPERATURE
@@ -729,7 +754,7 @@ class LogicSensorPush(LogicSensor):
         self.logic.remove_listener(self._handle_coordinator_update)
 
 
-class PercSensor(HbtnSensor):
+class PercSensor(HostReadingMixin, HbtnSensor):
     """Representation of a percentage sensor."""
 
     _attr_native_unit_of_measurement = PERCENTAGE
@@ -777,7 +802,7 @@ class PercSensor(HbtnSensor):
         self.async_write_ha_state()
 
 
-class FrequencySensor(HbtnSensor):
+class FrequencySensor(HostReadingMixin, HbtnSensor):
     """Representation of a frequency sensor."""
 
     _attr_device_class = SensorDeviceClass.FREQUENCY
