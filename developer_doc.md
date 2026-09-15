@@ -41,9 +41,14 @@ strings, translations and README sections; `.gitignore` loses the `data/` entry.
 They were the data-fetch half of `communicate.py` that genuinely was not a
 forward -- and the only reason `save_config_data` and async file writing existed
 here. What they wrote went to `custom_components/habitron/data/`, inside the
-integration's own directory, which an update replaces wholesale. A service whose
-output is deleted by the next version update is not a place to keep a
-configuration backup.
+integration's own directory, which an update replaces wholesale.
+
+Nothing replaces them, and nothing should. The SmartHub itself produces the
+`.smc`, `.smg` and `.smr` files in a better form than this integration ever
+did, which leaves these services duplicating -- worse -- what the device
+already offers. Saving a *status* dump is a different matter, but it belongs in
+the hub as a special function too: the integration's job is to bind the bus
+model to entities, not to be a file exporter for it.
 
 ### An event counts as ours under any of the hub's names
 `update_entity` compared the stamp on a pushed event against a single spelling,
