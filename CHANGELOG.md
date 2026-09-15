@@ -3,6 +3,11 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.4.3b6
+- Beta. The fingerprint reader's raw values are now resolved by `habitron_client` instead of by this integration. Nothing about the states changes, with one exception below -- the names, the "Error" and "Unknown" markers and the "-disabled" suffix are the same strings as before.
+- Fixed: while nobody had presented a finger, the ekey user sensor showed the literal text `None`, which reads like a name and cannot be translated. It is now simply unknown, as the finger sensor next to it has always been. A freshly started entity no longer claims `None` either.
+- Uses habitron_client 2.4.0.
+
 ## v3.4.3b5
 - Beta. Fixed: the hub's own readings -- CPU load and frequency, memory, disk, CPU temperature -- kept showing their last value when the hub stopped answering the query behind them. Nothing said the value had gone stale, so it was indistinguishable from a live one. They now report themselves unavailable while that query fails, and come back on their own once it answers. Your modules are unaffected: their failures were always reported.
 - Fixed: a module list the hub could not read was taken for "these modules are gone", and the devices were removed -- with their entities -- until the next successful read. That could happen after a hub restart or while the bus was busy. Such an answer is now recognised and the setup is retried instead. Nothing is lost when it happens: Home Assistant restores the devices with their names, areas and history.

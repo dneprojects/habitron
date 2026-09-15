@@ -4,6 +4,34 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.4.3b6
+
+### The ekey decoding moved into the library
+`EKeyUserNameSensor` and `EKeyFingerNameSensor` carried four wire rules
+between them: the sentinels `0` ("nothing presented") and `255` ("the reader
+failed"), the identity counted from one against `module.ids`, and the sign
+convention that marks an enrolled identity as disabled. Plus the fixed mapping
+of the raw values 1..10 onto ten fingers.
+
+`habitron_client` 2.4.0 answers both questions -- `decode_user(raw, ids)` and
+`decode_finger(raw)`, with `FINGER_KEYS` for the enum options. The two entity
+classes now read a member and hand the value over; the keys they publish are
+unchanged, so `strings.json` and every recorded state stay as they are.
+
+This was the last raw protocol value in the integration. It survived two
+earlier sweeps because it sits in the *rendering* path: the command sweep
+looked at `communicate.py`, the parser sweep at the module and router parsers,
+and nobody looked inside a sensor's update handler.
+
+### The ekey user sensor no longer says "None"
+With raw `0` it set the literal string `"None"` as its state, and seeded the
+same text at construction. That reads like a name, sorts among the names and
+cannot be translated. It is unknown now -- which is what the finger sensor
+beside it has always reported for the same input, and what the core
+integration already does.
+
+Neither behaviour had a test. Both sensors have one now.
+
 ## v3.4.3b5
 
 ### The hub's own readings say when they went stale

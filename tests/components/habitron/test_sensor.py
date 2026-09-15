@@ -15,6 +15,8 @@ from custom_components.habitron.sensor import (
     TIMEOUT_DESCRIPTION,
     VOLTAGE_DESCRIPTION,
     WIND_DESCRIPTION,
+    EKeyFingerNameSensor,
+    EKeyUserNameSensor,
     HbtnDescribedSensor,
     HbtnSensorEntityDescription,
 )
@@ -1155,3 +1157,57 @@ async def test_hub_reading_names_match_what_the_platform_looks_for() -> None:
         "CPU load",
         "CPU Temperature",
     }
+
+
+def _ekey_module() -> MagicMock:
+    """A module whose reader has two enrolled identities."""
+    module = MagicMock()
+    module.uid = "MOD-1"
+    module.sensors = [MagicMock(value=0)]
+    module.ids = [MagicMock(name="x"), MagicMock(name="y")]
+    module.ids[0].name = "Anna"
+    module.ids[1].name = "Bert"
+    return module
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        pytest.param(0, None, id="nobody presented a finger"),
+        pytest.param(1, "Anna", id="enrolled"),
+        pytest.param(-1, "Anna-disabled", id="enrolled but disabled"),
+        pytest.param(9, "Unknown", id="not enrolled"),
+        pytest.param(255, "Error", id="reader error"),
+    ],
+)
+def test_ekey_user_name_states(raw: int, expected: str | None) -> None:
+    """The user sensor shows what the library resolves, unknown included.
+
+    Raw 0 used to publish the literal text "None" as the state, which reads
+    like a name and cannot be translated.
+    """
+    module = _ekey_module()
+    module.sensors[0].value = raw
+    entity = EKeyUserNameSensor(module, 0, MagicMock(spec=HbtnCoordinator), 0)
+    entity.async_write_ha_state = MagicMock()
+    entity._handle_coordinator_update()
+    assert entity._attr_native_value == expected
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        pytest.param(1, "left_pinky", id="first finger"),
+        pytest.param(10, "right_pinky", id="last finger"),
+        pytest.param(0, None, id="idle"),
+        pytest.param(255, None, id="reader error"),
+    ],
+)
+def test_ekey_finger_name_states(raw: int, expected: str | None) -> None:
+    """The finger sensor reports a stable key, or nothing at all."""
+    module = _ekey_module()
+    module.sensors[0].value = raw
+    entity = EKeyFingerNameSensor(module, 0, MagicMock(spec=HbtnCoordinator), 0)
+    entity.async_write_ha_state = MagicMock()
+    entity._handle_coordinator_update()
+    assert entity._attr_native_value == expected

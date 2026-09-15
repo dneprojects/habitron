@@ -4,7 +4,15 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, cast
 
-from habitron_client import BusMember, Logic, Module, SmartController
+from habitron_client import (
+    FINGER_KEYS,
+    BusMember,
+    Logic,
+    Module,
+    SmartController,
+    decode_finger,
+    decode_user,
+)
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -940,7 +948,8 @@ class EKeyUserNameSensor(CoordinatorEntity[HbtnCoordinator], SensorEntity):
         self._nmbr = nmbr
         self._attr_unique_id = f"{self._module.uid}_ekey_user_name"
         self._attr_device_info = hbtn_device_info(self._module.uid)
-        self._attr_native_value = "None"
+        # No seeded value: unknown until the reader reports someone. The literal
+        # text "None" used to stand here, which reads like a name.
 
     async def async_added_to_hass(self) -> None:
         """Subscribe to the underlying sensor's push updates."""
@@ -955,20 +964,10 @@ class EKeyUserNameSensor(CoordinatorEntity[HbtnCoordinator], SensorEntity):
 
     @callback
     def _handle_coordinator_update(self) -> None:
-        """Translate the raw identifier value into a user name string."""
-        id_val = int(self._module.sensors[self._nmbr].value or 0)
-        if id_val == 0:
-            self._attr_native_value = "None"
-        elif id_val == 255:
-            self._attr_native_value = "Error"
-        elif (id_val - 1) in range(len(self._module.ids)):
-            self._attr_native_value = self._module.ids[id_val - 1].name
-        elif (abs(id_val) - 1) in range(len(self._module.ids)):
-            self._attr_native_value = (
-                self._module.ids[abs(id_val) - 1].name + "-disabled"
-            )
-        else:
-            self._attr_native_value = "Unknown"
+        """Show who the reader identified, as the library resolves it."""
+        self._attr_native_value = decode_user(
+            int(self._module.sensors[self._nmbr].value or 0), self._module.ids
+        )
         self.async_write_ha_state()
 
 
@@ -979,23 +978,11 @@ class EKeyFingerNameSensor(CoordinatorEntity[HbtnCoordinator], SensorEntity):
     _attr_translation_key = "ekey_finger_name"
     _attr_device_class = SensorDeviceClass.ENUM
 
-    # Stable, language-independent enum keys ordered by the hub's raw finger
-    # value (1..10). Localized labels live in strings.json under
+    # The keys are the library's, ordered by the hub's raw finger value.
+    # Localized labels live in strings.json under
     # ``entity.sensor.ekey_finger_name.state`` — the state itself must not carry
     # display text.
-    _FINGER_KEYS: tuple[str, ...] = (
-        "left_pinky",
-        "left_ring",
-        "left_middle",
-        "left_index",
-        "left_thumb",
-        "right_thumb",
-        "right_index",
-        "right_middle",
-        "right_ring",
-        "right_pinky",
-    )
-    _attr_options = list(_FINGER_KEYS)
+    _attr_options = list(FINGER_KEYS)
 
     def __init__(
         self,
@@ -1026,11 +1013,8 @@ class EKeyFingerNameSensor(CoordinatorEntity[HbtnCoordinator], SensorEntity):
 
     @callback
     def _handle_coordinator_update(self) -> None:
-        """Translate the raw finger value into a finger-name string."""
-        id_val = int(self._module.sensors[self._nmbr].value or 0)
-        if id_val in range(1, 11):
-            self._attr_native_value = self._FINGER_KEYS[id_val - 1]
-        else:
-            # 0 (idle), 255 (error) or out of range → no current finger.
-            self._attr_native_value = None
+        """Show which finger was presented, as the library resolves it."""
+        self._attr_native_value = decode_finger(
+            int(self._module.sensors[self._nmbr].value or 0)
+        )
         self.async_write_ha_state()
