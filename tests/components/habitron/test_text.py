@@ -17,27 +17,24 @@ def _module(typ: bytes = b"\x01\x02") -> Module:
     return Module(uid="MOD-1", addr=5, typ=typ, name="SC")
 
 
-def _comm() -> MagicMock:
-    comm = MagicMock()
-    comm.send_message_text = AsyncMock()
-    comm.send_message = AsyncMock()
-    return comm
+def _client() -> MagicMock:
+    return AsyncMock()
 
 
 def test_display_text_unique_id() -> None:
     """The display-text entity exposes a stable unique id and starts empty."""
-    entity = HbtnDisplayText(_module(), _comm())
+    entity = HbtnDisplayText(_module(), _client())
     assert entity.unique_id == "MOD-1_message"
     assert entity.native_value == ""
 
 
 async def test_display_text_set_value_forwards_to_bus() -> None:
     """Setting a value forwards it to the module display."""
-    comm = _comm()
-    entity = HbtnDisplayText(_module(), comm)
+    client = _client()
+    entity = HbtnDisplayText(_module(), client)
     entity.async_write_ha_state = MagicMock()
     await entity.async_set_value("Hello")
-    comm.send_message_text.assert_awaited_with(5, "Hello")
+    client.send_message_text.assert_awaited_with(5, "Hello")
     assert entity.native_value == "Hello"
 
 
@@ -49,7 +46,7 @@ async def test_async_setup_entry_only_for_display_modules(hass: HomeAssistant) -
     router.modules = [display, plain]
     entry = MagicMock()
     entry.runtime_data.router = router
-    entry.runtime_data.comm = _comm()
+    entry.runtime_data.client = _client()
 
     added: list = []
     await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
@@ -80,7 +77,6 @@ async def test_set_value_service_reaches_bus_and_updates_state(
         {"entity_id": entity_id, "value": "Hello"},
         blocking=True,
     )
-    # comm converts the absolute addr (105) to the bus id (addr - 100 = 5).
     client.send_message_text.assert_awaited_once_with(5, "Hello")
     state = hass.states.get(entity_id)
     assert state is not None
@@ -118,14 +114,14 @@ async def test_set_value_resolves_and_echoes(typed: str, shown: str) -> None:
     Everything reaches the display as text: the id command the stored message
     would otherwise use is not carried out by the HbtnCoordinator.
     """
-    comm = _comm()
-    entity = HbtnDisplayText(_module_with_messages(), comm)
+    client = _client()
+    entity = HbtnDisplayText(_module_with_messages(), client)
     entity.async_write_ha_state = MagicMock()
 
     await entity.async_set_value(typed)
 
-    comm.send_message_text.assert_awaited_once_with(5, shown)
-    comm.send_message.assert_not_awaited()
+    client.send_message_text.assert_awaited_once_with(5, shown)
+    client.send_message.assert_not_awaited()
     assert entity.native_value == shown
 
 
@@ -140,11 +136,11 @@ async def test_a_message_named_like_a_number_wins_over_that_id() -> None:
         HbtnCommand(name="5", nmbr=9),
         HbtnCommand(name="Besuch", nmbr=5),
     ]
-    comm = _comm()
-    entity = HbtnDisplayText(module, comm)
+    client = _client()
+    entity = HbtnDisplayText(module, client)
     entity.async_write_ha_state = MagicMock()
 
     await entity.async_set_value("5")
 
-    comm.send_message_text.assert_awaited_once_with(5, "5")
+    client.send_message_text.assert_awaited_once_with(5, "5")
     assert entity.native_value == "5"

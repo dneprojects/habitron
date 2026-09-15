@@ -102,7 +102,7 @@ class HbtnSetTemperature(CoordinatorEntity[HbtnCoordinator], NumberEntity):
         """Set the new value."""
         self._attr_native_value = value
         int_val = int(value) * 10
-        await self.coordinator.comm.async_set_setpoint(
+        await self.coordinator.client.set_setpoint(
             self._module.addr, self._setval.nmbr + 1, int_val
         )
         await self.coordinator.async_request_refresh()
@@ -157,7 +157,7 @@ class HbtnAnalogOutput(HbtnAreaMixin, CoordinatorEntity[HbtnCoordinator], Number
         self._attr_native_value = value
         int_val = int(value)
         self._output.brightness = int_val
-        await self.coordinator.comm.async_set_analog_val(
-            self._module.addr, self._output.nmbr + 1, int_val
+        await self.coordinator.client.set_dimmval(
+            self._module.addr, Module.ANALOG_OUT_CHANNEL, int_val
         )
         await self.coordinator.async_request_refresh()

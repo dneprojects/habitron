@@ -291,68 +291,6 @@
         }
       }
     },
-    "save_module_smc": {
-      "name": "Modul .smc-Datei speichern",
-      "description": "Liest Modul-Regeln und Namen aus und speichert sie als .smc-Textdatei.",
-      "fields": {
-        "mod_nmbr": {
-          "name": "Modul-Nummer",
-          "description": "Habitron Modul-Adresse."
-        },
-        "device_id": {
-          "name": "Gerät",
-          "description": "Ein Habitron-Gerät am Ziel-SmartHub (Hub, Router oder Modul). Bei nur einem Hub optional."
-        }
-      }
-    },
-    "save_module_smg": {
-      "name": "Modul .smg-Datei speichern",
-      "description": "Liest Modul-Einstellungen aus und speichert sie als .smg-Textdatei.",
-      "fields": {
-        "mod_nmbr": {
-          "name": "Modul-Nummer",
-          "description": "Habitron Modul-Adresse."
-        },
-        "device_id": {
-          "name": "Gerät",
-          "description": "Ein Habitron-Gerät am Ziel-SmartHub (Hub, Router oder Modul). Bei nur einem Hub optional."
-        }
-      }
-    },
-    "save_module_status": {
-      "name": "Modulstatus speichern",
-      "description": "Liest den Modulstatus aus und speichert ihn als .mstat-Textdatei.",
-      "fields": {
-        "mod_nmbr": {
-          "name": "Modul-Nummer",
-          "description": "Habitron Modul-Adresse."
-        },
-        "device_id": {
-          "name": "Gerät",
-          "description": "Ein Habitron-Gerät am Ziel-SmartHub (Hub, Router oder Modul). Bei nur einem Hub optional."
-        }
-      }
-    },
-    "save_router_smr": {
-      "name": "Router .smr-Datei speichern",
-      "description": "Liest Router-Einstellungen aus und speichert sie als .smr-Textdatei.",
-      "fields": {
-        "device_id": {
-          "name": "Gerät",
-          "description": "Ein Habitron-Gerät am Ziel-SmartHub (Hub, Router oder Modul). Bei nur einem Hub optional."
-        }
-      }
-    },
-    "save_router_status": {
-      "name": "Routerstatus speichern",
-      "description": "Liest den Routerstatus aus und speichert ihn als .rstat-Textdatei.",
-      "fields": {
-        "device_id": {
-          "name": "Gerät",
-          "description": "Ein Habitron-Gerät am Ziel-SmartHub (Hub, Router oder Modul). Bei nur einem Hub optional."
-        }
-      }
-    },
     "sc_system_command": {
       "name": "Smart Touch Systembefehl",
       "description": "Führt einen Neustart oder Factory Reset der App eines spezifischen Smart Touch Moduls aus.",

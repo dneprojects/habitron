@@ -13,7 +13,7 @@
 
 from typing import TYPE_CHECKING
 
-from habitron_client import BusMember, HbtnCommand, Module
+from habitron_client import BusMember, HabitronClient, HbtnCommand, Module
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
@@ -88,7 +88,6 @@ class HbtnAreaMixin(Entity):
 
 
 if TYPE_CHECKING:
-    from .communicate import HbtnComm
     from .coordinator import HbtnCoordinator
 
 
@@ -107,7 +106,7 @@ class HabitronEntity(CoordinatorEntity["HbtnCoordinator"]):
     Holds the parsed :class:`~habitron_client.Module` and one of its members,
     links to the module device and—on add—subscribes the member's change
     listener so the HbtnCoordinator's pushed updates write HA state immediately. The
-    transport is reached through ``self.comm`` (the coordinator owns it); the
+    commands are sent through ``self.client`` (the coordinator owns it); the
     model itself carries no back-reference.
     """
 
@@ -128,9 +127,14 @@ class HabitronEntity(CoordinatorEntity["HbtnCoordinator"]):
         self._attr_device_info = hbtn_device_info(module.uid)
 
     @property
-    def comm(self) -> HbtnComm:
-        """Return the transport wrapper held by the coordinator."""
-        return self.coordinator.comm
+    def client(self) -> HabitronClient:
+        """Return the bus client, for sending commands.
+
+        Commands go straight to the library: a module's ``addr`` is its bus
+        address and the wire semantics live there, so there is nothing for the
+        integration to adapt on the way out.
+        """
+        return self.coordinator.client
 
     async def async_added_to_hass(self) -> None:
         """Subscribe to the member's change notifications (push updates)."""

@@ -1,6 +1,7 @@
 """Tests for the Habitron domain services (habitron_client v2 model)."""
 
 from collections.abc import Awaitable, Callable
+from functools import partial
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from habitron_client import Module, Router
@@ -8,13 +9,13 @@ import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron.const import DOMAIN
+from custom_components.habitron.coordinator import HbtnCoordinator
 from custom_components.habitron.services import (
     _async_dispatch_sc_command_for_device,
     _async_reboot_hub,
     _async_restart_hub,
     _async_restart_module,
     _async_restart_router,
-    _async_save_module_smc,
     _async_sc_system_command,
     _async_update_entity,
 )
@@ -29,15 +30,13 @@ _TARGETED = "custom_components.habitron.services._targeted_hubs"
 def _hub(host: str = "1.2.3.4") -> MagicMock:
     hub = MagicMock()
     hub.host = host
-    hub.comm = MagicMock()
-    for method in (
-        "hub_restart",
-        "hub_reboot",
-        "module_restart",
-        "save_smc_file",
-        "update_entity",
-    ):
-        setattr(hub.comm, method, AsyncMock())
+    hub.reported_ip = host
+    hub._host_conf = host
+    hub.client = AsyncMock()
+    # ``update_entity`` is the coordinator's own now, not a transport call.
+    hub.update_entity = AsyncMock()
+    # The real matcher, bound to the stub: a MagicMock would claim every event.
+    hub.owns_event_from = partial(HbtnCoordinator.owns_event_from, hub)
     hub.router = Router(uid="rt_1")
     hub.ws_provider = None
     return hub
@@ -68,13 +67,13 @@ def _call(hass: MagicMock, data: dict) -> MagicMock:
 
 
 async def test_restart_and_reboot_hub() -> None:
-    """Hub restart/reboot forward to the comm wrapper of the targeted hub."""
+    """Hub restart/reboot forward to the client of the targeted hub."""
     hub = _hub()
     with patch(_TARGETED, AsyncMock(return_value=[hub])):
         await _async_restart_hub(_call(_hass([_entry(hub)]), {}))
-        hub.comm.hub_restart.assert_awaited()
+        hub.client.hub_restart.assert_awaited()
         await _async_reboot_hub(_call(_hass([_entry(hub)]), {}))
-        hub.comm.hub_reboot.assert_awaited()
+        hub.client.hub_reboot.assert_awaited()
 
 
 async def test_restart_module_and_router() -> None:
@@ -82,22 +81,9 @@ async def test_restart_module_and_router() -> None:
     hub = _hub()
     with patch(_TARGETED, AsyncMock(return_value=[hub])):
         await _async_restart_module(_call(_hass([_entry(hub)]), {"mod_nmbr": 5}))
-        hub.comm.module_restart.assert_awaited_with(5)
+        hub.client.module_restart.assert_awaited_with(5)
         await _async_restart_router(_call(_hass([_entry(hub)]), {}))
-        hub.comm.module_restart.assert_awaited_with(0)
-
-
-async def test_save_module_smc() -> None:
-    """Saving a module .smc file forwards the (100 + nmbr) address."""
-    hub = _hub()
-    with patch(_TARGETED, AsyncMock(return_value=[hub])):
-        await _async_save_module_smc(_call(_hass([_entry(hub)]), {"mod_nmbr": 3}))
-    hub.comm.save_smc_file.assert_awaited_with(3)
-
-
-# ---------------------------------------------------------------------------
-# update_entity
-# ---------------------------------------------------------------------------
+        hub.client.module_restart.assert_awaited_with(0)
 
 
 async def test_update_entity_matches_host() -> None:
@@ -112,7 +98,7 @@ async def test_update_entity_matches_host() -> None:
         "evnt_arg2": 1,
     }
     await _async_update_entity(_call(hass, data))
-    hub.comm.update_entity.assert_awaited_with("10.0.0.5", 2, 1, 3, 1, 0, 0, 0)
+    hub.update_entity.assert_awaited_with("10.0.0.5", 2, 1, 3, 1, 0, 0, 0)
 
 
 async def test_update_entity_unknown_host_ignored() -> None:
@@ -127,7 +113,7 @@ async def test_update_entity_unknown_host_ignored() -> None:
         "evnt_arg2": 1,
     }
     await _async_update_entity(_call(hass, data))
-    hub.comm.update_entity.assert_not_awaited()
+    hub.update_entity.assert_not_awaited()
 
 
 # ---------------------------------------------------------------------------

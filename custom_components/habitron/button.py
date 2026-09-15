@@ -86,7 +86,7 @@ class CollCmdButton(ButtonEntity):
 
     async def async_press(self) -> None:
         """Handle the button press."""
-        await self._smhub.comm.async_call_coll_command(self._nmbr)
+        await self._smhub.client.call_coll_command(self._nmbr)
 
 
 class DirCmdButton(ButtonEntity):
@@ -107,7 +107,7 @@ class DirCmdButton(ButtonEntity):
 
     async def async_press(self) -> None:
         """Handle the button press."""
-        await self._smhub.comm.async_call_dir_command(self._module.addr, self._nmbr)
+        await self._smhub.client.call_dir_command(self._module.addr, self._nmbr)
 
 
 class VisCmdButton(ButtonEntity):
@@ -130,7 +130,7 @@ class VisCmdButton(ButtonEntity):
 
     async def async_press(self) -> None:
         """Handle the button press."""
-        await self._smhub.comm.async_call_vis_command(self._module.addr, self._nmbr)
+        await self._smhub.client.call_vis_command(self._module.addr, self._nmbr)
 
 
 class RestartButton(ButtonEntity):
@@ -151,9 +151,9 @@ class RestartButton(ButtonEntity):
     async def async_press(self) -> None:
         """Handle the button press."""
         if isinstance(self._target, Module):
-            await self._smhub.comm.module_restart(self._target.addr)
+            await self._smhub.client.module_restart(self._target.addr)
         else:
-            await self._smhub.comm.module_restart(0)
+            await self._smhub.client.module_restart(0)
 
 
 class RestartFwdTableButton(ButtonEntity):
@@ -172,7 +172,7 @@ class RestartFwdTableButton(ButtonEntity):
 
     async def async_press(self) -> None:
         """Handle the button press."""
-        await self._smhub.comm.restart_fwd_tbl()
+        await self._smhub.client.restart_fwd_tbl()
 
 
 class RestartAllButton(ButtonEntity):
@@ -191,7 +191,7 @@ class RestartAllButton(ButtonEntity):
 
     async def async_press(self) -> None:
         """Handle the button press."""
-        await self._smhub.comm.module_restart(0xFF)
+        await self._smhub.client.module_restart(0xFF)
 
 
 class RestartHubButton(ButtonEntity):
@@ -251,7 +251,7 @@ class CountUpButton(ButtonEntity):
 
     async def async_press(self) -> None:
         """Handle the button press."""
-        await self._smhub.comm.async_inc_dec_counter(self._module.addr, self._nmbr, 1)
+        await self._smhub.client.inc_dec_counter(self._module.addr, self._nmbr, 1)
 
 
 class CountDownButton(ButtonEntity):
@@ -273,7 +273,7 @@ class CountDownButton(ButtonEntity):
 
     async def async_press(self) -> None:
         """Handle the button press."""
-        await self._smhub.comm.async_inc_dec_counter(self._module.addr, self._nmbr, 2)
+        await self._smhub.client.inc_dec_counter(self._module.addr, self._nmbr, 2)
 
 
 class ResetChannelPowerButton(ButtonEntity):
@@ -294,7 +294,7 @@ class ResetChannelPowerButton(ButtonEntity):
 
     async def async_press(self) -> None:
         """Handle the button press."""
-        await self._smhub.comm.async_power_cycle_channel(self._chan)
+        await self._smhub.client.power_cycle_channel(self._chan)
 
 
 class SpeechButton(ButtonEntity):

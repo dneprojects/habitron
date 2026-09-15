@@ -113,14 +113,14 @@ class SwitchedLight(HbtnAreaMixin, CoordinatorEntity[HbtnCoordinator], LightEnti
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Instruct the light to turn on."""
-        await self.coordinator.comm.async_set_output(
-            self._module.addr, self._nmbr + 1, 1
+        await self.coordinator.client.set_output(
+            self._module.addr, self._nmbr + 1, True
         )
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Instruct the light to turn off."""
-        await self.coordinator.comm.async_set_output(
-            self._module.addr, self._nmbr + 1, 0
+        await self.coordinator.client.set_output(
+            self._module.addr, self._nmbr + 1, False
         )
 
 
@@ -156,7 +156,7 @@ class DimmedOutput(SwitchedLight):
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Instruct the light to turn on (with optional brightness)."""
         self._brightness = kwargs.get(ATTR_BRIGHTNESS, self._brightness)
-        await self.coordinator.comm.async_set_dimmval(
+        await self.coordinator.client.set_dimmval(
             self._module.addr,
             self._nmbr - self._out_offs + 1,
             round(self._brightness * 100.0 / 255),
@@ -300,13 +300,13 @@ class HbtnColorLight(CoordinatorEntity[HbtnCoordinator], LightEntity):
         )
         self._led.is_on = True
         self._led.rgb = [dimmed_col[0], dimmed_col[1], dimmed_col[2], 0]
-        await self.coordinator.comm.async_set_rgbval(
+        await self.coordinator.client.set_rgbval(
             self._module.addr, self._nmbr, list(dimmed_col)
         )
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Instruct the light to turn off."""
         self._led.is_on = False
-        await self.coordinator.comm.async_set_rgb_output(
-            self._module.addr, self._nmbr, 0
+        await self.coordinator.client.set_rgb_output(
+            self._module.addr, self._nmbr, False
         )

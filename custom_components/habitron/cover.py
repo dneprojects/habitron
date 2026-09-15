@@ -120,7 +120,7 @@ class HbtnShutter(HbtnAreaMixin, CoordinatorEntity[HbtnCoordinator], CoverEntity
             self._out_down = self._nmbr * 2
         self._position: int = 0
         self._moving: int = 0
-        self.stop_delay: int | None = coord.comm.router.cover_autostop_del
+        self.stop_delay: int | None = coord.router.cover_autostop_del
         self._stop_task: asyncio.Task[None] | None = None
         self._attr_unique_id: str | None = f"{self._module.uid}_cover_{cover.nmbr}"
         self._attr_device_info = hbtn_device_info(self._module.uid)
@@ -189,7 +189,7 @@ class HbtnShutter(HbtnAreaMixin, CoordinatorEntity[HbtnCoordinator], CoverEntity
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
         self._position = 100 - int(self._cover.position)
-        self.stop_delay = self.coordinator.comm.router.cover_autostop_del
+        self.stop_delay = self.coordinator.router.cover_autostop_del
         if self._module.outputs[self._out_up].is_on:
             self._moving = 1
         elif self._module.outputs[self._out_down].is_on:
@@ -210,12 +210,12 @@ class HbtnShutter(HbtnAreaMixin, CoordinatorEntity[HbtnCoordinator], CoverEntity
         # Handle network failures gracefully
         try:
             if self._moving == 1:
-                await self.coordinator.comm.async_set_output(
-                    self._module.addr, self._out_up + 1, 0
+                await self.coordinator.client.set_output(
+                    self._module.addr, self._out_up + 1, False
                 )
             else:
-                await self.coordinator.comm.async_set_output(
-                    self._module.addr, self._out_down + 1, 0
+                await self.coordinator.client.set_output(
+                    self._module.addr, self._out_down + 1, False
                 )
         except TimeoutError:
             # Log specific timeout error without period
@@ -235,11 +235,11 @@ class HbtnShutter(HbtnAreaMixin, CoordinatorEntity[HbtnCoordinator], CoverEntity
     # the cover to the desired position, or open and close it all the way.
     async def async_stop_cover(self, **kwargs: Any) -> None:
         """Stop the cover."""
-        await self.coordinator.comm.async_set_output(
-            self._module.addr, self._out_up + 1, 0
+        await self.coordinator.client.set_output(
+            self._module.addr, self._out_up + 1, False
         )
-        await self.coordinator.comm.async_set_output(
-            self._module.addr, self._out_down + 1, 0
+        await self.coordinator.client.set_output(
+            self._module.addr, self._out_down + 1, False
         )
         self._moving = 0
         self._position = 100 - int(self._cover.position)
@@ -247,16 +247,16 @@ class HbtnShutter(HbtnAreaMixin, CoordinatorEntity[HbtnCoordinator], CoverEntity
     async def async_open_cover(self, **kwargs: Any) -> None:
         """Open the cover."""
         self._position = 100 - int(self._cover.position)
-        await self.coordinator.comm.async_set_output(
-            self._module.addr, self._out_up + 1, 1
+        await self.coordinator.client.set_output(
+            self._module.addr, self._out_up + 1, True
         )
         self._moving = 1
 
     async def async_close_cover(self, **kwargs: Any) -> None:
         """Close the cover."""
         self._position = 100 - int(self._cover.position)
-        await self.coordinator.comm.async_set_output(
-            self._module.addr, self._out_down + 1, 1
+        await self.coordinator.client.set_output(
+            self._module.addr, self._out_down + 1, True
         )
         self._moving = -1
 
@@ -275,7 +275,7 @@ class HbtnShutter(HbtnAreaMixin, CoordinatorEntity[HbtnCoordinator], CoverEntity
             self._moving = 1
         if self._position > tmp_position:
             self._moving = -1
-        await self.coordinator.comm.async_set_shutterpos(
+        await self.coordinator.client.set_shutterpos(
             self._module.addr,
             sh_nmbr,
             100 - tmp_position,
@@ -317,7 +317,7 @@ class HbtnBlind(HbtnShutter):
         """Handle updated data from the coordinator."""
         self._position = 100 - int(self._module.covers[self._nmbr].position)
         self._tilt_position = 100 - self._module.covers[self._nmbr].tilt
-        self.stop_delay = self.coordinator.comm.router.cover_autostop_del
+        self.stop_delay = self.coordinator.router.cover_autostop_del
         if self._module.outputs[self._out_up].is_on:
             self._moving = 1
         elif self._module.outputs[self._out_down].is_on:
@@ -343,7 +343,7 @@ class HbtnBlind(HbtnShutter):
             sh_nmbr -= 2  # map #3..5 to 1..3
             if sh_nmbr < 1:
                 sh_nmbr += 5  # ...and 1..2 to 4..5
-        await self.coordinator.comm.async_set_blindtilt(
+        await self.coordinator.client.set_blindtilt(
             self._module.addr,
             sh_nmbr,
             100 - tmp_tilt_position,
@@ -357,7 +357,7 @@ class HbtnBlind(HbtnShutter):
             sh_nmbr -= 2  # map #3..5 to 1..3
             if sh_nmbr < 1:
                 sh_nmbr += 5  # ...and 1..2 to 4..5
-        await self.coordinator.comm.async_set_blindtilt(
+        await self.coordinator.client.set_blindtilt(
             self._module.addr,
             sh_nmbr,
             0,
@@ -371,7 +371,7 @@ class HbtnBlind(HbtnShutter):
             sh_nmbr -= 2  # map #3..5 to 1..3
             if sh_nmbr < 1:
                 sh_nmbr += 5  # ...and 1..2 to 4..5
-        await self.coordinator.comm.async_set_blindtilt(
+        await self.coordinator.client.set_blindtilt(
             self._module.addr,
             sh_nmbr,
             100,

@@ -3,6 +3,12 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.4.3b4
+- Beta. The last piece of the restructuring, and nothing about it should be visible: the integration no longer has a command layer of its own. Every command goes straight to `habitron_client`, which as of 2.3.0 knows the last few wire details the integration still had to encode itself. Please report anything that stopped reacting.
+- Removed: the five services that wrote configuration and status to file -- `save_module_smc`, `save_module_smg`, `save_router_smr`, `save_module_status` and `save_router_status`. They saved into a `data` folder inside the integration's own directory, which is replaced wholesale on every update, so nothing kept there survived for long. If you call one of them from an automation or script, that call now fails.
+- Fixed: events pushed by the hub were discarded unless the address it stamps them with matched exactly the one the integration had connected to. A hub answering on a different interface, or one configured by host name, therefore had its pushes dropped and its entities only caught up on the next poll. Every spelling that legitimately names the hub is now accepted.
+- Uses habitron_client 2.3.0.
+
 ## v3.4.3b3
 - Beta. A module is now addressed by its own address on the bus. It used to be that address plus 100, a leftover from a time when several routers were planned; every command had to undo it again. Nothing about your setup changes -- devices, entities and their history keep their ids -- but please report anything that stops reacting.
 - Fixed: the router firmware update addressed the wrong target. Reading a firmware version and installing one disagreed about how to address the router and the modules, so one of the two was always wrong.

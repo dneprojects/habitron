@@ -3,7 +3,7 @@
 import logging
 from typing import TYPE_CHECKING
 
-from habitron_client import HbtnCommand, Module
+from habitron_client import HabitronClient, HbtnCommand, Module
 
 from homeassistant.components.notify import NotifyEntity
 from homeassistant.core import HomeAssistant
@@ -23,7 +23,6 @@ from .coordinator import HabitronConfigEntry
 from .text import DISPLAY_TYPES
 
 if TYPE_CHECKING:
-    from .communicate import HbtnComm
     from .coordinator import HbtnCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -44,7 +43,7 @@ async def async_setup_entry(
             new_devices.append(HbtnDisplayMessage(hbt_module, coordinator))
         if hbt_module.typ == b"\x1e\x03":
             new_devices.extend(
-                HbtnGSMMessage(hbt_module, sms, coordinator.comm)
+                HbtnGSMMessage(hbt_module, sms, coordinator.client)
                 for sms in hbt_module.gsm_numbers
             )
 
@@ -65,11 +64,13 @@ class HbtnGSMMessage(NotifyEntity):
 
     _attr_has_entity_name = True
 
-    def __init__(self, module: Module, gsm_number: HbtnCommand, comm: HbtnComm) -> None:
+    def __init__(
+        self, module: Module, gsm_number: HbtnCommand, client: HabitronClient
+    ) -> None:
         """Initialize a GSM SMS notify entity."""
         super().__init__()
         self._module = module
-        self._comm = comm
+        self._client = client
         self.messages = module.messages
         self.sms_id = gsm_number.nmbr
         self.sms_no = gsm_number.name.replace(" ", "").replace("-", "")
@@ -96,7 +97,7 @@ class HbtnGSMMessage(NotifyEntity):
                 self._module.uid,
             )
             return
-        await self._comm.send_sms(self._module.addr, msg_id, self.sms_id)
+        await self._client.send_sms(self._module.addr, msg_id, self.sms_id)
 
     async def async_clear_sent_message(self) -> None:
         """Refuse: an SMS cannot be taken back once it has been sent."""
@@ -111,7 +112,7 @@ class HbtnGSMMessage(NotifyEntity):
         action sits here and not on the list: one module's messages can go to
         any of its numbers.
         """
-        await self._comm.send_sms(
+        await self._client.send_sms(
             self._module.addr,
             selected_message_id(self.hass, self._module.uid),
             self.sms_id,

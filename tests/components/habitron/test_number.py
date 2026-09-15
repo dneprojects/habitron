@@ -18,9 +18,8 @@ def _module(uid: str = "MOD-1", **kwargs) -> Module:
 
 def _coord() -> MagicMock:
     coord = MagicMock()
-    coord.comm = MagicMock()
-    coord.comm.async_set_setpoint = AsyncMock()
-    coord.comm.async_set_analog_val = AsyncMock()
+    coord.client = AsyncMock()
+    coord.client.set_setpoint = AsyncMock()
     coord.async_request_refresh = AsyncMock()
     return coord
 
@@ -44,7 +43,7 @@ async def test_set_temperature_set_value_forwards_setpoint() -> None:
     setval = SetValue(name="Set temperature", nmbr=1, type=2, value=20.0)
     entity = HbtnSetTemperature(setval, _module(), coord, 0)
     await entity.async_set_native_value(22.0)
-    coord.comm.async_set_setpoint.assert_awaited_with(5, 2, 220)
+    coord.client.set_setpoint.assert_awaited_with(5, 2, 220)
     coord.async_request_refresh.assert_awaited()
 
 
@@ -77,7 +76,7 @@ async def test_analog_output_set_value() -> None:
     entity = HbtnAnalogOutput(analog, _module(), coord, 0)
     await entity.async_set_native_value(42.0)
     assert analog.brightness == 42
-    coord.comm.async_set_analog_val.assert_awaited_with(5, 16, 42)
+    coord.client.set_dimmval.assert_awaited_with(5, Module.ANALOG_OUT_CHANNEL, 42)
     coord.async_request_refresh.assert_awaited()
 
 

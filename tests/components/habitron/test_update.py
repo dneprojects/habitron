@@ -20,8 +20,10 @@ from homeassistant.exceptions import HomeAssistantError
 def _fw_coord() -> MagicMock:
     coord = MagicMock()
     coord.data = {}
-    coord.comm = MagicMock()
-    coord.comm.update_firmware = AsyncMock()
+    coord.client = AsyncMock()
+    # The firmware coordinator reaches the bus through its status parent.
+    coord.status = MagicMock()
+    coord.status.update_firmware = AsyncMock()
     return coord
 
 
@@ -59,7 +61,7 @@ async def test_module_update_install_module() -> None:
     entity.async_write_ha_state = MagicMock()
     with patch("custom_components.habitron.update.sleep", new=AsyncMock()):
         await entity.async_install("1.3.0", backup=False)
-    coord.comm.update_firmware.assert_awaited_with(5)
+    coord.status.update_firmware.assert_awaited_with(5)
     assert entity.installed_version == "1.3.0"
 
 
@@ -71,7 +73,7 @@ async def test_module_update_install_router() -> None:
     entity.async_write_ha_state = MagicMock()
     with patch("custom_components.habitron.update.sleep", new=AsyncMock()):
         await entity.async_install("2.1.0", backup=False)
-    coord.comm.update_firmware.assert_awaited_with(0)
+    coord.status.update_firmware.assert_awaited_with(0)
 
 
 # ---------------------------------------------------------------------------
@@ -157,7 +159,7 @@ async def test_async_setup_entry_emits_updates(hass: HomeAssistant) -> None:
     router.modules = [module, touch]
     coordinator = _hub_coord()
     coordinator.router = router
-    coordinator.comm = MagicMock()
+    coordinator.client = AsyncMock()
     entry = MagicMock()
     entry.runtime_data = coordinator
 

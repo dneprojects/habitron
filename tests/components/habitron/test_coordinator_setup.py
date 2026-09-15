@@ -13,7 +13,7 @@ from custom_components.habitron.system_health import async_register, system_heal
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import area_registry as ar, device_registry as dr
 
-from .const import MOCK_HOST, MOCK_SMHUB_INFO, MOCK_UID
+from .const import MOCK_HOST, MOCK_MAC, MOCK_SMHUB_INFO, MOCK_UID
 
 
 def test_logging_levels_enum_values() -> None:
@@ -28,45 +28,27 @@ def test_logging_levels_enum_values() -> None:
 
 @pytest.fixture
 def coordinator_stub() -> HbtnCoordinator:
-    """Build a HbtnCoordinator with its transport stubbed out.
+    """Build a HbtnCoordinator with its client stubbed out.
 
-    The coordinator constructs its own ``HbtnComm``, so the stub is patched in
-    at construction rather than passed: the real one reads the integration
-    manifest out of ``hass.data``, which a bare unit test has not loaded.
+    The coordinator owns the connection now, so the stub goes in after
+    construction. ``hass.data`` carries the manifest the constructor reads for
+    the version it reports to the hub.
     """
-    with patch("custom_components.habitron.coordinator.HbtnComm") as mock_com:
-        comm = MagicMock()
-        comm.com_ip = MOCK_HOST
-        comm.com_port = 7777
-        comm.com_mac = "AA:BB:CC:DD:EE:FF"
-        comm.com_version = "9.9.9"
-        comm.com_hwtype = "Raspberry Pi 4"
-        comm.hbtn_version = "3.4.3"
-        comm.is_addon = False
-        comm.slugname = ""
-        comm.async_setup = AsyncMock()
-        comm.async_close = AsyncMock()
-        comm.get_smhub_info = AsyncMock()
-        comm.get_smhub_update = AsyncMock()
-        comm.get_host_diagnostics = AsyncMock()
-        comm.get_smhub_version = AsyncMock()
-        comm.reinit_hub = AsyncMock()
-        comm.send_network_info = AsyncMock()
-        comm.send_devregid = AsyncMock()
-        comm.set_router = MagicMock()
-        comm.hub_restart = AsyncMock()
-        comm.hub_reboot = AsyncMock()
-        mock_com.return_value = comm
+    hass = MagicMock()
+    hass.async_add_executor_job = AsyncMock()
+    hass.http.async_register_static_paths = AsyncMock()
+    hass.data = {"integrations": {"habitron": MagicMock(manifest={"version": "3.4.3"})}}
+    config = MagicMock()
+    config.title = "Habitron"
+    config.entry_id = "entry-id"
+    config.data = {"host": MOCK_HOST, "websock_token": "tok"}
 
-        hass = MagicMock()
-        hass.async_add_executor_job = AsyncMock()
-        hass.http.async_register_static_paths = AsyncMock()
-        config = MagicMock()
-        config.title = "Habitron"
-        config.entry_id = "entry-id"
-        config.data = {"websock_token": "tok"}
-        coord = HbtnCoordinator(hass, config)
-    return coord  # noqa: RET504
+    coord = HbtnCoordinator(hass, config)
+    coord._client = AsyncMock()
+    coord.host = MOCK_HOST
+    coord._mac = "AA:BB:CC:DD:EE:FF"
+    coord.is_addon = False
+    return coord
 
 
 def test_init_starts_with_empty_models(
@@ -173,9 +155,9 @@ async def test_update_hands_the_hub_to_the_library(
         await coordinator_stub.update()
 
     refresh.assert_awaited_once_with(
-        coordinator_stub.comm.client,
+        coordinator_stub.client,
         coordinator_stub.hub,
-        hbtn_version=coordinator_stub.comm.hbtn_version,
+        hbtn_version=coordinator_stub._hbtn_version,
     )
 
 
@@ -191,12 +173,16 @@ async def test_async_update_delegates_to_update(
     refresh.assert_awaited_once()
 
 
-async def test_async_close_delegates_to_comm(
+async def test_async_close_releases_the_client(
     coordinator_stub: HbtnCoordinator,
 ) -> None:
-    """async_close hands off to comm.async_close to tear down the persistent client."""
+    """Unload drops the client so it can close any probe socket it holds."""
+    client = coordinator_stub.client
     await coordinator_stub.async_close()
-    coordinator_stub.comm.async_close.assert_awaited()
+    client.close.assert_awaited()
+    # Idempotent: a second unload must not explode on the dropped reference.
+    await coordinator_stub.async_close()
+    client.close.assert_awaited_once()
 
 
 async def test_get_version_strips_smartip_prefix(
@@ -205,7 +191,7 @@ async def test_get_version_strips_smartip_prefix(
     """``get_version`` strips the leading SmartIP marker from the reply."""
     # ``get_version`` returns ver_string[9:] when the SmartIP prefix is
     # present — so the version payload sits at byte index 9.
-    coordinator_stub.comm.get_smhub_version = AsyncMock(
+    coordinator_stub.client.get_smhub_version = AsyncMock(
         return_value=b"SmartIP\x00\x001.2.3.4"
     )
     ver = await coordinator_stub.get_version()
@@ -216,7 +202,7 @@ async def test_get_version_returns_zero_default_when_marker_missing(
     coordinator_stub: HbtnCoordinator,
 ) -> None:
     """If the SmartIP marker is missing, ``get_version`` falls back to 0.0.0."""
-    coordinator_stub.comm.get_smhub_version = AsyncMock(return_value=b"garbled")
+    coordinator_stub.client.get_smhub_version = AsyncMock(return_value=b"garbled")
     ver = await coordinator_stub.get_version()
     assert ver == "0.0.0"
 
@@ -224,13 +210,13 @@ async def test_get_version_returns_zero_default_when_marker_missing(
 async def test_restart_forwards_to_comm(coordinator_stub: HbtnCoordinator) -> None:
     """``restart`` accepts a router id (forward-compat) but forwards a no-arg call."""
     await coordinator_stub.restart()
-    coordinator_stub.comm.hub_restart.assert_awaited_with()
+    coordinator_stub.client.hub_restart.assert_awaited_with()
 
 
 async def test_reboot_forwards_to_comm(coordinator_stub: HbtnCoordinator) -> None:
-    """reboot() forwards the call to ``comm.hub_reboot``."""
+    """reboot() forwards the call to ``client.hub_reboot``."""
     await coordinator_stub.reboot()
-    coordinator_stub.comm.hub_reboot.assert_awaited()
+    coordinator_stub.client.hub_reboot.assert_awaited()
 
 
 def test_async_register_forwards_system_health_info() -> None:
@@ -331,3 +317,63 @@ async def test_setup_links_modules_via_router_to_hub(
     assert hub is not None and rt is not None and mod is not None
     assert rt.via_device_id == hub.id
     assert mod.via_device_id == rt.id
+
+
+@pytest.mark.parametrize(
+    "stamp",
+    ["10.0.0.7", "192.168.1.50", "smarthub.local"],
+    ids=["reached at", "reported by the hub", "as configured"],
+)
+def test_a_pushed_event_is_matched_by_any_address_naming_this_hub(
+    coordinator_stub: HbtnCoordinator, stamp: str
+) -> None:
+    """The hub picks the stamp itself, so all three spellings have to match.
+
+    The service documents the field as "host name or IP", and an unmatched push
+    is dropped with a debug line -- guessing which one the firmware uses would
+    cost every button press and motion pulse silently.
+    """
+    coordinator_stub.host = "10.0.0.7"
+    coordinator_stub.reported_ip = "192.168.1.50"
+    coordinator_stub._host_conf = "smarthub.local"
+
+    assert coordinator_stub.owns_event_from(stamp) is True
+
+
+def test_a_pushed_event_from_another_hub_is_not_claimed(
+    coordinator_stub: HbtnCoordinator,
+) -> None:
+    """A second hub's events must not be applied to this one's model."""
+    coordinator_stub.host = "10.0.0.7"
+    coordinator_stub.reported_ip = "192.168.1.50"
+    coordinator_stub._host_conf = "smarthub.local"
+
+    assert coordinator_stub.owns_event_from("10.0.0.99") is False
+
+
+async def test_the_reported_address_does_not_replace_the_one_we_reached(
+    coordinator_stub: HbtnCoordinator,
+) -> None:
+    """Device links are built from ``host``, so the hub must not overwrite it.
+
+    A hub whose interface is unnumbered from its own point of view answers
+    ``0.0.0.0``; taking that as the address would put it into every device's
+    configuration URL.
+    """
+    coordinator_stub.host = "10.0.0.7"
+    coordinator_stub.client.get_smhub_info = AsyncMock(
+        return_value={
+            "hardware": {
+                "platform": {"type": "Raspberry Pi 4"},
+                "network": {"ip": "0.0.0.0", "host": "smarthub", "lan mac": MOCK_MAC},
+            },
+            "software": {"version": "9.9.9", "type": "Smart Hub"},
+        }
+    )
+
+    await coordinator_stub._async_read_hub_info()
+
+    assert coordinator_stub.host == "10.0.0.7"
+    assert coordinator_stub.reported_ip == "0.0.0.0"
+    # ...and the hub is still recognised when it stamps that very address.
+    assert coordinator_stub.owns_event_from("0.0.0.0") is True

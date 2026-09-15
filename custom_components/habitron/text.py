@@ -1,9 +1,8 @@
 """Text platform for Habitron module displays."""
 
 import logging
-from typing import TYPE_CHECKING
 
-from habitron_client import Module
+from habitron_client import HabitronClient, Module
 
 from homeassistant.components.text import TextEntity
 from homeassistant.core import HomeAssistant
@@ -11,9 +10,6 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from ._helpers import hbtn_device_info, resolve_stored_message
 from .coordinator import HabitronConfigEntry
-
-if TYPE_CHECKING:
-    from .communicate import HbtnComm
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -32,7 +28,7 @@ async def async_setup_entry(
     """Add a display-text entity for each display-capable module."""
     coordinator = entry.runtime_data
     new_devices = [
-        HbtnDisplayText(hbt_module, coordinator.comm)
+        HbtnDisplayText(hbt_module, coordinator.client)
         for hbt_module in coordinator.router.modules
         if hbt_module.typ in DISPLAY_TYPES
     ]
@@ -47,10 +43,10 @@ class HbtnDisplayText(TextEntity):
     _attr_translation_key = "message"
     _attr_native_value = ""
 
-    def __init__(self, module: Module, comm: HbtnComm) -> None:
+    def __init__(self, module: Module, client: HabitronClient) -> None:
         """Initialize the display-text entity."""
         self._module = module
-        self._comm = comm
+        self._client = client
         self._attr_unique_id = f"{module.uid}_message"
         self._attr_device_info = hbtn_device_info(module.uid)
 
@@ -72,6 +68,6 @@ class HbtnDisplayText(TextEntity):
         here does what the hub would have done anyway.
         """
         _nmbr, label = resolve_stored_message(self._module.messages, value)
-        await self._comm.send_message_text(self._module.addr, label)
+        await self._client.send_message_text(self._module.addr, label)
         self._attr_native_value = label
         self.async_write_ha_state()

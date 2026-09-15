@@ -120,11 +120,11 @@ async def test_real_recording_builds_devices_and_entities(
 
     with (
         patch(
-            "custom_components.habitron.communicate.HabitronClient",
+            "custom_components.habitron.coordinator.HabitronClient",
             return_value=client,
         ),
         patch(
-            "custom_components.habitron.communicate.network.async_get_source_ip",
+            "custom_components.habitron.coordinator.network.async_get_source_ip",
             new=AsyncMock(return_value="192.168.1.10"),
         ),
         # The frontend iconset registration needs the frontend component; it is

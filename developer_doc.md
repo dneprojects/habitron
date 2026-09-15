@@ -4,6 +4,61 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.4.3b4
+
+### `communicate.py` is gone
+`habitron_client` 2.3.0 took the last four places that still encoded bus
+semantics: the day/night and alarm settings the bus folds into one
+`SET_GROUP_MODE` argument (`set_daytime_mode`, `set_alarm_mode`), the indicator
+LEDs that continue a module's output numbering (`Module.led_output`), the
+analogue output addressed as a dimmer channel (`Module.ANALOG_OUT_CHANNEL`) and
+the power cycle whose pause is part of the operation (`power_cycle_channel`).
+With those gone, all 33 command methods of `HbtnComm` were forwards, and
+forwarding was the whole of what they did.
+
+The platforms now call `coordinator.client.<command>` directly. What was never a
+forward moved onto `HbtnCoordinator`, which has owned the hub and the bus model
+since b2:
+
+- `_async_connect` and `_async_read_hub_info` -- address resolution plus the
+  fields the *connection* needs: the address the hub stamps its pushes with, the
+  MAC the network handshake scrambles a token against, and the add-on flag.
+- `send_network_info`, `reinit_hub` and `async_system_update`.
+- `handle_firmware` and `update_firmware`, with `_read_deduped` behind them. The
+  per-stream CRC map moved along unchanged; the compact status keeps its own
+  `self.crc`, which is this coordinator's data.
+- `update_entity`, the event-server handler.
+
+`self.comm` is gone with it, and so is the last consumer of `anyio`.
+`coordinator.router` replaces `coordinator.comm.router`, and the firmware
+coordinator takes its status parent (`status`) instead of a comm wrapper.
+
+### The file-saving services are gone
+`save_module_smc`, `save_module_smg`, `save_router_smr`, `save_module_status`
+and `save_router_status` are removed, together with their schemas, icons,
+strings, translations and README sections; `.gitignore` loses the `data/` entry.
+
+They were the data-fetch half of `communicate.py` that genuinely was not a
+forward -- and the only reason `save_config_data` and async file writing existed
+here. What they wrote went to `custom_components/habitron/data/`, inside the
+integration's own directory, which an update replaces wholesale. A service whose
+output is deleted by the next version update is not a place to keep a
+configuration backup.
+
+### An event counts as ours under any of the hub's names
+`update_entity` compared the stamp on a pushed event against a single spelling,
+the resolved address (`_hostip`), and dropped everything else with a debug line.
+But the hub picks that stamp itself and the service documents it as "host name
+or IP", so a hub answering on a different interface -- or an entry configured by
+name -- had its pushes silently discarded, and the entity waited for the next
+poll instead of reacting.
+
+`HbtnCoordinator.owns_event_from` accepts all three spellings that legitimately
+name this hub: the address we reached it at, the one it reports for itself, and
+whatever the entry was configured with. They coincide in every normal setup;
+guessing which one the hub would use costs events silently, which is the worse
+failure of the two.
+
 ## v3.4.3b3
 
 ### `Module.addr` is the bus address

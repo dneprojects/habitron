@@ -109,15 +109,15 @@ def mock_habitron_client() -> Generator[MagicMock]:
             new=fake_gethostbyname,
         ),
         patch(
-            "custom_components.habitron.communicate.get_own_ip",
+            "custom_components.habitron.coordinator.get_own_ip",
             return_value="192.168.1.10",
         ),
         patch(
-            "custom_components.habitron.communicate.get_host_ip",
+            "custom_components.habitron.coordinator.get_host_ip",
             new=AsyncMock(return_value=MOCK_HOST),
         ),
         patch(
-            "custom_components.habitron.communicate.HabitronClient",
+            "custom_components.habitron.coordinator.HabitronClient",
             autospec=True,
         ) as mock_client_cls,
     ):
@@ -268,15 +268,15 @@ def real_setup(
 
         with (
             patch(
-                "custom_components.habitron.communicate.HabitronClient",
+                "custom_components.habitron.coordinator.HabitronClient",
                 return_value=client,
             ),
             patch(
-                "custom_components.habitron.communicate.get_own_ip",
+                "custom_components.habitron.coordinator.get_own_ip",
                 return_value="192.168.1.10",
             ),
             patch(
-                "custom_components.habitron.communicate.get_host_ip",
+                "custom_components.habitron.coordinator.get_host_ip",
                 new=AsyncMock(return_value=MOCK_HOST),
             ),
             patch(

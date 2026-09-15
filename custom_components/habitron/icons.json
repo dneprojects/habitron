@@ -144,26 +144,17 @@
     "rtr_restart": {
       "service": "mdi:router-network"
     },
-    "save_module_smc": {
-      "service": "mdi:content-save-cog"
-    },
-    "save_module_smg": {
-      "service": "mdi:content-save-settings"
-    },
-    "save_router_smr": {
-      "service": "mdi:content-save-edit"
-    },
-    "save_module_status": {
-      "service": "mdi:content-save"
-    },
-    "save_router_status": {
-      "service": "mdi:content-save-outline"
-    },
     "update_entity": {
       "service": "mdi:swap-horizontal-bold"
     },
     "sc_system_command": {
       "service": "mdi:remote"
+    },
+    "send_selected_message": {
+      "service": "mdi:message-arrow-right"
+    },
+    "clear_sent_message": {
+      "service": "mdi:message-off"
     }
   }
 }

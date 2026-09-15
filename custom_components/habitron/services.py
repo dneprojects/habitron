@@ -37,11 +37,6 @@ SERVICE_HUB_RESTART = "hub_restart"
 SERVICE_HUB_REBOOT = "hub_reboot"
 SERVICE_MOD_RESTART = "mod_restart"
 SERVICE_RTR_RESTART = "rtr_restart"
-SERVICE_SAVE_MODULE_SMC = "save_module_smc"
-SERVICE_SAVE_MODULE_SMG = "save_module_smg"
-SERVICE_SAVE_ROUTER_SMR = "save_router_smr"
-SERVICE_SAVE_MODULE_STATUS = "save_module_status"
-SERVICE_SAVE_ROUTER_STATUS = "save_router_status"
 SERVICE_UPDATE_ENTITY = "update_entity"
 SERVICE_SC_SYSTEM_COMMAND = "sc_system_command"
 
@@ -117,59 +112,26 @@ async def _targeted_hubs(call: ServiceCall) -> list[HbtnCoordinator]:
 async def _async_restart_hub(call: ServiceCall) -> None:
     """Trigger a soft restart of the targeted SmartHub(s)."""
     for hub in await _targeted_hubs(call):
-        await hub.comm.hub_restart()
+        await hub.client.hub_restart()
 
 
 async def _async_reboot_hub(call: ServiceCall) -> None:
     """Trigger a reboot of the targeted SmartHub(s)."""
     for hub in await _targeted_hubs(call):
-        await hub.comm.hub_reboot()
+        await hub.client.hub_reboot()
 
 
 async def _async_restart_module(call: ServiceCall) -> None:
     """Restart a single Habitron module."""
     mod_nmbr = call.data.get(RESTART_KEY_NMBR, RESTART_ALL)
     for hub in await _targeted_hubs(call):
-        await hub.comm.module_restart(mod_nmbr)
+        await hub.client.module_restart(mod_nmbr)
 
 
 async def _async_restart_router(call: ServiceCall) -> None:
     """Restart the router of the targeted hub(s)."""
     for hub in await _targeted_hubs(call):
-        await hub.comm.module_restart(0)
-
-
-async def _async_save_module_smc(call: ServiceCall) -> None:
-    """Persist a module's .smc file."""
-    mod_nmbr = call.data.get(FILE_MOD_NMBR, 1)
-    for hub in await _targeted_hubs(call):
-        await hub.comm.save_smc_file(mod_nmbr)
-
-
-async def _async_save_module_smg(call: ServiceCall) -> None:
-    """Persist a module's .smg file."""
-    mod_nmbr = call.data.get(FILE_MOD_NMBR, 1)
-    for hub in await _targeted_hubs(call):
-        await hub.comm.save_smg_file(100 + mod_nmbr)
-
-
-async def _async_save_router_smr(call: ServiceCall) -> None:
-    """Persist the router's .smr file."""
-    for hub in await _targeted_hubs(call):
-        await hub.comm.save_smr_file()
-
-
-async def _async_save_module_status(call: ServiceCall) -> None:
-    """Persist a module's status to disk."""
-    mod_nmbr = call.data.get(FILE_MOD_NMBR, 1)
-    for hub in await _targeted_hubs(call):
-        await hub.comm.save_module_status(100 + mod_nmbr)
-
-
-async def _async_save_router_status(call: ServiceCall) -> None:
-    """Persist the router status to disk."""
-    for hub in await _targeted_hubs(call):
-        await hub.comm.save_router_status()
+        await hub.client.module_restart(0)
 
 
 async def _async_update_entity(call: ServiceCall) -> None:
@@ -184,10 +146,8 @@ async def _async_update_entity(call: ServiceCall) -> None:
     arg5: int = call.data.get(EVNT_ARG5, 0)
     for entry in call.hass.config_entries.async_loaded_entries(DOMAIN):
         hub: HbtnCoordinator = entry.runtime_data
-        if hub.host == hub_id:
-            await hub.comm.update_entity(
-                hub_id, mod_id, evnt, arg1, arg2, arg3, arg4, arg5
-            )
+        if hub.owns_event_from(hub_id):
+            await hub.update_entity(hub_id, mod_id, evnt, arg1, arg2, arg3, arg4, arg5)
             return
     # No loaded hub owns this address yet. This is normally a brief startup
     # race (the hub posts an event before its host is resolved); the next poll
@@ -281,11 +241,6 @@ _SERVICE_REGISTRY: tuple[tuple[str, _ServiceHandler, vol.Schema], ...] = (
     (SERVICE_HUB_REBOOT, _async_reboot_hub, _HUB_TARGET_SCHEMA),
     (SERVICE_MOD_RESTART, _async_restart_module, _MOD_RESTART_SCHEMA),
     (SERVICE_RTR_RESTART, _async_restart_router, _HUB_TARGET_SCHEMA),
-    (SERVICE_SAVE_MODULE_SMC, _async_save_module_smc, _MOD_FILE_SCHEMA),
-    (SERVICE_SAVE_MODULE_SMG, _async_save_module_smg, _MOD_FILE_SCHEMA),
-    (SERVICE_SAVE_ROUTER_SMR, _async_save_router_smr, _HUB_TARGET_SCHEMA),
-    (SERVICE_SAVE_MODULE_STATUS, _async_save_module_status, _MOD_FILE_SCHEMA),
-    (SERVICE_SAVE_ROUTER_STATUS, _async_save_router_status, _HUB_TARGET_SCHEMA),
     (SERVICE_UPDATE_ENTITY, _async_update_entity, _UPDATE_ENTITY_SCHEMA),
     (
         SERVICE_SC_SYSTEM_COMMAND,

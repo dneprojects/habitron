@@ -291,68 +291,6 @@
         }
       }
     },
-    "save_module_smc": {
-      "name": "Save module .smc file",
-      "description": "Read module rule and name definitions and save them to an .smc text file.",
-      "fields": {
-        "mod_nmbr": {
-          "name": "Module number",
-          "description": "Habitron's module address."
-        },
-        "device_id": {
-          "name": "Device",
-          "description": "A Habitron device on the target SmartHub (hub, router or module). Optional with a single hub."
-        }
-      }
-    },
-    "save_module_smg": {
-      "name": "Save module .smg file",
-      "description": "Read module settings and save them to an .smg text file.",
-      "fields": {
-        "mod_nmbr": {
-          "name": "Module number",
-          "description": "Habitron's module address."
-        },
-        "device_id": {
-          "name": "Device",
-          "description": "A Habitron device on the target SmartHub (hub, router or module). Optional with a single hub."
-        }
-      }
-    },
-    "save_module_status": {
-      "name": "Save module status",
-      "description": "Read module status and save it to an .mstat text file.",
-      "fields": {
-        "mod_nmbr": {
-          "name": "Module number",
-          "description": "Habitron's module address."
-        },
-        "device_id": {
-          "name": "Device",
-          "description": "A Habitron device on the target SmartHub (hub, router or module). Optional with a single hub."
-        }
-      }
-    },
-    "save_router_smr": {
-      "name": "Save router .smr file",
-      "description": "Read router settings and save them to an .smr text file.",
-      "fields": {
-        "device_id": {
-          "name": "Device",
-          "description": "A Habitron device on the target SmartHub (hub, router or module). Optional with a single hub."
-        }
-      }
-    },
-    "save_router_status": {
-      "name": "Save router status",
-      "description": "Read router status and save it to an .rstat text file.",
-      "fields": {
-        "device_id": {
-          "name": "Device",
-          "description": "A Habitron device on the target SmartHub (hub, router or module). Optional with a single hub."
-        }
-      }
-    },
     "sc_system_command": {
       "name": "Smart Touch system command",
       "description": "Execute a soft restart or factory reset on a Smart Touch Controller app.",

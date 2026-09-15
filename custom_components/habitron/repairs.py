@@ -138,7 +138,7 @@ class ModuleFaultRepairFlow(RepairsFlow):
         if resolved is None:
             return self.async_abort(reason="module_unavailable")
         coordinator, module = resolved
-        await coordinator.comm.module_restart(module.addr)
+        await coordinator.client.module_restart(module.addr)
         return self.async_create_entry(title="", data={})
 
     async def async_step_confirm_power_cycle(
@@ -179,7 +179,7 @@ class ModuleFaultRepairFlow(RepairsFlow):
         channel, _ = _channel_and_peers(coordinator.router, module)
         if channel is None:
             return self.async_abort(reason="channel_unknown")
-        await coordinator.comm.async_power_cycle_channel(channel)
+        await coordinator.client.power_cycle_channel(channel)
         return self.async_create_entry(title="", data={})
 
     async def async_step_room_controller_unreachable(

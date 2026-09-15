@@ -16,13 +16,13 @@ from .conftest import class_attr
 
 
 def _coord(autostop: int | None = 5) -> MagicMock:
-    """Build a mock coordinator with comm stubs and the autostop delay."""
+    """Build a mock coordinator with client stubs and the autostop delay."""
     coord = MagicMock()
-    coord.comm = MagicMock()
-    coord.comm.router.cover_autostop_del = autostop
-    coord.comm.async_set_output = AsyncMock()
-    coord.comm.async_set_shutterpos = AsyncMock()
-    coord.comm.async_set_blindtilt = AsyncMock()
+    coord.client = AsyncMock()
+    coord.router.cover_autostop_del = autostop
+    coord.client.set_output = AsyncMock()
+    coord.client.set_shutterpos = AsyncMock()
+    coord.client.set_blindtilt = AsyncMock()
     return coord
 
 
@@ -75,10 +75,10 @@ async def test_shutter_open_close_stop() -> None:
     """Open/close/stop drive the matching backing outputs."""
     entity = _shutter()
     await entity.async_open_cover()
-    entity.coordinator.comm.async_set_output.assert_awaited_with(5, 1, 1)
+    entity.coordinator.client.set_output.assert_awaited_with(5, 1, 1)
     assert entity.is_opening is True
     await entity.async_close_cover()
-    entity.coordinator.comm.async_set_output.assert_awaited_with(5, 2, 1)
+    entity.coordinator.client.set_output.assert_awaited_with(5, 2, 1)
     assert entity.is_closing is True
     await entity.async_stop_cover()
     assert entity._moving == 0
@@ -88,7 +88,7 @@ async def test_shutter_set_position_calls_shutterpos() -> None:
     """Setting a position forwards the inverted target to the bus."""
     entity = _shutter(Cover(name="Sh", nmbr=0, type=1, position=0))  # at 100
     await entity.async_set_cover_position(**{ATTR_POSITION: 40})
-    entity.coordinator.comm.async_set_shutterpos.assert_awaited_with(5, 1, 60)
+    entity.coordinator.client.set_shutterpos.assert_awaited_with(5, 1, 60)
 
 
 async def test_shutter_set_position_smart_controller_remap() -> None:
@@ -101,7 +101,7 @@ async def test_shutter_set_position_smart_controller_remap() -> None:
     entity.hass = MagicMock()
     await entity.async_set_cover_position(**{ATTR_POSITION: 40})
     # sh_nmbr = 1 -> -2 -> +5 = 4
-    entity.coordinator.comm.async_set_shutterpos.assert_awaited_with(5, 4, 60)
+    entity.coordinator.client.set_shutterpos.assert_awaited_with(5, 4, 60)
 
 
 def test_shutter_moving_from_outputs() -> None:
@@ -171,7 +171,7 @@ async def test_stop_cover_after_delay_resets_moving() -> None:
     entity._moving = 1
     with patch("custom_components.habitron.cover.asyncio.sleep", new=AsyncMock()):
         await entity._stop_cover_after_delay(0)
-    entity.coordinator.comm.async_set_output.assert_awaited_with(5, 1, 0)
+    entity.coordinator.client.set_output.assert_awaited_with(5, 1, 0)
     assert entity._moving == 0
 
 
@@ -222,7 +222,7 @@ async def test_blind_set_tilt_calls_blindtilt() -> None:
     entity = HbtnBlind(cover, module, _coord(), 0)
     entity.hass = MagicMock()
     await entity.async_set_cover_tilt_position(**{ATTR_TILT_POSITION: 40})
-    entity.coordinator.comm.async_set_blindtilt.assert_awaited_with(5, 1, 60)
+    entity.coordinator.client.set_blindtilt.assert_awaited_with(5, 1, 60)
 
 
 async def test_blind_open_close_tilt() -> None:
@@ -233,9 +233,9 @@ async def test_blind_open_close_tilt() -> None:
     entity = HbtnBlind(cover, module, _coord(), 0)
     entity.hass = MagicMock()
     await entity.async_open_cover_tilt()
-    entity.coordinator.comm.async_set_blindtilt.assert_awaited_with(5, 1, 0)
+    entity.coordinator.client.set_blindtilt.assert_awaited_with(5, 1, 0)
     await entity.async_close_cover_tilt()
-    entity.coordinator.comm.async_set_blindtilt.assert_awaited_with(5, 1, 100)
+    entity.coordinator.client.set_blindtilt.assert_awaited_with(5, 1, 100)
 
 
 # ---------------------------------------------------------------------------

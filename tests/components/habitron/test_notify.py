@@ -19,36 +19,34 @@ def _gsm_module() -> Module:
     return module
 
 
-def _comm() -> MagicMock:
-    comm = MagicMock()
-    comm.send_sms = AsyncMock()
-    return comm
+def _client() -> MagicMock:
+    return AsyncMock()
 
 
 def test_gsm_message_unique_id() -> None:
     """The SMS entity exposes a stable unique id derived from the number."""
     module = _gsm_module()
-    entity = HbtnGSMMessage(module, module.gsm_numbers[0], _comm())
+    entity = HbtnGSMMessage(module, module.gsm_numbers[0], _client())
     assert entity.unique_id == "MOD-GSM_sms_01701234"
     assert entity.name == "SMS 0170 1234"
 
 
 async def test_gsm_message_sends_known_message() -> None:
     """A stored message name is resolved and sent as an SMS."""
-    comm = _comm()
+    client = _client()
     module = _gsm_module()
-    entity = HbtnGSMMessage(module, module.gsm_numbers[0], comm)
+    entity = HbtnGSMMessage(module, module.gsm_numbers[0], client)
     await entity.async_send_message("Alarm")
-    comm.send_sms.assert_awaited_with(5, 3, 1)
+    client.send_sms.assert_awaited_with(5, 3, 1)
 
 
 async def test_gsm_message_unknown_text_skipped() -> None:
     """A free-text message that is not a stored entry is skipped."""
-    comm = _comm()
+    client = _client()
     module = _gsm_module()
-    entity = HbtnGSMMessage(module, module.gsm_numbers[0], comm)
+    entity = HbtnGSMMessage(module, module.gsm_numbers[0], client)
     await entity.async_send_message("free text")
-    comm.send_sms.assert_not_awaited()
+    client.send_sms.assert_not_awaited()
 
 
 async def test_async_setup_entry_builds_sms_entities(hass: HomeAssistant) -> None:
@@ -58,7 +56,7 @@ async def test_async_setup_entry_builds_sms_entities(hass: HomeAssistant) -> Non
     router.modules = [module]
     entry = MagicMock()
     entry.runtime_data.router = router
-    entry.runtime_data.comm = _comm()
+    entry.runtime_data.client = _client()
 
     added: list = []
     # The platform registers its two entity services on setup; called directly
@@ -97,6 +95,5 @@ async def test_send_message_service_reaches_bus(
         {"entity_id": entity_id, "message": "Alarm"},
         blocking=True,
     )
-    # comm converts the absolute addr (105) to the bus id (addr - 100 = 5);
     # "Alarm" -> stored message id 3; SMS contact id 1.
     client.send_sms.assert_awaited_once_with(5, 3, 1)

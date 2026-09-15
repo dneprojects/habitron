@@ -236,7 +236,7 @@ class HbtnClimate(CoordinatorEntity[HbtnCoordinator], ClimateEntity):
         """Set temperature."""
         if (temp := kwargs.get(ATTR_TEMPERATURE)) is not None:
             self._target_temperature = temp
-            await self.coordinator.comm.async_set_setpoint(
+            await self.coordinator.client.set_setpoint(
                 self._module.addr, self._controller_idx + 1, int(temp * 10)
             )
             await self.coordinator.async_request_refresh()
@@ -253,7 +253,7 @@ class HbtnClimate(CoordinatorEntity[HbtnCoordinator], ClimateEntity):
         self._module.climate_settings = val
 
         # This update affects both controllers
-        await self.coordinator.comm.async_set_climate_mode(
+        await self.coordinator.client.set_climate_mode(
             self._module.addr, val, self._module.climate_ctl12
         )
         await self.coordinator.async_request_refresh()

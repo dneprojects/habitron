@@ -154,11 +154,9 @@ class HbtnMode(CoordinatorEntity[HbtnCoordinator], SelectEntity):
         self._mode = (int(self._module.mode.value) & (0xFF - self._mask)) + mode_val
         if isinstance(self._module, Router):
             # Router-level mode change targets group 0.
-            await self.coordinator.comm.async_set_group_mode(0, self._mode)
+            await self.coordinator.client.set_group_mode(0, self._mode)
         else:
-            await self.coordinator.comm.async_set_group_mode(
-                self._module.group, self._mode
-            )
+            await self.coordinator.client.set_group_mode(self._module.group, self._mode)
 
 
 class HbtnSelectDaytimeMode(HbtnMode):
@@ -199,13 +197,11 @@ class HbtnSelectDaytimeMode(HbtnMode):
 
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
-        mode_val = self._enum[option].value
-        if isinstance(self._module, Router):
-            await self.coordinator.comm.async_set_daytime_mode(0, mode_val)
-        else:
-            await self.coordinator.comm.async_set_daytime_mode(
-                self._module.group, mode_val
-            )
+        # The library takes the setting, not its wire value: ``day`` is the
+        # first of the two, ``night`` the other.
+        daytime = self._enum[option] is DaytimeMode.day
+        group = 0 if isinstance(self._module, Router) else self._module.group
+        await self.coordinator.client.set_daytime_mode(group, daytime)
 
 
 class HbtnSelectAlarmMode(HbtnMode):
@@ -233,13 +229,9 @@ class HbtnSelectAlarmMode(HbtnMode):
 
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
-        set_val = bool(self._enum[option].value > 0)
-        if isinstance(self._module, Router):
-            await self.coordinator.comm.async_set_alarm_mode(0, set_val)
-        else:
-            await self.coordinator.comm.async_set_alarm_mode(
-                self._module.group, set_val
-            )
+        alarm = self._enum[option].value > 0
+        group = 0 if isinstance(self._module, Router) else self._module.group
+        await self.coordinator.client.set_alarm_mode(group, alarm)
 
 
 class HbtnSelectGroupMode(HbtnMode):
@@ -294,11 +286,9 @@ class HbtnSelectGroupMode(HbtnMode):
         """Change the selected option."""
         set_val = self._enum[option].value
         if isinstance(self._module, Router):
-            await self.coordinator.comm.async_set_group_mode(0, set_val)
+            await self.coordinator.client.set_group_mode(0, set_val)
         else:
-            await self.coordinator.comm.async_set_group_mode(
-                self._module.group, set_val
-            )
+            await self.coordinator.client.set_group_mode(self._module.group, set_val)
 
 
 class HbtnSelectDaytimeModePush(HbtnSelectDaytimeMode):
@@ -432,7 +422,7 @@ class HbtnSelectLoggingLevel(CoordinatorEntity[HbtnCoordinator], SelectEntity):
         """Change the selected option."""
         self._value = self._enum[option].value
         # nmbr used to select console/file handler
-        await self._smhub.comm.async_set_log_level(self._nmbr, self._value * 10)
+        await self._smhub.client.set_log_level(self._nmbr, self._value * 10)
 
 
 class HbtnStoredMessageSelect(SelectEntity, RestoreEntity):

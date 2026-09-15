@@ -123,11 +123,11 @@ class SwitchedOutput(HbtnAreaMixin, HabitronEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the output on."""
-        await self.comm.async_set_output(self._module.addr, self._nmbr + 1, 1)
+        await self.client.set_output(self._module.addr, self._nmbr + 1, True)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the output off."""
-        await self.comm.async_set_output(self._module.addr, self._nmbr + 1, 0)
+        await self.client.set_output(self._module.addr, self._nmbr + 1, False)
 
 
 class SwitchedLed(HabitronEntity, SwitchEntity):
@@ -170,11 +170,15 @@ class SwitchedLed(HabitronEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the LED on."""
-        await self.comm.async_set_led_outp(self._module.addr, self._nmbr, 1)
+        await self.client.set_output(
+            self._module.addr, self._module.led_output(self._nmbr), True
+        )
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the LED off."""
-        await self.comm.async_set_led_outp(self._module.addr, self._nmbr, 0)
+        await self.client.set_output(
+            self._module.addr, self._module.led_output(self._nmbr), False
+        )
 
 
 class HbtnFlag(CoordinatorEntity[HbtnCoordinator], SwitchEntity):
@@ -220,11 +224,11 @@ class HbtnFlag(CoordinatorEntity[HbtnCoordinator], SwitchEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Set the flag."""
-        await self.coordinator.comm.async_set_flag(self._mod_addr, self._nmbr, 1)
+        await self.coordinator.client.set_flag(self._mod_addr, self._nmbr, True)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Clear the flag."""
-        await self.coordinator.comm.async_set_flag(self._mod_addr, self._nmbr, 0)
+        await self.coordinator.client.set_flag(self._mod_addr, self._nmbr, False)
 
 
 class ClimateCtlSwitch(CoordinatorEntity[HbtnCoordinator], SwitchEntity):
@@ -254,14 +258,14 @@ class ClimateCtlSwitch(CoordinatorEntity[HbtnCoordinator], SwitchEntity):
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Activate the second climate controller."""
         self._module.climate_ctl12 = 2
-        await self.coordinator.comm.async_set_climate_mode(
+        await self.coordinator.client.set_climate_mode(
             self._module.addr, self._module.climate_settings, self._module.climate_ctl12
         )
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Activate the first climate controller."""
         self._module.climate_ctl12 = 1
-        await self.coordinator.comm.async_set_climate_mode(
+        await self.coordinator.client.set_climate_mode(
             self._module.addr, self._module.climate_settings, self._module.climate_ctl12
         )
 

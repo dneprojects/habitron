@@ -27,13 +27,12 @@ def _module(uid: str = "MOD-1", addr: int = 5, name: str = "Mod", **kwargs) -> M
 
 
 def _coord() -> MagicMock:
-    """Build a mock coordinator whose ``comm`` is an async stub."""
+    """Build a mock coordinator whose ``client`` is an async stub."""
     coord = MagicMock()
-    coord.comm = MagicMock()
-    coord.comm.async_set_output = AsyncMock()
-    coord.comm.async_set_led_outp = AsyncMock()
-    coord.comm.async_set_flag = AsyncMock()
-    coord.comm.async_set_climate_mode = AsyncMock()
+    coord.client = AsyncMock()
+    coord.client.set_output = AsyncMock()
+    coord.client.set_flag = AsyncMock()
+    coord.client.set_climate_mode = AsyncMock()
     return coord
 
 
@@ -79,19 +78,19 @@ def test_switched_output_negative_type_is_disabled_default() -> None:
 
 
 async def test_switched_output_turn_on_forwards_to_comm() -> None:
-    """``async_turn_on`` calls ``comm.async_set_output`` with the module addr."""
+    """``async_turn_on`` calls ``client.set_output`` with the module addr."""
     coord = _coord()
     entity = SwitchedOutput(coord, _module(), Output(name="Out 1", nmbr=0, type=1), 0)
     await entity.async_turn_on()
-    coord.comm.async_set_output.assert_awaited_with(5, 1, 1)
+    coord.client.set_output.assert_awaited_with(5, 1, 1)
 
 
 async def test_switched_output_turn_off_forwards_to_comm() -> None:
-    """``async_turn_off`` calls ``comm.async_set_output`` with 0."""
+    """``async_turn_off`` calls ``client.set_output`` with 0."""
     coord = _coord()
     entity = SwitchedOutput(coord, _module(), Output(name="Out 1", nmbr=0, type=1), 0)
     await entity.async_turn_off()
-    coord.comm.async_set_output.assert_awaited_with(5, 1, 0)
+    coord.client.set_output.assert_awaited_with(5, 1, 0)
 
 
 async def test_switched_output_listener_lifecycle() -> None:
@@ -149,9 +148,9 @@ async def test_switched_led_turn_on_off() -> None:
     coord = _coord()
     entity = SwitchedLed(coord, _module(), Led(name="r", nmbr=2, type=0), 0)
     await entity.async_turn_on()
-    coord.comm.async_set_led_outp.assert_awaited_with(5, 2, 1)
+    coord.client.set_output.assert_awaited_with(5, 2, 1)
     await entity.async_turn_off()
-    coord.comm.async_set_led_outp.assert_awaited_with(5, 2, 0)
+    coord.client.set_output.assert_awaited_with(5, 2, 0)
 
 
 # ---------------------------------------------------------------------------
@@ -167,11 +166,11 @@ async def test_habitron_flag_module_path() -> None:
     assert entity.unique_id == "MOD-1_flag_5"
     assert entity.is_on is False
     await entity.async_turn_on()
-    coord.comm.async_set_flag.assert_awaited_with(5, 5, 1)
+    coord.client.set_flag.assert_awaited_with(5, 5, 1)
     flag.value = 1
     assert entity.is_on is True
     await entity.async_turn_off()
-    coord.comm.async_set_flag.assert_awaited_with(5, 5, 0)
+    coord.client.set_flag.assert_awaited_with(5, 5, 0)
 
 
 async def test_habitron_flag_router_path() -> None:
@@ -180,7 +179,7 @@ async def test_habitron_flag_router_path() -> None:
     flag = Flag(name="F", nmbr=3, value=0)
     entity = HbtnFlag(coord, flag, device_uid="ROUTER-1", mod_addr=7, idx=0)
     await entity.async_turn_on()
-    coord.comm.async_set_flag.assert_awaited_with(7, 3, 1)
+    coord.client.set_flag.assert_awaited_with(7, 3, 1)
 
 
 async def test_habitron_flag_listener_lifecycle() -> None:
@@ -222,7 +221,7 @@ def test_climate_ctl_switch_state_and_device_info() -> None:
 
 
 async def test_climate_ctl_switch_turn_on_off() -> None:
-    """Turning the switch on/off flips ``climate_ctl12`` and calls comm."""
+    """Turning the switch on/off flips ``climate_ctl12`` and calls the client."""
     coord = _coord()
     module = _module()
     module.climate_ctl12 = 1
@@ -231,7 +230,7 @@ async def test_climate_ctl_switch_turn_on_off() -> None:
     assert module.climate_ctl12 == 2
     await entity.async_turn_off()
     assert module.climate_ctl12 == 1
-    coord.comm.async_set_climate_mode.assert_awaited()
+    coord.client.set_climate_mode.assert_awaited()
 
 
 # ---------------------------------------------------------------------------

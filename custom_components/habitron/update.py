@@ -56,7 +56,7 @@ async def async_setup_entry(
     """Add update entities for Habitron system."""
     coordinator = entry.runtime_data
     hbtn_rt = coordinator.router
-    fw_coord = HbtnFirmwareCoordinator(hass, entry, coordinator.comm)
+    fw_coord = HbtnFirmwareCoordinator(hass, entry, coordinator)
 
     new_devices: list[UpdateEntity] = []
     # Add router update entity
@@ -400,10 +400,10 @@ class HbtnModuleUpdate(CoordinatorEntity[HbtnFirmwareCoordinator], UpdateEntity)
             if isinstance(self._module, Router):
                 # The router answers as address 0, like it does for a
                 # firmware read or a restart.
-                await self.coordinator.comm.update_firmware(0)
+                await self.coordinator.status.update_firmware(0)
                 self._module.version = version or ""
             else:
-                await self.coordinator.comm.update_firmware(self._module.addr)
+                await self.coordinator.status.update_firmware(self._module.addr)
                 self._module.sw_version = version or ""
         finally:
             self.flash_in_progress = False

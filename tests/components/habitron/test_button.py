@@ -25,20 +25,10 @@ from homeassistant.core import HomeAssistant
 def _hub_coord() -> MagicMock:
     coordinator = MagicMock()
     coordinator.uid = "HUB-1"
-    coordinator.comm = MagicMock()
-    for method in (
-        "async_call_coll_command",
-        "async_call_dir_command",
-        "async_call_vis_command",
-        "module_restart",
-        "restart_fwd_tbl",
-        "async_inc_dec_counter",
-        "async_power_cycle_channel",
-    ):
-        setattr(coordinator.comm, method, AsyncMock())
+    coordinator.client = AsyncMock()
     coordinator.restart = AsyncMock()
     coordinator.reboot = AsyncMock()
-    coordinator.router = Router(uid="ROUTER-1")  # id defaults to 100
+    coordinator.router = Router(uid="ROUTER-1")
     coordinator.ws_provider = None
     return coordinator
 
@@ -53,7 +43,7 @@ async def test_coll_cmd_button() -> None:
     entity = CollCmdButton(HbtnCommand(name="All off", nmbr=5), coordinator)
     assert entity.unique_id == "HUB-1_collective_command_5"
     await entity.async_press()
-    coordinator.comm.async_call_coll_command.assert_awaited_with(5)
+    coordinator.client.call_coll_command.assert_awaited_with(5)
 
 
 async def test_dir_cmd_button() -> None:
@@ -62,7 +52,7 @@ async def test_dir_cmd_button() -> None:
     entity = DirCmdButton(HbtnCommand(name="Scene", nmbr=2), _module(), coordinator)
     assert entity.unique_id == "MOD-1_direct_command_2"
     await entity.async_press()
-    coordinator.comm.async_call_dir_command.assert_awaited_with(5, 2)
+    coordinator.client.call_dir_command.assert_awaited_with(5, 2)
 
 
 async def test_vis_cmd_button() -> None:
@@ -71,7 +61,7 @@ async def test_vis_cmd_button() -> None:
     entity = VisCmdButton(HbtnCommand(name="Vis", nmbr=258), _module(), coordinator)
     assert entity._attr_name == "VisCmd 1/2: Vis"
     await entity.async_press()
-    coordinator.comm.async_call_vis_command.assert_awaited_with(5, 258)
+    coordinator.client.call_vis_command.assert_awaited_with(5, 258)
 
 
 async def test_restart_button_module_and_router() -> None:
@@ -79,10 +69,10 @@ async def test_restart_button_module_and_router() -> None:
     coordinator = _hub_coord()
     mod_btn = RestartButton(_module(), coordinator)
     await mod_btn.async_press()
-    coordinator.comm.module_restart.assert_awaited_with(5)
+    coordinator.client.module_restart.assert_awaited_with(5)
     rt_btn = RestartButton(coordinator.router, coordinator)
     await rt_btn.async_press()
-    coordinator.comm.module_restart.assert_awaited_with(0)
+    coordinator.client.module_restart.assert_awaited_with(0)
 
 
 async def test_count_up_down_buttons() -> None:
@@ -91,19 +81,19 @@ async def test_count_up_down_buttons() -> None:
     logic = Logic(name="Cnt", nmbr=0, idx=0, type=5)
     up = CountUpButton(logic, _module(), coordinator)
     await up.async_press()
-    coordinator.comm.async_inc_dec_counter.assert_awaited_with(5, 1, 1)
+    coordinator.client.inc_dec_counter.assert_awaited_with(5, 1, 1)
     down = CountDownButton(logic, _module(), coordinator)
     await down.async_press()
-    coordinator.comm.async_inc_dec_counter.assert_awaited_with(5, 1, 2)
+    coordinator.client.inc_dec_counter.assert_awaited_with(5, 1, 2)
 
 
 async def test_router_restart_buttons() -> None:
     """Router/hub maintenance buttons call the right commands."""
     coordinator = _hub_coord()
     await RestartFwdTableButton(coordinator.router, coordinator).async_press()
-    coordinator.comm.restart_fwd_tbl.assert_awaited()
+    coordinator.client.restart_fwd_tbl.assert_awaited()
     await RestartAllButton(coordinator.router, coordinator).async_press()
-    coordinator.comm.module_restart.assert_awaited_with(0xFF)
+    coordinator.client.module_restart.assert_awaited_with(0xFF)
     await RestartHubButton(coordinator).async_press()
     coordinator.restart.assert_awaited_with()
     await RebootHubButton(coordinator).async_press()
@@ -116,7 +106,7 @@ async def test_power_cycle_button() -> None:
     entity = ResetChannelPowerButton(coordinator.router, coordinator, 3)
     assert entity.unique_id == "ROUTER-1_power_cycle_3"
     await entity.async_press()
-    coordinator.comm.async_power_cycle_channel.assert_awaited_with(3)
+    coordinator.client.power_cycle_channel.assert_awaited_with(3)
 
 
 async def test_speech_button_sends_activate() -> None:

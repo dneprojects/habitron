@@ -23,13 +23,13 @@ def _module(uid: str = "MOD-1", typ: bytes = b"\x0a\x14", **kwargs) -> Module:
 
 
 def _coord() -> MagicMock:
-    """Build a mock coordinator whose ``comm`` is an async stub."""
+    """Build a mock coordinator whose ``client`` is an async stub."""
     coord = MagicMock()
-    coord.comm = MagicMock()
-    coord.comm.async_set_output = AsyncMock()
-    coord.comm.async_set_dimmval = AsyncMock()
-    coord.comm.async_set_rgbval = AsyncMock()
-    coord.comm.async_set_rgb_output = AsyncMock()
+    coord.client = AsyncMock()
+    coord.client.set_output = AsyncMock()
+    coord.client.set_dimmval = AsyncMock()
+    coord.client.set_rgbval = AsyncMock()
+    coord.client.set_rgb_output = AsyncMock()
     return coord
 
 
@@ -82,9 +82,9 @@ async def test_switched_light_turn_on_off() -> None:
     coord = _coord()
     entity = SwitchedLight(Output(name="Lamp", nmbr=0, type=2), _module(), coord, 0)
     await entity.async_turn_on()
-    coord.comm.async_set_output.assert_awaited_with(5, 1, 1)
+    coord.client.set_output.assert_awaited_with(5, 1, 1)
     await entity.async_turn_off()
-    coord.comm.async_set_output.assert_awaited_with(5, 1, 0)
+    coord.client.set_output.assert_awaited_with(5, 1, 0)
 
 
 # ---------------------------------------------------------------------------
@@ -110,7 +110,7 @@ async def test_dimmed_output_turn_on_with_brightness() -> None:
     module.dimmers = [Dimmer(name="D", nmbr=0, type=2)]
     entity = DimmedOutput(Output(name="L", nmbr=0, type=2), module, coord, 0)
     await entity.async_turn_on(**{ATTR_BRIGHTNESS: 255})
-    coord.comm.async_set_dimmval.assert_awaited_with(5, 1, 100)
+    coord.client.set_dimmval.assert_awaited_with(5, 1, 100)
 
 
 def test_dimmed_output_controller_offset() -> None:
@@ -225,7 +225,7 @@ async def test_color_light_plain_turn_on_restores_last_brightness() -> None:
     entity._handle_coordinator_update()
 
     await entity.async_turn_on()
-    coord.comm.async_set_rgbval.assert_awaited_with(cled_module.addr, 1, [128, 64, 1])
+    coord.client.set_rgbval.assert_awaited_with(cled_module.addr, 1, [128, 64, 1])
 
 
 async def test_color_light_turn_on_sets_rgb() -> None:
@@ -236,7 +236,7 @@ async def test_color_light_turn_on_sets_rgb() -> None:
     await entity.async_turn_on(**{ATTR_RGB_COLOR: (200, 100, 0), ATTR_BRIGHTNESS: 255})
     assert cled.is_on is True
     assert cled.rgb == [200, 100, 1, 0]  # blue channel clamped to min 1
-    coord.comm.async_set_rgbval.assert_awaited_with(5, 1, [200, 100, 1])
+    coord.client.set_rgbval.assert_awaited_with(5, 1, [200, 100, 1])
 
 
 async def test_color_light_turn_off() -> None:
@@ -247,7 +247,7 @@ async def test_color_light_turn_off() -> None:
     entity = HbtnColorLight(cled, _module(), coord, 0)
     await entity.async_turn_off()
     assert cled.is_on is False
-    coord.comm.async_set_rgb_output.assert_awaited_with(5, 1, 0)
+    coord.client.set_rgb_output.assert_awaited_with(5, 1, 0)
 
 
 # ---------------------------------------------------------------------------
