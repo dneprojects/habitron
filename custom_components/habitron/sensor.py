@@ -25,7 +25,6 @@ from homeassistant.const import (
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers import area_registry as ar, entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -271,7 +270,7 @@ async def async_setup_entry(  # noqa: C901
         async_add_entities(new_devices)
 
 
-class HostReadingMixin(Entity):
+class HostReadingMixin(CoordinatorEntity[HbtnCoordinator]):
     """Availability for an entity that renders the hub's own readings.
 
     The host poll swallows its errors so a hub-diagnostics hiccup cannot mark
@@ -285,14 +284,17 @@ class HostReadingMixin(Entity):
     already reports on its own.
     """
 
+    # Declared, not assigned: the concrete entity classes set it. The hub has
+    # no module of its own, so its readings are constructed with the
+    # coordinator standing in for one -- which is what tells the two apart.
+    _module: Module
+
     @property
     def available(self) -> bool:
         """Whether the source of this entity's value last answered."""
-        available = super().available
-        coordinator = getattr(self, "coordinator", None)
-        if getattr(self, "_module", None) is not coordinator:
-            return available
-        return available and coordinator.host_readings_ok
+        if not isinstance(self._module, HbtnCoordinator):
+            return super().available
+        return super().available and self._module.host_readings_ok
 
 
 def _host_diags_unavailable(module: Module) -> bool:

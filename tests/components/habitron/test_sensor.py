@@ -6,6 +6,7 @@ from habitron_client import Area, async_build_hub
 import pytest
 
 from custom_components.habitron.const import DOMAIN
+from custom_components.habitron.coordinator import HbtnCoordinator
 from custom_components.habitron.sensor import (
     AIRQUALITY_DESCRIPTION,
     CURRENT_DESCRIPTION,
@@ -445,6 +446,34 @@ def test_perc_sensor_icon_by_name(name: str, expected_icon: str) -> None:
     coord = MagicMock(spec=DataUpdateCoordinator)
     entity = PercSensor(mod, desc, coord, 0)
     assert entity._attr_icon == expected_icon
+
+
+@pytest.mark.parametrize(
+    ("readings_ok", "expected"),
+    [pytest.param(True, True, id="fresh"), pytest.param(False, False, id="stale")],
+)
+def test_hub_reading_unavailable_while_the_host_query_fails(
+    readings_ok: bool, expected: bool
+) -> None:
+    """A hub reading reports itself unavailable once its query stops answering.
+
+    The host poll swallows its errors so a hiccup cannot take the bus entities
+    down with it; the cost is that the last value would stand forever, looking
+    live. Only the hub's readings follow that poll -- a bus sensor built from
+    the same class is untouched by it.
+    """
+    hub = MagicMock(spec=HbtnCoordinator)
+    hub.host_readings_ok = readings_ok
+    hub.last_update_success = True
+    desc = _make_sensor_descriptor(name="Memory usage", type_=1)
+
+    host_entity = PercSensor(hub, desc, hub, 0)
+    assert host_entity.available is expected
+
+    coord = MagicMock(spec=HbtnCoordinator)
+    coord.last_update_success = True
+    bus_entity = PercSensor(_make_hbtnsensor_module(), desc, coord, 0)
+    assert bus_entity.available is True
 
 
 def test_perc_sensor_diag_branch() -> None:
