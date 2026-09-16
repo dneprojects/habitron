@@ -4,6 +4,32 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.4.3b7
+
+### The event server is restored even when the stop request fails
+`async_setup` stops the hub's event server for the duration of the bus build
+and switches it back on afterwards. Both calls sat in the straight line of the
+setup, so anything raising in between -- a truncated inventory, a failed device
+registration, a timeout in `send_network_info` -- left the hub stopped. Home
+Assistant then retried the setup, hit the same failure, and the hub stayed
+silent across every attempt.
+
+The build now runs in a `try` with `reinit_hub(1)` in the `finally`. The stop
+itself is *inside* that `try`, which goes against the usual shape -- one
+acquires outside, so that nothing is released that was never taken. It does not
+hold here: `reinit_hub` is a request over the wire with a twelve-second
+timeout, and a lost reply says nothing about whether the hub carried the
+command out. The stop is therefore ambiguous, and an ambiguous acquisition has
+to be matched by an attempted release. A `reinit_hub(1)` reaching a hub that
+never stopped simply restarts a running event server.
+
+Ported from the core integration (home-assistant/core#174185), where the same
+boundary was found by review. The core version has no `send_network_info` and
+no stream-name seeding in the guarded block; the sequence is otherwise
+identical.
+
+Two tests pin it: the build failing, and the stop request itself failing.
+
 ## v3.4.3b6
 
 ### The ekey decoding moved into the library

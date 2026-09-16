@@ -344,21 +344,29 @@ class HbtnCoordinator(DataUpdateCoordinator[HbtnData]):
         await self._register_iconset()
 
         # 3. Build the bus model (router + modules), register their devices.
-        await self.reinit_hub(0)
-        # ``.get``, not a subscript: an entry created by the core integration
-        # carries no token -- it does not offer the field yet -- and would
-        # otherwise raise here the moment someone switches over. Empty is the
-        # right default anyway; only a hub on its own machine needs a token,
-        # one sharing the machine with Home Assistant uses the supervisor's.
-        await self.send_network_info(self.entry.data.get(KEY_TOKEN, ""))
-        self.router = await async_build_system(self.client, b_uid=self.uid)
-        # Seed the WebRTC stream name for Touch modules (used by camera /
-        # media_player / assist / voice button to address the Flutter client).
-        for module in self.router.modules:
-            if isinstance(module, SmartController):
-                module.stream_name = f"{slugify(module.name)}_{module.addr}"
-        await self._register_bus_devices()
-        await self.reinit_hub(1)
+        # The build needs the hub's event server stopped; ``reinit_hub(1)`` must
+        # always restore it, or the hub stays stopped while Home Assistant
+        # retries the setup. The stop is inside the try because a failed stop
+        # request may still have reached the hub.
+        try:
+            await self.reinit_hub(0)
+            # ``.get``, not a subscript: an entry created by the core
+            # integration carries no token -- it does not offer the field yet --
+            # and would otherwise raise here the moment someone switches over.
+            # Empty is the right default anyway; only a hub on its own machine
+            # needs a token, one sharing the machine with Home Assistant uses
+            # the supervisor's.
+            await self.send_network_info(self.entry.data.get(KEY_TOKEN, ""))
+            self.router = await async_build_system(self.client, b_uid=self.uid)
+            # Seed the WebRTC stream name for Touch modules (used by camera /
+            # media_player / assist / voice button to address the Flutter
+            # client).
+            for module in self.router.modules:
+                if isinstance(module, SmartController):
+                    module.stream_name = f"{slugify(module.name)}_{module.addr}"
+            await self._register_bus_devices()
+        finally:
+            await self.reinit_hub(1)
 
         # 4. First hub host-readings update.
         await self.update()

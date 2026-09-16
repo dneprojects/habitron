@@ -3,7 +3,7 @@
 from collections.abc import Awaitable, Callable
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from habitron_client import Area, HabitronError, Module, Router
+from habitron_client import Area, HabitronClient, HabitronError, Module, Router
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -13,7 +13,14 @@ from custom_components.habitron.system_health import async_register, system_heal
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import area_registry as ar, device_registry as dr
 
-from .const import MOCK_HOST, MOCK_MAC, MOCK_SMHUB_INFO, MOCK_UID
+from .const import (
+    MOCK_CONFIG_DATA,
+    MOCK_CONFIG_OPTIONS,
+    MOCK_HOST,
+    MOCK_MAC,
+    MOCK_SMHUB_INFO,
+    MOCK_UID,
+)
 
 
 def test_logging_levels_enum_values() -> None:
@@ -115,6 +122,75 @@ async def test_setup_registers_hub_device(
     assert device.manufacturer == "Habitron GmbH"
     assert device.sw_version == MOCK_SMHUB_INFO["software"]["version"]
     assert device.configuration_url == expected_conf_url
+
+
+@pytest.mark.parametrize(
+    ("build_error", "stop_error"),
+    [
+        (HabitronError("truncated inventory"), None),
+        (None, HabitronError("no reply")),
+    ],
+    ids=["the build fails", "the stop itself fails"],
+)
+async def test_event_server_is_restored_when_setup_fails(
+    hass: HomeAssistant,
+    setup_homeassistant: None,
+    mock_ws_provider: MagicMock,
+    mock_coordinator_refresh: AsyncMock,
+    build_error: Exception | None,
+    stop_error: Exception | None,
+) -> None:
+    """``reinit_hub(1)`` has to run even when the build never got going.
+
+    The stop takes seconds, so its answer can go missing long after the hub has
+    already stopped the event server. Restoring only after a stop that answered
+    would leave the hub stopped for good, across every setup retry.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id=MOCK_UID,
+        data=MOCK_CONFIG_DATA,
+        options=MOCK_CONFIG_OPTIONS,
+    )
+    entry.add_to_hass(hass)
+
+    client = AsyncMock(spec=HabitronClient)
+    client.host = MOCK_HOST
+    client.get_smhub_info = AsyncMock(return_value=MOCK_SMHUB_INFO)
+    client.get_smhub_update = AsyncMock(return_value=None)
+
+    def _reinit(mode: int) -> None:
+        if mode == 0 and stop_error is not None:
+            raise stop_error
+
+    client.reinit_hub = AsyncMock(side_effect=_reinit)
+
+    hass.data.setdefault("integrations", {})["habitron"] = MagicMock(
+        manifest={"version": "3.4.3"}
+    )
+
+    build = AsyncMock(return_value=Router(uid="rt_1"))
+    if build_error is not None:
+        build = AsyncMock(side_effect=build_error)
+
+    coord = HbtnCoordinator(hass, entry)
+    with (
+        patch(
+            "custom_components.habitron.coordinator.HabitronClient",
+            return_value=client,
+        ),
+        patch(
+            "custom_components.habitron.coordinator.get_host_ip",
+            new=AsyncMock(return_value=MOCK_HOST),
+        ),
+        patch("custom_components.habitron.coordinator.async_build_system", new=build),
+        patch("custom_components.habitron.coordinator.add_extra_js_url"),
+        patch.object(HbtnCoordinator, "_register_iconset", new=AsyncMock()),
+        pytest.raises(HabitronError),
+    ):
+        await coord.async_setup()
+
+    assert [call.args[0] for call in client.reinit_hub.await_args_list] == [0, 1]
 
 
 @pytest.mark.parametrize(

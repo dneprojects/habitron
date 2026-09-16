@@ -3,6 +3,9 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.4.3b7
+- Beta. Fixed: if the hub failed to answer while the integration was reading the bus, its event server could stay switched off. Home Assistant would keep retrying the setup, and every attempt found the hub in that state, so a hub that had only stumbled once stayed silent until it was restarted. The event server is now switched back on in every case.
+
 ## v3.4.3b6
 - Beta. The fingerprint reader's raw values are now resolved by `habitron_client` instead of by this integration. Nothing about the states changes, with one exception below -- the names, the "Error" and "Unknown" markers and the "-disabled" suffix are the same strings as before.
 - Fixed: while nobody had presented a finger, the ekey user sensor showed the literal text `None`, which reads like a name and cannot be translated. It is now simply unknown, as the finger sensor next to it has always been. A freshly started entity no longer claims `None` either.
