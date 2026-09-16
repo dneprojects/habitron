@@ -4,6 +4,13 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.4.3
+
+Stable for the 3.4.3b1-b7 line, unchanged. The split the line carried out --
+command layer, SmartHub class and ekey decoding moved into `habitron_client`
+2.4.0 -- is the one the core integration (home-assistant/core#174185) is built
+on, so both now share their wire handling instead of each keeping its own.
+
 ## v3.4.3b7
 
 ### The event server is restored even when the stop request fails

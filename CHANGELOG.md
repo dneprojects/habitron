@@ -3,6 +3,20 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.4.3
+- Removed: the five services that wrote configuration and status to file -- `save_module_smc`, `save_module_smg`, `save_router_smr`, `save_module_status` and `save_router_status`. They saved into a folder inside the integration's own directory, which is replaced wholesale on every update, so nothing kept there survived. If you call one of them from an automation or script, that call now fails.
+- Links to the hub, the router and each module work from outside the house as well. They were built with the local address and port of Home Assistant hard-coded, so opening a device page over a remote (Nabu Casa) URL -- or behind HTTPS, a reverse proxy or a changed port -- led nowhere.
+- Fixed: a module list the hub could not read was taken for "these modules are gone", and the devices were removed with their entities until the next successful read. That could happen after a hub restart or while the bus was busy. Such an answer is now recognised and the setup is retried instead; Home Assistant restores the devices with their names, areas and history.
+- Fixed: every answer from the hub is now checked against its checksum. It was sent along all this time and never verified, and the two bytes were read in the wrong order -- so a garbled answer from the bus behind the hub could pass as data.
+- Fixed: the hub's own readings -- CPU load and frequency, memory, disk, CPU temperature -- kept showing their last value when the hub stopped answering the query behind them. They now report themselves unavailable while that query fails, and come back on their own once it answers. Your modules were always unaffected.
+- Fixed: if the hub failed to answer while the bus was being read, its event server could stay switched off across every setup retry, leaving the hub silent until it was restarted. It is now switched back on in every case.
+- Fixed: events pushed by the hub were discarded unless the address it stamps them with matched exactly the one the integration had connected to, so a hub answering on a different interface or configured by host name had its pushes dropped. Every spelling that legitimately names the hub is now accepted.
+- Fixed: the router firmware update addressed the wrong target. Reading a firmware version and installing one disagreed about how to address the router and the modules, so one of the two was always wrong.
+- Fixed: while nobody had presented a finger, the ekey user sensor showed the literal text `None`, which reads like a name and cannot be translated. It is now simply unknown, as the finger sensor next to it has always been.
+- The two hub percentage sensors are now labelled "Memory usage" and "Disk usage". They always reported *used* space, so the old "free" labels said the opposite of what the value means. Entity ids are unchanged, and a name you set yourself is kept.
+- Internal, and nothing you should notice: the integration no longer has a command layer, a SmartHub class or an ekey decoding of its own -- the update coordinator owns the connection and the device model, and `habitron_client` handles the wire. A module is addressed by its own address on the bus. Please report anything that stopped reacting.
+- Uses habitron_client 2.4.0.
+
 ## v3.4.3b7
 - Beta. Fixed: if the hub failed to answer while the integration was reading the bus, its event server could stay switched off. Home Assistant would keep retrying the setup, and every attempt found the hub in that state, so a hub that had only stumbled once stayed silent until it was restarted. The event server is now switched back on in every case.
 
