@@ -93,18 +93,11 @@ def _area_name(router: Router, area_no: int) -> str:
 
 @dataclass(frozen=True, slots=True)
 class HbtnData:
-    """What one poll found, and the coordinator's change-detection key.
+    """The coordinator's change-detection key.
 
-    Most entities do not wait for this: they subscribe to the model member they
-    render and the library notifies them as soon as its value moves. The
-    coordinator fan-out covers what no member notification carries -- and with
-    ``always_update=False`` it happens only when this value differs from the
-    previous tick.
-
-    Hence both fields. The CRC moves when the bus status does. The host state
-    belongs here because it is not a member value at all: the hub's readings
-    are polled apart from the bus, and their failure is something the entities
-    show rather than something a member reports.
+    With ``always_update=False`` the fan-out happens only when this differs
+    from the previous tick, so anything no member notification carries has to
+    be in here -- which is why the host state travels beside the bus CRC.
     """
 
     crc: int
