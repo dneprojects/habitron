@@ -4,6 +4,43 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.4.4b1
+
+### The mode selects of a Smart Controller follow its own group
+`Module.group` was right all along, and so was everything built on it:
+`HbtnMode` reads the value from `module.mode.value`, the name is
+`f"Group {self._module.group} ..."` and the write targets
+`set_group_mode(self._module.group, ...)`. It showed "Group 0" because the
+router really did report group 0 for every module -- the SMR carries one byte
+per module at a fixed offset, and it was zero throughout.
+
+Confirmed at the byte level rather than by reading: the same field on an
+installation where one module had just been moved to group 4 reads
+`[(22, 4)]` -- index 22, so bus address 23, exactly the module that was moved.
+Two candidate fields sit there, each 80 bytes behind its own count byte; the
+second one differs between installations too and is *not* the assignment. Worth
+recording, because it cost a false lead: `parse_router_definitions` is correct
+and was never the problem.
+
+What was wrong is that the entities existed at all for a module in group 0.
+Three selects per controller that repeat the router's three, and a day/night
+select that was filed as a diagnostic and disabled by default -- which made
+sense only while it could never say anything of its own.
+
+- `select.py`: the per-controller block is gated on `group != 0`.
+- `select.py`: `EntityCategory.DIAGNOSTIC` dropped from `HbtnSelectDaytimeMode`
+  -- it sat before the branch, so it applied to the router's select as well,
+  while the alarm and group-mode selects never carried it. The two near-identical
+  "hot fix" blocks that lifted a 0 to 1 collapse into one fallback; it has to
+  stay, `DaytimeMode` starts at 1 and `DaytimeMode(0)` raises.
+- `__init__.py`: `_async_cleanup_group0_mode_entities`, next to
+  `_async_cleanup_stale_devices` and before the platforms are forwarded. The
+  existing `_async_migrate_unique_ids` was considered and rejected: it removes
+  only as a side effect of a rename whose target already exists, so on an
+  installation without the router's selects it would rename the module's onto
+  them instead of removing them.
+- `diagnostics.py`: `group` per module, so the next such question is one look.
+
 ## v3.4.3
 
 Stable for the 3.4.3b1-b7 line, unchanged. The split the line carried out --

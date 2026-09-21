@@ -187,6 +187,47 @@ async def test_async_setup_entry_emits_mode_and_log_selects(
     assert any(isinstance(e, HbtnSelectLoggingLevel) for e in added)
 
 
+async def test_a_controller_in_group_0_gets_no_mode_selects(
+    hass: HomeAssistant,
+) -> None:
+    """They would only repeat the three the router already carries."""
+    module = _module(group=0)
+    router = _router()
+    router.modules = [module]
+    coordinator = _hub_coord()
+    coordinator.router = router
+    coordinator.loglvl = []
+    entry = MagicMock()
+    entry.runtime_data = coordinator
+
+    added: list = []
+    await async_setup_entry(hass, entry, added.extend)  # pylint: disable=home-assistant-tests-direct-platform-async-setup-entry
+
+    # The router's own three remain; none of them sits on the module.
+    on_module = [e for e in added if e._module is module]
+    assert not on_module
+    assert len(added) == 3
+
+
+def test_daytime_select_is_a_normal_entity() -> None:
+    """Its group's day/night need not follow group 0, so it is not a diagnostic.
+
+    It used to be both diagnostic and disabled by default, from the time when
+    every module reported group 0 and the entity could only repeat the router.
+    """
+    entity = HbtnSelectDaytimeModePush(_module(group=3), _router(), _coord(), 0)
+
+    assert entity.entity_category is None
+    assert entity.entity_registry_enabled_default is True
+
+
+def test_daytime_select_starts_on_day_while_the_mode_is_unset() -> None:
+    """0 is no option of the enum, so a module that has not reported yet."""
+    entity = HbtnSelectDaytimeModePush(_module(mode=0x20), _router(), _coord(), 0)
+
+    assert entity.current_option == "day"
+
+
 # ---------------------------------------------------------------------------
 # base HbtnMode._handle_coordinator_update branches + base select_option
 # ---------------------------------------------------------------------------

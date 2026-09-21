@@ -9,6 +9,7 @@ import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.habitron import (
+    _async_cleanup_group0_mode_entities,
     _async_migrate_unique_ids,
     _legacy_suffixed_sensor_uid,
     _uid_scheme_rule,
@@ -325,6 +326,42 @@ async def test_migrate_unique_ids_removes_the_stale_duplicate(
 
     assert ent_reg.async_get(stale.entity_id) is None
     assert ent_reg.async_get(target.entity_id).unique_id == "Mod_MOD-1_snsr0"
+
+
+@pytest.mark.parametrize(
+    ("group", "still_there"),
+    [(0, False), (3, True)],
+    ids=["module in group 0", "module in its own group"],
+)
+async def test_cleanup_removes_the_mode_selects_of_a_group_0_module(
+    hass: HomeAssistant, group: int, still_there: bool
+) -> None:
+    """They are no longer created, so without this they linger as unavailable.
+
+    A module in group 0 has no mode of its own -- its three selects repeated
+    what the router's three say. Installations from before still carry them,
+    and a registry entry no platform claims comes back restored, forever
+    unavailable. A module in a real group keeps its own.
+    """
+    entry = MockConfigEntry(domain=DOMAIN)
+    entry.add_to_hass(hass)
+    ent_reg = er.async_get(hass)
+    registered = [
+        _register(ent_reg, entry, f"MOD-1_{suffix}", domain="select")
+        for suffix in ("daytime_mode", "alarm_mode", "group_mode")
+    ]
+    # An entity of the same module that the pass must not touch.
+    keep = _register(ent_reg, entry, "MOD-1_stored_message", domain="select")
+
+    module = MagicMock(uid="MOD-1", group=group)
+    coordinator = MagicMock(router=MagicMock(modules=[module]))
+
+    for _ in range(2):  # idempotent
+        _async_cleanup_group0_mode_entities(hass, entry, coordinator)
+
+    for ent in registered:
+        assert (ent_reg.async_get(ent.entity_id) is not None) is still_there
+    assert ent_reg.async_get(keep.entity_id) is not None
 
 
 async def test_migrate_unique_ids_leaves_everything_else_alone(

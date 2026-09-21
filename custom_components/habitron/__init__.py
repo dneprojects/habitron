@@ -91,6 +91,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: HabitronConfigEntry) -> 
         entry.async_on_unload(entry.add_update_listener(update_listener))
 
         _async_cleanup_stale_devices(hass, entry, coordinator)
+        _async_cleanup_group0_mode_entities(hass, entry, coordinator)
 
         # Before the platforms register anything, so an entity comes up
         # under its final id and no duplicate is ever created.
@@ -198,6 +199,40 @@ def _async_cleanup_stale_devices(
             if identifier[0] == DOMAIN and identifier[1] not in keep_uids:
                 dev_reg.async_remove_device(device.id)
                 break
+
+
+# The three mode selects a Smart Controller used to carry, by unique_id suffix.
+_GROUP_MODE_SUFFIXES: Final = ("daytime_mode", "alarm_mode", "group_mode")
+
+
+def _async_cleanup_group0_mode_entities(
+    hass: HomeAssistant,
+    entry: HabitronConfigEntry,
+    coordinator: HbtnCoordinator,
+) -> None:
+    """Remove the mode selects of a module that sits in group 0.
+
+    Those three said exactly what the router's own three say -- a module in
+    group 0 has no mode of its own -- so they are no longer created. Without
+    this they would linger in the registry as restored, unavailable entities.
+    Idempotent: after the first run there is nothing left to find.
+    """
+    ent_reg = er.async_get(hass)
+    for module in coordinator.router.modules:
+        if getattr(module, "group", 0) != 0:
+            continue
+        for suffix in _GROUP_MODE_SUFFIXES:
+            entity_id = ent_reg.async_get_entity_id(
+                Platform.SELECT, DOMAIN, f"{module.uid}_{suffix}"
+            )
+            if entity_id is None:
+                continue
+            _LOGGER.info(
+                "Habitron: removing %s; module %s is in group 0",
+                entity_id,
+                module.uid,
+            )
+            ent_reg.async_remove(entity_id)
 
 
 def _legacy_suffixed_sensor_uid(ent: er.RegistryEntry) -> str | None:

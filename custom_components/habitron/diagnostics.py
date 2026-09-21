@@ -29,6 +29,7 @@ def _module_summary(module: Any) -> dict[str, Any]:
         ),
         "mod_type": getattr(module, "mod_type", None),
         "addr": getattr(module, "addr", None),
+        "group": getattr(module, "group", None),
         "sw_version": getattr(module, "sw_version", None),
         "input_count": len(getattr(module, "inputs", []) or []),
         "output_count": len(getattr(module, "outputs", []) or []),

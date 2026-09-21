@@ -6,7 +6,6 @@ import logging
 from habitron_client import Module, Router, Sensor
 
 from homeassistant.components.select import SelectEntity
-from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
@@ -35,8 +34,8 @@ async def async_setup_entry(
     for hbt_module in hbtn_rt.modules:
         if hbt_module.messages:
             new_devices.append(HbtnStoredMessageSelect(hbt_module))
-        if hbt_module.mod_type[:16] == "Smart Controller":
-            # Mode setting is per group, entities linked to smart controllers only
+        if hbt_module.mod_type[:16] == "Smart Controller" and hbt_module.group != 0:
+            # Per group, on the controllers; group 0 already sits on the router.
             new_devices.append(
                 HbtnSelectDaytimeModePush(
                     hbt_module, hbtn_rt, hbtn_cord, len(new_devices)
@@ -174,26 +173,14 @@ class HbtnSelectDaytimeMode(HbtnMode):
         self._mask = 0x03
         self._enum = DaytimeMode
         self._value = self._mode & self._mask
-        self._attr_entity_category = EntityCategory.DIAGNOSTIC
         if isinstance(self._module, Router):
             self._attr_name = "Group 0 daytime"
             self._attr_unique_id = f"{self.hbtnr.uid}_group_0_daytime_mode"
-            if self._value == 0:
-                # hot fix: why is mode 0?
-                _LOGGER.info("Enum value 0 for router")
-                self._value = 1
-            self._current_option = self._enum(self._value).name
         else:
             self._attr_name = f"Group {self._module.group} daytime"
             self._attr_unique_id = f"{self._module.uid}_daytime_mode"
-            self._attr_entity_registry_enabled_default = (
-                False  # Entity will initially be disabled
-            )
-            if self._value == 0:
-                # Not clear, inherit mode of group 0?
-                _LOGGER.info("Enum value 0 for router daytime mode")
-                self._value = 1
-            self._current_option = self._enum(self._value).name
+        # 0 is no option of the enum: the sub-field is unset until the first report.
+        self._current_option = self._enum(self._value or DaytimeMode.day.value).name
 
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""

@@ -3,6 +3,12 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.4.4b1
+- Beta. A Smart Controller now shows and changes the mode of **its own** group. It always said "Group 0" because on most installations every module sits in group 0 -- assign a controller to a group at the router and it follows that one, for the group mode, the alarm and day/night alike.
+- A controller that is in group 0 no longer gets those three entities at all: they only repeated what the router already carries. If your installation had them, they are removed on the next start.
+- The day/night selector is no longer filed under diagnostics and no longer disabled by default. A group's day/night need not follow group 0's, so it is something to operate, not to inspect. This also applies to the router's own.
+- The diagnostics download now names each module's group.
+
 ## v3.4.3
 - Removed: the five services that wrote configuration and status to file -- `save_module_smc`, `save_module_smg`, `save_router_smr`, `save_module_status` and `save_router_status`. They saved into a folder inside the integration's own directory, which is replaced wholesale on every update, so nothing kept there survived. If you call one of them from an automation or script, that call now fails.
 - Links to the hub, the router and each module work from outside the house as well. They were built with the local address and port of Home Assistant hard-coded, so opening a device page over a remote (Nabu Casa) URL -- or behind HTTPS, a reverse proxy or a changed port -- led nowhere.
