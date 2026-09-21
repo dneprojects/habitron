@@ -4,6 +4,10 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.4.4
+
+Stable for 3.4.4b1, unchanged.
+
 ## v3.4.4b1
 
 ### The mode selects of a Smart Controller follow its own group
