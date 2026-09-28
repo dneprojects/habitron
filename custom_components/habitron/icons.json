@@ -86,6 +86,12 @@
       "ekey_finger": {
         "default": "mdi:fingerprint"
       },
+      "ekey_user_name": {
+        "default": "mdi:fingerprint"
+      },
+      "ekey_finger_name": {
+        "default": "mdi:fingerprint"
+      },
       "wind": {
         "default": "mdi:weather-windy-variant"
       },
