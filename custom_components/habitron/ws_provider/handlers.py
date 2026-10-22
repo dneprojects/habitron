@@ -1,10 +1,10 @@
 """WebSocket command handlers for the Habitron WebRTC provider.
 
-Exposes ``register_handlers(provider)`` which registers every
-``habitron/*`` websocket command with Home Assistant. Each handler still
-lives as a nested closure over the ``provider`` argument so it can share
-state — but extracting the registration into this module keeps the main
-provider file focused on its own surface.
+Exposes ``register_handlers(hass)`` which registers every ``habitron/*``
+websocket command with Home Assistant, once. The commands are global, but
+each hub has its own provider; every handler therefore resolves the provider
+per request -- through the connection a client registered, or for
+``register_stream`` through the hub that owns the module.
 """
 
 import asyncio
@@ -20,6 +20,7 @@ from homeassistant.components.websocket_api import ActiveConnection
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 
+from .provider import loaded_providers
 from .voice_pipeline import run_voice_pipeline
 
 if TYPE_CHECKING:
@@ -30,21 +31,39 @@ _LOGGER = logging.getLogger(__name__)
 
 
 @callback
-def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
+def register_handlers(hass: HomeAssistant) -> None:  # noqa: C901
     """Register every Habitron WebSocket command handler on ``hass``.
 
-    All handlers stay as nested closures over ``provider`` so they can
-    share its state containers (``active_ws_connections``,
-    ``voice_pipelines``, …). The decorator chain
-    ``@websocket_command(...) @async_response`` is what registers the
-    command name against the inner function; the surrounding
-    ``register_handlers`` call is what actually attaches the handlers
-    to ``hass.data``.
+    The decorator chain ``@websocket_command(...) @async_response`` is what
+    registers the command name against the inner function; the surrounding
+    ``register_handlers`` call is what actually attaches the handlers to
+    ``hass.data``.
     """
     _LOGGER.info("Registering all Habitron WebSocket command handlers")
 
+    def _client_or_send_error(
+        connection: ActiveConnection, msg: dict[str, Any]
+    ) -> tuple[HabitronWebRTCProvider, str] | None:
+        """Return the provider and stream a connection registered, or reject it."""
+        for provider in loaded_providers(hass):
+            if stream_name := provider.stream_of(connection):
+                return provider, stream_name
+
+        _LOGGER.warning(
+            "Received command '%s' from unknown client %s, forcing reconnect",
+            msg.get("type", "unknown"),
+            connection,
+        )
+        # Send error to Dart to trigger _forceDisconnect()
+        connection.send_error(
+            msg["id"], "unregistered", "Client not registered. Please reconnect"
+        )
+        return None
+
     @callback
-    def _async_on_ws_disconnect(stream_name: str) -> None:
+    def _async_on_ws_disconnect(
+        provider: HabitronWebRTCProvider, stream_name: str
+    ) -> None:
         """Handle client disconnection and clean up resources."""
         _LOGGER.info("Client for stream '%s' disconnected", stream_name)
         provider.active_ws_connections.pop(
@@ -80,9 +99,9 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
         hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
     ) -> None:
         """Handle request from client to start the voice pipeline."""
-        stream_name = provider.get_stream_or_send_error(connection, msg)
-        if not stream_name:
+        if not (client := _client_or_send_error(connection, msg)):
             return
+        provider, stream_name = client
 
         # Ignore if pipeline already running for this client
         if stream_name in provider.voice_pipelines:
@@ -124,9 +143,9 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
         hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
     ) -> None:
         """Handle request from client to start the voice pipeline."""
-        stream_name = provider.get_stream_or_send_error(connection, msg)
-        if not stream_name:
+        if not (client := _client_or_send_error(connection, msg)):
             return
+        provider, stream_name = client
 
         # Ignore if pipeline already running for this client
         if stream_name in provider.voice_pipelines:
@@ -210,9 +229,9 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
         hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
     ) -> None:
         """Handle incoming audio chunks from the client."""
-        stream_name = provider.get_stream_or_send_error(connection, msg)
-        if not stream_name:
+        if not (client := _client_or_send_error(connection, msg)):
             return
+        provider, stream_name = client
 
         # Find the running pipeline and its audio queue
         if not (pipeline_data := provider.voice_pipelines.get(stream_name)):
@@ -238,9 +257,9 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
         hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
     ) -> None:
         """Handle explicit abort from client on timeout."""
-        stream_name = provider.get_stream_or_send_error(connection, msg)
-        if not stream_name:
+        if not (client := _client_or_send_error(connection, msg)):
             return
+        provider, stream_name = client
 
         _LOGGER.warning("Client forced voice pipeline abort for %s", stream_name)
         # Cancel task if running
@@ -262,9 +281,9 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
         _: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
     ) -> None:
         """Handle signal from client that audio streaming is finished."""
-        stream_name = provider.get_stream_or_send_error(connection, msg)
-        if not stream_name:
+        if not (client := _client_or_send_error(connection, msg)):
             return
+        provider, stream_name = client
 
         if not (pipeline_data := provider.voice_pipelines.get(stream_name)):
             _LOGGER.debug(
@@ -291,9 +310,9 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
         hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
     ) -> None:
         """Handle signal from client that TTS playback has finished."""
-        stream_name = provider.get_stream_or_send_error(connection, msg)
-        if not stream_name:
+        if not (client := _client_or_send_error(connection, msg)):
             return
+        provider, stream_name = client
 
         # Find the running pipeline and trigger its wait event
         if pipeline_data := provider.voice_pipelines.get(stream_name):
@@ -327,6 +346,24 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
         """Handle client registering its stream name."""
         stream_name = msg["stream_name"]
         client_version = msg.get("version") or "unknown"
+        if not (providers := loaded_providers(hass)):
+            connection.send_error(
+                msg["id"], "not_ready", "Habitron integration is not loaded"
+            )
+            return
+        # The hub that owns the module serves the client; with a single hub
+        # an unknown module still lands there, as it always did.
+        provider = next(
+            (p for p in providers if p.module_by_stream(stream_name)), providers[0]
+        )
+        # A client that re-registers under another hub must not linger in
+        # the one it came from.
+        for other in providers:
+            if (
+                other is not provider
+                and other.active_ws_connections.get(stream_name) is connection
+            ):
+                other.active_ws_connections.pop(stream_name)
         module = provider.module_by_stream(stream_name)
         if module and client_version != "unknown":
             # Only a version the client actually names is worth keeping: a
@@ -342,7 +379,7 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
         provider.active_ws_connections[stream_name] = connection
         # Register disconnect handler
         connection.subscriptions[msg["id"]] = lambda: _async_on_ws_disconnect(
-            stream_name
+            provider, stream_name
         )
         connection.send_result(msg["id"])  # Acknowledge registration
         _LOGGER.info(
@@ -364,9 +401,9 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
         hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
     ) -> None:
         """Handle the WebRTC answer SDP from the client."""
-        stream_name = provider.get_stream_or_send_error(connection, msg)
-        if not stream_name:
+        if not (client := _client_or_send_error(connection, msg)):
             return
+        provider, _ = client
 
         session_id = msg["session_id"]
         # Find the corresponding future and set the result
@@ -394,9 +431,9 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
         hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
     ) -> None:
         """Handle an ICE candidate received from the client."""
-        stream_name = provider.get_stream_or_send_error(connection, msg)
-        if not stream_name:
+        if not (client := _client_or_send_error(connection, msg)):
             return
+        provider, _ = client
 
         session_id = msg["session_id"]
         send_message = provider.webrtc_send_message_callbacks.get(session_id)
@@ -432,9 +469,9 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
         hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
     ) -> None:
         """Handle the snapshot result (image data or error) from the client."""
-        stream_name = provider.get_stream_or_send_error(connection, msg)
-        if not stream_name:
+        if not (client := _client_or_send_error(connection, msg)):
             return
+        provider, _ = client
 
         request_id = msg["request_id"]
         # Find the corresponding future
@@ -497,9 +534,9 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
         hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
     ) -> None:
         """Announce message from client."""
-        stream_name = provider.get_stream_or_send_error(connection, msg)
-        if not stream_name:
+        if not (client := _client_or_send_error(connection, msg)):
             return
+        provider, stream_name = client
 
         # Extract the message text from the payload
         message_text = msg.get("message")
@@ -557,9 +594,9 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
         hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
     ) -> None:
         """Handle media player state updates pushed from the client."""
-        stream_name = provider.get_stream_or_send_error(connection, msg)
-        if not stream_name:
+        if not (client := _client_or_send_error(connection, msg)):
             return
+        provider, stream_name = client
 
         # Find the corresponding media player entity and update its state
         if player := provider.media_players.get(stream_name):
@@ -585,9 +622,9 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
         hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
     ) -> None:
         """Handle skip to next track command triggered from the client UI."""
-        stream_name = provider.get_stream_or_send_error(connection, msg)
-        if not stream_name:
+        if not (client := _client_or_send_error(connection, msg)):
             return
+        provider, stream_name = client
 
         success = False
         if player := provider.media_players.get(stream_name):
@@ -610,9 +647,9 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
         hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
     ) -> None:
         """Handle skip to previous track command triggered from the client UI."""
-        stream_name = provider.get_stream_or_send_error(connection, msg)
-        if not stream_name:
+        if not (client := _client_or_send_error(connection, msg)):
             return
+        provider, stream_name = client
 
         success = False
         if player := provider.media_players.get(stream_name):
@@ -638,9 +675,9 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
         hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
     ) -> None:
         """Handle device state reports (battery, temp, etc.) from client."""
-        stream_name = provider.get_stream_or_send_error(connection, msg)
-        if not stream_name:
-            return  # Stream unknown, error already sent
+        if not (client := _client_or_send_error(connection, msg)):
+            return
+        provider, stream_name = client
 
         payload = msg["payload"]
         _LOGGER.debug("Received device state report for %s: %s", stream_name, payload)
@@ -662,18 +699,18 @@ def register_handlers(provider: HabitronWebRTCProvider) -> None:  # noqa: C901
         connection.send_result(msg["id"])
 
     # --- REGISTRATION OF ALL HANDLERS ---
-    websocket_api.async_register_command(provider.hass, handle_register_stream)
-    websocket_api.async_register_command(provider.hass, handle_webrtc_answer)
-    websocket_api.async_register_command(provider.hass, handle_webrtc_candidate)
-    websocket_api.async_register_command(provider.hass, handle_call_announcement)
-    websocket_api.async_register_command(provider.hass, handle_snapshot_result)
-    websocket_api.async_register_command(provider.hass, handle_update_media_state)
-    websocket_api.async_register_command(provider.hass, handle_voice_pipeline_status)
-    websocket_api.async_register_command(provider.hass, handle_voice_pipeline_start)
-    websocket_api.async_register_command(provider.hass, handle_voice_audio_chunk)
-    websocket_api.async_register_command(provider.hass, handle_voice_pipeline_abort)
-    websocket_api.async_register_command(provider.hass, handle_voice_pipeline_end)
-    websocket_api.async_register_command(provider.hass, handle_media_next_track)
-    websocket_api.async_register_command(provider.hass, handle_media_previous_track)
-    websocket_api.async_register_command(provider.hass, handle_tts_playback_finished)
-    websocket_api.async_register_command(provider.hass, handle_report_state)
+    websocket_api.async_register_command(hass, handle_register_stream)
+    websocket_api.async_register_command(hass, handle_webrtc_answer)
+    websocket_api.async_register_command(hass, handle_webrtc_candidate)
+    websocket_api.async_register_command(hass, handle_call_announcement)
+    websocket_api.async_register_command(hass, handle_snapshot_result)
+    websocket_api.async_register_command(hass, handle_update_media_state)
+    websocket_api.async_register_command(hass, handle_voice_pipeline_status)
+    websocket_api.async_register_command(hass, handle_voice_pipeline_start)
+    websocket_api.async_register_command(hass, handle_voice_audio_chunk)
+    websocket_api.async_register_command(hass, handle_voice_pipeline_abort)
+    websocket_api.async_register_command(hass, handle_voice_pipeline_end)
+    websocket_api.async_register_command(hass, handle_media_next_track)
+    websocket_api.async_register_command(hass, handle_media_previous_track)
+    websocket_api.async_register_command(hass, handle_tts_playback_finished)
+    websocket_api.async_register_command(hass, handle_report_state)

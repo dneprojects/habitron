@@ -3,6 +3,9 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.4.5b1
+- Beta. Fixed: with a second hub set up, or after the hub was briefly gone during startup, a SmartController Touch could lose its player and camera although it kept connecting: play, pause and volume ended in "no client for stream", the video in "no client connected", while speech went on working. Its commands reached the wrong hub's connection handling. They now always reach the hub the panel belongs to, and only that hub offers its camera.
+
 ## v3.4.4
 - A Smart Controller now shows and changes the mode of **its own** group. It always said "Group 0" because on most installations every module sits in group 0 -- assign a controller to a group at the router and it follows that one, for the group mode, the alarm and day/night alike.
 - A controller that is in group 0 no longer gets those three entities at all: they only repeated what the router already carries. If your installation had them, they are removed on the next start.

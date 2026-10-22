@@ -23,11 +23,13 @@ from custom_components.habitron.ws_provider.handlers import register_handlers
 from custom_components.habitron.ws_provider.provider import HabitronWebRTCProvider
 
 
-def _make_provider() -> HabitronWebRTCProvider:
-    hass = MagicMock()
-    hass.data = {}
-    hass.bus = MagicMock()
-    hass.async_create_background_task = MagicMock()
+def _make_provider(hass: MagicMock | None = None) -> HabitronWebRTCProvider:
+    """Build a provider; pass the ``hass`` of another one to model a second hub."""
+    if hass is None:
+        hass = MagicMock()
+        hass.data = {}
+        hass.bus = MagicMock()
+        hass.async_create_background_task = MagicMock()
     rtr = MagicMock()
     with patch(
         "custom_components.habitron.ws_provider.provider.async_register_webrtc_provider"
@@ -37,7 +39,7 @@ def _make_provider() -> HabitronWebRTCProvider:
 
 def _registered_handlers(provider: HabitronWebRTCProvider) -> dict[str, object]:
     """Register handlers and return the wrapped-unwrapped pair indexed by name."""
-    register_handlers(provider)
+    register_handlers(provider.hass)
     out: dict[str, object] = {}
     for ws_type, (wrapped, _schema) in provider.hass.data["websocket_api"].items():
         # The decorator chain stores the original async function as ``__wrapped__``.
@@ -65,7 +67,7 @@ def _make_connection(stream_name: str | None = None) -> MagicMock:
 def test_register_handlers_registers_15_commands() -> None:
     """15 habitron/* command handlers (now including the abort) are registered."""
     provider = _make_provider()
-    register_handlers(provider)
+    register_handlers(provider.hass)
     cmds = [k for k in provider.hass.data["websocket_api"] if k.startswith("habitron/")]
     assert len(cmds) == 15
     assert "habitron/voice_pipeline_abort" in cmds
@@ -74,7 +76,7 @@ def test_register_handlers_registers_15_commands() -> None:
 def test_register_handlers_registers_all_expected_commands() -> None:
     """Each documented habitron command name is registered."""
     provider = _make_provider()
-    register_handlers(provider)
+    register_handlers(provider.hass)
     cmds = set(provider.hass.data["websocket_api"])
     for name in (
         "habitron/register_stream",
@@ -205,6 +207,95 @@ async def test_register_stream_disconnect_skips_done_task() -> None:
     provider.voice_pipelines["touch_1"] = {"task": done}
     conn.subscriptions[1]()
     done.cancel.assert_not_called()
+
+
+# ---------- two hubs: provider resolved per request ----------
+
+
+def _register_msg(stream_name: str, msg_id: int = 1) -> dict[str, object]:
+    return {
+        "id": msg_id,
+        "type": "habitron/register_stream",
+        "stream_name": stream_name,
+        "version": "1.0",
+    }
+
+
+async def test_register_stream_goes_to_the_hub_owning_the_module() -> None:
+    """The client lands at the hub with its module, not at the last one set up.
+
+    The commands used to be bound to whichever provider registered them last.
+    With a second hub that left the client in a provider without its player
+    and camera: "Player not registered" one way, "no client" the other.
+    """
+    own = _make_provider()
+    other = _make_provider(own.hass)
+    own.module_by_stream = MagicMock(
+        side_effect=lambda n: MagicMock() if n == "touch_1" else None
+    )
+    other.module_by_stream = MagicMock(return_value=None)
+    player = MagicMock()
+    own.media_players["touch_1"] = player
+    handlers = _registered_handlers(other)
+    conn = _make_connection()
+
+    await handlers["register_stream"](own.hass, conn, _register_msg("touch_1"))
+
+    assert own.active_ws_connections == {"touch_1": conn}
+    assert other.active_ws_connections == {}
+
+    await handlers["update_media_state"](
+        own.hass,
+        conn,
+        {"id": 2, "type": "habitron/update_media_state", "state": "playing"},
+    )
+    player.update_from_client.assert_called_once_with("playing", {})
+    conn.send_result.assert_called_with(2)
+
+
+async def test_register_stream_moves_a_client_between_hubs() -> None:
+    """A client that re-registers under another hub leaves the first one."""
+    first = _make_provider()
+    second = _make_provider(first.hass)
+    first.module_by_stream = MagicMock(return_value=None)
+    second.module_by_stream = MagicMock(return_value=MagicMock())
+    conn = _make_connection()
+    first.active_ws_connections["touch_1"] = conn
+    handlers = _registered_handlers(first)
+
+    await handlers["register_stream"](first.hass, conn, _register_msg("touch_1"))
+
+    assert first.active_ws_connections == {}
+    assert second.active_ws_connections == {"touch_1": conn}
+
+
+async def test_register_stream_rejected_without_a_loaded_hub() -> None:
+    """With every hub unloaded the client is told so instead of accepted."""
+    provider = _make_provider()
+    handlers = _registered_handlers(provider)
+    provider.async_close()
+    conn = _make_connection()
+
+    await handlers["register_stream"](provider.hass, conn, _register_msg("touch_1"))
+
+    conn.send_error.assert_called_once()
+    assert conn.send_error.call_args.args[1] == "not_ready"
+    assert provider.active_ws_connections == {}
+
+
+async def test_disconnect_cleans_up_the_hub_the_client_was_in() -> None:
+    """The disconnect callback cleans the provider that took the client."""
+    own = _make_provider()
+    other = _make_provider(own.hass)
+    own.module_by_stream = MagicMock(return_value=MagicMock())
+    other.module_by_stream = MagicMock(return_value=None)
+    handlers = _registered_handlers(other)
+    conn = _make_connection()
+    await handlers["register_stream"](own.hass, conn, _register_msg("touch_1"))
+
+    conn.subscriptions[1]()
+
+    assert own.active_ws_connections == {}
 
 
 # ---------- voice_pipeline_status ----------
@@ -1100,7 +1191,7 @@ async def test_report_state_without_matching_module_just_fires() -> None:
     ],
 )
 async def test_all_handlers_send_error_for_unknown_client(command: str) -> None:
-    """Every handler that calls ``get_stream_or_send_error`` errors out for unknown clients."""
+    """Every handler that needs a registered client errors out for unknown clients."""
     provider = _make_provider()
     handlers = _registered_handlers(provider)
     conn = _make_connection()

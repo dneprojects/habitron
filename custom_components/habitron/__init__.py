@@ -77,6 +77,8 @@ async def async_migrate_entry(hass: HomeAssistant, entry: HabitronConfigEntry) -
 
 async def async_setup_entry(hass: HomeAssistant, entry: HabitronConfigEntry) -> bool:
     """Set up Habitron from a config entry."""
+    provider: HabitronWebRTCProvider | None = None
+    set_up = False
     try:
         coordinator = HbtnCoordinator(hass, entry)
         await coordinator.async_setup()
@@ -107,6 +109,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: HabitronConfigEntry) -> 
         async_setup_services(hass)
 
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+        set_up = True
 
     except (TimeoutError, HabitronTimeoutError) as ex:
         raise ConfigEntryNotReady(
@@ -134,6 +137,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: HabitronConfigEntry) -> 
         ) from ex
     else:
         return True
+    finally:
+        # Unload never runs for a failed setup. A provider left behind would
+        # stay registered for the cameras next to the one of the retry.
+        if not set_up and provider is not None:
+            provider.async_close()
 
 
 async def async_remove_config_entry_device(

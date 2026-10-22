@@ -4,6 +4,44 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.4.5b1
+
+### The websocket commands resolve their provider per request
+Every loaded entry builds its own `HabitronWebRTCProvider`, but the
+`habitron/*` commands are registered with `websocket_api.async_register_command`,
+which is global per Home Assistant. `register_handlers(provider)` closed over the
+provider that called it, and each later call overwrote the previous closures.
+Whichever entry set up last therefore owned every client: `register_stream`
+filed the panel there, while its media player, satellite and camera sat in the
+provider of their own entry. The field log showed both halves at once --
+"Cannot send message, no client for stream" from the player's provider,
+"Player not registered" from the handlers' one, and speech working because it
+runs entirely inside the handlers. A reload rebound the closures, which is why
+it "fixed" it until the next setup of another entry.
+
+- `provider.py`: the providers of loaded entries live in
+  `hass.data[DATA_PROVIDERS]`; a provider adds itself in `__init__` and removes
+  itself in `async_close`. `async_register_websocket_handlers` registers once
+  per hass (`DATA_HANDLERS_REGISTERED`); the commands outlive an unloaded entry
+  anyway, since core offers no way to unregister them.
+- `handlers.py`: `register_handlers(hass)`. `register_stream` picks the provider
+  whose router has the module (`module_by_stream`), falling back to the first
+  one so a single hub behaves as before, drops the connection from any other
+  provider it was filed under, and answers `not_ready` with no hub loaded. Every
+  other command finds the provider through the connection the client
+  registered (`stream_of`) and otherwise sends the familiar `unregistered`
+  error. The disconnect callback is bound to the provider that took the client.
+- `async_is_supported` claims only `habitron://` sources of its own hub's
+  modules. Core hands a camera to the first registered provider that claims
+  it, so with two providers loaded the other hub's could take the offer and
+  answer it with "No client connected".
+
+### A failed setup closes its provider
+`async_close` ran only from `async_unload_entry`, which never runs for a setup
+that raised. A provider created before the failure stayed registered as WebRTC
+provider next to the one of the retry. `async_setup_entry` now closes it in a
+`finally` unless the setup completed.
+
 ## v3.4.4
 
 Stable for 3.4.4b1, unchanged.

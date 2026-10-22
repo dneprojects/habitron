@@ -18,6 +18,7 @@ from custom_components.habitron import (
 )
 from custom_components.habitron.const import DOMAIN, KEY_TOKEN
 from custom_components.habitron.services import SERVICE_HUB_RESTART
+from custom_components.habitron.ws_provider.provider import loaded_providers
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant
@@ -112,6 +113,8 @@ async def test_services_kept_while_other_entry_loaded(
 
     # Other entry still here → services must still be registered.
     assert hass.services.has_service(DOMAIN, SERVICE_HUB_RESTART)
+    # Only the remaining hub's provider still answers the clients.
+    assert loaded_providers(hass) == [other.runtime_data.ws_provider]
 
 
 async def test_update_listener_triggers_reload(
@@ -210,6 +213,32 @@ async def test_setup_entry_oserror_marks_retry(
         assert not await hass.config_entries.async_setup(mock_config_entry.entry_id)
         await hass.async_block_till_done()
     assert mock_config_entry.state is ConfigEntryState.SETUP_RETRY
+
+
+async def test_setup_entry_failure_closes_the_provider(
+    hass: HomeAssistant,
+    setup_homeassistant: None,
+    mock_config_entry: MockConfigEntry,
+    mock_habitron_client: MagicMock,
+    mock_coordinator_setup: None,
+    mock_ws_provider: MagicMock,
+    mock_coordinator_refresh: AsyncMock,
+) -> None:
+    """A setup that fails after the provider exists leaves no provider behind.
+
+    Unload never runs for it, so the provider stayed registered for the
+    cameras next to the one of the retry.
+    """
+    mock_config_entry.add_to_hass(hass)
+    with patch(
+        "custom_components.habitron._async_cleanup_stale_devices",
+        side_effect=OSError("hub gone"),
+    ):
+        assert not await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+    assert mock_config_entry.state is ConfigEntryState.SETUP_RETRY
+    assert loaded_providers(hass) == []
+    mock_ws_provider.return_value.assert_called_once()
 
 
 async def test_unload_entry_returns_false_when_platform_unload_fails(

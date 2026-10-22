@@ -30,6 +30,7 @@ from homeassistant.components.websocket_api import ActiveConnection
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util import slugify
+from homeassistant.util.hass_dict import HassKey
 
 from ..const import DOMAIN
 
@@ -39,6 +40,19 @@ if TYPE_CHECKING:
 
 
 _LOGGER = logging.getLogger(__name__)
+
+# Every loaded hub has its own provider, but the websocket commands exist once
+# per Home Assistant. The handlers therefore look the provider up per request
+# in this list instead of holding on to whichever one registered them.
+DATA_PROVIDERS: HassKey[list[HabitronWebRTCProvider]] = HassKey(
+    f"{DOMAIN}_ws_providers"
+)
+DATA_HANDLERS_REGISTERED: HassKey[bool] = HassKey(f"{DOMAIN}_ws_handlers")
+
+
+def loaded_providers(hass: HomeAssistant) -> list[HabitronWebRTCProvider]:
+    """Return the providers of all currently loaded hubs."""
+    return hass.data.get(DATA_PROVIDERS, [])
 
 
 def _filter_ipv6_candidates(sdp: str) -> str:
@@ -70,6 +84,7 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
         self._remove_provider: Callable[[], None] | None = (
             async_register_webrtc_provider(self.hass, self)
         )
+        hass.data.setdefault(DATA_PROVIDERS, []).append(self)
 
     def module_by_stream(self, stream_name: str) -> SmartController | None:
         """Return the Smart Controller Touch module for a WebRTC stream name."""
@@ -94,6 +109,8 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
         if self._remove_provider is not None:
             self._remove_provider()
             self._remove_provider = None
+        if self in (providers := loaded_providers(self.hass)):
+            providers.remove(self)
 
         for pipeline in self.voice_pipelines.values():
             task = pipeline.get("task")
@@ -178,8 +195,18 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
 
     @callback
     def async_is_supported(self, stream_source: str) -> bool:
-        """Return True if the stream source is supported by this provider."""
-        return stream_source.startswith("habitron://")
+        """Return True if the stream belongs to a module of this provider's hub.
+
+        Home Assistant hands a camera to the first registered provider that
+        claims it. With a second hub loaded, claiming every ``habitron://``
+        source let the other hub's provider take the offer and answer it with
+        "no client connected".
+        """
+        if not stream_source.startswith("habitron://"):
+            return False
+        return (
+            self.module_by_stream(stream_source.removeprefix("habitron://")) is not None
+        )
 
     async def async_handle_async_webrtc_offer(
         self,
@@ -298,38 +325,27 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
 
     @callback
     def async_register_websocket_handlers(self) -> None:
-        """Register all custom websocket command handlers.
+        """Register all custom websocket command handlers, once per hass.
 
         Delegates to the ``handlers`` module so this file stays focused on
-        the provider itself and the WebRTC / snapshot flows.
+        the provider itself and the WebRTC / snapshot flows. The handlers
+        serve every loaded provider, so a second hub or a setup retry must
+        not register them again.
         """
+        if DATA_HANDLERS_REGISTERED in self.hass.data:
+            return
+        self.hass.data[DATA_HANDLERS_REGISTERED] = True
         # Imported here to break the otherwise-cyclic chain between
         # ``provider`` and ``handlers``: the handlers module needs the
         # provider for type hints and the voice pipeline imports come
         # back here for the helper protocol.
         from .handlers import register_handlers  # noqa: PLC0415
 
-        register_handlers(self)
+        register_handlers(self.hass)
 
-    def get_stream_or_send_error(
-        self, connection: ActiveConnection, msg: dict[str, Any]
-    ) -> str | None:
-        """Look up the stream name for a connection or send an error to it."""
-        stream_name = next(
+    def stream_of(self, connection: ActiveConnection) -> str | None:
+        """Return the stream name a connection registered here, if any."""
+        return next(
             (n for n, c in self.active_ws_connections.items() if c == connection),
             None,
         )
-
-        if not stream_name:
-            _LOGGER.warning(
-                "Received command '%s' from unknown client %s, forcing reconnect",
-                msg.get("type", "unknown"),
-                connection,
-            )
-            # Send error to Dart to trigger _forceDisconnect()
-            connection.send_error(
-                msg["id"], "unregistered", "Client not registered. Please reconnect"
-            )
-            return None
-
-        return stream_name

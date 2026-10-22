@@ -14,6 +14,7 @@ import pytest
 from custom_components.habitron.ws_provider.provider import (
     HabitronWebRTCProvider,
     _filter_ipv6_candidates,
+    loaded_providers,
 )
 from homeassistant.components.camera import WebRTCAnswer, WebRTCError
 from homeassistant.exceptions import HomeAssistantError
@@ -22,6 +23,7 @@ from homeassistant.exceptions import HomeAssistantError
 def _make_provider() -> HabitronWebRTCProvider:
     """Build a provider with ``async_register_webrtc_provider`` mocked out."""
     hass = MagicMock()
+    hass.data = {}
     rtr = MagicMock()
     with patch(
         "custom_components.habitron.ws_provider.provider."
@@ -63,6 +65,7 @@ def test_init_seeds_state_containers_and_registers_provider() -> None:
     assert provider.assist_satellites == {}
     assert provider.voice_pipelines == {}
     assert provider._remove_provider is not None
+    assert loaded_providers(provider.hass) == [provider]
 
 
 def test_domain_returns_habitron() -> None:
@@ -83,6 +86,7 @@ def test_async_close_unregisters_and_clears_state() -> None:
     provider.async_close()
     remove_cb.assert_called()
     assert provider._remove_provider is None
+    assert loaded_providers(provider.hass) == []
     assert provider.voice_pipelines == {}
     assert provider.active_ws_connections == {}
     assert provider.media_players == {}
@@ -191,11 +195,20 @@ async def test_async_send_system_command_logs_when_no_connection() -> None:
 # ---------- async_is_supported ----------
 
 
-def test_async_is_supported_accepts_habitron_uris() -> None:
-    """The provider supports ``habitron://`` stream sources."""
+def test_async_is_supported_accepts_habitron_uris_of_its_own_modules() -> None:
+    """The provider supports ``habitron://`` sources of its own hub's modules."""
     provider = _make_provider()
+    provider.module_by_stream = MagicMock(return_value=MagicMock())
     assert provider.async_is_supported("habitron://touch_1") is True
+    provider.module_by_stream.assert_called_with("touch_1")
     assert provider.async_is_supported("rtsp://other") is False
+
+
+def test_async_is_supported_rejects_another_hubs_stream() -> None:
+    """A stream of another hub's module goes to that hub's provider instead."""
+    provider = _make_provider()
+    provider.module_by_stream = MagicMock(return_value=None)
+    assert provider.async_is_supported("habitron://touch_1") is False
 
 
 # ---------- WebRTC offer ----------
@@ -424,23 +437,18 @@ async def test_async_take_snapshot_raises_on_timeout() -> None:
 # ---------- Stream lookup helper ----------
 
 
-def testget_stream_or_send_error_returns_matching_stream_name() -> None:
+def test_stream_of_returns_matching_stream_name() -> None:
     """When the connection matches an entry the stream name is returned."""
     provider = _make_provider()
     conn = MagicMock()
     provider.active_ws_connections["touch_1"] = conn
-    assert provider.get_stream_or_send_error(conn, {"id": 5}) == "touch_1"
+    assert provider.stream_of(conn) == "touch_1"
 
 
-def testget_stream_or_send_error_sends_error_for_unknown_connection() -> None:
-    """An unknown connection sends an "unregistered" error back to the client."""
+def test_stream_of_returns_none_for_unknown_connection() -> None:
+    """A connection that registered nowhere here has no stream."""
     provider = _make_provider()
-    conn = MagicMock()
-    result = provider.get_stream_or_send_error(
-        conn, {"id": 5, "type": "habitron/whatever"}
-    )
-    assert result is None
-    conn.send_error.assert_called()
+    assert provider.stream_of(MagicMock()) is None
 
 
 def test_async_register_websocket_handlers_delegates_to_register_handlers() -> None:
@@ -450,4 +458,15 @@ def test_async_register_websocket_handlers_delegates_to_register_handlers() -> N
         "custom_components.habitron.ws_provider.handlers.register_handlers"
     ) as mock_register:
         provider.async_register_websocket_handlers()
-    mock_register.assert_called_with(provider)
+    mock_register.assert_called_with(provider.hass)
+
+
+def test_async_register_websocket_handlers_registers_once_per_hass() -> None:
+    """A second hub or a setup retry does not register the commands again."""
+    provider = _make_provider()
+    with patch(
+        "custom_components.habitron.ws_provider.handlers.register_handlers"
+    ) as mock_register:
+        provider.async_register_websocket_handlers()
+        provider.async_register_websocket_handlers()
+    mock_register.assert_called_once()
