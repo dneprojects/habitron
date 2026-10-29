@@ -4,6 +4,22 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.4.5
+
+Stable for 3.4.5b1, plus:
+
+### `RTCIceCandidateInit` comes from `webrtc_models`
+Home Assistant 2026.11 no longer re-exports `RTCIceCandidateInit` from
+`homeassistant.components.camera` (home-assistant/core#186872), so
+`ws_provider/handlers.py` and `ws_provider/provider.py` failed with an
+`ImportError`. Both import it from `webrtc_models`, where it is defined and
+where `camera.py` already took it from; that works on older versions too.
+
+### Icons for the ekey name sensors
+The move to icon translations covered `ekey_id` and `ekey_finger` but not
+`ekey_user_name` and `ekey_finger_name`; `icons.json` now gives both
+`mdi:fingerprint` again.
+
 ## v3.4.5b1
 
 ### The websocket commands resolve their provider per request

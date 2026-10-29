@@ -3,6 +3,11 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.4.5
+- Fixed: with a second hub set up, or after the hub was briefly gone during startup, a SmartController Touch could lose its player and camera although it kept connecting: play, pause and volume ended in "no client for stream", the video in "no client connected", while speech went on working. Its commands reached the wrong hub's connection handling. They now always reach the hub the panel belongs to, and only that hub offers its camera.
+- Fixed: on Home Assistant 2026.11 the SmartController Touch connection (player, camera, speech) failed to load with an import error. It works again, and still does on older Home Assistant versions.
+- The ekey "Identifier Name" and "Finger Name" sensors show their fingerprint icon again instead of the default sensor icon.
+
 ## v3.4.5b1
 - Beta. Fixed: with a second hub set up, or after the hub was briefly gone during startup, a SmartController Touch could lose its player and camera although it kept connecting: play, pause and volume ended in "no client for stream", the video in "no client connected", while speech went on working. Its commands reached the wrong hub's connection handling. They now always reach the hub the panel belongs to, and only that hub offers its camera.
 
