@@ -13,9 +13,10 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
+from webrtc_models import RTCIceCandidateInit
 
 from homeassistant.components import websocket_api
-from homeassistant.components.camera import RTCIceCandidateInit, WebRTCCandidate
+from homeassistant.components.camera import WebRTCCandidate
 from homeassistant.components.websocket_api import ActiveConnection
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
