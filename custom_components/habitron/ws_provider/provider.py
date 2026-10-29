@@ -15,11 +15,11 @@ from typing import TYPE_CHECKING, Any
 import uuid
 
 from habitron_client import Router, SmartController
+from webrtc_models import RTCIceCandidateInit
 
 from homeassistant.components.camera import (
     Camera,
     CameraWebRTCProvider,
-    RTCIceCandidateInit,
     WebRTCAnswer,
     WebRTCCandidate,
     WebRTCError,
