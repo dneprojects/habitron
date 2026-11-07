@@ -396,6 +396,36 @@ async def test_setup_links_modules_via_router_to_hub(
 
 
 @pytest.mark.parametrize(
+    ("typ", "mod_type", "model"),
+    [
+        (b"\x0b\x1e", "Smart In 8/24V", "Smart In 24"),
+        (b"\x0a\x32", "Smart Out 8/R-1", "Smart Out R-1"),
+        (b"\x0a\x1e", "Smart IO 2", "Smart IO Mini"),
+        (b"\x1e\x01", "Fanekey", "Smart Com E"),
+        (b"\x01\x04", "Smart Controller Touch", "Smart Controller Touch"),
+    ],
+)
+async def test_module_device_shows_the_product_name(
+    hass: HomeAssistant,
+    real_setup: Callable[..., Awaitable[tuple[MockConfigEntry, AsyncMock]]],
+    typ: bytes,
+    mod_type: str,
+    model: str,
+) -> None:
+    """The device model is the product name; unmapped types keep ``mod_type``."""
+    router = Router(uid="rt_1")
+    router.modules = [
+        Module(uid="MOD-1", addr=5, typ=typ, name="Mod 1", mod_type=mod_type)
+    ]
+    entry, _client = await real_setup(router)
+
+    dev_reg = dr.async_get(hass)
+    mod = dev_reg.async_get_device_by_identifier((DOMAIN, "MOD-1"), entry.entry_id)
+    assert mod is not None
+    assert mod.model == model
+
+
+@pytest.mark.parametrize(
     "stamp",
     ["10.0.0.7", "192.168.1.50", "smarthub.local"],
     ids=["reached at", "reported by the hub", "as configured"],

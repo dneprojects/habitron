@@ -38,10 +38,11 @@ The integration drives one **Habitron SmartHub** (SmartIP / SmartCenter) per con
 | --- | --- | --- |
 | Smart Controller | SC, SC Mini, SC Touch | binary sensors, switches, lights, dimmers, climate, notify, group-mode selectors |
 | Smart Controller Touch | SC Touch | adds camera, media_player, assist_satellite, microphone switch and on-device speech button |
-| Smart Out modules | Out8, Out16, Out8R, Out8R-relais | switches, dimmers, blinds/shutter covers, RGB CLEDs |
-| Smart In modules | In16, In16 24V, In16 230V | binary sensors, button events |
-| Smart Detect / Climate | motion + rain sensors, ekey, wind | motion, moisture, illuminance, wind-speed sensors plus event entities |
-| GSM | Smart GSM | per-recipient SMS notify entities |
+| Smart Out modules | Smart Out R, Smart Out T | switches, dimmers, blinds/shutter covers, RGB CLEDs |
+| Smart In modules | Smart In 24, Smart In 230 | binary sensors, button events |
+| Smart IO | Smart IO Mini | binary sensors, button events, switches, a blind/shutter cover |
+| Smart Detect / Nature / Sensor | Smart Detect 180, Smart Detect 360, Smart Nature, Smart Sensor | motion, moisture, illuminance, temperature, humidity, wind-speed sensors |
+| Smart Com | Smart Com E (ekey), Smart Com G (GSM), Smart Com M (M-Bus) | ekey finger-print events and sensors, per-recipient SMS notify entities |
 | Router & Hub | SmartHub, integrated router | diagnostic sensors (CPU, disk, memory, voltages, currents, timeouts), restart/reboot buttons, firmware update |
 
 Each module appears in Home Assistant as its own device under the SmartHub. Module discovery happens during entry setup via the SmartHub's own bus inventory — there is no per-module pairing step.

@@ -58,6 +58,21 @@ _LOGGER = logging.getLogger(__name__)
 
 MANUFACTURER = "Habitron GmbH"
 
+# Product names shown as device model, by type code; other types keep ``mod_type``.
+MODULE_MODELS: dict[bytes, str] = {
+    b"\x0a\x01": "Smart Out R",
+    b"\x0a\x32": "Smart Out R-1",
+    b"\x0a\x33": "Smart Out R-2",
+    b"\x0a\x02": "Smart Out T",
+    b"\x0a\x1e": "Smart IO Mini",
+    b"\x0b\x1e": "Smart In 24",
+    b"\x0b\x1f": "Smart In 24-1",
+    b"\x0b\x01": "Smart In 230",
+    b"\x1e\x01": "Smart Com E",
+    b"\x1e\x03": "Smart Com G",
+    b"\x1e\x04": "Smart Com M",
+}
+
 # Bus port of the SmartHub, and the port its standalone web UI answers on.
 _BUS_PORT = 7777
 _WEB_PORT = 7780
@@ -444,7 +459,7 @@ class HbtnCoordinator(DataUpdateCoordinator[HbtnData]):
                 manufacturer=MANUFACTURER,
                 suggested_area=area_name,
                 name=module.name,
-                model=module.mod_type,
+                model=MODULE_MODELS.get(module.typ, module.mod_type),
                 sw_version=module.sw_version,
                 hw_version=module.hw_version,
                 via_device_id=rt_dev.id,
