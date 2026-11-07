@@ -6,7 +6,7 @@
 </h2>
 
 <p align="center">
-  <a href="https://github.com/custom-components/hacs"><img src="https://img.shields.io/badge/HACS-Custom-orange.svg"></a>
+  <img src="https://img.shields.io/badge/Home%20Assistant-Marketplace-41BDF5.svg" alt="Home Assistant Marketplace">
   <img src="https://img.shields.io/github/v/release/dneprojects/habitron" alt="Current version">
 </p>
 
@@ -78,28 +78,11 @@ The integration covers every Habitron entity domain Home Assistant offers, excep
 
 ## Installation
 
-### HACS (recommended)
+Habitron is listed in the Home Assistant Marketplace.
 
-1. Open HACS in the Home Assistant menu.
-2. Click on **Integrations** → top right menu (three dots) → **Custom repositories**.
-3. Paste the repository URL `https://github.com/dneprojects/habitron` and set category to **Integration**.
-4. Click **Add**, then **Install** on the Habitron card.
-5. **Restart Home Assistant** and clear your browser cache.
-6. Go to **Settings → Devices & Services → Add Integration → Habitron** and provide the SmartHub address.
-
-### Manual install
-
-```bash
-# Clone the repository
-git clone https://github.com/dneprojects/habitron.git
-
-# Copy the integration into your HA custom_components
-cp -r habitron/custom_components/habitron <home-assistant-config>/custom_components/
-
-# Restart Home Assistant, then add the integration from the UI.
-```
-
-After install the integration is also auto-discovered via SSDP when both Home Assistant and the SmartHub share the same network segment. Accept the discovery card to complete setup.
+1. Open the **Marketplace** from **Settings**, search for **Habitron** and install it.
+2. **Restart Home Assistant** when asked.
+3. A SmartHub on the same network segment is discovered via SSDP and offered under **Settings → Devices & Services**; accept it to complete setup. Otherwise use **Add Integration → Habitron** there and provide the SmartHub address.
 
 ## Configuration parameters
 
@@ -210,7 +193,7 @@ script:
 
 ## Known limitations
 
-- **One SmartHub per network** is supported per HACS install. Multiple SmartHubs work fine, but cross-Hub services (`update_entity` / `sc_system_command`) currently use device-registry / `hub_uid` lookups; explicit per-call target selectors will arrive with the multi-hub services follow-up.
+- **One SmartHub per network** is supported per Home Assistant instance. Multiple SmartHubs work fine, but cross-Hub services (`update_entity` / `sc_system_command`) currently use device-registry / `hub_uid` lookups; explicit per-call target selectors will arrive with the multi-hub services follow-up.
 - **Habitron module discovery is configuration-time**, not bus-side hot-plug. New modules need to be registered in the SmartHub's web UI; afterwards a reload of the integration picks them up. Stale modules are removed from HA's device registry automatically on the next setup pass.
 - **Heavy operations take seconds.** Even with the fully async `habitron_client` library, firmware pushes and full SMC backups involve large device round-trips plus local file hashing (the latter offloaded to the executor). They run to completion in the background, but a single call can take several seconds.
 - **WebRTC and Voice handlers register WebSocket commands globally**. After the last SmartHub is removed those handlers stay registered for the lifetime of the HA process. The provider itself is unregistered on unload, so no stream is double-served.
@@ -245,7 +228,7 @@ A copy of the [`Diagnostics`](https://www.home-assistant.io/docs/configuration/t
 1. Go to **Settings → Devices & Services → Habitron**.
 2. Click the three-dot menu → **Delete**. This removes the entry, every device and entity it owns, and (after the last entry is gone) the domain-level services.
 3. The WebRTC provider and any registered static paths are torn down on unload.
-4. If installed manually, remove `custom_components/habitron` from your HA config directory; if installed through HACS, use the HACS menu to **Remove** the repository.
+4. Uninstall Habitron in the **Marketplace**.
 5. Restart Home Assistant.
 
 State files written by the `save_*` services (`custom_components/habitron/data/`) are not removed automatically — delete them by hand if you no longer need them.

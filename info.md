@@ -6,7 +6,7 @@
 </h2>
 
 <p align="center">
-  <a href="https://github.com/custom-components/hacs"><img src="https://img.shields.io/badge/HACS-Custom-orange.svg"></a>
+  <img src="https://img.shields.io/badge/Home%20Assistant-Marketplace-41BDF5.svg" alt="Home Assistant Marketplace">
   <img src="https://img.shields.io/github/v/release/dneprojects/habitron" alt="Current version">
 </p>
 
