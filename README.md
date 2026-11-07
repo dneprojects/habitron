@@ -70,9 +70,9 @@ The integration covers every Habitron entity domain Home Assistant offers, excep
 
 ## Use cases
 
-- **Single-family home**: Use Habitron modules in your house for a robust, wired, room-centered installation. All lights, dimmers, blinds, climate and door entry devices land in HA. They show up in dashboards and can be controlled via mobile phone intuitively. Automations within HA can be used to link Habitron components with other devices.
-- **SmartCenter installation**: HA running on the SmartCenter connects to the bus via the native Habitron router. The integration auto-detects the local SmartHub.
-- **SC Touch as a wall-mounted Assist panel**: use the SC Touch microphone and speaker as a fully-integrated Voice Assistant satellite. The built-in camera can be utilized for room surveillance during your holidays.
+- **Single-family home**: Use Habitron modules for a robust, wired, room-centred installation. All lights, dimmers, blinds, climate and door entry devices land in HA, show up in dashboards and can be controlled intuitively from a phone. HA automations link Habitron components with your other devices.
+- **SmartCenter installation**: HA running on the SmartCenter connects to the bus through the native Habitron router. The integration detects the local SmartHub on its own, no address needed.
+- **SC Touch as a wall-mounted Assist panel**: Use the SC Touch microphone and speaker as a fully integrated Assist satellite. Its built-in camera can watch the room while you are away.
 
 ## Installation
 
