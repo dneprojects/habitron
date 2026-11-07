@@ -3,6 +3,10 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.4.6
+- Devices show the Habitron product names as their model: Smart In 24 and 230, Smart Out R and T, Smart IO Mini, and Smart Com E, G and M for the ekey, GSM and M-Bus interfaces. Hardware variants keep their -1 or -2. Only the shown name changes; devices, entities and automations stay as they are.
+- The documentation now installs through the Home Assistant Marketplace; the manual installation is gone.
+
 ## v3.4.5
 - Fixed: with a second hub set up, or after the hub was briefly gone during startup, a SmartController Touch could lose its player and camera although it kept connecting: play, pause and volume ended in "no client for stream", the video in "no client connected", while speech went on working. Its commands reached the wrong hub's connection handling. They now always reach the hub the panel belongs to, and only that hub offers its camera.
 - Fixed: on Home Assistant 2026.11 the SmartController Touch connection (player, camera, speech) failed to load with an import error. It works again, and still does on older Home Assistant versions.

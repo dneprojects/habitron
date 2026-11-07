@@ -4,6 +4,20 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.4.6
+
+### Product names as device model
+`habitron_client` names the module types after their internal codes
+(`Smart In 8/24V`, `Smart Out 8/R-1`, `Fanekey`, ...). The device registry now
+takes the model from `MODULE_MODELS` in `coordinator.py`, keyed by the type
+code, and falls back to `mod_type` for unmapped types (controllers, dimmers).
+`mod_type` itself is unchanged: the library and the platforms branch on it.
+
+### Documentation
+README installs through the Marketplace, which reads only `README.md` at the
+installed or latest release, so `info.md` is removed. The logo now comes from
+the Home Assistant brands CDN; the old habitron.de URL returned 404.
+
 ## v3.4.5
 
 Stable for 3.4.5b1, plus:
