@@ -95,7 +95,7 @@ def test_hub_properties_read_through_to_the_model(
         # Relative to whatever base the viewer is on: the frontend rewrites
         # ``homeassistant://`` to ``/``, so this one stored value resolves both
         # on the LAN and behind a remote (Nabu Casa) URL.
-        (True, "homeassistant://habitron_smarthub/ingress?index=%2Fhub"),
+        (True, "homeassistant://app/habitron_smarthub?index=%2Fhub"),
     ],
 )
 async def test_setup_registers_hub_device(

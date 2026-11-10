@@ -1,6 +1,7 @@
 {
   "domain": "habitron",
   "name": "Habitron",
+  "categories": ["hubs_protocols.building_automation"],
   "codeowners": ["@dneprojects"],
   "config_flow": true,
   "dependencies": [
@@ -14,12 +15,12 @@
   "issue_tracker": "https://github.com/dneprojects/habitron/issues",
   "loggers": ["habitron_client"],
   "requirements": [
-    "habitron_client==2.4.0"
+    "habitron_client==2.4.1"
   ],
   "ssdp": [
     {
       "st": "urn:habitron-com:device:SmartHub:1"
     }
   ],
-  "version": "3.4.6"
+  "version": "3.4.7b1"
 }

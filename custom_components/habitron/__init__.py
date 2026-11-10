@@ -120,7 +120,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: HabitronConfigEntry) -> 
         raise ConfigEntryNotReady(
             translation_domain=DOMAIN,
             translation_key="connect_refused",
-            translation_placeholders={"error": str(ex)},
         ) from ex
     except (OSError, ConnectionError, HabitronError) as ex:
         # Any transient HbtnCoordinator problem at setup — a dropped connection or
@@ -133,7 +132,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: HabitronConfigEntry) -> 
         raise ConfigEntryNotReady(
             translation_domain=DOMAIN,
             translation_key="connect_error",
-            translation_placeholders={"error": str(ex)},
         ) from ex
     else:
         return True

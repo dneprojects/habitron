@@ -272,7 +272,6 @@ class HabitronWebRTCProvider(CameraWebRTCProvider):
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="webrtc_negotiation_failed",
-                translation_placeholders={"error": str(err)},
             ) from err
 
     async def async_on_webrtc_candidate(

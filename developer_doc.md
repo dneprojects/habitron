@@ -4,6 +4,27 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.4.7b1
+
+Changes carried over from the core PR review and current core dev.
+
+- `habitron_client` 2.4.1: the Smart Nature wind is published rounded to 0.1
+  from an unrounded running average, so calm wind settles at 0.0.
+- Add-on links use `homeassistant://app/<slug>?index=...` instead of
+  `homeassistant://<slug>/ingress?...`; the `/<slug>` panel only exists while
+  the add-on is shown in the sidebar (`hassio/addon_panel.py`). `/app/<slug>`
+  is the frontend route since core#161264 (HA 2026.2).
+- No `{error}` placeholders with `str(err)` in translated exceptions; the
+  cause stays chained with `from err`.
+- `_set_confirm_only()` removed from the discovery step: a no-op on current
+  core, which reports it for core integrations.
+- Manifest `categories`: `hubs_protocols.building_automation`, as in core.
+
+Not carried over: core 2026.11 lets the config entry methods return `None` and
+adds `async_unload_platforms_or_raise`. HA 2026.10 and older reject a `None`
+from `async_setup_entry`, and `hacs.json` still allows 2026.8, so they keep
+returning `bool`.
+
 ## v3.4.6
 
 ### Product names as device model

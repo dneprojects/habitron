@@ -339,7 +339,8 @@ class HbtnCoordinator(DataUpdateCoordinator[HbtnData]):
         self._resolve_uid()
 
         if self.is_addon:
-            self.base_url = f"homeassistant://{self.addon_slug}/ingress"
+            # The app panel also works when the add-on is not in the sidebar.
+            self.base_url = f"homeassistant://app/{self.addon_slug}"
         else:
             self.base_url = f"http://{self.host}:{_WEB_PORT}"
 
@@ -546,7 +547,6 @@ class HbtnCoordinator(DataUpdateCoordinator[HbtnData]):
             raise UpdateFailed(
                 translation_domain=DOMAIN,
                 translation_key="update_network_error",
-                translation_placeholders={"error": str(err)},
             ) from err
         # Outside the try: the host readings swallow their own errors, so a
         # hub-diag hiccup must not mark every entity unavailable.

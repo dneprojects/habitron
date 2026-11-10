@@ -358,10 +358,10 @@
   },
   "exceptions": {
     "connect_error": {
-      "message": "Error connecting to SmartHub: {error}"
+      "message": "Error connecting to SmartHub."
     },
     "connect_refused": {
-      "message": "Connection refused to SmartHub: {error}"
+      "message": "Connection refused to SmartHub."
     },
     "connect_timeout": {
       "message": "Timeout while connecting to SmartHub."
@@ -391,7 +391,7 @@
       "message": "Client {module_name} is not connected."
     },
     "update_network_error": {
-      "message": "Network error fetching status from SmartHub: {error}"
+      "message": "Network error fetching status from SmartHub."
     },
     "update_no_apk_filename": {
       "message": "No APK filename available for the Smart Touch app update."
@@ -406,7 +406,7 @@
       "message": "Timeout fetching system status from SmartHub."
     },
     "webrtc_negotiation_failed": {
-      "message": "WebRTC negotiation failed: {error}"
+      "message": "WebRTC negotiation failed."
     },
     "webrtc_no_active_client": {
       "message": "No active client for stream {stream_name}."

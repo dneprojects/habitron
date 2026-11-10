@@ -392,7 +392,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 _LOGGER.exception("Unexpected exception")
                 return self.async_abort(reason="unknown")
 
-        self._set_confirm_only()
         return self.async_show_form(
             step_id="discovery_confirm",
             description_placeholders={
