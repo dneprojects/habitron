@@ -3,6 +3,11 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.4.7
+- Fixed: the Smart Nature wind sensor wrote thousands of states a day in calm weather, many of them tiny numbers like 1e-251. It now settles at 0 and only records real changes (habitron_client 2.4.1).
+- Fixed: if the SmartHub runs as an add-on that is not shown in the sidebar, the links from the hub, router and module devices led nowhere. They now open the add-on through its app page.
+- Error messages when the SmartHub cannot be reached no longer end in raw, untranslated error text; the details stay in the log.
+
 ## v3.4.7b1
 - Beta. Fixed: the Smart Nature wind sensor wrote thousands of states a day in calm weather, many of them tiny numbers like 1e-251. It now settles at 0 and only records real changes (habitron_client 2.4.1).
 - Fixed: if the SmartHub runs as an add-on that is not shown in the sidebar, the links from the hub, router and module devices led nowhere. They now open the add-on through its app page.
