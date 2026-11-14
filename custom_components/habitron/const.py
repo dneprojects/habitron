@@ -44,6 +44,11 @@ EVNT_ARG5 = "evnt_arg5"
 RESTART_KEY_NMBR = "mod_nmbr"
 FILE_MOD_NMBR = "mod_nmbr"
 
+# A config entry of this type is the Smart Energy Agent add-on, not a SmartHub.
+CONF_ENTRY_TYPE: Final = "entry_type"
+ENTRY_TYPE_SEA: Final = "sea"
+SEA_ID: Final = "sea"
+
 
 class DaytimeMode(Enum):
     """Habitron daytime mode states."""

@@ -40,7 +40,14 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import slugify
 
-from .const import CONF_DEFAULT_HOST, DOMAIN, KEY_TOKEN, SCAN_INTERVAL
+from .const import (
+    CONF_DEFAULT_HOST,
+    CONF_ENTRY_TYPE,
+    DOMAIN,
+    ENTRY_TYPE_SEA,
+    KEY_TOKEN,
+    SCAN_INTERVAL,
+)
 
 if TYPE_CHECKING:
     from .ws_provider import HabitronWebRTCProvider
@@ -721,3 +728,12 @@ class HbtnFirmwareCoordinator(DataUpdateCoordinator[dict[str, tuple[str, str]]])
         self.data[target.uid] = (installed, latest)
         if latest != installed:
             _LOGGER.info("Firmware %s: %s -> %s", target.name, installed, latest)
+
+
+def hub_entries(hass: HomeAssistant) -> list[HabitronConfigEntry]:
+    """Return the loaded SmartHub entries, without the SEA entry."""
+    return [
+        entry
+        for entry in hass.config_entries.async_loaded_entries(DOMAIN)
+        if entry.data.get(CONF_ENTRY_TYPE) != ENTRY_TYPE_SEA
+    ]

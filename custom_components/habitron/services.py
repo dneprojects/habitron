@@ -27,7 +27,7 @@ from .const import (
     RESTART_KEY_NMBR,
     ROUTER_NMBR,
 )
-from .sea import DATA_SEA, PLATFORM_BINARY_SENSOR, PLATFORM_SENSOR
+from .coordinator import hub_entries
 
 if TYPE_CHECKING:
     from .coordinator import HbtnCoordinator
@@ -40,7 +40,6 @@ SERVICE_MOD_RESTART = "mod_restart"
 SERVICE_RTR_RESTART = "rtr_restart"
 SERVICE_UPDATE_ENTITY = "update_entity"
 SERVICE_SC_SYSTEM_COMMAND = "sc_system_command"
-SERVICE_SEA_UPDATE = "sea_update"
 
 # Hub-acting services pick the hub via a Habitron device. The device is
 # optional: with a single configured hub it is inferred, so existing single-hub
@@ -82,28 +81,6 @@ _SC_SYSTEM_COMMAND_SCHEMA = vol.Schema(
         vol.Optional("new_ip"): str,
     }
 )
-_SEA_ENTITY_SCHEMA = vol.Schema(
-    {
-        vol.Required("key"): vol.All(str, vol.Match(r"^[a-z0-9_]+$")),
-        vol.Required("platform"): vol.In([PLATFORM_SENSOR, PLATFORM_BINARY_SENSOR]),
-        vol.Optional("name"): vol.Any(None, str),
-        vol.Optional("state"): vol.Any(None, str, int, float),
-        vol.Optional("unit"): vol.Any(None, str),
-        vol.Optional("device_class"): vol.Any(None, str),
-        vol.Optional("icon"): vol.Any(None, str),
-        vol.Optional("attributes"): vol.Any(None, dict),
-    },
-    extra=vol.ALLOW_EXTRA,
-)
-_SEA_UPDATE_SCHEMA = vol.Schema(
-    {
-        vol.Optional("version"): vol.Any(None, str),
-        vol.Optional("url"): vol.Any(None, str),
-        vol.Optional("full", default=False): bool,
-        vol.Required("entities"): [_SEA_ENTITY_SCHEMA],
-    },
-    extra=vol.ALLOW_EXTRA,
-)
 
 
 async def _targeted_hubs(call: ServiceCall) -> list[HbtnCoordinator]:
@@ -115,7 +92,7 @@ async def _targeted_hubs(call: ServiceCall) -> list[HbtnCoordinator]:
     common case); with several hubs a target is required. Raises
     ``ServiceValidationError`` when the call does not resolve to a loaded hub.
     """
-    loaded = call.hass.config_entries.async_loaded_entries(DOMAIN)
+    loaded = hub_entries(call.hass)
     entry_ids = await async_extract_config_entry_ids(call)
     if entry_ids:
         hubs: list[HbtnCoordinator] = [
@@ -168,7 +145,7 @@ async def _async_update_entity(call: ServiceCall) -> None:
     arg3: int = call.data.get(EVNT_ARG3, 0)
     arg4: int = call.data.get(EVNT_ARG4, 0)
     arg5: int = call.data.get(EVNT_ARG5, 0)
-    for entry in call.hass.config_entries.async_loaded_entries(DOMAIN):
+    for entry in hub_entries(call.hass):
         hub: HbtnCoordinator = entry.runtime_data
         if hub.owns_event_from(hub_id):
             await hub.update_entity(hub_id, mod_id, evnt, arg1, arg2, arg3, arg4, arg5)
@@ -235,9 +212,7 @@ async def _async_sc_system_command(call: ServiceCall) -> None:
         )
 
     dev_reg = dr.async_get(call.hass)
-    hubs: list[HbtnCoordinator] = [
-        e.runtime_data for e in call.hass.config_entries.async_loaded_entries(DOMAIN)
-    ]
+    hubs: list[HbtnCoordinator] = [e.runtime_data for e in hub_entries(call.hass)]
     if not hubs:
         raise ServiceValidationError(
             translation_domain=DOMAIN,
@@ -258,16 +233,6 @@ async def _async_sc_system_command(call: ServiceCall) -> None:
             )
 
 
-async def _async_sea_update(call: ServiceCall) -> None:
-    """Apply the values SEA reports to its device."""
-    if (manager := call.hass.data.get(DATA_SEA)) is None:
-        raise ServiceValidationError(
-            translation_domain=DOMAIN,
-            translation_key="no_hub_loaded",
-        )
-    await manager.async_update(call.data)
-
-
 _ServiceHandler = Callable[[ServiceCall], Coroutine[Any, Any, None]]
 
 _SERVICE_REGISTRY: tuple[tuple[str, _ServiceHandler, vol.Schema], ...] = (
@@ -281,7 +246,6 @@ _SERVICE_REGISTRY: tuple[tuple[str, _ServiceHandler, vol.Schema], ...] = (
         _async_sc_system_command,
         _SC_SYSTEM_COMMAND_SCHEMA,
     ),
-    (SERVICE_SEA_UPDATE, _async_sea_update, _SEA_UPDATE_SCHEMA),
 )
 
 

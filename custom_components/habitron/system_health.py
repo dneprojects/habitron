@@ -5,7 +5,7 @@ from typing import Any
 from homeassistant.components import system_health
 from homeassistant.core import HomeAssistant, callback
 
-from .const import DOMAIN
+from .coordinator import hub_entries
 
 
 @callback
@@ -27,9 +27,7 @@ def _aggregate_router_status(hubs: list[Any]) -> str:
 
 async def system_health_info(hass: HomeAssistant) -> dict[str, Any]:
     """Get info for the info page."""
-    hubs = [
-        entry.runtime_data for entry in hass.config_entries.async_loaded_entries(DOMAIN)
-    ]
+    hubs = [entry.runtime_data for entry in hub_entries(hass)]
     return {
         "hbtn_version": hass.data["integrations"]["habitron"].manifest.get(
             "version", "0.0.0"

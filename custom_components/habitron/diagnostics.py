@@ -3,13 +3,16 @@
 from typing import Any
 
 from homeassistant.components.diagnostics import async_redact_data
+from homeassistant.const import CONF_TOKEN
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceEntry
 
-from .const import KEY_TOKEN
+from .const import CONF_ENTRY_TYPE, ENTRY_TYPE_SEA, KEY_TOKEN
 from .coordinator import HabitronConfigEntry
+from .sea import SeaCoordinator
 
 REDACT_KEYS = {
+    CONF_TOKEN,
     KEY_TOKEN,
     "mac",
     "lan mac",
@@ -46,10 +49,23 @@ def _module_summary(module: Any) -> dict[str, Any]:
     }
 
 
+def _sea_diagnostics(entry: HabitronConfigEntry) -> dict[str, Any]:
+    """Return diagnostics of the Smart Energy Agent entry."""
+    sea: SeaCoordinator = entry.runtime_data  # type: ignore[assignment]
+    return {
+        "config_entry": async_redact_data(dict(entry.data), REDACT_KEYS),
+        "info": sea.info,
+        "connected": sea.last_update_success,
+        "values": sea.data,
+    }
+
+
 async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: HabitronConfigEntry
 ) -> dict[str, Any]:
     """Return diagnostics for the given Habitron config entry."""
+    if entry.data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_SEA:
+        return _sea_diagnostics(entry)
     coordinator = entry.runtime_data
     router = coordinator.router
 
@@ -96,6 +112,8 @@ async def async_get_device_diagnostics(
     device: DeviceEntry,
 ) -> dict[str, Any]:
     """Return diagnostics for a single Habitron device (module or hub)."""
+    if entry.data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_SEA:
+        return _sea_diagnostics(entry)
     coordinator = entry.runtime_data
     router = coordinator.router
 

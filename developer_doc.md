@@ -4,6 +4,27 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.4.8b2
+
+### Smart Energy Agent over its own API
+Replaces the `sea_update` service of 3.4.8b1 with the core-compatible
+interface agreed with the SEA add-on (key contract v1).
+
+- Supervisor discovery `habitron` with `{"sea": {host, port, token}}` creates a
+  separate config entry (`entry_type: sea`, unique id `sea`) after
+  `hassio_confirm` checks `GET /api/v1/info`. No options, no reconfigure.
+- `sea.py`: `SeaClient` (Bearer token, `/api/v1/info`, `/state`, `WS /ws` with a
+  30 s heartbeat) and a push `SeaCoordinator`: first refresh reads info and
+  state, then a background task applies `snapshot`/`update` messages and
+  reconnects with backoff (5 s to 5 min), refreshing info and the device.
+- Fixed entity descriptions per contract key with translations and icons;
+  `akku_plan` and `regelung` are enum sensors. A value of the wrong type is
+  unknown, a key missing from the snapshot or a lost connection unavailable.
+- Unique ids stay `sea_<key>`, so entities of 3.4.8b1 keep their entity ids.
+  The b1 storage `habitron.sea` is deleted.
+- `hub_entries()` returns the loaded SmartHub entries; services, system health
+  and the host matching skip the SEA entry.
+
 ## v3.4.8b1
 
 ### Smart Energy Agent device

@@ -37,8 +37,9 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from ._helpers import HbtnAreaMixin, deviating_area_id, hbtn_device_info
+from .const import CONF_ENTRY_TYPE, ENTRY_TYPE_SEA
 from .coordinator import HabitronConfigEntry, HbtnCoordinator
-from .sea import PLATFORM_SENSOR, async_setup_sea_platform
+from .sea import SEA_SENSORS, SeaConfigEntry, SeaSensor
 
 PARALLEL_UPDATES = 0
 
@@ -49,6 +50,13 @@ async def async_setup_entry(  # noqa: C901
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add sensors for passed config_entry in HA."""
+    if entry.data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_SEA:
+        sea_entry = cast(SeaConfigEntry, entry)
+        async_add_entities(
+            SeaSensor(sea_entry.runtime_data, description)
+            for description in SEA_SENSORS
+        )
+        return
     coordinator = entry.runtime_data
     hbtn_rt = coordinator.router
     hbtn_cord = coordinator
@@ -277,12 +285,6 @@ async def async_setup_entry(  # noqa: C901
 
     if new_devices:
         async_add_entities(new_devices)
-
-    entry.async_on_unload(
-        async_setup_sea_platform(
-            hass, entry.entry_id, PLATFORM_SENSOR, async_add_entities
-        )
-    )
 
 
 class HostReadingMixin(CoordinatorEntity[HbtnCoordinator]):

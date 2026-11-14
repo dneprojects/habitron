@@ -1,5 +1,7 @@
 """Platform for switch integration."""
 
+from typing import cast
+
 from habitron_client import BusMember, Flag, Module, Router, decode_module_faults
 
 # Import the device class from the component that you want to support
@@ -15,9 +17,9 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from ._helpers import hbtn_device_info
-from .const import DOMAIN
+from .const import CONF_ENTRY_TYPE, DOMAIN, ENTRY_TYPE_SEA
 from .coordinator import HabitronConfigEntry, HbtnCoordinator
-from .sea import PLATFORM_BINARY_SENSOR, async_setup_sea_platform
+from .sea import SEA_BINARY_SENSORS, SeaBinarySensor, SeaConfigEntry
 
 PARALLEL_UPDATES = 1
 TYPE_DIAG = 10  # diagnostic entity, hidden by default (was interfaces.TYPE_DIAG)
@@ -29,6 +31,13 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add binary sensors for Habitron inputs."""
+    if entry.data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_SEA:
+        sea_entry = cast(SeaConfigEntry, entry)
+        async_add_entities(
+            SeaBinarySensor(sea_entry.runtime_data, description)
+            for description in SEA_BINARY_SENSORS
+        )
+        return
     coordinator = entry.runtime_data
     hbtn_rt = coordinator.router
     hbtn_cord = coordinator
@@ -59,12 +68,6 @@ async def async_setup_entry(
 
     if new_devices:
         async_add_entities(new_devices)
-
-    entry.async_on_unload(
-        async_setup_sea_platform(
-            hass, entry.entry_id, PLATFORM_BINARY_SENSOR, async_add_entities
-        )
-    )
 
     registry: er.EntityRegistry = er.async_get(hass)
     area_reg = ar.async_get(hass)

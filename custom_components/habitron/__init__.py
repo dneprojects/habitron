@@ -3,7 +3,7 @@
 from collections.abc import Callable, Iterable
 import logging
 import re
-from typing import Any, Final
+from typing import Any, Final, cast
 
 from habitron_client import HabitronError, HabitronTimeoutError
 
@@ -13,10 +13,10 @@ from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.device_registry import DeviceEntry
 
-from .const import DOMAIN
-from .coordinator import HabitronConfigEntry, HbtnCoordinator
+from .const import CONF_ENTRY_TYPE, DOMAIN, ENTRY_TYPE_SEA, SEA_ID
+from .coordinator import HabitronConfigEntry, HbtnCoordinator, hub_entries
 from .health import async_setup_module_health_issues
-from .sea import SEA_ID, async_setup_sea, async_unload_sea
+from .sea import SeaConfigEntry, async_setup_sea_entry, async_unload_sea_entry
 from .services import async_remove_services, async_setup_services
 from .system_health import system_health_info  # noqa: F401
 from .ws_provider import HabitronWebRTCProvider
@@ -78,6 +78,8 @@ async def async_migrate_entry(hass: HomeAssistant, entry: HabitronConfigEntry) -
 
 async def async_setup_entry(hass: HomeAssistant, entry: HabitronConfigEntry) -> bool:
     """Set up Habitron from a config entry."""
+    if entry.data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_SEA:
+        return await async_setup_sea_entry(hass, cast(SeaConfigEntry, entry))
     provider: HabitronWebRTCProvider | None = None
     set_up = False
     try:
@@ -108,7 +110,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: HabitronConfigEntry) -> 
         # Services live on the domain, not on the entry. The helper is
         # idempotent so subsequent entries are a no-op.
         async_setup_services(hass)
-        await async_setup_sea(hass)
 
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
         set_up = True
@@ -150,6 +151,8 @@ async def async_remove_config_entry_device(
     device_entry: DeviceEntry,
 ) -> bool:
     """Remove a config entry from a device."""
+    if config_entry.data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_SEA:
+        return False
     coordinator = config_entry.runtime_data
     return not any(
         identifier
@@ -160,6 +163,8 @@ async def async_remove_config_entry_device(
 
 async def async_unload_entry(hass: HomeAssistant, entry: HabitronConfigEntry) -> bool:
     """Unload a config entry."""
+    if entry.data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_SEA:
+        return await async_unload_sea_entry(hass, cast(SeaConfigEntry, entry))
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if not unload_ok:
         return False
@@ -173,9 +178,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: HabitronConfigEntry) ->
     # tear them down once the last loaded hub is gone, otherwise a
     # remaining hub would lose its services. ``async_loaded_entries``
     # excludes the entry currently being unloaded.
-    if not hass.config_entries.async_loaded_entries(DOMAIN):
+    if not hub_entries(hass):
         async_remove_services(hass)
-        async_unload_sea(hass)
 
     return True
 

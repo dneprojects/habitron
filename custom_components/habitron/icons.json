@@ -30,6 +30,15 @@
         "state": {
           "on": "mdi:microphone-message"
         }
+      },
+      "guenstig": {
+        "default": "mdi:cash-check"
+      },
+      "einspeisung_gesperrt": {
+        "default": "mdi:transmission-tower-off"
+      },
+      "14a_gedimmt": {
+        "default": "mdi:speedometer-slow"
       }
     },
     "button": {
@@ -103,6 +112,42 @@
       },
       "airquality": {
         "default": "mdi:air-filter"
+      },
+      "pv_prognose_heute": {
+        "default": "mdi:solar-power"
+      },
+      "pv_prognose_heute_rest": {
+        "default": "mdi:solar-power-variant"
+      },
+      "pv_prognose_morgen": {
+        "default": "mdi:solar-power"
+      },
+      "strompreis": {
+        "default": "mdi:currency-eur"
+      },
+      "naechstes_guenstiges_fenster": {
+        "default": "mdi:clock-start"
+      },
+      "naechstes_guenstiges_fenster_ende": {
+        "default": "mdi:clock-end"
+      },
+      "akku_plan": {
+        "default": "mdi:battery-sync"
+      },
+      "akku_plan_bis": {
+        "default": "mdi:battery-clock"
+      },
+      "regelung": {
+        "default": "mdi:tune-variant"
+      },
+      "kosten_heute": {
+        "default": "mdi:cash"
+      },
+      "einsparung_heute": {
+        "default": "mdi:piggy-bank"
+      },
+      "hinweise": {
+        "default": "mdi:lightbulb-alert"
       }
     },
     "switch": {

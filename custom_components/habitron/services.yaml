@@ -119,22 +119,3 @@ clear_sent_message:
     entity:
       integration: habitron
       domain: notify
-
-sea_update:
-  fields:
-    version:
-      example: "0.15.0"
-      selector:
-        text: null
-    url:
-      example: "homeassistant://app/<slug>"
-      selector:
-        text: null
-    full:
-      default: false
-      selector:
-        boolean: null
-    entities:
-      required: true
-      selector:
-        object: null

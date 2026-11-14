@@ -14,16 +14,26 @@ import voluptuous as vol
 
 from homeassistant import config_entries, exceptions
 from homeassistant.components import network
-from homeassistant.const import CONF_HOST
+from homeassistant.const import CONF_HOST, CONF_PORT, CONF_TOKEN
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.service_info.hassio import HassioServiceInfo
 from homeassistant.helpers.service_info.ssdp import (
     ATTR_UPNP_SERIAL,
     ATTR_UPNP_UDN,
     SsdpServiceInfo,
 )
 
-from .const import CONF_DEFAULT_HOST, DOMAIN, KEY_TOKEN
+from .const import (
+    CONF_DEFAULT_HOST,
+    CONF_ENTRY_TYPE,
+    DOMAIN,
+    ENTRY_TYPE_SEA,
+    KEY_TOKEN,
+    SEA_ID,
+)
 from .coordinator import HabitronConfigEntry
+from .sea import SEA_NAME, SeaClient, SeaError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -166,6 +176,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         """Initialize the config flow."""
         self._discovered_device: dict[str, Any] = {}
+        self._sea: dict[str, Any] = {}
 
     @staticmethod
     @callback
@@ -174,6 +185,49 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> config_entries.OptionsFlow:
         """Create the options flow."""
         return MyOptionsFlowHandler()
+
+    @classmethod
+    @callback
+    def async_supports_options_flow(
+        cls, config_entry: config_entries.ConfigEntry
+    ) -> bool:
+        """Offer options for SmartHub entries only."""
+        return config_entry.data.get(CONF_ENTRY_TYPE) != ENTRY_TYPE_SEA
+
+    async def async_step_hassio(
+        self, discovery_info: HassioServiceInfo
+    ) -> config_entries.ConfigFlowResult:
+        """Handle the discovery of the Smart Energy Agent add-on."""
+        config = discovery_info.config.get("sea", discovery_info.config)
+        self._sea = {
+            CONF_ENTRY_TYPE: ENTRY_TYPE_SEA,
+            CONF_HOST: config[CONF_HOST],
+            CONF_PORT: int(config[CONF_PORT]),
+            CONF_TOKEN: config[CONF_TOKEN],
+        }
+        await self.async_set_unique_id(SEA_ID)
+        self._abort_if_unique_id_configured(updates=self._sea)
+        return await self.async_step_hassio_confirm()
+
+    async def async_step_hassio_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.ConfigFlowResult:
+        """Confirm the Smart Energy Agent add-on."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            client = SeaClient(
+                async_get_clientsession(self.hass),
+                self._sea[CONF_HOST],
+                self._sea[CONF_PORT],
+                self._sea[CONF_TOKEN],
+            )
+            try:
+                await client.get_info()
+            except SeaError:
+                errors["base"] = "cannot_connect"
+            else:
+                return self.async_create_entry(title=SEA_NAME, data=self._sea)
+        return self.async_show_form(step_id="hassio_confirm", errors=errors)
 
     async def _async_canonical_host(self, host: str) -> str:
         """Return a comparable form of ``host``.
@@ -215,7 +269,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         canonical = {await self._async_canonical_host(value) for value in candidates}
         for entry in entries:
             entry_host = entry.data.get(CONF_HOST)
-            if not entry_host:
+            if not entry_host or entry.data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_SEA:
                 continue
             if entry_host in candidates:
                 return True
@@ -322,6 +376,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             await self._async_canonical_host(host) for host in candidate_hosts if host
         }
         for entry in self._async_current_entries(include_ignore=False):
+            if entry.data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_SEA:
+                continue
             # Match the hub by any stable signal we have:
             #  * the hub MAC — a loaded entry exposes its HbtnCoordinator as
             #    ``runtime_data`` whose ``uid`` is the MAC without separators,
@@ -484,6 +540,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """
         errors: dict[str, str] = {}
         existing = self._get_reconfigure_entry()
+        if existing.data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_SEA:
+            return self.async_abort(reason="sea_not_supported")
 
         if user_input is not None:
             try:

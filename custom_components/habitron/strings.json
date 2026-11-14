@@ -4,7 +4,8 @@
       "already_configured": "[%key:common::config_flow::abort::already_configured_device%]",
       "no_host_in_ssdp": "The discovered device did not report a host address.",
       "reconfigure_successful": "[%key:common::config_flow::abort::reconfigure_successful%]",
-      "unknown": "[%key:common::config_flow::error::unknown%]"
+      "unknown": "[%key:common::config_flow::error::unknown%]",
+      "sea_not_supported": "The Smart Energy Agent is set up by its add-on."
     },
     "error": {
       "cannot_connect": "Cannot connect to SmartHub",
@@ -33,6 +34,10 @@
           "websock_token": "[%key:component::habitron::config::step::user::data_description::websock_token%]"
         },
         "title": "Reconfigure SmartHub connection"
+      },
+      "hassio_confirm": {
+        "title": "Smart Energy Agent",
+        "description": "Connect the Smart Energy Agent add-on to Home Assistant?"
       }
     }
   },
@@ -80,6 +85,15 @@
       },
       "module_health": {
         "name": "Health"
+      },
+      "guenstig": {
+        "name": "Cheap now"
+      },
+      "einspeisung_gesperrt": {
+        "name": "Feed-in blocked"
+      },
+      "14a_gedimmt": {
+        "name": "Dimmed by §14a"
       }
     },
     "button": {
@@ -165,6 +179,56 @@
       },
       "airquality": {
         "name": "Air quality"
+      },
+      "pv_prognose_heute": {
+        "name": "PV forecast today"
+      },
+      "pv_prognose_heute_rest": {
+        "name": "PV forecast rest of today"
+      },
+      "pv_prognose_morgen": {
+        "name": "PV forecast tomorrow"
+      },
+      "strompreis": {
+        "name": "Electricity price"
+      },
+      "naechstes_guenstiges_fenster": {
+        "name": "Next cheap window"
+      },
+      "naechstes_guenstiges_fenster_ende": {
+        "name": "Next cheap window end"
+      },
+      "akku_plan": {
+        "name": "Battery plan",
+        "state": {
+          "charge_pv": "Charge from PV",
+          "charge_grid": "Charge from grid",
+          "discharge": "Discharge",
+          "hold": "Hold",
+          "spare": "Capacity reserved",
+          "idle": "Idle"
+        }
+      },
+      "akku_plan_bis": {
+        "name": "Battery plan until"
+      },
+      "regelung": {
+        "name": "Control mode",
+        "state": {
+          "auto": "Automatic",
+          "assisted": "Advisory",
+          "rules": "Rules only",
+          "manual": "Manual"
+        }
+      },
+      "kosten_heute": {
+        "name": "Cost today"
+      },
+      "einsparung_heute": {
+        "name": "Savings today"
+      },
+      "hinweise": {
+        "name": "Open hints"
       }
     },
     "switch": {
@@ -354,28 +418,6 @@
           "description": "Fifth event argument (optional)."
         }
       }
-    },
-    "sea_update": {
-      "name": "Update Smart Energy Agent",
-      "description": "Delivers the values of the Smart Energy Agent add-on to its device. Called by the add-on, not normally by hand.",
-      "fields": {
-        "version": {
-          "name": "Version",
-          "description": "Software version of the add-on."
-        },
-        "url": {
-          "name": "URL",
-          "description": "Link to the add-on's user interface."
-        },
-        "full": {
-          "name": "Full list",
-          "description": "The list holds every entity; missing ones become unavailable."
-        },
-        "entities": {
-          "name": "Entities",
-          "description": "Values of the entities, with key, platform, name and state."
-        }
-      }
     }
   },
   "exceptions": {
@@ -441,6 +483,9 @@
     },
     "websocket_provider_missing": {
       "message": "WebSocket provider not initialized on SmartHub."
+    },
+    "sea_unreachable": {
+      "message": "The Smart Energy Agent add-on cannot be reached."
     }
   },
   "system_health": {

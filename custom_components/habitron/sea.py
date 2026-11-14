@@ -1,391 +1,340 @@
-"""Smart Energy Agent (SEA) device, fed by the ``sea_update`` service."""
+"""Smart Energy Agent (SEA) add-on: client, coordinator and entities."""
 
-from collections.abc import Callable
-from dataclasses import asdict, dataclass
-from datetime import datetime, timedelta
+import asyncio
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
+from datetime import datetime
+import json
 import logging
 from typing import Any, Final
 
-from homeassistant.components.binary_sensor import (
-    BinarySensorDeviceClass,
-    BinarySensorEntity,
-)
-from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
-from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
-from homeassistant.helpers import device_registry as dr, entity_registry as er
-from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.dispatcher import (
-    async_dispatcher_connect,
-    async_dispatcher_send,
-)
-from homeassistant.helpers.entity import Entity
-from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
-from homeassistant.helpers.event import async_call_later
-from homeassistant.helpers.storage import Store
-from homeassistant.util import dt as dt_util
-from homeassistant.util.hass_dict import HassKey
+import aiohttp
 
-from .const import DOMAIN
+from homeassistant.components.binary_sensor import (
+    BinarySensorEntity,
+    BinarySensorEntityDescription,
+)
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorEntityDescription,
+)
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import (
+    CONF_HOST,
+    CONF_PORT,
+    CONF_TOKEN,
+    CURRENCY_EURO,
+    Platform,
+    UnitOfEnergy,
+)
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.storage import Store
+from homeassistant.helpers.update_coordinator import (
+    CoordinatorEntity,
+    DataUpdateCoordinator,
+    UpdateFailed,
+)
+from homeassistant.util import dt as dt_util
+
+from .const import DOMAIN, SEA_ID
 
 _LOGGER = logging.getLogger(__name__)
 
-SEA_ID: Final = "sea"
-SEA_TIMEOUT: Final = timedelta(minutes=30)
-PLATFORM_SENSOR: Final = "sensor"
-PLATFORM_BINARY_SENSOR: Final = "binary_sensor"
-DATA_SEA: HassKey[SeaManager] = HassKey(f"{DOMAIN}_sea")
-_STORE_KEY: Final = f"{DOMAIN}.sea"
-_STORE_VERSION: Final = 1
-_SIGNAL: Final = f"{DOMAIN}_sea_update"
+SEA_PLATFORMS: Final = [Platform.BINARY_SENSOR, Platform.SENSOR]
+SEA_NAME: Final = "Smart Energy Agent"
+_RETRY_MIN: Final = 5
+_RETRY_MAX: Final = 300
+_HEARTBEAT: Final = 30
+_TIMEOUT: Final = aiohttp.ClientTimeout(total=10)
 _URL_SCHEMES: Final = ("http://", "https://", "homeassistant://")
 
+type SeaConfigEntry = ConfigEntry[SeaCoordinator]
 
-@dataclass
-class SeaMeta:
-    """Static description of one SEA entity."""
 
-    key: str
-    platform: str
-    name: str | None
-    unit: str | None
-    device_class: str | None
-    icon: str | None
+class SeaError(Exception):
+    """SEA could not be reached or answered unusably."""
 
-    @classmethod
-    def from_payload(cls, item: dict[str, Any]) -> SeaMeta:
-        """Build the description from one entity of a ``sea_update`` call."""
-        return cls(
-            key=item["key"],
-            platform=item["platform"],
-            name=item.get("name"),
-            unit=item.get("unit"),
-            device_class=item.get("device_class"),
-            icon=item.get("icon"),
+
+class SeaClient:
+    """HTTP and WebSocket access to the SEA add-on API."""
+
+    def __init__(
+        self, session: aiohttp.ClientSession, host: str, port: int, token: str
+    ) -> None:
+        """Initialize the client."""
+        self._session = session
+        self._base = f"http://{host}:{port}/api/v1"
+        self._headers = {"Authorization": f"Bearer {token}"}
+
+    async def _get(self, path: str) -> Any:
+        try:
+            async with self._session.get(
+                f"{self._base}/{path}", headers=self._headers, timeout=_TIMEOUT
+            ) as response:
+                response.raise_for_status()
+                return await response.json()
+        except (aiohttp.ClientError, TimeoutError, ValueError) as err:
+            raise SeaError(f"{path}: {err!r}") from err
+
+    async def get_info(self) -> dict[str, Any]:
+        """Return version, name and url of the add-on."""
+        info: dict[str, Any] = await self._get("info")
+        return info
+
+    async def get_state(self) -> dict[str, Any]:
+        """Return all current values."""
+        state: dict[str, Any] = await self._get("state")
+        return state
+
+    async def messages(self) -> AsyncIterator[dict[str, Any]]:
+        """Yield the push messages until the connection ends."""
+        try:
+            async with self._session.ws_connect(
+                f"{self._base}/ws", headers=self._headers, heartbeat=_HEARTBEAT
+            ) as ws:
+                async for msg in ws:
+                    if msg.type is not aiohttp.WSMsgType.TEXT:
+                        break
+                    try:
+                        yield json.loads(msg.data)
+                    except ValueError:
+                        _LOGGER.debug("Ignoring unreadable SEA message")
+        except aiohttp.ClientError as err:
+            raise SeaError(f"ws: {err!r}") from err
+        raise SeaError("ws: connection closed")
+
+
+class SeaCoordinator(DataUpdateCoordinator[dict[str, Any]]):
+    """Hold the values SEA pushes."""
+
+    config_entry: SeaConfigEntry
+
+    def __init__(self, hass: HomeAssistant, entry: SeaConfigEntry) -> None:
+        """Initialize the coordinator."""
+        super().__init__(
+            hass, _LOGGER, config_entry=entry, name=SEA_NAME, update_interval=None
         )
-
-
-class SeaManager:
-    """Hold SEA's entities, their states and the device they belong to."""
-
-    def __init__(self, hass: HomeAssistant) -> None:
-        """Initialize the manager."""
-        self.hass = hass
-        self.metas: dict[str, SeaMeta] = {}
-        self.version: str | None = None
-        self.url: str | None = None
-        self._store: Store[dict[str, Any]] = Store(hass, _STORE_VERSION, _STORE_KEY)
-        self._states: dict[str, str | None] = {}
-        self._attributes: dict[str, dict[str, Any]] = {}
-        self._present: set[str] = set()
-        self._alive = False
-        self._adders: dict[str, dict[str, AddConfigEntryEntitiesCallback]] = {}
-        self._owner: str | None = None
-        self._created: set[str] = set()
-        self._cancel_timeout: CALLBACK_TYPE | None = None
-
-    async def async_load(self) -> None:
-        """Restore the last full entity list from storage."""
-        if (data := await self._store.async_load()) is None:
-            return
-        self.metas = {item["key"]: SeaMeta(**item) for item in data.get("entities", [])}
-        self.version = data.get("version")
-        self.url = data.get("url")
-
-    @callback
-    def async_shutdown(self) -> None:
-        """Stop the timeout."""
-        if self._cancel_timeout is not None:
-            self._cancel_timeout()
-            self._cancel_timeout = None
-
-    def is_available(self, key: str) -> bool:
-        """Return whether the entity has a current value."""
-        return self._alive and key in self._present
-
-    def state(self, key: str) -> str | None:
-        """Return the raw state of an entity."""
-        return self._states.get(key)
-
-    def attributes(self, key: str) -> dict[str, Any]:
-        """Return the extra attributes of an entity."""
-        return self._attributes.get(key, {})
+        self.client = SeaClient(
+            async_get_clientsession(hass),
+            entry.data[CONF_HOST],
+            entry.data[CONF_PORT],
+            entry.data[CONF_TOKEN],
+        )
+        self.info: dict[str, Any] = {}
 
     @property
     def configuration_url(self) -> str | None:
         """Return the url if the device registry accepts it."""
-        if self.url and self.url.startswith(_URL_SCHEMES):
-            return self.url
-        return None
+        url = self.info.get("url")
+        return url if isinstance(url, str) and url.startswith(_URL_SCHEMES) else None
 
-    @callback
-    def async_register(
-        self,
-        entry_id: str,
-        platform: str,
-        add_entities: AddConfigEntryEntitiesCallback,
-    ) -> CALLBACK_TYPE:
-        """Register a platform of a config entry; return the unregister callback."""
-        self._adders.setdefault(entry_id, {})[platform] = add_entities
-        if self._owner is None:
-            self._owner = entry_id
-        if self._owner == entry_id:
-            self._create(
-                meta for meta in self.metas.values() if meta.platform == platform
-            )
+    async def _async_update_data(self) -> dict[str, Any]:
+        """Read info and the full state once."""
+        try:
+            self.info = await self.client.get_info()
+            return await self.client.get_state()
+        except SeaError as err:
+            raise UpdateFailed(
+                translation_domain=DOMAIN, translation_key="sea_unreachable"
+            ) from err
 
-        @callback
-        def _unregister() -> None:
-            adders = self._adders.get(entry_id, {})
-            adders.pop(platform, None)
-            if adders:
-                return
-            self._adders.pop(entry_id, None)
-            if self._owner != entry_id:
-                return
-            # Move the device to the next loaded entry, so SEA keeps working.
-            self._created.clear()
-            self._owner = next(iter(self._adders), None)
-            self._create(self.metas.values())
+    async def async_listen(self) -> None:
+        """Follow the push channel, reconnecting with backoff."""
+        retry = _RETRY_MIN
+        while True:
+            try:
+                async for message in self.client.messages():
+                    retry = _RETRY_MIN
+                    self._handle(message)
+            except SeaError as err:
+                _LOGGER.debug("SEA connection lost: %s", err)
+                self.async_set_update_error(err)
+            await asyncio.sleep(retry)
+            retry = min(retry * 2, _RETRY_MAX)
+            try:
+                self.info = await self.client.get_info()
+            except SeaError:
+                continue
+            self._update_device()
 
-        return _unregister
-
-    @callback
-    def _create(self, metas: Any) -> None:
-        """Create entities for metas the owner entry does not have yet."""
-        if self._owner is None:
+    def _handle(self, message: dict[str, Any]) -> None:
+        values = message.get("values")
+        if not isinstance(values, dict):
             return
-        adders = self._adders[self._owner]
-        registry = er.async_get(self.hass)
-        new: dict[str, list[Entity]] = {}
-        for meta in metas:
-            if meta.key in self._created or meta.platform not in adders:
-                continue
-            entity: Entity = (
-                SeaSensor(self, meta)
-                if meta.platform == PLATFORM_SENSOR
-                else SeaBinarySensor(self, meta)
-            )
-            # Drop a state the old REST way left, or the entity id gets a suffix.
-            if self.hass.states.get(entity.entity_id) and not registry.async_get(
-                entity.entity_id
-            ):
-                self.hass.states.async_remove(entity.entity_id)
-            self._created.add(meta.key)
-            new.setdefault(meta.platform, []).append(entity)
-        for platform, entities in new.items():
-            adders[platform](entities)
+        if message.get("type") == "snapshot":
+            self.async_set_updated_data(values)
+        elif message.get("type") == "update":
+            self.async_set_updated_data({**(self.data or {}), **values})
 
-    async def async_update(self, data: dict[str, Any]) -> None:
-        """Apply a ``sea_update`` call."""
-        full: bool = data["full"]
-        changed: set[str] = set()
-        new_metas: list[SeaMeta] = []
-        for item in data["entities"]:
-            meta = SeaMeta.from_payload(item)
-            known = self.metas.get(meta.key)
-            if known is not None and known.platform != meta.platform:
-                _LOGGER.warning(
-                    "SEA entity %s cannot change its platform to %s",
-                    meta.key,
-                    meta.platform,
-                )
-                continue
-            if known is None:
-                new_metas.append(meta)
-            self.metas[meta.key] = meta
-            state = item.get("state")
-            self._states[meta.key] = None if state is None else str(state)
-            self._attributes[meta.key] = item.get("attributes") or {}
-            self._present.add(meta.key)
-            changed.add(meta.key)
-        if full:
-            missing = self._present - changed
-            self._present -= missing
-            changed |= missing
-        if not self._alive:
-            self._alive = True
-            changed |= set(self.metas)
-        self._update_device(data.get("version"), data.get("url"))
-        self._create(new_metas)
-        self._restart_timeout()
-        for key in changed:
-            async_dispatcher_send(self.hass, f"{_SIGNAL}_{key}")
-        if full:
-            await self._store.async_save(
-                {
-                    "version": self.version,
-                    "url": self.url,
-                    "entities": [
-                        asdict(meta)
-                        for key, meta in self.metas.items()
-                        if key in self._present
-                    ],
-                }
-            )
-
-    @callback
-    def _update_device(self, version: str | None, url: str | None) -> None:
-        """Update version and link of the device."""
-        if version is not None:
-            self.version = version
-        if url is not None:
-            self.url = url
+    def _update_device(self) -> None:
         registry = dr.async_get(self.hass)
-        if (device := registry.async_get_device({(DOMAIN, SEA_ID)})) is None:
-            return
-        if (
-            device.sw_version != self.version
-            or device.configuration_url != self.configuration_url
-        ):
+        if device := registry.async_get_device({(DOMAIN, SEA_ID)}):
             registry.async_update_device(
                 device.id,
-                sw_version=self.version,
+                sw_version=self.info.get("version"),
                 configuration_url=self.configuration_url,
             )
 
-    @callback
-    def _restart_timeout(self) -> None:
-        """Mark all entities unavailable when SEA stays silent."""
-        self.async_shutdown()
-        self._cancel_timeout = async_call_later(self.hass, SEA_TIMEOUT, self._expire)
 
-    @callback
-    def _expire(self, _now: datetime) -> None:
-        """Handle the timeout."""
-        self._cancel_timeout = None
-        self._alive = False
-        for key in self.metas:
-            async_dispatcher_send(self.hass, f"{_SIGNAL}_{key}")
-
-
-async def async_setup_sea(hass: HomeAssistant) -> None:
-    """Create the SEA manager once per Home Assistant instance."""
-    if DATA_SEA in hass.data:
-        return
-    manager = SeaManager(hass)
-    await manager.async_load()
-    hass.data[DATA_SEA] = manager
+async def async_setup_sea_entry(hass: HomeAssistant, entry: SeaConfigEntry) -> bool:
+    """Set up the SEA add-on entry."""
+    coordinator = SeaCoordinator(hass, entry)
+    await coordinator.async_config_entry_first_refresh()
+    entry.runtime_data = coordinator
+    # The b1 service stored its entity list here; nothing reads it any more.
+    await Store(hass, 1, f"{DOMAIN}.sea").async_remove()
+    await hass.config_entries.async_forward_entry_setups(entry, SEA_PLATFORMS)
+    entry.async_create_background_task(
+        hass, coordinator.async_listen(), "habitron_sea_listen"
+    )
+    return True
 
 
-@callback
-def async_unload_sea(hass: HomeAssistant) -> None:
-    """Drop the SEA manager when the last config entry is gone."""
-    if (manager := hass.data.pop(DATA_SEA, None)) is not None:
-        manager.async_shutdown()
+async def async_unload_sea_entry(hass: HomeAssistant, entry: SeaConfigEntry) -> bool:
+    """Unload the SEA add-on entry."""
+    return await hass.config_entries.async_unload_platforms(entry, SEA_PLATFORMS)
 
 
-@callback
-def async_setup_sea_platform(
-    hass: HomeAssistant,
-    entry_id: str,
-    platform: str,
-    add_entities: AddConfigEntryEntitiesCallback,
-) -> Callable[[], None]:
-    """Let SEA add entities through a platform of this entry."""
-    if (manager := hass.data.get(DATA_SEA)) is None:
-        return lambda: None
-    return manager.async_register(entry_id, platform, add_entities)
+@dataclass(frozen=True, kw_only=True)
+class SeaSensorEntityDescription(SensorEntityDescription):
+    """SEA sensor; ``key`` is the key of the SEA contract."""
 
 
-class SeaEntity(Entity):
+SEA_SENSORS: Final[tuple[SeaSensorEntityDescription, ...]] = (
+    *(
+        SeaSensorEntityDescription(
+            key=key,
+            translation_key=key,
+            device_class=SensorDeviceClass.ENERGY,
+            native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+            suggested_display_precision=1,
+        )
+        for key in ("pv_prognose_heute", "pv_prognose_heute_rest", "pv_prognose_morgen")
+    ),
+    SeaSensorEntityDescription(
+        key="strompreis",
+        translation_key="strompreis",
+        native_unit_of_measurement="ct/kWh",
+        suggested_display_precision=1,
+    ),
+    *(
+        SeaSensorEntityDescription(
+            key=key, translation_key=key, device_class=SensorDeviceClass.TIMESTAMP
+        )
+        for key in (
+            "naechstes_guenstiges_fenster",
+            "naechstes_guenstiges_fenster_ende",
+            "akku_plan_bis",
+        )
+    ),
+    SeaSensorEntityDescription(
+        key="akku_plan",
+        translation_key="akku_plan",
+        device_class=SensorDeviceClass.ENUM,
+        options=["charge_pv", "charge_grid", "discharge", "hold", "spare", "idle"],
+    ),
+    SeaSensorEntityDescription(
+        key="regelung",
+        translation_key="regelung",
+        device_class=SensorDeviceClass.ENUM,
+        options=["auto", "assisted", "rules", "manual"],
+    ),
+    *(
+        SeaSensorEntityDescription(
+            key=key,
+            translation_key=key,
+            device_class=SensorDeviceClass.MONETARY,
+            native_unit_of_measurement=CURRENCY_EURO,
+            suggested_display_precision=2,
+        )
+        for key in ("kosten_heute", "einsparung_heute")
+    ),
+    SeaSensorEntityDescription(key="hinweise", translation_key="hinweise"),
+)
+
+SEA_BINARY_SENSORS: Final[tuple[BinarySensorEntityDescription, ...]] = tuple(
+    BinarySensorEntityDescription(key=key, translation_key=key)
+    for key in ("guenstig", "einspeisung_gesperrt", "14a_gedimmt")
+)
+
+
+class SeaEntity(CoordinatorEntity[SeaCoordinator]):
     """Base class of the SEA entities."""
 
     _attr_has_entity_name = True
-    _attr_should_poll = False
 
-    def __init__(self, manager: SeaManager, meta: SeaMeta) -> None:
+    def __init__(self, coordinator: SeaCoordinator, key: str) -> None:
         """Initialize the entity."""
-        self._manager = manager
-        self._key = meta.key
-        self._attr_unique_id = f"{SEA_ID}_{meta.key}"
-        # Keeps the ids of the former REST states.
-        self.entity_id = f"{meta.platform}.{SEA_ID}_{meta.key}"
+        super().__init__(coordinator)
+        # Same unique id as the b1 service entities, so their entity ids stay.
+        self._attr_unique_id = f"{SEA_ID}_{key}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, SEA_ID)},
-            name="Smart Energy Agent",
+            name="SEA",
             manufacturer="Habitron",
-            model="SEA",
-            sw_version=manager.version,
-            configuration_url=manager.configuration_url,
+            model=SEA_NAME,
+            sw_version=coordinator.info.get("version"),
+            configuration_url=coordinator.configuration_url,
         )
 
     @property
-    def _meta(self) -> SeaMeta:
-        return self._manager.metas[self._key]
-
-    @property
-    def name(self) -> str | None:
-        """Return the name from SEA."""
-        return self._meta.name or self._key
-
-    @property
-    def icon(self) -> str | None:
-        """Return the icon from SEA."""
-        return self._meta.icon
+    def _raw(self) -> Any:
+        return (self.coordinator.data or {}).get(self.entity_description.key)
 
     @property
     def available(self) -> bool:
-        """Return whether SEA reported this entity recently."""
-        return self._manager.is_available(self._key)
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Return the attributes from SEA."""
-        return self._manager.attributes(self._key)
-
-    async def async_added_to_hass(self) -> None:
-        """Follow the updates of this entity."""
-        self.async_on_remove(
-            async_dispatcher_connect(
-                self.hass, f"{_SIGNAL}_{self._key}", self.async_write_ha_state
-            )
+        """Return whether SEA is connected and reports this key."""
+        return super().available and self.entity_description.key in (
+            self.coordinator.data or {}
         )
 
 
 class SeaSensor(SeaEntity, SensorEntity):
-    """SEA value as a sensor."""
+    """SEA value."""
 
-    @property
-    def device_class(self) -> SensorDeviceClass | None:
-        """Return the device class from SEA."""
-        try:
-            return SensorDeviceClass(self._meta.device_class or "")
-        except ValueError:
-            return None
+    entity_description: SeaSensorEntityDescription
 
-    @property
-    def native_unit_of_measurement(self) -> str | None:
-        """Return the unit from SEA."""
-        return self._meta.unit
+    def __init__(
+        self, coordinator: SeaCoordinator, description: SeaSensorEntityDescription
+    ) -> None:
+        """Initialize the sensor."""
+        self.entity_description = description
+        super().__init__(coordinator, description.key)
 
     @property
     def native_value(self) -> str | float | datetime | None:
-        """Return the state, as a number or time where SEA declares one."""
-        if (raw := self._manager.state(self._key)) is None:
+        """Return the value in the type the contract declares."""
+        raw = self._raw
+        if raw is None:
             return None
-        if self.device_class is SensorDeviceClass.TIMESTAMP:
-            value = dt_util.parse_datetime(raw)
+        device_class = self.entity_description.device_class
+        if device_class is SensorDeviceClass.TIMESTAMP:
+            value = dt_util.parse_datetime(str(raw))
             return value if value is not None and value.tzinfo is not None else None
-        if self._meta.unit:
-            try:
-                return float(raw)
-            except ValueError:
-                return None
+        if device_class is SensorDeviceClass.ENUM:
+            options = self.entity_description.options or []
+            return raw if raw in options else None
+        if isinstance(raw, bool) or not isinstance(raw, int | float):
+            return None
         return raw
 
 
 class SeaBinarySensor(SeaEntity, BinarySensorEntity):
-    """SEA flag as a binary sensor."""
+    """SEA flag."""
 
-    @property
-    def device_class(self) -> BinarySensorDeviceClass | None:
-        """Return the device class from SEA."""
-        try:
-            return BinarySensorDeviceClass(self._meta.device_class or "")
-        except ValueError:
-            return None
+    def __init__(
+        self, coordinator: SeaCoordinator, description: BinarySensorEntityDescription
+    ) -> None:
+        """Initialize the binary sensor."""
+        self.entity_description = description
+        super().__init__(coordinator, description.key)
 
     @property
     def is_on(self) -> bool | None:
-        """Return the state from SEA."""
-        return {"on": True, "off": False}.get(self._manager.state(self._key) or "")
+        """Return the flag."""
+        raw = self._raw
+        return raw if isinstance(raw, bool) else None
