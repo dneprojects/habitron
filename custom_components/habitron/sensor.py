@@ -38,6 +38,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from ._helpers import HbtnAreaMixin, deviating_area_id, hbtn_device_info
 from .coordinator import HabitronConfigEntry, HbtnCoordinator
+from .sea import PLATFORM_SENSOR, async_setup_sea_platform
 
 PARALLEL_UPDATES = 0
 
@@ -276,6 +277,12 @@ async def async_setup_entry(  # noqa: C901
 
     if new_devices:
         async_add_entities(new_devices)
+
+    entry.async_on_unload(
+        async_setup_sea_platform(
+            hass, entry.entry_id, PLATFORM_SENSOR, async_add_entities
+        )
+    )
 
 
 class HostReadingMixin(CoordinatorEntity[HbtnCoordinator]):

@@ -17,6 +17,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from ._helpers import hbtn_device_info
 from .const import DOMAIN
 from .coordinator import HabitronConfigEntry, HbtnCoordinator
+from .sea import PLATFORM_BINARY_SENSOR, async_setup_sea_platform
 
 PARALLEL_UPDATES = 1
 TYPE_DIAG = 10  # diagnostic entity, hidden by default (was interfaces.TYPE_DIAG)
@@ -58,6 +59,12 @@ async def async_setup_entry(
 
     if new_devices:
         async_add_entities(new_devices)
+
+    entry.async_on_unload(
+        async_setup_sea_platform(
+            hass, entry.entry_id, PLATFORM_BINARY_SENSOR, async_add_entities
+        )
+    )
 
     registry: er.EntityRegistry = er.async_get(hass)
     area_reg = ar.async_get(hass)

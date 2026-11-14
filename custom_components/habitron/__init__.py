@@ -16,6 +16,7 @@ from homeassistant.helpers.device_registry import DeviceEntry
 from .const import DOMAIN
 from .coordinator import HabitronConfigEntry, HbtnCoordinator
 from .health import async_setup_module_health_issues
+from .sea import SEA_ID, async_setup_sea, async_unload_sea
 from .services import async_remove_services, async_setup_services
 from .system_health import system_health_info  # noqa: F401
 from .ws_provider import HabitronWebRTCProvider
@@ -107,6 +108,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: HabitronConfigEntry) -> 
         # Services live on the domain, not on the entry. The helper is
         # idempotent so subsequent entries are a no-op.
         async_setup_services(hass)
+        await async_setup_sea(hass)
 
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
         set_up = True
@@ -173,6 +175,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: HabitronConfigEntry) ->
     # excludes the entry currently being unloaded.
     if not hass.config_entries.async_loaded_entries(DOMAIN):
         async_remove_services(hass)
+        async_unload_sea(hass)
 
     return True
 
@@ -196,7 +199,7 @@ def _async_cleanup_stale_devices(
     by ``(DOMAIN, <some uid>)`` is removed if that uid is no longer in
     the router's current module list.
     """
-    keep_uids: set[str] = {coordinator.uid, coordinator.router.uid}
+    keep_uids: set[str] = {coordinator.uid, coordinator.router.uid, SEA_ID}
     keep_uids.update(module.uid for module in coordinator.router.modules)
 
     dev_reg = dr.async_get(hass)

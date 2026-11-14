@@ -4,6 +4,30 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.4.8b1
+
+### Smart Energy Agent device
+SEA pushes its results through the domain service `habitron.sea_update`
+(no target, no response), registered with the other services. Payload:
+`version`, optional `url`, `full` and `entities`; each entity has `key`
+(`[a-z0-9_]+`), `platform` (`sensor`/`binary_sensor`), `name`, `state`
+(string or null), `unit`, `device_class`, `icon` and `attributes`.
+
+- `sea.py`: one `SeaManager` per instance (`hass.data`). It creates the device
+  `(DOMAIN, "sea")` ("Smart Energy Agent", Habitron, model SEA) on the first
+  loaded entry and moves it to the next entry when that one unloads.
+- Entities: unique id `sea_<key>`, entity id `sensor.sea_<key>` /
+  `binary_sensor.sea_<key>` as the former REST states; a leftover REST state of
+  that id is removed first. Unknown keys are added at runtime through the
+  platforms' `async_add_entities`.
+- A sensor with a unit reports a number, `timestamp` a datetime with zone,
+  anything unparsable is unknown. Binary: `on`/`off`.
+- `full: true` marks keys it does not list unavailable; 30 minutes without a
+  call mark all unavailable.
+- The last full list is kept in `.storage/habitron.sea`; the entities are
+  recreated from it at start, unavailable until SEA calls.
+- `_async_cleanup_stale_devices` keeps the SEA device.
+
 ## v3.4.7
 
 Stable for 3.4.7b1, unchanged.

@@ -27,6 +27,7 @@ from .const import (
     RESTART_KEY_NMBR,
     ROUTER_NMBR,
 )
+from .sea import DATA_SEA, PLATFORM_BINARY_SENSOR, PLATFORM_SENSOR
 
 if TYPE_CHECKING:
     from .coordinator import HbtnCoordinator
@@ -39,6 +40,7 @@ SERVICE_MOD_RESTART = "mod_restart"
 SERVICE_RTR_RESTART = "rtr_restart"
 SERVICE_UPDATE_ENTITY = "update_entity"
 SERVICE_SC_SYSTEM_COMMAND = "sc_system_command"
+SERVICE_SEA_UPDATE = "sea_update"
 
 # Hub-acting services pick the hub via a Habitron device. The device is
 # optional: with a single configured hub it is inferred, so existing single-hub
@@ -79,6 +81,28 @@ _SC_SYSTEM_COMMAND_SCHEMA = vol.Schema(
         vol.Optional("command", default="restart"): str,
         vol.Optional("new_ip"): str,
     }
+)
+_SEA_ENTITY_SCHEMA = vol.Schema(
+    {
+        vol.Required("key"): vol.All(str, vol.Match(r"^[a-z0-9_]+$")),
+        vol.Required("platform"): vol.In([PLATFORM_SENSOR, PLATFORM_BINARY_SENSOR]),
+        vol.Optional("name"): vol.Any(None, str),
+        vol.Optional("state"): vol.Any(None, str, int, float),
+        vol.Optional("unit"): vol.Any(None, str),
+        vol.Optional("device_class"): vol.Any(None, str),
+        vol.Optional("icon"): vol.Any(None, str),
+        vol.Optional("attributes"): vol.Any(None, dict),
+    },
+    extra=vol.ALLOW_EXTRA,
+)
+_SEA_UPDATE_SCHEMA = vol.Schema(
+    {
+        vol.Optional("version"): vol.Any(None, str),
+        vol.Optional("url"): vol.Any(None, str),
+        vol.Optional("full", default=False): bool,
+        vol.Required("entities"): [_SEA_ENTITY_SCHEMA],
+    },
+    extra=vol.ALLOW_EXTRA,
 )
 
 
@@ -234,6 +258,16 @@ async def _async_sc_system_command(call: ServiceCall) -> None:
             )
 
 
+async def _async_sea_update(call: ServiceCall) -> None:
+    """Apply the values SEA reports to its device."""
+    if (manager := call.hass.data.get(DATA_SEA)) is None:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="no_hub_loaded",
+        )
+    await manager.async_update(call.data)
+
+
 _ServiceHandler = Callable[[ServiceCall], Coroutine[Any, Any, None]]
 
 _SERVICE_REGISTRY: tuple[tuple[str, _ServiceHandler, vol.Schema], ...] = (
@@ -247,6 +281,7 @@ _SERVICE_REGISTRY: tuple[tuple[str, _ServiceHandler, vol.Schema], ...] = (
         _async_sc_system_command,
         _SC_SYSTEM_COMMAND_SCHEMA,
     ),
+    (SERVICE_SEA_UPDATE, _async_sea_update, _SEA_UPDATE_SCHEMA),
 )
 
 

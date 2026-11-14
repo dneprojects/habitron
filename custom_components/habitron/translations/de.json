@@ -354,6 +354,28 @@
           "description": "Fünftes Event-Argument (optional)."
         }
       }
+    },
+    "sea_update": {
+      "name": "Smart Energy Agent aktualisieren",
+      "description": "Überträgt die Werte des Add-ons Smart Energy Agent an sein Gerät. Wird vom Add-on aufgerufen, nicht von Hand.",
+      "fields": {
+        "version": {
+          "name": "Version",
+          "description": "Softwareversion des Add-ons."
+        },
+        "url": {
+          "name": "URL",
+          "description": "Link zur Oberfläche des Add-ons."
+        },
+        "full": {
+          "name": "Vollständige Liste",
+          "description": "Die Liste enthält alle Entitäten; fehlende werden nicht verfügbar."
+        },
+        "entities": {
+          "name": "Entitäten",
+          "description": "Werte der Entitäten mit Schlüssel, Plattform, Name und Zustand."
+        }
+      }
     }
   },
   "exceptions": {

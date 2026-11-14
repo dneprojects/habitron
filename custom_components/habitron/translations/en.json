@@ -351,6 +351,28 @@
           "description": "Fifth event argument (optional)."
         }
       }
+    },
+    "sea_update": {
+      "name": "Update Smart Energy Agent",
+      "description": "Delivers the values of the Smart Energy Agent add-on to its device. Called by the add-on, not normally by hand.",
+      "fields": {
+        "version": {
+          "name": "Version",
+          "description": "Software version of the add-on."
+        },
+        "url": {
+          "name": "URL",
+          "description": "Link to the add-on's user interface."
+        },
+        "full": {
+          "name": "Full list",
+          "description": "The list holds every entity; missing ones become unavailable."
+        },
+        "entities": {
+          "name": "Entities",
+          "description": "Values of the entities, with key, platform, name and state."
+        }
+      }
     }
   },
   "exceptions": {

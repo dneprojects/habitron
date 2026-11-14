@@ -3,6 +3,9 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.4.8b1
+- Beta. New: the Smart Energy Agent add-on appears as its own device with registered entities (service `habitron.sea_update`).
+
 ## v3.4.7
 - Fixed: the Smart Nature wind no longer floods the history in calm weather.
 - Fixed: hub, router and module links work when the add-on is hidden from the sidebar.
