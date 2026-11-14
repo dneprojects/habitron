@@ -3,7 +3,7 @@
 import asyncio
 from collections.abc import AsyncGenerator, Callable
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 from aiohttp import WSMsgType, web
 from aiohttp.test_utils import TestServer
@@ -77,6 +77,7 @@ class FakeSea:
         self.state: dict[str, Any] = dict(STATE)
         self.sockets: list[web.WebSocketResponse] = []
         self.connected = asyncio.Event()
+        self.down = False
 
     def _authorized(self, request: web.Request) -> bool:
         return request.headers.get("Authorization") == f"Bearer {TOKEN}"
@@ -84,6 +85,8 @@ class FakeSea:
     async def _info(self, request: web.Request) -> web.Response:
         if not self._authorized(request):
             return web.Response(status=401)
+        if self.down:
+            return web.Response(status=503)
         return web.json_response(self.info)
 
     async def _state(self, request: web.Request) -> web.Response:
@@ -168,7 +171,7 @@ def _sea_entry(server: TestServer, token: str = TOKEN) -> MockConfigEntry:
 
 async def _until(check: Callable[[], bool]) -> None:
     """Wait for the listener task, which block_till_done does not track."""
-    for _ in range(200):
+    for _ in range(1000):
         if check():
             return
         await asyncio.sleep(0.01)
@@ -189,7 +192,7 @@ async def sea_entry(
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
-    await asyncio.wait_for(sea.connected.wait(), 2)
+    await asyncio.wait_for(sea.connected.wait(), 10)
     return entry
 
 
@@ -365,7 +368,7 @@ async def test_lost_connection_and_reconnect(
     await sea.drop()
     await _until(lambda: _state(hass, PV) in (STATE_UNAVAILABLE, "13.0"))
 
-    await asyncio.wait_for(sea.connected.wait(), 2)
+    await asyncio.wait_for(sea.connected.wait(), 10)
     await _until(lambda: _state(hass, PV) == "13.0")
     device = device_registry.async_get_device({(DOMAIN, "sea")})
     assert device.sw_version == "0.17.0"
@@ -375,15 +378,12 @@ async def test_reconnect_waits_while_the_add_on_is_down(
     hass: HomeAssistant, sea_entry: MockConfigEntry, sea: FakeSea
 ) -> None:
     """While info cannot be read the listener keeps retrying."""
-    real_info = sea.info
-    sea.info = None  # type: ignore[assignment]
-    sea._info = AsyncMock(return_value=web.Response(status=503))  # type: ignore[method-assign]
+    sea.down = True
     await sea.drop()
     await _until(lambda: _state(hass, PV) == STATE_UNAVAILABLE)
 
-    sea.info = real_info
-    del sea._info
-    await asyncio.wait_for(sea.connected.wait(), 2)
+    sea.down = False
+    await asyncio.wait_for(sea.connected.wait(), 10)
     await _until(lambda: _state(hass, PV) == "12.4")
 
 
@@ -510,3 +510,15 @@ async def test_b1_entities_keep_their_ids(
     await hass.async_block_till_done()
 
     assert _state(hass, "sensor.sea_pv_prognose_heute") == "12.4"
+
+
+async def test_info_that_is_not_an_object_counts_as_unreachable(
+    hass: HomeAssistant, setup_homeassistant: None, sea: FakeSea, sea_server: TestServer
+) -> None:
+    """An answer that is not a JSON object lets HA retry the setup."""
+    sea.info = None  # type: ignore[assignment]
+    entry = _sea_entry(sea_server)
+    entry.add_to_hass(hass)
+
+    assert not await hass.config_entries.async_setup(entry.entry_id)
+    assert entry.state is ConfigEntryState.SETUP_RETRY

@@ -80,15 +80,19 @@ class SeaClient:
         except (aiohttp.ClientError, TimeoutError, ValueError) as err:
             raise SeaError(f"{path}: {err!r}") from err
 
+    async def _get_object(self, path: str) -> dict[str, Any]:
+        data = await self._get(path)
+        if not isinstance(data, dict):
+            raise SeaError(f"{path}: not an object")
+        return data
+
     async def get_info(self) -> dict[str, Any]:
         """Return version, name and url of the add-on."""
-        info: dict[str, Any] = await self._get("info")
-        return info
+        return await self._get_object("info")
 
     async def get_state(self) -> dict[str, Any]:
         """Return all current values."""
-        state: dict[str, Any] = await self._get("state")
-        return state
+        return await self._get_object("state")
 
     async def messages(self) -> AsyncIterator[dict[str, Any]]:
         """Yield the push messages until the connection ends."""
