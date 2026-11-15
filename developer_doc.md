@@ -4,6 +4,17 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.4.8b3
+
+### SEA takes over the b1 entities
+The b1 entities kept their registry entries (unique id `sea_<key>`, entity id
+`sensor.sea_<key>`), and SEA's REST fallback posts plain states under those ids
+until a client is connected. Core refuses an entity whose registered id already
+has a non-restored state, so 12 of 15 were ignored. `_async_adopt_b1` now runs
+before the platforms: it moves `sea_<key>` entries of the contract to the SEA
+entry, removes those without a contract key, removes non-restored states of the
+entry's ids and moves the device `(habitron, sea)` to the entry.
+
 ## v3.4.8b2
 
 ### Smart Energy Agent over its own API

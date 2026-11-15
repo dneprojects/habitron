@@ -21,6 +21,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
+    ATTR_RESTORED,
     CONF_HOST,
     CONF_PORT,
     CONF_TOKEN,
@@ -29,7 +30,7 @@ from homeassistant.const import (
     UnitOfEnergy,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.storage import Store
@@ -189,6 +190,7 @@ async def async_setup_sea_entry(hass: HomeAssistant, entry: SeaConfigEntry) -> b
     coordinator = SeaCoordinator(hass, entry)
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
+    _async_adopt_b1(hass, entry)
     # The b1 service stored its entity list here; nothing reads it any more.
     await Store(hass, 1, f"{DOMAIN}.sea").async_remove()
     await hass.config_entries.async_forward_entry_setups(entry, SEA_PLATFORMS)
@@ -196,6 +198,40 @@ async def async_setup_sea_entry(hass: HomeAssistant, entry: SeaConfigEntry) -> b
         hass, coordinator.async_listen(), "habitron_sea_listen"
     )
     return True
+
+
+def _async_adopt_b1(hass: HomeAssistant, entry: SeaConfigEntry) -> None:
+    """Take over the entities and the device of the b1 service."""
+    platforms = {description.key: Platform.SENSOR for description in SEA_SENSORS}
+    platforms |= {
+        description.key: Platform.BINARY_SENSOR for description in SEA_BINARY_SENSORS
+    }
+    entity_registry = er.async_get(hass)
+    for item in list(entity_registry.entities.values()):
+        if (
+            item.platform != DOMAIN
+            or item.config_entry_id == entry.entry_id
+            or not item.unique_id.startswith(f"{SEA_ID}_")
+        ):
+            continue
+        if platforms.get(item.unique_id.removeprefix(f"{SEA_ID}_")) == item.domain:
+            entity_registry.async_update_entity(
+                item.entity_id, config_entry_id=entry.entry_id
+            )
+        else:
+            entity_registry.async_remove(item.entity_id)
+    # SEA posts plain states under these ids while it has no connection.
+    for item in er.async_entries_for_config_entry(entity_registry, entry.entry_id):
+        state = hass.states.get(item.entity_id)
+        if state is not None and ATTR_RESTORED not in state.attributes:
+            hass.states.async_remove(item.entity_id)
+    device_registry = dr.async_get(hass)
+    device = device_registry.async_get_device({(DOMAIN, SEA_ID)})
+    if device is None or device.config_entries == {entry.entry_id}:
+        return
+    device_registry.async_update_device(device.id, add_config_entry_id=entry.entry_id)
+    for other in device.config_entries - {entry.entry_id}:
+        device_registry.async_update_device(device.id, remove_config_entry_id=other)
 
 
 async def async_unload_sea_entry(hass: HomeAssistant, entry: SeaConfigEntry) -> bool:

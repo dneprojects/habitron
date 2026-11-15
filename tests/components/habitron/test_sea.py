@@ -3,7 +3,7 @@
 import asyncio
 from collections.abc import AsyncGenerator, Callable
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from aiohttp import WSMsgType, web
 from aiohttp.test_utils import TestServer
@@ -17,7 +17,11 @@ from custom_components.habitron.diagnostics import (
     async_get_config_entry_diagnostics,
     async_get_device_diagnostics,
 )
-from homeassistant.config_entries import SOURCE_HASSIO, ConfigEntryState
+from homeassistant.config_entries import (
+    SOURCE_HASSIO,
+    ConfigEntryDisabler,
+    ConfigEntryState,
+)
 from homeassistant.const import (
     CONF_HOST,
     CONF_PORT,
@@ -38,6 +42,12 @@ pytestmark = pytest.mark.filterwarnings(
 )
 
 TOKEN = "a" * 64
+# Keys the b1 service did not have.
+B1_MISSING = {
+    "pv_prognose_heute_rest",
+    "naechstes_guenstiges_fenster_ende",
+    "akku_plan_bis",
+}
 PV = "sensor.sea_pv_forecast_today"
 PLAN = "sensor.sea_battery_plan"
 WINDOW = "sensor.sea_next_cheap_window"
@@ -491,27 +501,63 @@ async def test_service_storage_of_b1_is_removed(
     assert "habitron.sea" not in hass_storage
 
 
-async def test_b1_entities_keep_their_ids(
+async def test_b1_entities_move_to_the_sea_entry(
     hass: HomeAssistant,
+    device_registry: dr.DeviceRegistry,
     entity_registry: er.EntityRegistry,
     setup_homeassistant: None,
     sea: FakeSea,
     sea_server: TestServer,
-    mock_habitron_client: MagicMock,
 ) -> None:
-    """Entities the b1 service created keep their entity ids."""
-    entity_registry.async_get_or_create(
-        "sensor",
-        DOMAIN,
-        "sea_pv_prognose_heute",
-        suggested_object_id="sea_pv_prognose_heute",
+    """Entities of the b1 service move to the SEA entry with their ids."""
+    # Disabled, so loading the integration does not set up a real hub.
+    hub = MockConfigEntry(
+        domain=DOMAIN, unique_id="aabbccddeeff", disabled_by=ConfigEntryDisabler.USER
     )
+    hub.add_to_hass(hass)
+    old_device = device_registry.async_get_or_create(
+        config_entry_id=hub.entry_id,
+        identifiers={(DOMAIN, "sea")},
+        name="Smart Energy Agent",
+        manufacturer="Habitron",
+        model="SEA",
+    )
+    binary = {"guenstig", "einspeisung_gesperrt", "14a_gedimmt"}
+    b1_keys = [key for key in STATE if key not in B1_MISSING] + ["veraltet"]
+    for key in b1_keys:
+        platform = "binary_sensor" if key in binary else "sensor"
+        entity_registry.async_get_or_create(
+            platform,
+            DOMAIN,
+            f"sea_{key}",
+            config_entry=hub,
+            device_id=old_device.id,
+            suggested_object_id=f"sea_{key}",
+        )
+
+    # The REST fallback of SEA posts plain states under the b1 ids.
+    hass.states.async_set("sensor.sea_pv_prognose_heute", "11.0")
+    hass.states.async_set("binary_sensor.sea_guenstig", "off")
+
     entry = _sea_entry(sea_server)
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
+    entities = er.async_entries_for_config_entry(entity_registry, entry.entry_id)
+    assert len(entities) == 15
     assert _state(hass, "sensor.sea_pv_prognose_heute") == "12.4"
+    assert _state(hass, "binary_sensor.sea_guenstig") == STATE_ON
+    assert _state(hass, "sensor.sea_akku_plan") == "charge_pv"
+    assert _state(hass, "sensor.sea_hinweise") == "2"
+    assert entity_registry.async_get("sensor.sea_veraltet") is None
+
+    device = device_registry.async_get_device({(DOMAIN, "sea")})
+    assert device.id == old_device.id
+    assert device.config_entries == {entry.entry_id}
+    assert device.name == "SEA"
+    assert device.model == "Smart Energy Agent"
+    assert all(entity.device_id == device.id for entity in entities)
 
 
 async def test_info_that_is_not_an_object_counts_as_unreachable(

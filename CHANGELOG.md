@@ -3,6 +3,9 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.4.8b3
+- Beta. Fixed: only 3 of the 15 SEA entities appeared; the entities from 3.4.8b1 now move to the SEA device and keep their ids.
+
 ## v3.4.8b2
 - Beta. New: the Smart Energy Agent add-on connects itself via discovery and pushes its values to the device SEA.
 - Removed: the `habitron.sea_update` service of 3.4.8b1.
