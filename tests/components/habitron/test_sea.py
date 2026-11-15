@@ -97,6 +97,8 @@ class FakeSea:
     async def _ws(self, request: web.Request) -> web.StreamResponse:
         if not self._authorized(request):
             return web.Response(status=401)
+        if self.down:
+            return web.Response(status=503)
         ws = web.WebSocketResponse()
         await ws.prepare(request)
         self.sockets.append(ws)
