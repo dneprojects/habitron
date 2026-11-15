@@ -20,8 +20,9 @@ pytest-asyncio>=0.23
 pytest-cov>=5.0
 pytest-homeassistant-custom-component==0.13.357
 
-# Snapshot testing (used by HA-style integration tests).
-syrupy>=4.6
+# Snapshot testing (used by HA-style integration tests). Pinned like
+# pytest-homeassistant-custom-component: syrupy 7 names snapshots differently.
+syrupy==5.5.3
 
 # Runtime dependencies that the integration imports at module level.
 # Mocking covers most external behavior, but the import statements
