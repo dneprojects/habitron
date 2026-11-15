@@ -1,6 +1,6 @@
 """Platform for switch integration."""
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from habitron_client import Flag, Led, Module, Output
 
@@ -13,7 +13,9 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from ._helpers import HabitronEntity, HbtnAreaMixin, deviating_area_id, hbtn_device_info
+from .const import CONF_ENTRY_TYPE, ENTRY_TYPE_SEA
 from .coordinator import HabitronConfigEntry, HbtnCoordinator
+from .sea import SEA_SWITCHES, SeaConfigEntry, SeaSwitch
 
 if TYPE_CHECKING:
     from .ws_provider import HabitronWebRTCProvider
@@ -27,6 +29,13 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add switches for passed config_entry in HA."""
+    if entry.data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_SEA:
+        sea_entry = cast(SeaConfigEntry, entry)
+        async_add_entities(
+            SeaSwitch(sea_entry.runtime_data, description)
+            for description in SEA_SWITCHES
+        )
+        return
     coordinator = entry.runtime_data
     router = coordinator.router
     coord = coordinator

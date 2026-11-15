@@ -34,6 +34,7 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.service_info.hassio import HassioServiceInfo
 
@@ -92,6 +93,8 @@ class FakeSea:
         self.sockets: list[web.WebSocketResponse] = []
         self.connected = asyncio.Event()
         self.down = False
+        self.commands: list[dict[str, Any]] = []
+        self.command_status = 200
 
     def _authorized(self, request: web.Request) -> bool:
         return request.headers.get("Authorization") == f"Bearer {TOKEN}"
@@ -124,12 +127,27 @@ class FakeSea:
         self.sockets.remove(ws)
         return ws
 
+    async def _command(self, request: web.Request) -> web.Response:
+        if not self._authorized(request):
+            return web.Response(status=401)
+        body = await request.json()
+        self.commands.append(body)
+        if self.command_status != 200:
+            return web.json_response({"error": "nope"}, status=self.command_status)
+        key, value = body["key"], body["value"]
+        self.state[key] = (
+            ("ready" if value else "off") if key.startswith("strategie_") else value
+        )
+        await self.send({"type": "update", "values": {key: self.state[key]}})
+        return web.json_response({"ok": True, "values": {}})
+
     def app(self) -> web.Application:
         """Return the web app."""
         app = web.Application()
         app.router.add_get("/api/v1/info", self._info)
         app.router.add_get("/api/v1/state", self._state)
         app.router.add_get("/api/v1/ws", self._ws)
+        app.router.add_post("/api/v1/command", self._command)
         return app
 
     async def send(self, message: Any) -> None:
@@ -292,7 +310,7 @@ async def test_device_and_entities(
     assert device.model == "Smart Energy Agent"
     assert device.sw_version == "0.16.0"
     assert device.configuration_url == "homeassistant://app/sea"
-    assert len(er.async_entries_for_device(entity_registry, device.id)) == 29
+    assert len(er.async_entries_for_device(entity_registry, device.id)) == 38
 
     assert entity_registry.async_get(PV).unique_id == "sea_pv_prognose_heute"
     assert _state(hass, PV) == "12.4"
@@ -553,7 +571,7 @@ async def test_b1_entities_move_to_the_sea_entry(
     await hass.async_block_till_done()
 
     entities = er.async_entries_for_config_entry(entity_registry, entry.entry_id)
-    assert len(entities) == 29
+    assert len(entities) == 38
     assert _state(hass, "sensor.sea_pv_prognose_heute") == "12.4"
     assert _state(hass, "binary_sensor.sea_guenstig") == STATE_ON
     assert _state(hass, "sensor.sea_akku_plan") == "charge_pv"
@@ -675,3 +693,99 @@ async def test_strategy_states(
     )
     await _until(lambda: _state(hass, entity_id) == "acting")
     assert _state(hass, "sensor.sea_strategy_optimizer") == "ready"
+
+
+SWITCH = "switch.sea_pv_surplus"
+SELECT = "select.sea_control_mode"
+
+
+async def test_strategy_switches(
+    hass: HomeAssistant,
+    sea_entry: MockConfigEntry,
+    sea: FakeSea,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Eight strategies can be switched; the state follows the push update."""
+    switches = [
+        entry
+        for entry in er.async_entries_for_config_entry(
+            entity_registry, sea_entry.entry_id
+        )
+        if entry.domain == "switch"
+    ]
+    assert len(switches) == 8
+    assert entity_registry.async_get(SWITCH).unique_id == (
+        "sea_strategie_self_consumption_switch"
+    )
+    assert _state(hass, SWITCH) == STATE_ON
+
+    await hass.services.async_call(
+        "switch", "turn_off", {"entity_id": SWITCH}, blocking=True
+    )
+    assert sea.commands[-1] == {"key": "strategie_self_consumption", "value": False}
+    await _until(lambda: _state(hass, SWITCH) == STATE_OFF)
+    assert _state(hass, "sensor.sea_strategy_pv_surplus") == "off"
+
+    await hass.services.async_call(
+        "switch", "turn_on", {"entity_id": SWITCH}, blocking=True
+    )
+    assert sea.commands[-1] == {"key": "strategie_self_consumption", "value": True}
+    await _until(lambda: _state(hass, SWITCH) == STATE_ON)
+
+
+async def test_missing_prerequisite_is_still_on(
+    hass: HomeAssistant, sea_entry: MockConfigEntry, sea: FakeSea
+) -> None:
+    """A strategy waiting for a prerequisite is on; unknown is unknown."""
+    await sea.send(
+        {"type": "update", "values": {"strategie_self_consumption": "missing"}}
+    )
+    await _until(lambda: _state(hass, "sensor.sea_strategy_pv_surplus") == "missing")
+    assert _state(hass, SWITCH) == STATE_ON
+
+    await sea.send({"type": "update", "values": {"strategie_self_consumption": None}})
+    await _until(lambda: _state(hass, SWITCH) == STATE_UNKNOWN)
+
+
+async def test_control_level_select(
+    hass: HomeAssistant, sea_entry: MockConfigEntry, sea: FakeSea
+) -> None:
+    """The control level can be selected."""
+    assert _state(hass, SELECT) == "auto"
+
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {"entity_id": SELECT, "option": "manual"},
+        blocking=True,
+    )
+    assert sea.commands[-1] == {"key": "regelung", "value": "manual"}
+    await _until(lambda: _state(hass, SELECT) == "manual")
+    assert _state(hass, "sensor.sea_control_mode") == "manual"
+
+    await sea.send({"type": "update", "values": {"regelung": "boost"}})
+    await _until(lambda: _state(hass, SELECT) == STATE_UNKNOWN)
+
+
+@pytest.mark.parametrize(
+    ("status", "message"),
+    [
+        pytest.param(400, "refused the command", id="refused"),
+        pytest.param(500, "cannot be reached", id="unreachable"),
+    ],
+)
+async def test_command_errors(
+    hass: HomeAssistant,
+    sea_entry: MockConfigEntry,
+    sea: FakeSea,
+    status: int,
+    message: str,
+) -> None:
+    """A refused or failed command raises an error and changes nothing."""
+    sea.command_status = status
+
+    with pytest.raises(HomeAssistantError, match=message):
+        await hass.services.async_call(
+            "switch", "turn_off", {"entity_id": SWITCH}, blocking=True
+        )
+    assert _state(hass, SWITCH) == STATE_ON

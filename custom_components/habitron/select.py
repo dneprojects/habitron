@@ -2,6 +2,7 @@
 
 from enum import Enum
 import logging
+from typing import cast
 
 from habitron_client import Module, Router, Sensor
 
@@ -13,8 +14,15 @@ from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from ._helpers import hbtn_device_info
-from .const import ATTR_MESSAGE_ID, AlarmMode, DaytimeMode
+from .const import (
+    ATTR_MESSAGE_ID,
+    CONF_ENTRY_TYPE,
+    ENTRY_TYPE_SEA,
+    AlarmMode,
+    DaytimeMode,
+)
 from .coordinator import HabitronConfigEntry, HbtnCoordinator, LoggingLevels
+from .sea import SEA_SELECTS, SeaConfigEntry, SeaSelect
 
 PARALLEL_UPDATES = 1
 _LOGGER = logging.getLogger(__name__)
@@ -26,6 +34,13 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add input_select for passed config_entry in HA."""
+    if entry.data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_SEA:
+        sea_entry = cast(SeaConfigEntry, entry)
+        async_add_entities(
+            SeaSelect(sea_entry.runtime_data, description)
+            for description in SEA_SELECTS
+        )
+        return
     coordinator = entry.runtime_data
     hbtn_rt = coordinator.router
     hbtn_cord = coordinator

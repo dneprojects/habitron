@@ -362,6 +362,30 @@
       },
       "climate_ctl": {
         "name": "Climate controller"
+      },
+      "strategie_self_consumption": {
+        "name": "PV surplus"
+      },
+      "strategie_setpoint_boost": {
+        "name": "Heat pump boost"
+      },
+      "strategie_tariff_shift": {
+        "name": "Dynamic tariff"
+      },
+      "strategie_setback": {
+        "name": "Setback"
+      },
+      "strategie_circuit_guide": {
+        "name": "Heating circuit control"
+      },
+      "strategie_battery_cover": {
+        "name": "Battery coverage"
+      },
+      "strategie_peak_shaving": {
+        "name": "Peak shaving"
+      },
+      "strategie_feed_in_limit": {
+        "name": "Feed-in limit"
       }
     },
     "select": {
@@ -391,6 +415,15 @@
       },
       "stored_message": {
         "name": "Messages list"
+      },
+      "regelung": {
+        "name": "Control mode",
+        "state": {
+          "auto": "Automatic",
+          "assisted": "Advisory",
+          "rules": "Rules only",
+          "manual": "Manual"
+        }
       }
     },
     "event": {
@@ -608,6 +641,9 @@
     },
     "sea_unreachable": {
       "message": "The Smart Energy Agent add-on cannot be reached."
+    },
+    "sea_command_refused": {
+      "message": "Smart Energy Agent refused the command."
     }
   },
   "system_health": {

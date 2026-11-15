@@ -4,6 +4,16 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.4.8b6
+
+### SEA commands
+`POST /api/v1/command` with `{"key", "value"}` sets a writable key. Switches for
+the 8 strategies with their own on/off (`SEA_SWITCHES`, unique id
+`sea_<key>_switch`, on while the enum state is not `off`) and a select for
+`regelung` (`sea_regelung_select`). No optimistic state: SEA pushes the new
+state as an update. A 400 raises `sea_command_refused`, other failures
+`sea_unreachable`; the enum sensors stay.
+
 ## v3.4.8b5
 
 ### SEA strategy keys

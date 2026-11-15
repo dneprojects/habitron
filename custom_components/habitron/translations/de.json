@@ -365,6 +365,30 @@
       },
       "climate_ctl": {
         "name": "Klimaregler"
+      },
+      "strategie_self_consumption": {
+        "name": "PV-Überschuss"
+      },
+      "strategie_setpoint_boost": {
+        "name": "WP-Anhebung"
+      },
+      "strategie_tariff_shift": {
+        "name": "Dyn. Tarif"
+      },
+      "strategie_setback": {
+        "name": "Absenkung"
+      },
+      "strategie_circuit_guide": {
+        "name": "HK-Führung"
+      },
+      "strategie_battery_cover": {
+        "name": "Batteriedeckung"
+      },
+      "strategie_peak_shaving": {
+        "name": "Bezugs-Deckel"
+      },
+      "strategie_feed_in_limit": {
+        "name": "Einspeise-Deckel"
       }
     },
     "select": {
@@ -394,6 +418,15 @@
       },
       "stored_message": {
         "name": "Meldungsliste"
+      },
+      "regelung": {
+        "name": "Regelung",
+        "state": {
+          "auto": "Automatik",
+          "assisted": "Beratend",
+          "rules": "Nur Regeln",
+          "manual": "Manuell"
+        }
       }
     },
     "event": {
@@ -611,6 +644,9 @@
     },
     "sea_unreachable": {
       "message": "Das Add-on Smart Energy Agent ist nicht erreichbar."
+    },
+    "sea_command_refused": {
+      "message": "Der Smart Energy Agent hat den Befehl abgelehnt."
     }
   },
   "system_health": {

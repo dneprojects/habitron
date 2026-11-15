@@ -3,6 +3,9 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.4.8b6
+- Beta. New: switches for the eight SEA strategies and a select for the SEA control level.
+
 ## v3.4.8b5
 - Beta. New: one SEA sensor per strategy (off, prerequisite missing, ready, acting) for automations.
 

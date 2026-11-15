@@ -14,11 +14,13 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
     BinarySensorEntityDescription,
 )
+from homeassistant.components.select import SelectEntity, SelectEntityDescription
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
     SensorEntityDescription,
 )
+from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_RESTORED,
@@ -30,6 +32,7 @@ from homeassistant.const import (
     UnitOfEnergy,
 )
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -45,7 +48,12 @@ from .const import DOMAIN, SEA_ID
 
 _LOGGER = logging.getLogger(__name__)
 
-SEA_PLATFORMS: Final = [Platform.BINARY_SENSOR, Platform.SENSOR]
+SEA_PLATFORMS: Final = [
+    Platform.BINARY_SENSOR,
+    Platform.SELECT,
+    Platform.SENSOR,
+    Platform.SWITCH,
+]
 SEA_NAME: Final = "Smart Energy Agent"
 _RETRY_MIN: Final = 5
 _RETRY_MAX: Final = 300
@@ -62,6 +70,10 @@ type SeaConfigEntry = ConfigEntry[SeaCoordinator]
 
 class SeaError(Exception):
     """SEA could not be reached or answered unusably."""
+
+
+class SeaCommandError(SeaError):
+    """SEA refused a command."""
 
 
 class SeaClient:
@@ -98,6 +110,21 @@ class SeaClient:
     async def get_state(self) -> dict[str, Any]:
         """Return all current values."""
         return await self._get_object("state")
+
+    async def command(self, key: str, value: str | bool) -> None:
+        """Set a writable key; the new state follows as a push update."""
+        try:
+            async with self._session.post(
+                f"{self._base}/command",
+                headers=self._headers,
+                json={"key": key, "value": value},
+                timeout=_TIMEOUT,
+            ) as response:
+                if response.status == 400:
+                    raise SeaCommandError(f"{key}: {await response.text()}")
+                response.raise_for_status()
+        except (aiohttp.ClientError, TimeoutError) as err:
+            raise SeaError(f"command {key}: {err!r}") from err
 
     async def messages(self) -> AsyncIterator[dict[str, Any]]:
         """Yield the push messages until the connection ends."""
@@ -442,3 +469,92 @@ class SeaBinarySensor(SeaEntity, BinarySensorEntity):
         """Return the flag."""
         raw = self._raw
         return raw if isinstance(raw, bool) else None
+
+
+# Strategies SEA can switch on and off; the others are display only.
+SEA_SWITCHES: Final[tuple[SwitchEntityDescription, ...]] = tuple(
+    SwitchEntityDescription(
+        key=f"strategie_{strategy}", translation_key=f"strategie_{strategy}"
+    )
+    for strategy in (
+        "self_consumption",
+        "setpoint_boost",
+        "tariff_shift",
+        "setback",
+        "circuit_guide",
+        "battery_cover",
+        "peak_shaving",
+        "feed_in_limit",
+    )
+)
+SEA_SELECTS: Final[tuple[SelectEntityDescription, ...]] = (
+    SelectEntityDescription(
+        key="regelung",
+        translation_key="regelung",
+        options=["auto", "assisted", "rules", "manual"],
+    ),
+)
+
+
+async def _async_command(
+    coordinator: SeaCoordinator, key: str, value: str | bool
+) -> None:
+    """Send a command; the push update brings the new state."""
+    try:
+        await coordinator.client.command(key, value)
+    except SeaCommandError as err:
+        raise HomeAssistantError(
+            translation_domain=DOMAIN, translation_key="sea_command_refused"
+        ) from err
+    except SeaError as err:
+        raise HomeAssistantError(
+            translation_domain=DOMAIN, translation_key="sea_unreachable"
+        ) from err
+
+
+class SeaSwitch(SeaEntity, SwitchEntity):
+    """SEA strategy on or off."""
+
+    def __init__(
+        self, coordinator: SeaCoordinator, description: SwitchEntityDescription
+    ) -> None:
+        """Initialize the switch."""
+        self.entity_description = description
+        super().__init__(coordinator, description.key)
+        self._attr_unique_id = f"{SEA_ID}_{description.key}_switch"
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return whether the strategy is on, whatever its state."""
+        raw = self._raw
+        return None if raw is None else raw != "off"
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Switch the strategy on."""
+        await _async_command(self.coordinator, self.entity_description.key, True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Switch the strategy off; SEA keeps its settings."""
+        await _async_command(self.coordinator, self.entity_description.key, False)
+
+
+class SeaSelect(SeaEntity, SelectEntity):
+    """SEA control level."""
+
+    def __init__(
+        self, coordinator: SeaCoordinator, description: SelectEntityDescription
+    ) -> None:
+        """Initialize the select."""
+        self.entity_description = description
+        super().__init__(coordinator, description.key)
+        self._attr_unique_id = f"{SEA_ID}_{description.key}_select"
+
+    @property
+    def current_option(self) -> str | None:
+        """Return the current level."""
+        raw = self._raw
+        return raw if raw in self.options else None
+
+    async def async_select_option(self, option: str) -> None:
+        """Set the level."""
+        await _async_command(self.coordinator, self.entity_description.key, option)
