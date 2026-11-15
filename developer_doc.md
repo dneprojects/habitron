@@ -4,6 +4,13 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.4.8b5
+
+### SEA strategy keys
+13 additive enum keys of contract v1, `strategie_<strategy>` with `off` /
+`missing` / `ready` / `acting` (`SEA_STRATEGIES`). Plain enum sensors, enabled
+by default, no state class.
+
 ## v3.4.8b4
 
 ### SEA key `tarif`

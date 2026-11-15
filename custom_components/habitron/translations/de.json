@@ -237,6 +237,123 @@
           "ht_nt": "HT/NT",
           "dynamic": "Dynamisch"
         }
+      },
+      "strategie_self_consumption": {
+        "name": "Strategie PV-Überschuss",
+        "state": {
+          "off": "Aus",
+          "missing": "Voraussetzung fehlt",
+          "ready": "Bereit",
+          "acting": "Wirkt"
+        }
+      },
+      "strategie_setpoint_boost": {
+        "name": "Strategie WP-Anhebung",
+        "state": {
+          "off": "Aus",
+          "missing": "Voraussetzung fehlt",
+          "ready": "Bereit",
+          "acting": "Wirkt"
+        }
+      },
+      "strategie_tariff_shift": {
+        "name": "Strategie Dyn. Tarif",
+        "state": {
+          "off": "Aus",
+          "missing": "Voraussetzung fehlt",
+          "ready": "Bereit",
+          "acting": "Wirkt"
+        }
+      },
+      "strategie_setback": {
+        "name": "Strategie Absenkung",
+        "state": {
+          "off": "Aus",
+          "missing": "Voraussetzung fehlt",
+          "ready": "Bereit",
+          "acting": "Wirkt"
+        }
+      },
+      "strategie_circuit_guide": {
+        "name": "Strategie HK-Führung",
+        "state": {
+          "off": "Aus",
+          "missing": "Voraussetzung fehlt",
+          "ready": "Bereit",
+          "acting": "Wirkt"
+        }
+      },
+      "strategie_battery_cover": {
+        "name": "Strategie Batteriedeckung",
+        "state": {
+          "off": "Aus",
+          "missing": "Voraussetzung fehlt",
+          "ready": "Bereit",
+          "acting": "Wirkt"
+        }
+      },
+      "strategie_optimizer": {
+        "name": "Strategie Optimierer",
+        "state": {
+          "off": "Aus",
+          "missing": "Voraussetzung fehlt",
+          "ready": "Bereit",
+          "acting": "Wirkt"
+        }
+      },
+      "strategie_grid_limits": {
+        "name": "Strategie Netzgrenze",
+        "state": {
+          "off": "Aus",
+          "missing": "Voraussetzung fehlt",
+          "ready": "Bereit",
+          "acting": "Wirkt"
+        }
+      },
+      "strategie_peak_shaving": {
+        "name": "Strategie Bezugs-Deckel",
+        "state": {
+          "off": "Aus",
+          "missing": "Voraussetzung fehlt",
+          "ready": "Bereit",
+          "acting": "Wirkt"
+        }
+      },
+      "strategie_feed_in_limit": {
+        "name": "Strategie Einspeise-Deckel",
+        "state": {
+          "off": "Aus",
+          "missing": "Voraussetzung fehlt",
+          "ready": "Bereit",
+          "acting": "Wirkt"
+        }
+      },
+      "strategie_emergency_reserve": {
+        "name": "Strategie Notstrom-Reserve",
+        "state": {
+          "off": "Aus",
+          "missing": "Voraussetzung fehlt",
+          "ready": "Bereit",
+          "acting": "Wirkt"
+        }
+      },
+      "strategie_battery_care": {
+        "name": "Strategie Batteriepflege",
+        "state": {
+          "off": "Aus",
+          "missing": "Voraussetzung fehlt",
+          "ready": "Bereit",
+          "acting": "Wirkt"
+        }
+      },
+      "strategie_rules": {
+        "name": "Strategie Eigene Regeln",
+        "state": {
+          "off": "Aus",
+          "missing": "Voraussetzung fehlt",
+          "ready": "Bereit",
+          "acting": "Wirkt"
+        }
       }
     },
     "switch": {

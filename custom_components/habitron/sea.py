@@ -277,6 +277,22 @@ class SeaSensorEntityDescription(SensorEntityDescription):
     """SEA sensor; ``key`` is the key of the SEA contract."""
 
 
+SEA_STRATEGIES: Final = (
+    "self_consumption",
+    "setpoint_boost",
+    "tariff_shift",
+    "setback",
+    "circuit_guide",
+    "battery_cover",
+    "optimizer",
+    "grid_limits",
+    "peak_shaving",
+    "feed_in_limit",
+    "emergency_reserve",
+    "battery_care",
+    "rules",
+)
+
 SEA_SENSORS: Final[tuple[SeaSensorEntityDescription, ...]] = (
     *(
         SeaSensorEntityDescription(
@@ -315,6 +331,15 @@ SEA_SENSORS: Final[tuple[SeaSensorEntityDescription, ...]] = (
         translation_key="regelung",
         device_class=SensorDeviceClass.ENUM,
         options=["auto", "assisted", "rules", "manual"],
+    ),
+    *(
+        SeaSensorEntityDescription(
+            key=f"strategie_{strategy}",
+            translation_key=f"strategie_{strategy}",
+            device_class=SensorDeviceClass.ENUM,
+            options=["off", "missing", "ready", "acting"],
+        )
+        for strategy in SEA_STRATEGIES
     ),
     SeaSensorEntityDescription(
         key="tarif",

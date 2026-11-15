@@ -151,6 +151,45 @@
       },
       "tarif": {
         "default": "mdi:cash-clock"
+      },
+      "strategie_self_consumption": {
+        "default": "mdi:strategy"
+      },
+      "strategie_setpoint_boost": {
+        "default": "mdi:strategy"
+      },
+      "strategie_tariff_shift": {
+        "default": "mdi:strategy"
+      },
+      "strategie_setback": {
+        "default": "mdi:strategy"
+      },
+      "strategie_circuit_guide": {
+        "default": "mdi:strategy"
+      },
+      "strategie_battery_cover": {
+        "default": "mdi:strategy"
+      },
+      "strategie_optimizer": {
+        "default": "mdi:strategy"
+      },
+      "strategie_grid_limits": {
+        "default": "mdi:strategy"
+      },
+      "strategie_peak_shaving": {
+        "default": "mdi:strategy"
+      },
+      "strategie_feed_in_limit": {
+        "default": "mdi:strategy"
+      },
+      "strategie_emergency_reserve": {
+        "default": "mdi:strategy"
+      },
+      "strategie_battery_care": {
+        "default": "mdi:strategy"
+      },
+      "strategie_rules": {
+        "default": "mdi:strategy"
       }
     },
     "switch": {

@@ -3,6 +3,9 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.4.8b5
+- Beta. New: one SEA sensor per strategy (off, prerequisite missing, ready, acting) for automations.
+
 ## v3.4.8b4
 - Beta. New: SEA sensor "Tarif"; at a fixed price the two cheap-window sensors are hidden.
 

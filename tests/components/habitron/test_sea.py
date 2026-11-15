@@ -17,6 +17,7 @@ from custom_components.habitron.diagnostics import (
     async_get_config_entry_diagnostics,
     async_get_device_diagnostics,
 )
+from custom_components.habitron.sea import SEA_STRATEGIES
 from homeassistant.config_entries import (
     SOURCE_HASSIO,
     ConfigEntryDisabler,
@@ -72,6 +73,7 @@ STATE: dict[str, Any] = {
     "einsparung_heute": None,
     "hinweise": 2,
     "regelung": "auto",
+    **{f"strategie_{strategy}": "ready" for strategy in SEA_STRATEGIES},
 }
 
 
@@ -290,7 +292,7 @@ async def test_device_and_entities(
     assert device.model == "Smart Energy Agent"
     assert device.sw_version == "0.16.0"
     assert device.configuration_url == "homeassistant://app/sea"
-    assert len(er.async_entries_for_device(entity_registry, device.id)) == 16
+    assert len(er.async_entries_for_device(entity_registry, device.id)) == 29
 
     assert entity_registry.async_get(PV).unique_id == "sea_pv_prognose_heute"
     assert _state(hass, PV) == "12.4"
@@ -525,7 +527,11 @@ async def test_b1_entities_move_to_the_sea_entry(
         model="SEA",
     )
     binary = {"guenstig", "einspeisung_gesperrt", "14a_gedimmt"}
-    b1_keys = [key for key in STATE if key not in B1_MISSING] + ["veraltet"]
+    b1_keys = [
+        key
+        for key in STATE
+        if key not in B1_MISSING and not key.startswith("strategie_")
+    ] + ["veraltet"]
     for key in b1_keys:
         platform = "binary_sensor" if key in binary else "sensor"
         entity_registry.async_get_or_create(
@@ -547,7 +553,7 @@ async def test_b1_entities_move_to_the_sea_entry(
     await hass.async_block_till_done()
 
     entities = er.async_entries_for_config_entry(entity_registry, entry.entry_id)
-    assert len(entities) == 16
+    assert len(entities) == 29
     assert _state(hass, "sensor.sea_pv_prognose_heute") == "12.4"
     assert _state(hass, "binary_sensor.sea_guenstig") == STATE_ON
     assert _state(hass, "sensor.sea_akku_plan") == "charge_pv"
@@ -649,3 +655,23 @@ async def test_fixed_tariff_at_start_hides_the_windows(
         _hidden_by(entity_registry, entity_id) is er.RegistryEntryHider.INTEGRATION
         for entity_id in WINDOWS
     )
+
+
+async def test_strategy_states(
+    hass: HomeAssistant, sea_entry: MockConfigEntry, sea: FakeSea
+) -> None:
+    """Each strategy is an enum sensor that follows the pushed state."""
+    entity_id = "sensor.sea_strategy_pv_surplus"
+    assert _state(hass, entity_id) == "ready"
+    assert hass.states.get(entity_id).attributes["options"] == [
+        "off",
+        "missing",
+        "ready",
+        "acting",
+    ]
+
+    await sea.send(
+        {"type": "update", "values": {"strategie_self_consumption": "acting"}}
+    )
+    await _until(lambda: _state(hass, entity_id) == "acting")
+    assert _state(hass, "sensor.sea_strategy_optimizer") == "ready"
