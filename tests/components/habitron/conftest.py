@@ -7,6 +7,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from habitron_client import HabitronClient, Router, SmartHub
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.syrupy import HomeAssistantSnapshotExtension
+from syrupy.assertion import SnapshotAssertion
 
 from custom_components.habitron.const import DOMAIN
 from homeassistant.core import HomeAssistant
@@ -52,6 +54,12 @@ def fake_gethostbyname(host: str) -> str:
     if host.count(".") == 3 and all(part.isdigit() for part in host.split(".")):
         return host
     return "192.168.1.10"
+
+
+@pytest.fixture
+def snapshot(snapshot: SnapshotAssertion) -> SnapshotAssertion:
+    """Use the HA extension whatever order the plugins load in."""
+    return snapshot.use_extension(HomeAssistantSnapshotExtension)
 
 
 @pytest.fixture(autouse=True)
