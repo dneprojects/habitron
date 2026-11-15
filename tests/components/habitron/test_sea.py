@@ -47,6 +47,7 @@ B1_MISSING = {
     "pv_prognose_heute_rest",
     "naechstes_guenstiges_fenster_ende",
     "akku_plan_bis",
+    "tarif",
 }
 PV = "sensor.sea_pv_forecast_today"
 PLAN = "sensor.sea_battery_plan"
@@ -60,6 +61,7 @@ STATE: dict[str, Any] = {
     "pv_prognose_morgen": 20.0,
     "strompreis": 18.2,
     "guenstig": True,
+    "tarif": "dynamic",
     "naechstes_guenstiges_fenster": "2026-11-15T01:00:00+00:00",
     "naechstes_guenstiges_fenster_ende": "2026-11-15T05:00:00+00:00",
     "akku_plan": "charge_pv",
@@ -288,7 +290,7 @@ async def test_device_and_entities(
     assert device.model == "Smart Energy Agent"
     assert device.sw_version == "0.16.0"
     assert device.configuration_url == "homeassistant://app/sea"
-    assert len(er.async_entries_for_device(entity_registry, device.id)) == 15
+    assert len(er.async_entries_for_device(entity_registry, device.id)) == 16
 
     assert entity_registry.async_get(PV).unique_id == "sea_pv_prognose_heute"
     assert _state(hass, PV) == "12.4"
@@ -545,7 +547,7 @@ async def test_b1_entities_move_to_the_sea_entry(
     await hass.async_block_till_done()
 
     entities = er.async_entries_for_config_entry(entity_registry, entry.entry_id)
-    assert len(entities) == 15
+    assert len(entities) == 16
     assert _state(hass, "sensor.sea_pv_prognose_heute") == "12.4"
     assert _state(hass, "binary_sensor.sea_guenstig") == STATE_ON
     assert _state(hass, "sensor.sea_akku_plan") == "charge_pv"
@@ -570,3 +572,80 @@ async def test_info_that_is_not_an_object_counts_as_unreachable(
 
     assert not await hass.config_entries.async_setup(entry.entry_id)
     assert entry.state is ConfigEntryState.SETUP_RETRY
+
+
+WINDOWS = (WINDOW, "sensor.sea_next_cheap_window_end")
+
+
+def _hidden_by(
+    entity_registry: er.EntityRegistry, entity_id: str
+) -> er.RegistryEntryHider | None:
+    entry = entity_registry.async_get(entity_id)
+    assert entry is not None
+    return entry.hidden_by
+
+
+async def test_fixed_tariff_hides_the_windows(
+    hass: HomeAssistant,
+    sea_entry: MockConfigEntry,
+    sea: FakeSea,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """A fixed price hides the window entities, another tariff shows them again."""
+    assert _state(hass, "sensor.sea_tariff") == "dynamic"
+    assert all(_hidden_by(entity_registry, entity_id) is None for entity_id in WINDOWS)
+
+    await sea.send({"type": "update", "values": {"tarif": "fixed"}})
+    await _until(lambda: _state(hass, "sensor.sea_tariff") == "fixed")
+    assert all(
+        _hidden_by(entity_registry, entity_id) is er.RegistryEntryHider.INTEGRATION
+        for entity_id in WINDOWS
+    )
+
+    await sea.send({"type": "update", "values": {"tarif": None}})
+    await _until(lambda: _state(hass, "sensor.sea_tariff") == STATE_UNKNOWN)
+    assert all(
+        _hidden_by(entity_registry, entity_id) is er.RegistryEntryHider.INTEGRATION
+        for entity_id in WINDOWS
+    )
+
+    await sea.send({"type": "update", "values": {"tarif": "ht_nt"}})
+    await _until(lambda: _state(hass, "sensor.sea_tariff") == "ht_nt")
+    assert all(_hidden_by(entity_registry, entity_id) is None for entity_id in WINDOWS)
+
+
+async def test_a_user_hidden_window_stays_hidden(
+    hass: HomeAssistant,
+    sea_entry: MockConfigEntry,
+    sea: FakeSea,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """The tariff never changes what the user hid or showed."""
+    entity_registry.async_update_entity(WINDOW, hidden_by=er.RegistryEntryHider.USER)
+
+    await sea.send({"type": "update", "values": {"tarif": "fixed"}})
+    await _until(lambda: _state(hass, "sensor.sea_tariff") == "fixed")
+    await sea.send({"type": "update", "values": {"tarif": "dynamic"}})
+    await _until(lambda: _state(hass, "sensor.sea_tariff") == "dynamic")
+
+    assert _hidden_by(entity_registry, WINDOW) is er.RegistryEntryHider.USER
+
+
+async def test_fixed_tariff_at_start_hides_the_windows(
+    hass: HomeAssistant,
+    setup_homeassistant: None,
+    sea: FakeSea,
+    sea_server: TestServer,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """A fixed price reported at setup hides the windows right away."""
+    sea.state["tarif"] = "fixed"
+    entry = _sea_entry(sea_server)
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert all(
+        _hidden_by(entity_registry, entity_id) is er.RegistryEntryHider.INTEGRATION
+        for entity_id in WINDOWS
+    )

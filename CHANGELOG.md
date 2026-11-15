@@ -3,6 +3,9 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.4.8b4
+- Beta. New: SEA sensor "Tarif"; at a fixed price the two cheap-window sensors are hidden.
+
 ## v3.4.8b3
 - Beta. Fixed: only 3 of the 15 SEA entities appeared; the entities from 3.4.8b1 now move to the SEA device and keep their ids.
 

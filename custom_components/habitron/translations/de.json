@@ -229,6 +229,14 @@
       },
       "hinweise": {
         "name": "Offene Hinweise"
+      },
+      "tarif": {
+        "name": "Tarif",
+        "state": {
+          "fixed": "Festpreis",
+          "ht_nt": "HT/NT",
+          "dynamic": "Dynamisch"
+        }
       }
     },
     "switch": {

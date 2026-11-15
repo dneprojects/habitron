@@ -229,6 +229,14 @@
       },
       "hinweise": {
         "name": "Open hints"
+      },
+      "tarif": {
+        "name": "Tariff",
+        "state": {
+          "fixed": "Fixed price",
+          "ht_nt": "Peak/off-peak",
+          "dynamic": "Dynamic"
+        }
       }
     },
     "switch": {

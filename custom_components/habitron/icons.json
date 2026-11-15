@@ -148,6 +148,9 @@
       },
       "hinweise": {
         "default": "mdi:lightbulb-alert"
+      },
+      "tarif": {
+        "default": "mdi:cash-clock"
       }
     },
     "switch": {

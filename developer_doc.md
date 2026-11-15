@@ -4,6 +4,15 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.4.8b4
+
+### SEA key `tarif`
+Additive key of contract v1: enum `fixed` / `ht_nt` / `dynamic`. While it is
+`fixed`, `_async_hide_windows` sets `hidden_by=INTEGRATION` on the two
+cheap-window sensors and clears it for another tariff; `null` changes nothing
+and `hidden_by=USER` is never touched. It runs as a coordinator listener and
+once at setup.
+
 ## v3.4.8b3
 
 ### SEA takes over the b1 entities

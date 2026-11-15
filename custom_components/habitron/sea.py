@@ -29,7 +29,7 @@ from homeassistant.const import (
     Platform,
     UnitOfEnergy,
 )
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -52,6 +52,10 @@ _RETRY_MAX: Final = 300
 _HEARTBEAT: Final = 30
 _TIMEOUT: Final = aiohttp.ClientTimeout(total=10)
 _URL_SCHEMES: Final = ("http://", "https://", "homeassistant://")
+_WINDOW_KEYS: Final = (
+    "naechstes_guenstiges_fenster",
+    "naechstes_guenstiges_fenster_ende",
+)
 
 type SeaConfigEntry = ConfigEntry[SeaCoordinator]
 
@@ -194,10 +198,39 @@ async def async_setup_sea_entry(hass: HomeAssistant, entry: SeaConfigEntry) -> b
     # The b1 service stored its entity list here; nothing reads it any more.
     await Store(hass, 1, f"{DOMAIN}.sea").async_remove()
     await hass.config_entries.async_forward_entry_setups(entry, SEA_PLATFORMS)
+
+    @callback
+    def _hide_windows() -> None:
+        _async_hide_windows(hass, coordinator)
+
+    entry.async_on_unload(coordinator.async_add_listener(_hide_windows))
+    _hide_windows()
     entry.async_create_background_task(
         hass, coordinator.async_listen(), "habitron_sea_listen"
     )
     return True
+
+
+@callback
+def _async_hide_windows(hass: HomeAssistant, coordinator: SeaCoordinator) -> None:
+    """Hide the cheap-window entities while the tariff has a fixed price."""
+    tarif = (coordinator.data or {}).get("tarif")
+    if tarif is None:
+        return
+    hidden_by = er.RegistryEntryHider.INTEGRATION if tarif == "fixed" else None
+    registry = er.async_get(hass)
+    for key in _WINDOW_KEYS:
+        entity_id = registry.async_get_entity_id(
+            Platform.SENSOR, DOMAIN, f"{SEA_ID}_{key}"
+        )
+        if entity_id is None:
+            continue
+        current = registry.async_get(entity_id)
+        # A user's own choice stays.
+        if current is None or current.hidden_by is er.RegistryEntryHider.USER:
+            continue
+        if current.hidden_by != hidden_by:
+            registry.async_update_entity(entity_id, hidden_by=hidden_by)
 
 
 def _async_adopt_b1(hass: HomeAssistant, entry: SeaConfigEntry) -> None:
@@ -282,6 +315,12 @@ SEA_SENSORS: Final[tuple[SeaSensorEntityDescription, ...]] = (
         translation_key="regelung",
         device_class=SensorDeviceClass.ENUM,
         options=["auto", "assisted", "rules", "manual"],
+    ),
+    SeaSensorEntityDescription(
+        key="tarif",
+        translation_key="tarif",
+        device_class=SensorDeviceClass.ENUM,
+        options=["fixed", "ht_nt", "dynamic"],
     ),
     *(
         SeaSensorEntityDescription(
