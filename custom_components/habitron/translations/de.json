@@ -86,13 +86,13 @@
       "module_health": {
         "name": "Zustand"
       },
-      "guenstig": {
+      "cheap_now": {
         "name": "Günstig jetzt"
       },
-      "einspeisung_gesperrt": {
+      "feed_in_blocked": {
         "name": "Einspeisung gesperrt"
       },
-      "14a_gedimmt": {
+      "dimmed_14a": {
         "name": "Nach §14a gedimmt"
       }
     },
@@ -180,25 +180,25 @@
       "airquality": {
         "name": "Luftqualität"
       },
-      "pv_prognose_heute": {
+      "pv_forecast_today": {
         "name": "PV-Prognose heute"
       },
-      "pv_prognose_heute_rest": {
+      "pv_forecast_today_remaining": {
         "name": "PV-Prognose Rest heute"
       },
-      "pv_prognose_morgen": {
+      "pv_forecast_tomorrow": {
         "name": "PV-Prognose morgen"
       },
-      "strompreis": {
+      "electricity_price": {
         "name": "Strompreis"
       },
-      "naechstes_guenstiges_fenster": {
+      "next_cheap_window": {
         "name": "Nächstes günstiges Fenster"
       },
-      "naechstes_guenstiges_fenster_ende": {
+      "next_cheap_window_end": {
         "name": "Ende nächstes günstiges Fenster"
       },
-      "akku_plan": {
+      "battery_plan": {
         "name": "Akku-Plan",
         "state": {
           "charge_pv": "Laden aus PV",
@@ -209,28 +209,19 @@
           "idle": "Ruhe"
         }
       },
-      "akku_plan_bis": {
+      "battery_plan_until": {
         "name": "Akku-Plan bis"
       },
-      "regelung": {
-        "name": "Regelung",
-        "state": {
-          "auto": "Automatik",
-          "assisted": "Beratend",
-          "rules": "Nur Regeln",
-          "manual": "Manuell"
-        }
-      },
-      "kosten_heute": {
+      "cost_today": {
         "name": "Kosten heute"
       },
-      "einsparung_heute": {
+      "savings_today": {
         "name": "Einsparung heute"
       },
-      "hinweise": {
+      "open_hints": {
         "name": "Offene Hinweise"
       },
-      "tarif": {
+      "tariff": {
         "name": "Tarif",
         "state": {
           "fixed": "Festpreis",
@@ -238,7 +229,7 @@
           "dynamic": "Dynamisch"
         }
       },
-      "strategie_self_consumption": {
+      "strategy_self_consumption": {
         "name": "Strategie PV-Überschuss",
         "state": {
           "off": "Aus",
@@ -247,7 +238,7 @@
           "acting": "Wirkt"
         }
       },
-      "strategie_setpoint_boost": {
+      "strategy_setpoint_boost": {
         "name": "Strategie WP-Anhebung",
         "state": {
           "off": "Aus",
@@ -256,7 +247,7 @@
           "acting": "Wirkt"
         }
       },
-      "strategie_tariff_shift": {
+      "strategy_tariff_shift": {
         "name": "Strategie Dyn. Tarif",
         "state": {
           "off": "Aus",
@@ -265,7 +256,7 @@
           "acting": "Wirkt"
         }
       },
-      "strategie_setback": {
+      "strategy_setback": {
         "name": "Strategie Absenkung",
         "state": {
           "off": "Aus",
@@ -274,7 +265,7 @@
           "acting": "Wirkt"
         }
       },
-      "strategie_circuit_guide": {
+      "strategy_circuit_guide": {
         "name": "Strategie HK-Führung",
         "state": {
           "off": "Aus",
@@ -283,7 +274,7 @@
           "acting": "Wirkt"
         }
       },
-      "strategie_battery_cover": {
+      "strategy_battery_cover": {
         "name": "Strategie Batteriedeckung",
         "state": {
           "off": "Aus",
@@ -292,7 +283,7 @@
           "acting": "Wirkt"
         }
       },
-      "strategie_optimizer": {
+      "strategy_optimizer": {
         "name": "Strategie Optimierer",
         "state": {
           "off": "Aus",
@@ -301,7 +292,7 @@
           "acting": "Wirkt"
         }
       },
-      "strategie_grid_limits": {
+      "strategy_grid_limits": {
         "name": "Strategie Netzgrenze",
         "state": {
           "off": "Aus",
@@ -310,7 +301,7 @@
           "acting": "Wirkt"
         }
       },
-      "strategie_peak_shaving": {
+      "strategy_peak_shaving": {
         "name": "Strategie Bezugs-Deckel",
         "state": {
           "off": "Aus",
@@ -319,7 +310,7 @@
           "acting": "Wirkt"
         }
       },
-      "strategie_feed_in_limit": {
+      "strategy_feed_in_limit": {
         "name": "Strategie Einspeise-Deckel",
         "state": {
           "off": "Aus",
@@ -328,7 +319,7 @@
           "acting": "Wirkt"
         }
       },
-      "strategie_emergency_reserve": {
+      "strategy_emergency_reserve": {
         "name": "Strategie Notstrom-Reserve",
         "state": {
           "off": "Aus",
@@ -337,7 +328,7 @@
           "acting": "Wirkt"
         }
       },
-      "strategie_battery_care": {
+      "strategy_battery_care": {
         "name": "Strategie Batteriepflege",
         "state": {
           "off": "Aus",
@@ -346,7 +337,7 @@
           "acting": "Wirkt"
         }
       },
-      "strategie_rules": {
+      "strategy_rules": {
         "name": "Strategie Eigene Regeln",
         "state": {
           "off": "Aus",
@@ -366,28 +357,28 @@
       "climate_ctl": {
         "name": "Klimaregler"
       },
-      "strategie_self_consumption": {
+      "strategy_self_consumption": {
         "name": "PV-Überschuss"
       },
-      "strategie_setpoint_boost": {
+      "strategy_setpoint_boost": {
         "name": "WP-Anhebung"
       },
-      "strategie_tariff_shift": {
+      "strategy_tariff_shift": {
         "name": "Dyn. Tarif"
       },
-      "strategie_setback": {
+      "strategy_setback": {
         "name": "Absenkung"
       },
-      "strategie_circuit_guide": {
+      "strategy_circuit_guide": {
         "name": "HK-Führung"
       },
-      "strategie_battery_cover": {
+      "strategy_battery_cover": {
         "name": "Batteriedeckung"
       },
-      "strategie_peak_shaving": {
+      "strategy_peak_shaving": {
         "name": "Bezugs-Deckel"
       },
-      "strategie_feed_in_limit": {
+      "strategy_feed_in_limit": {
         "name": "Einspeise-Deckel"
       }
     },
@@ -419,7 +410,7 @@
       "stored_message": {
         "name": "Meldungsliste"
       },
-      "regelung": {
+      "control_mode": {
         "name": "Regelung",
         "state": {
           "auto": "Automatik",

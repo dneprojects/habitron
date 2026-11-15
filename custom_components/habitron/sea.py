@@ -1,14 +1,12 @@
-"""Smart Energy Agent (SEA) add-on: client, coordinator and entities."""
+"""Smart Energy Agent (SEA) add-on: coordinator and entities."""
 
 import asyncio
-from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import datetime
-import json
 import logging
 from typing import Any, Final
 
-import aiohttp
+from habitron_client.sea import SeaClient, SeaCommandError, SeaError
 
 from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
@@ -23,7 +21,6 @@ from homeassistant.components.sensor import (
 from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
-    ATTR_RESTORED,
     CONF_HOST,
     CONF_PORT,
     CONF_TOKEN,
@@ -31,12 +28,11 @@ from homeassistant.const import (
     Platform,
     UnitOfEnergy,
 )
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
     DataUpdateCoordinator,
@@ -57,91 +53,9 @@ SEA_PLATFORMS: Final = [
 SEA_NAME: Final = "Smart Energy Agent"
 _RETRY_MIN: Final = 5
 _RETRY_MAX: Final = 300
-_HEARTBEAT: Final = 30
-_TIMEOUT: Final = aiohttp.ClientTimeout(total=10)
 _URL_SCHEMES: Final = ("http://", "https://", "homeassistant://")
-_WINDOW_KEYS: Final = (
-    "naechstes_guenstiges_fenster",
-    "naechstes_guenstiges_fenster_ende",
-)
 
 type SeaConfigEntry = ConfigEntry[SeaCoordinator]
-
-
-class SeaError(Exception):
-    """SEA could not be reached or answered unusably."""
-
-
-class SeaCommandError(SeaError):
-    """SEA refused a command."""
-
-
-class SeaClient:
-    """HTTP and WebSocket access to the SEA add-on API."""
-
-    def __init__(
-        self, session: aiohttp.ClientSession, host: str, port: int, token: str
-    ) -> None:
-        """Initialize the client."""
-        self._session = session
-        self._base = f"http://{host}:{port}/api/v1"
-        self._headers = {"Authorization": f"Bearer {token}"}
-
-    async def _get(self, path: str) -> Any:
-        try:
-            async with self._session.get(
-                f"{self._base}/{path}", headers=self._headers, timeout=_TIMEOUT
-            ) as response:
-                response.raise_for_status()
-                return await response.json()
-        except (aiohttp.ClientError, TimeoutError, ValueError) as err:
-            raise SeaError(f"{path}: {err!r}") from err
-
-    async def _get_object(self, path: str) -> dict[str, Any]:
-        data = await self._get(path)
-        if not isinstance(data, dict):
-            raise SeaError(f"{path}: not an object")
-        return data
-
-    async def get_info(self) -> dict[str, Any]:
-        """Return version, name and url of the add-on."""
-        return await self._get_object("info")
-
-    async def get_state(self) -> dict[str, Any]:
-        """Return all current values."""
-        return await self._get_object("state")
-
-    async def command(self, key: str, value: str | bool) -> None:
-        """Set a writable key; the new state follows as a push update."""
-        try:
-            async with self._session.post(
-                f"{self._base}/command",
-                headers=self._headers,
-                json={"key": key, "value": value},
-                timeout=_TIMEOUT,
-            ) as response:
-                if response.status == 400:
-                    raise SeaCommandError(f"{key}: {await response.text()}")
-                response.raise_for_status()
-        except (aiohttp.ClientError, TimeoutError) as err:
-            raise SeaError(f"command {key}: {err!r}") from err
-
-    async def messages(self) -> AsyncIterator[dict[str, Any]]:
-        """Yield the push messages until the connection ends."""
-        try:
-            async with self._session.ws_connect(
-                f"{self._base}/ws", headers=self._headers, heartbeat=_HEARTBEAT
-            ) as ws:
-                async for msg in ws:
-                    if msg.type is not aiohttp.WSMsgType.TEXT:
-                        break
-                    try:
-                        yield json.loads(msg.data)
-                    except ValueError:
-                        _LOGGER.debug("Ignoring unreadable SEA message")
-        except aiohttp.ClientError as err:
-            raise SeaError(f"ws: {err!r}") from err
-        raise SeaError("ws: connection closed")
 
 
 class SeaCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -215,83 +129,30 @@ class SeaCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 configuration_url=self.configuration_url,
             )
 
+    async def async_command(self, key: str, value: str | bool) -> None:
+        """Send a command; the push update brings the new state."""
+        try:
+            await self.client.command(key, value)
+        except SeaCommandError as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="sea_command_refused"
+            ) from err
+        except SeaError as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="sea_unreachable"
+            ) from err
+
 
 async def async_setup_sea_entry(hass: HomeAssistant, entry: SeaConfigEntry) -> bool:
     """Set up the SEA add-on entry."""
     coordinator = SeaCoordinator(hass, entry)
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
-    _async_adopt_b1(hass, entry)
-    # The b1 service stored its entity list here; nothing reads it any more.
-    await Store(hass, 1, f"{DOMAIN}.sea").async_remove()
     await hass.config_entries.async_forward_entry_setups(entry, SEA_PLATFORMS)
-
-    @callback
-    def _hide_windows() -> None:
-        _async_hide_windows(hass, coordinator)
-
-    entry.async_on_unload(coordinator.async_add_listener(_hide_windows))
-    _hide_windows()
     entry.async_create_background_task(
         hass, coordinator.async_listen(), "habitron_sea_listen"
     )
     return True
-
-
-@callback
-def _async_hide_windows(hass: HomeAssistant, coordinator: SeaCoordinator) -> None:
-    """Hide the cheap-window entities while the tariff has a fixed price."""
-    tarif = (coordinator.data or {}).get("tarif")
-    if tarif is None:
-        return
-    hidden_by = er.RegistryEntryHider.INTEGRATION if tarif == "fixed" else None
-    registry = er.async_get(hass)
-    for key in _WINDOW_KEYS:
-        entity_id = registry.async_get_entity_id(
-            Platform.SENSOR, DOMAIN, f"{SEA_ID}_{key}"
-        )
-        if entity_id is None:
-            continue
-        current = registry.async_get(entity_id)
-        # A user's own choice stays.
-        if current is None or current.hidden_by is er.RegistryEntryHider.USER:
-            continue
-        if current.hidden_by != hidden_by:
-            registry.async_update_entity(entity_id, hidden_by=hidden_by)
-
-
-def _async_adopt_b1(hass: HomeAssistant, entry: SeaConfigEntry) -> None:
-    """Take over the entities and the device of the b1 service."""
-    platforms = {description.key: Platform.SENSOR for description in SEA_SENSORS}
-    platforms |= {
-        description.key: Platform.BINARY_SENSOR for description in SEA_BINARY_SENSORS
-    }
-    entity_registry = er.async_get(hass)
-    for item in list(entity_registry.entities.values()):
-        if (
-            item.platform != DOMAIN
-            or item.config_entry_id == entry.entry_id
-            or not item.unique_id.startswith(f"{SEA_ID}_")
-        ):
-            continue
-        if platforms.get(item.unique_id.removeprefix(f"{SEA_ID}_")) == item.domain:
-            entity_registry.async_update_entity(
-                item.entity_id, config_entry_id=entry.entry_id
-            )
-        else:
-            entity_registry.async_remove(item.entity_id)
-    # SEA posts plain states under these ids while it has no connection.
-    for item in er.async_entries_for_config_entry(entity_registry, entry.entry_id):
-        state = hass.states.get(item.entity_id)
-        if state is not None and ATTR_RESTORED not in state.attributes:
-            hass.states.async_remove(item.entity_id)
-    device_registry = dr.async_get(hass)
-    device = device_registry.async_get_device({(DOMAIN, SEA_ID)})
-    if device is None or device.config_entries == {entry.entry_id}:
-        return
-    device_registry.async_update_device(device.id, add_config_entry_id=entry.entry_id)
-    for other in device.config_entries - {entry.entry_id}:
-        device_registry.async_update_device(device.id, remove_config_entry_id=other)
 
 
 async def async_unload_sea_entry(hass: HomeAssistant, entry: SeaConfigEntry) -> bool:
@@ -319,50 +180,61 @@ SEA_STRATEGIES: Final = (
     "battery_care",
     "rules",
 )
+# Strategies with their own on/off in SEA.
+SEA_SWITCHABLE: Final = (
+    "self_consumption",
+    "setpoint_boost",
+    "tariff_shift",
+    "setback",
+    "circuit_guide",
+    "battery_cover",
+    "peak_shaving",
+    "feed_in_limit",
+)
 
 SEA_SENSORS: Final[tuple[SeaSensorEntityDescription, ...]] = (
     *(
         SeaSensorEntityDescription(
             key=key,
-            translation_key=key,
+            translation_key=translation_key,
             device_class=SensorDeviceClass.ENERGY,
             native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
             suggested_display_precision=1,
         )
-        for key in ("pv_prognose_heute", "pv_prognose_heute_rest", "pv_prognose_morgen")
+        for key, translation_key in (
+            ("pv_prognose_heute", "pv_forecast_today"),
+            ("pv_prognose_heute_rest", "pv_forecast_today_remaining"),
+            ("pv_prognose_morgen", "pv_forecast_tomorrow"),
+        )
     ),
     SeaSensorEntityDescription(
         key="strompreis",
-        translation_key="strompreis",
+        translation_key="electricity_price",
         native_unit_of_measurement="ct/kWh",
         suggested_display_precision=1,
     ),
     *(
         SeaSensorEntityDescription(
-            key=key, translation_key=key, device_class=SensorDeviceClass.TIMESTAMP
+            key=key,
+            translation_key=translation_key,
+            device_class=SensorDeviceClass.TIMESTAMP,
         )
-        for key in (
-            "naechstes_guenstiges_fenster",
-            "naechstes_guenstiges_fenster_ende",
-            "akku_plan_bis",
+        for key, translation_key in (
+            ("naechstes_guenstiges_fenster", "next_cheap_window"),
+            ("naechstes_guenstiges_fenster_ende", "next_cheap_window_end"),
+            ("akku_plan_bis", "battery_plan_until"),
         )
     ),
     SeaSensorEntityDescription(
         key="akku_plan",
-        translation_key="akku_plan",
+        translation_key="battery_plan",
         device_class=SensorDeviceClass.ENUM,
         options=["charge_pv", "charge_grid", "discharge", "hold", "spare", "idle"],
-    ),
-    SeaSensorEntityDescription(
-        key="regelung",
-        translation_key="regelung",
-        device_class=SensorDeviceClass.ENUM,
-        options=["auto", "assisted", "rules", "manual"],
     ),
     *(
         SeaSensorEntityDescription(
             key=f"strategie_{strategy}",
-            translation_key=f"strategie_{strategy}",
+            translation_key=f"strategy_{strategy}",
             device_class=SensorDeviceClass.ENUM,
             options=["off", "missing", "ready", "acting"],
         )
@@ -370,26 +242,48 @@ SEA_SENSORS: Final[tuple[SeaSensorEntityDescription, ...]] = (
     ),
     SeaSensorEntityDescription(
         key="tarif",
-        translation_key="tarif",
+        translation_key="tariff",
         device_class=SensorDeviceClass.ENUM,
         options=["fixed", "ht_nt", "dynamic"],
     ),
     *(
         SeaSensorEntityDescription(
             key=key,
-            translation_key=key,
+            translation_key=translation_key,
             device_class=SensorDeviceClass.MONETARY,
             native_unit_of_measurement=CURRENCY_EURO,
             suggested_display_precision=2,
         )
-        for key in ("kosten_heute", "einsparung_heute")
+        for key, translation_key in (
+            ("kosten_heute", "cost_today"),
+            ("einsparung_heute", "savings_today"),
+        )
     ),
-    SeaSensorEntityDescription(key="hinweise", translation_key="hinweise"),
+    SeaSensorEntityDescription(key="hinweise", translation_key="open_hints"),
 )
 
 SEA_BINARY_SENSORS: Final[tuple[BinarySensorEntityDescription, ...]] = tuple(
-    BinarySensorEntityDescription(key=key, translation_key=key)
-    for key in ("guenstig", "einspeisung_gesperrt", "14a_gedimmt")
+    BinarySensorEntityDescription(key=key, translation_key=translation_key)
+    for key, translation_key in (
+        ("guenstig", "cheap_now"),
+        ("einspeisung_gesperrt", "feed_in_blocked"),
+        ("14a_gedimmt", "dimmed_14a"),
+    )
+)
+
+SEA_SWITCHES: Final[tuple[SwitchEntityDescription, ...]] = tuple(
+    SwitchEntityDescription(
+        key=f"strategie_{strategy}", translation_key=f"strategy_{strategy}"
+    )
+    for strategy in SEA_SWITCHABLE
+)
+
+SEA_SELECTS: Final[tuple[SelectEntityDescription, ...]] = (
+    SelectEntityDescription(
+        key="regelung",
+        translation_key="control_mode",
+        options=["auto", "assisted", "rules", "manual"],
+    ),
 )
 
 
@@ -398,11 +292,11 @@ class SeaEntity(CoordinatorEntity[SeaCoordinator]):
 
     _attr_has_entity_name = True
 
-    def __init__(self, coordinator: SeaCoordinator, key: str) -> None:
+    def __init__(self, coordinator: SeaCoordinator, key: str, suffix: str = "") -> None:
         """Initialize the entity."""
         super().__init__(coordinator)
-        # Same unique id as the b1 service entities, so their entity ids stay.
-        self._attr_unique_id = f"{SEA_ID}_{key}"
+        self._key = key
+        self._attr_unique_id = f"{SEA_ID}_{key}{suffix}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, SEA_ID)},
             name="SEA",
@@ -414,14 +308,12 @@ class SeaEntity(CoordinatorEntity[SeaCoordinator]):
 
     @property
     def _raw(self) -> Any:
-        return (self.coordinator.data or {}).get(self.entity_description.key)
+        return (self.coordinator.data or {}).get(self._key)
 
     @property
     def available(self) -> bool:
         """Return whether SEA is connected and reports this key."""
-        return super().available and self.entity_description.key in (
-            self.coordinator.data or {}
-        )
+        return super().available and self._key in (self.coordinator.data or {})
 
 
 class SeaSensor(SeaEntity, SensorEntity):
@@ -447,8 +339,7 @@ class SeaSensor(SeaEntity, SensorEntity):
             value = dt_util.parse_datetime(str(raw))
             return value if value is not None and value.tzinfo is not None else None
         if device_class is SensorDeviceClass.ENUM:
-            options = self.entity_description.options or []
-            return raw if raw in options else None
+            return raw if raw in (self.entity_description.options or []) else None
         if isinstance(raw, bool) or not isinstance(raw, int | float):
             return None
         return raw
@@ -471,47 +362,6 @@ class SeaBinarySensor(SeaEntity, BinarySensorEntity):
         return raw if isinstance(raw, bool) else None
 
 
-# Strategies SEA can switch on and off; the others are display only.
-SEA_SWITCHES: Final[tuple[SwitchEntityDescription, ...]] = tuple(
-    SwitchEntityDescription(
-        key=f"strategie_{strategy}", translation_key=f"strategie_{strategy}"
-    )
-    for strategy in (
-        "self_consumption",
-        "setpoint_boost",
-        "tariff_shift",
-        "setback",
-        "circuit_guide",
-        "battery_cover",
-        "peak_shaving",
-        "feed_in_limit",
-    )
-)
-SEA_SELECTS: Final[tuple[SelectEntityDescription, ...]] = (
-    SelectEntityDescription(
-        key="regelung",
-        translation_key="regelung",
-        options=["auto", "assisted", "rules", "manual"],
-    ),
-)
-
-
-async def _async_command(
-    coordinator: SeaCoordinator, key: str, value: str | bool
-) -> None:
-    """Send a command; the push update brings the new state."""
-    try:
-        await coordinator.client.command(key, value)
-    except SeaCommandError as err:
-        raise HomeAssistantError(
-            translation_domain=DOMAIN, translation_key="sea_command_refused"
-        ) from err
-    except SeaError as err:
-        raise HomeAssistantError(
-            translation_domain=DOMAIN, translation_key="sea_unreachable"
-        ) from err
-
-
 class SeaSwitch(SeaEntity, SwitchEntity):
     """SEA strategy on or off."""
 
@@ -520,8 +370,7 @@ class SeaSwitch(SeaEntity, SwitchEntity):
     ) -> None:
         """Initialize the switch."""
         self.entity_description = description
-        super().__init__(coordinator, description.key)
-        self._attr_unique_id = f"{SEA_ID}_{description.key}_switch"
+        super().__init__(coordinator, description.key, "_switch")
 
     @property
     def is_on(self) -> bool | None:
@@ -531,11 +380,11 @@ class SeaSwitch(SeaEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Switch the strategy on."""
-        await _async_command(self.coordinator, self.entity_description.key, True)
+        await self.coordinator.async_command(self._key, True)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Switch the strategy off; SEA keeps its settings."""
-        await _async_command(self.coordinator, self.entity_description.key, False)
+        await self.coordinator.async_command(self._key, False)
 
 
 class SeaSelect(SeaEntity, SelectEntity):
@@ -546,8 +395,7 @@ class SeaSelect(SeaEntity, SelectEntity):
     ) -> None:
         """Initialize the select."""
         self.entity_description = description
-        super().__init__(coordinator, description.key)
-        self._attr_unique_id = f"{SEA_ID}_{description.key}_select"
+        super().__init__(coordinator, description.key, "_select")
 
     @property
     def current_option(self) -> str | None:
@@ -557,4 +405,4 @@ class SeaSelect(SeaEntity, SelectEntity):
 
     async def async_select_option(self, option: str) -> None:
         """Set the level."""
-        await _async_command(self.coordinator, self.entity_description.key, option)
+        await self.coordinator.async_command(self._key, option)

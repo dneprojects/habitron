@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 
 # pylint:disable=unused-import
 from habitron_client import HabitronClient, HabitronError, test_connection
+from habitron_client.sea import SeaClient, SeaError
 import voluptuous as vol
 
 from homeassistant import config_entries, exceptions
@@ -33,7 +34,7 @@ from .const import (
     SEA_ID,
 )
 from .coordinator import HabitronConfigEntry
-from .sea import SEA_NAME, SeaClient, SeaError
+from .sea import SEA_NAME
 
 _LOGGER = logging.getLogger(__name__)
 

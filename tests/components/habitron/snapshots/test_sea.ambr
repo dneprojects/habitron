@@ -1,0 +1,2249 @@
+# serializer version: 1
+# name: test_entities[binary_sensor.sea_cheap_now-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'binary_sensor',
+    'entity_category': None,
+    'entity_id': 'binary_sensor.sea_cheap_now',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Cheap now',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': False,
+      }),
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'Cheap now',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'cheap_now',
+    'unique_id': 'sea_guenstig',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_entities[binary_sensor.sea_cheap_now-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA Cheap now',
+    }),
+    'context': <ANY>,
+    'entity_id': 'binary_sensor.sea_cheap_now',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'on',
+  })
+# ---
+# name: test_entities[binary_sensor.sea_dimmed_by_ss14a-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'binary_sensor',
+    'entity_category': None,
+    'entity_id': 'binary_sensor.sea_dimmed_by_ss14a',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Dimmed by §14a',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': False,
+      }),
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'Dimmed by §14a',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'dimmed_14a',
+    'unique_id': 'sea_14a_gedimmt',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_entities[binary_sensor.sea_dimmed_by_ss14a-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA Dimmed by §14a',
+    }),
+    'context': <ANY>,
+    'entity_id': 'binary_sensor.sea_dimmed_by_ss14a',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'off',
+  })
+# ---
+# name: test_entities[binary_sensor.sea_feed_in_blocked-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'binary_sensor',
+    'entity_category': None,
+    'entity_id': 'binary_sensor.sea_feed_in_blocked',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Feed-in blocked',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': False,
+      }),
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'Feed-in blocked',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'feed_in_blocked',
+    'unique_id': 'sea_einspeisung_gesperrt',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_entities[binary_sensor.sea_feed_in_blocked-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA Feed-in blocked',
+    }),
+    'context': <ANY>,
+    'entity_id': 'binary_sensor.sea_feed_in_blocked',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'off',
+  })
+# ---
+# name: test_entities[device]
+  DeviceRegistryEntrySnapshot({
+    'area_id': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'configuration_url': 'homeassistant://app/sea',
+    'connections': set({
+    }),
+    'disabled_by': None,
+    'entry_type': None,
+    'hw_version': None,
+    'id': <ANY>,
+    'identifiers': set({
+      tuple(
+        'habitron',
+        'sea',
+      ),
+    }),
+    'labels': set({
+    }),
+    'manufacturer': 'Habitron',
+    'model': 'Smart Energy Agent',
+    'model_id': None,
+    'name': 'SEA',
+    'name_by_user': None,
+    'serial_number': None,
+    'sw_version': '0.16.0',
+    'via_device_id': None,
+  })
+# ---
+# name: test_entities[select.sea_control_mode-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': dict({
+      <SelectEntityCapabilityAttribute.OPTIONS: 'options'>: list([
+        'auto',
+        'assisted',
+        'rules',
+        'manual',
+      ]),
+    }),
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'select',
+    'entity_category': None,
+    'entity_id': 'select.sea_control_mode',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Control mode',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': False,
+      }),
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'Control mode',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'control_mode',
+    'unique_id': 'sea_regelung_select',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_entities[select.sea_control_mode-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA Control mode',
+      <SelectEntityCapabilityAttribute.OPTIONS: 'options'>: list([
+        'auto',
+        'assisted',
+        'rules',
+        'manual',
+      ]),
+    }),
+    'context': <ANY>,
+    'entity_id': 'select.sea_control_mode',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'auto',
+  })
+# ---
+# name: test_entities[sensor.sea_battery_plan-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': dict({
+      <SensorEntityCapabilityAttribute.OPTIONS: 'options'>: list([
+        'charge_pv',
+        'charge_grid',
+        'discharge',
+        'hold',
+        'spare',
+        'idle',
+      ]),
+    }),
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.sea_battery_plan',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Battery plan',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': False,
+      }),
+    }),
+    'original_device_class': <SensorDeviceClass.ENUM: 'enum'>,
+    'original_icon': None,
+    'original_name': 'Battery plan',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'battery_plan',
+    'unique_id': 'sea_akku_plan',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_entities[sensor.sea_battery_plan-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'enum',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA Battery plan',
+      <SensorEntityCapabilityAttribute.OPTIONS: 'options'>: list([
+        'charge_pv',
+        'charge_grid',
+        'discharge',
+        'hold',
+        'spare',
+        'idle',
+      ]),
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.sea_battery_plan',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'charge_pv',
+  })
+# ---
+# name: test_entities[sensor.sea_battery_plan_until-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.sea_battery_plan_until',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Battery plan until',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': False,
+      }),
+    }),
+    'original_device_class': <SensorDeviceClass.TIMESTAMP: 'timestamp'>,
+    'original_icon': None,
+    'original_name': 'Battery plan until',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'battery_plan_until',
+    'unique_id': 'sea_akku_plan_bis',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_entities[sensor.sea_battery_plan_until-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'timestamp',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA Battery plan until',
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.sea_battery_plan_until',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '2026-11-14T16:00:00+00:00',
+  })
+# ---
+# name: test_entities[sensor.sea_cost_today-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.sea_cost_today',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Cost today',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': False,
+      }),
+      'sensor': dict({
+        'suggested_display_precision': 2,
+      }),
+    }),
+    'original_device_class': <SensorDeviceClass.MONETARY: 'monetary'>,
+    'original_icon': None,
+    'original_name': 'Cost today',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'cost_today',
+    'unique_id': 'sea_kosten_heute',
+    'unit_of_measurement': '€',
+  })
+# ---
+# name: test_entities[sensor.sea_cost_today-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'monetary',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA Cost today',
+      <EntityStateAttribute.UNIT_OF_MEASUREMENT: 'unit_of_measurement'>: '€',
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.sea_cost_today',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'unknown',
+  })
+# ---
+# name: test_entities[sensor.sea_electricity_price-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.sea_electricity_price',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Electricity price',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': False,
+      }),
+      'sensor': dict({
+        'suggested_display_precision': 1,
+      }),
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'Electricity price',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'electricity_price',
+    'unique_id': 'sea_strompreis',
+    'unit_of_measurement': 'ct/kWh',
+  })
+# ---
+# name: test_entities[sensor.sea_electricity_price-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA Electricity price',
+      <EntityStateAttribute.UNIT_OF_MEASUREMENT: 'unit_of_measurement'>: 'ct/kWh',
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.sea_electricity_price',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '18.2',
+  })
+# ---
+# name: test_entities[sensor.sea_next_cheap_window-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.sea_next_cheap_window',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Next cheap window',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': False,
+      }),
+    }),
+    'original_device_class': <SensorDeviceClass.TIMESTAMP: 'timestamp'>,
+    'original_icon': None,
+    'original_name': 'Next cheap window',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'next_cheap_window',
+    'unique_id': 'sea_naechstes_guenstiges_fenster',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_entities[sensor.sea_next_cheap_window-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'timestamp',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA Next cheap window',
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.sea_next_cheap_window',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '2026-11-15T01:00:00+00:00',
+  })
+# ---
+# name: test_entities[sensor.sea_next_cheap_window_end-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.sea_next_cheap_window_end',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Next cheap window end',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': False,
+      }),
+    }),
+    'original_device_class': <SensorDeviceClass.TIMESTAMP: 'timestamp'>,
+    'original_icon': None,
+    'original_name': 'Next cheap window end',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'next_cheap_window_end',
+    'unique_id': 'sea_naechstes_guenstiges_fenster_ende',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_entities[sensor.sea_next_cheap_window_end-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'timestamp',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA Next cheap window end',
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.sea_next_cheap_window_end',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '2026-11-15T05:00:00+00:00',
+  })
+# ---
+# name: test_entities[sensor.sea_open_hints-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.sea_open_hints',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Open hints',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': False,
+      }),
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'Open hints',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'open_hints',
+    'unique_id': 'sea_hinweise',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_entities[sensor.sea_open_hints-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA Open hints',
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.sea_open_hints',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '2',
+  })
+# ---
+# name: test_entities[sensor.sea_pv_forecast_rest_of_today-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.sea_pv_forecast_rest_of_today',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'PV forecast rest of today',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': False,
+      }),
+      'sensor': dict({
+        'suggested_display_precision': 1,
+      }),
+    }),
+    'original_device_class': <SensorDeviceClass.ENERGY: 'energy'>,
+    'original_icon': None,
+    'original_name': 'PV forecast rest of today',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'pv_forecast_today_remaining',
+    'unique_id': 'sea_pv_prognose_heute_rest',
+    'unit_of_measurement': <UnitOfEnergy.KILO_WATT_HOUR: 'kWh'>,
+  })
+# ---
+# name: test_entities[sensor.sea_pv_forecast_rest_of_today-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'energy',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA PV forecast rest of today',
+      <EntityStateAttribute.UNIT_OF_MEASUREMENT: 'unit_of_measurement'>: <UnitOfEnergy.KILO_WATT_HOUR: 'kWh'>,
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.sea_pv_forecast_rest_of_today',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '5.1',
+  })
+# ---
+# name: test_entities[sensor.sea_pv_forecast_today-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.sea_pv_forecast_today',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'PV forecast today',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': False,
+      }),
+      'sensor': dict({
+        'suggested_display_precision': 1,
+      }),
+    }),
+    'original_device_class': <SensorDeviceClass.ENERGY: 'energy'>,
+    'original_icon': None,
+    'original_name': 'PV forecast today',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'pv_forecast_today',
+    'unique_id': 'sea_pv_prognose_heute',
+    'unit_of_measurement': <UnitOfEnergy.KILO_WATT_HOUR: 'kWh'>,
+  })
+# ---
+# name: test_entities[sensor.sea_pv_forecast_today-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'energy',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA PV forecast today',
+      <EntityStateAttribute.UNIT_OF_MEASUREMENT: 'unit_of_measurement'>: <UnitOfEnergy.KILO_WATT_HOUR: 'kWh'>,
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.sea_pv_forecast_today',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '12.4',
+  })
+# ---
+# name: test_entities[sensor.sea_pv_forecast_tomorrow-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.sea_pv_forecast_tomorrow',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'PV forecast tomorrow',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': False,
+      }),
+      'sensor': dict({
+        'suggested_display_precision': 1,
+      }),
+    }),
+    'original_device_class': <SensorDeviceClass.ENERGY: 'energy'>,
+    'original_icon': None,
+    'original_name': 'PV forecast tomorrow',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'pv_forecast_tomorrow',
+    'unique_id': 'sea_pv_prognose_morgen',
+    'unit_of_measurement': <UnitOfEnergy.KILO_WATT_HOUR: 'kWh'>,
+  })
+# ---
+# name: test_entities[sensor.sea_pv_forecast_tomorrow-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'energy',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA PV forecast tomorrow',
+      <EntityStateAttribute.UNIT_OF_MEASUREMENT: 'unit_of_measurement'>: <UnitOfEnergy.KILO_WATT_HOUR: 'kWh'>,
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.sea_pv_forecast_tomorrow',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '20.0',
+  })
+# ---
+# name: test_entities[sensor.sea_savings_today-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.sea_savings_today',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Savings today',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': False,
+      }),
+      'sensor': dict({
+        'suggested_display_precision': 2,
+      }),
+    }),
+    'original_device_class': <SensorDeviceClass.MONETARY: 'monetary'>,
+    'original_icon': None,
+    'original_name': 'Savings today',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'savings_today',
+    'unique_id': 'sea_einsparung_heute',
+    'unit_of_measurement': '€',
+  })
+# ---
+# name: test_entities[sensor.sea_savings_today-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'monetary',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA Savings today',
+      <EntityStateAttribute.UNIT_OF_MEASUREMENT: 'unit_of_measurement'>: '€',
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.sea_savings_today',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'unknown',
+  })
+# ---
+# name: test_entities[sensor.sea_strategy_battery_care-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': dict({
+      <SensorEntityCapabilityAttribute.OPTIONS: 'options'>: list([
+        'off',
+        'missing',
+        'ready',
+        'acting',
+      ]),
+    }),
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.sea_strategy_battery_care',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Strategy battery care',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': False,
+      }),
+    }),
+    'original_device_class': <SensorDeviceClass.ENUM: 'enum'>,
+    'original_icon': None,
+    'original_name': 'Strategy battery care',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'strategy_battery_care',
+    'unique_id': 'sea_strategie_battery_care',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_entities[sensor.sea_strategy_battery_care-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'enum',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA Strategy battery care',
+      <SensorEntityCapabilityAttribute.OPTIONS: 'options'>: list([
+        'off',
+        'missing',
+        'ready',
+        'acting',
+      ]),
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.sea_strategy_battery_care',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'ready',
+  })
+# ---
+# name: test_entities[sensor.sea_strategy_battery_coverage-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': dict({
+      <SensorEntityCapabilityAttribute.OPTIONS: 'options'>: list([
+        'off',
+        'missing',
+        'ready',
+        'acting',
+      ]),
+    }),
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.sea_strategy_battery_coverage',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Strategy battery coverage',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': False,
+      }),
+    }),
+    'original_device_class': <SensorDeviceClass.ENUM: 'enum'>,
+    'original_icon': None,
+    'original_name': 'Strategy battery coverage',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'strategy_battery_cover',
+    'unique_id': 'sea_strategie_battery_cover',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_entities[sensor.sea_strategy_battery_coverage-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'enum',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA Strategy battery coverage',
+      <SensorEntityCapabilityAttribute.OPTIONS: 'options'>: list([
+        'off',
+        'missing',
+        'ready',
+        'acting',
+      ]),
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.sea_strategy_battery_coverage',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'ready',
+  })
+# ---
+# name: test_entities[sensor.sea_strategy_dynamic_tariff-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': dict({
+      <SensorEntityCapabilityAttribute.OPTIONS: 'options'>: list([
+        'off',
+        'missing',
+        'ready',
+        'acting',
+      ]),
+    }),
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.sea_strategy_dynamic_tariff',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Strategy dynamic tariff',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': False,
+      }),
+    }),
+    'original_device_class': <SensorDeviceClass.ENUM: 'enum'>,
+    'original_icon': None,
+    'original_name': 'Strategy dynamic tariff',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'strategy_tariff_shift',
+    'unique_id': 'sea_strategie_tariff_shift',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_entities[sensor.sea_strategy_dynamic_tariff-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'enum',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA Strategy dynamic tariff',
+      <SensorEntityCapabilityAttribute.OPTIONS: 'options'>: list([
+        'off',
+        'missing',
+        'ready',
+        'acting',
+      ]),
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.sea_strategy_dynamic_tariff',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'ready',
+  })
+# ---
+# name: test_entities[sensor.sea_strategy_emergency_reserve-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': dict({
+      <SensorEntityCapabilityAttribute.OPTIONS: 'options'>: list([
+        'off',
+        'missing',
+        'ready',
+        'acting',
+      ]),
+    }),
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.sea_strategy_emergency_reserve',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Strategy emergency reserve',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': False,
+      }),
+    }),
+    'original_device_class': <SensorDeviceClass.ENUM: 'enum'>,
+    'original_icon': None,
+    'original_name': 'Strategy emergency reserve',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'strategy_emergency_reserve',
+    'unique_id': 'sea_strategie_emergency_reserve',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_entities[sensor.sea_strategy_emergency_reserve-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'enum',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA Strategy emergency reserve',
+      <SensorEntityCapabilityAttribute.OPTIONS: 'options'>: list([
+        'off',
+        'missing',
+        'ready',
+        'acting',
+      ]),
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.sea_strategy_emergency_reserve',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'ready',
+  })
+# ---
+# name: test_entities[sensor.sea_strategy_feed_in_limit-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': dict({
+      <SensorEntityCapabilityAttribute.OPTIONS: 'options'>: list([
+        'off',
+        'missing',
+        'ready',
+        'acting',
+      ]),
+    }),
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.sea_strategy_feed_in_limit',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Strategy feed-in limit',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': False,
+      }),
+    }),
+    'original_device_class': <SensorDeviceClass.ENUM: 'enum'>,
+    'original_icon': None,
+    'original_name': 'Strategy feed-in limit',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'strategy_feed_in_limit',
+    'unique_id': 'sea_strategie_feed_in_limit',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_entities[sensor.sea_strategy_feed_in_limit-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'enum',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA Strategy feed-in limit',
+      <SensorEntityCapabilityAttribute.OPTIONS: 'options'>: list([
+        'off',
+        'missing',
+        'ready',
+        'acting',
+      ]),
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.sea_strategy_feed_in_limit',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'ready',
+  })
+# ---
+# name: test_entities[sensor.sea_strategy_grid_limit-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': dict({
+      <SensorEntityCapabilityAttribute.OPTIONS: 'options'>: list([
+        'off',
+        'missing',
+        'ready',
+        'acting',
+      ]),
+    }),
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.sea_strategy_grid_limit',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Strategy grid limit',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': False,
+      }),
+    }),
+    'original_device_class': <SensorDeviceClass.ENUM: 'enum'>,
+    'original_icon': None,
+    'original_name': 'Strategy grid limit',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'strategy_grid_limits',
+    'unique_id': 'sea_strategie_grid_limits',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_entities[sensor.sea_strategy_grid_limit-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'enum',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA Strategy grid limit',
+      <SensorEntityCapabilityAttribute.OPTIONS: 'options'>: list([
+        'off',
+        'missing',
+        'ready',
+        'acting',
+      ]),
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.sea_strategy_grid_limit',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'ready',
+  })
+# ---
+# name: test_entities[sensor.sea_strategy_heat_pump_boost-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': dict({
+      <SensorEntityCapabilityAttribute.OPTIONS: 'options'>: list([
+        'off',
+        'missing',
+        'ready',
+        'acting',
+      ]),
+    }),
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.sea_strategy_heat_pump_boost',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Strategy heat pump boost',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': False,
+      }),
+    }),
+    'original_device_class': <SensorDeviceClass.ENUM: 'enum'>,
+    'original_icon': None,
+    'original_name': 'Strategy heat pump boost',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'strategy_setpoint_boost',
+    'unique_id': 'sea_strategie_setpoint_boost',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_entities[sensor.sea_strategy_heat_pump_boost-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'enum',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA Strategy heat pump boost',
+      <SensorEntityCapabilityAttribute.OPTIONS: 'options'>: list([
+        'off',
+        'missing',
+        'ready',
+        'acting',
+      ]),
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.sea_strategy_heat_pump_boost',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'ready',
+  })
+# ---
+# name: test_entities[sensor.sea_strategy_heating_circuit_control-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': dict({
+      <SensorEntityCapabilityAttribute.OPTIONS: 'options'>: list([
+        'off',
+        'missing',
+        'ready',
+        'acting',
+      ]),
+    }),
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.sea_strategy_heating_circuit_control',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Strategy heating circuit control',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': False,
+      }),
+    }),
+    'original_device_class': <SensorDeviceClass.ENUM: 'enum'>,
+    'original_icon': None,
+    'original_name': 'Strategy heating circuit control',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'strategy_circuit_guide',
+    'unique_id': 'sea_strategie_circuit_guide',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_entities[sensor.sea_strategy_heating_circuit_control-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'enum',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA Strategy heating circuit control',
+      <SensorEntityCapabilityAttribute.OPTIONS: 'options'>: list([
+        'off',
+        'missing',
+        'ready',
+        'acting',
+      ]),
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.sea_strategy_heating_circuit_control',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'ready',
+  })
+# ---
+# name: test_entities[sensor.sea_strategy_optimizer-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': dict({
+      <SensorEntityCapabilityAttribute.OPTIONS: 'options'>: list([
+        'off',
+        'missing',
+        'ready',
+        'acting',
+      ]),
+    }),
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.sea_strategy_optimizer',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Strategy optimizer',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': False,
+      }),
+    }),
+    'original_device_class': <SensorDeviceClass.ENUM: 'enum'>,
+    'original_icon': None,
+    'original_name': 'Strategy optimizer',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'strategy_optimizer',
+    'unique_id': 'sea_strategie_optimizer',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_entities[sensor.sea_strategy_optimizer-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'enum',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA Strategy optimizer',
+      <SensorEntityCapabilityAttribute.OPTIONS: 'options'>: list([
+        'off',
+        'missing',
+        'ready',
+        'acting',
+      ]),
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.sea_strategy_optimizer',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'ready',
+  })
+# ---
+# name: test_entities[sensor.sea_strategy_own_rules-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': dict({
+      <SensorEntityCapabilityAttribute.OPTIONS: 'options'>: list([
+        'off',
+        'missing',
+        'ready',
+        'acting',
+      ]),
+    }),
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.sea_strategy_own_rules',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Strategy own rules',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': False,
+      }),
+    }),
+    'original_device_class': <SensorDeviceClass.ENUM: 'enum'>,
+    'original_icon': None,
+    'original_name': 'Strategy own rules',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'strategy_rules',
+    'unique_id': 'sea_strategie_rules',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_entities[sensor.sea_strategy_own_rules-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'enum',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA Strategy own rules',
+      <SensorEntityCapabilityAttribute.OPTIONS: 'options'>: list([
+        'off',
+        'missing',
+        'ready',
+        'acting',
+      ]),
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.sea_strategy_own_rules',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'ready',
+  })
+# ---
+# name: test_entities[sensor.sea_strategy_peak_shaving-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': dict({
+      <SensorEntityCapabilityAttribute.OPTIONS: 'options'>: list([
+        'off',
+        'missing',
+        'ready',
+        'acting',
+      ]),
+    }),
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.sea_strategy_peak_shaving',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Strategy peak shaving',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': False,
+      }),
+    }),
+    'original_device_class': <SensorDeviceClass.ENUM: 'enum'>,
+    'original_icon': None,
+    'original_name': 'Strategy peak shaving',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'strategy_peak_shaving',
+    'unique_id': 'sea_strategie_peak_shaving',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_entities[sensor.sea_strategy_peak_shaving-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'enum',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA Strategy peak shaving',
+      <SensorEntityCapabilityAttribute.OPTIONS: 'options'>: list([
+        'off',
+        'missing',
+        'ready',
+        'acting',
+      ]),
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.sea_strategy_peak_shaving',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'ready',
+  })
+# ---
+# name: test_entities[sensor.sea_strategy_pv_surplus-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': dict({
+      <SensorEntityCapabilityAttribute.OPTIONS: 'options'>: list([
+        'off',
+        'missing',
+        'ready',
+        'acting',
+      ]),
+    }),
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.sea_strategy_pv_surplus',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Strategy PV surplus',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': False,
+      }),
+    }),
+    'original_device_class': <SensorDeviceClass.ENUM: 'enum'>,
+    'original_icon': None,
+    'original_name': 'Strategy PV surplus',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'strategy_self_consumption',
+    'unique_id': 'sea_strategie_self_consumption',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_entities[sensor.sea_strategy_pv_surplus-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'enum',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA Strategy PV surplus',
+      <SensorEntityCapabilityAttribute.OPTIONS: 'options'>: list([
+        'off',
+        'missing',
+        'ready',
+        'acting',
+      ]),
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.sea_strategy_pv_surplus',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'ready',
+  })
+# ---
+# name: test_entities[sensor.sea_strategy_setback-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': dict({
+      <SensorEntityCapabilityAttribute.OPTIONS: 'options'>: list([
+        'off',
+        'missing',
+        'ready',
+        'acting',
+      ]),
+    }),
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.sea_strategy_setback',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Strategy setback',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': False,
+      }),
+    }),
+    'original_device_class': <SensorDeviceClass.ENUM: 'enum'>,
+    'original_icon': None,
+    'original_name': 'Strategy setback',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'strategy_setback',
+    'unique_id': 'sea_strategie_setback',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_entities[sensor.sea_strategy_setback-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'enum',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA Strategy setback',
+      <SensorEntityCapabilityAttribute.OPTIONS: 'options'>: list([
+        'off',
+        'missing',
+        'ready',
+        'acting',
+      ]),
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.sea_strategy_setback',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'ready',
+  })
+# ---
+# name: test_entities[sensor.sea_tariff-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': dict({
+      <SensorEntityCapabilityAttribute.OPTIONS: 'options'>: list([
+        'fixed',
+        'ht_nt',
+        'dynamic',
+      ]),
+    }),
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.sea_tariff',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Tariff',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': False,
+      }),
+    }),
+    'original_device_class': <SensorDeviceClass.ENUM: 'enum'>,
+    'original_icon': None,
+    'original_name': 'Tariff',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'tariff',
+    'unique_id': 'sea_tarif',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_entities[sensor.sea_tariff-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'enum',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA Tariff',
+      <SensorEntityCapabilityAttribute.OPTIONS: 'options'>: list([
+        'fixed',
+        'ht_nt',
+        'dynamic',
+      ]),
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.sea_tariff',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'dynamic',
+  })
+# ---
+# name: test_entities[switch.sea_battery_coverage-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'switch',
+    'entity_category': None,
+    'entity_id': 'switch.sea_battery_coverage',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Battery coverage',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': True,
+      }),
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'Battery coverage',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'strategy_battery_cover',
+    'unique_id': 'sea_strategie_battery_cover_switch',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_entities[switch.sea_battery_coverage-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA Battery coverage',
+    }),
+    'context': <ANY>,
+    'entity_id': 'switch.sea_battery_coverage',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'on',
+  })
+# ---
+# name: test_entities[switch.sea_dynamic_tariff-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'switch',
+    'entity_category': None,
+    'entity_id': 'switch.sea_dynamic_tariff',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Dynamic tariff',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': True,
+      }),
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'Dynamic tariff',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'strategy_tariff_shift',
+    'unique_id': 'sea_strategie_tariff_shift_switch',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_entities[switch.sea_dynamic_tariff-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA Dynamic tariff',
+    }),
+    'context': <ANY>,
+    'entity_id': 'switch.sea_dynamic_tariff',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'on',
+  })
+# ---
+# name: test_entities[switch.sea_feed_in_limit-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'switch',
+    'entity_category': None,
+    'entity_id': 'switch.sea_feed_in_limit',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Feed-in limit',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': True,
+      }),
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'Feed-in limit',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'strategy_feed_in_limit',
+    'unique_id': 'sea_strategie_feed_in_limit_switch',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_entities[switch.sea_feed_in_limit-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA Feed-in limit',
+    }),
+    'context': <ANY>,
+    'entity_id': 'switch.sea_feed_in_limit',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'on',
+  })
+# ---
+# name: test_entities[switch.sea_heat_pump_boost-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'switch',
+    'entity_category': None,
+    'entity_id': 'switch.sea_heat_pump_boost',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Heat pump boost',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': True,
+      }),
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'Heat pump boost',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'strategy_setpoint_boost',
+    'unique_id': 'sea_strategie_setpoint_boost_switch',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_entities[switch.sea_heat_pump_boost-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA Heat pump boost',
+    }),
+    'context': <ANY>,
+    'entity_id': 'switch.sea_heat_pump_boost',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'on',
+  })
+# ---
+# name: test_entities[switch.sea_heating_circuit_control-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'switch',
+    'entity_category': None,
+    'entity_id': 'switch.sea_heating_circuit_control',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Heating circuit control',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': True,
+      }),
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'Heating circuit control',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'strategy_circuit_guide',
+    'unique_id': 'sea_strategie_circuit_guide_switch',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_entities[switch.sea_heating_circuit_control-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA Heating circuit control',
+    }),
+    'context': <ANY>,
+    'entity_id': 'switch.sea_heating_circuit_control',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'on',
+  })
+# ---
+# name: test_entities[switch.sea_peak_shaving-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'switch',
+    'entity_category': None,
+    'entity_id': 'switch.sea_peak_shaving',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Peak shaving',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': True,
+      }),
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'Peak shaving',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'strategy_peak_shaving',
+    'unique_id': 'sea_strategie_peak_shaving_switch',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_entities[switch.sea_peak_shaving-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA Peak shaving',
+    }),
+    'context': <ANY>,
+    'entity_id': 'switch.sea_peak_shaving',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'on',
+  })
+# ---
+# name: test_entities[switch.sea_pv_surplus-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'switch',
+    'entity_category': None,
+    'entity_id': 'switch.sea_pv_surplus',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'PV surplus',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': True,
+      }),
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'PV surplus',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'strategy_self_consumption',
+    'unique_id': 'sea_strategie_self_consumption_switch',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_entities[switch.sea_pv_surplus-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA PV surplus',
+    }),
+    'context': <ANY>,
+    'entity_id': 'switch.sea_pv_surplus',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'on',
+  })
+# ---
+# name: test_entities[switch.sea_setback-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'switch',
+    'entity_category': None,
+    'entity_id': 'switch.sea_setback',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Setback',
+    'options': dict({
+      'conversation': dict({
+        'should_expose': True,
+      }),
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'Setback',
+    'platform': 'habitron',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'strategy_setback',
+    'unique_id': 'sea_strategie_setback_switch',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_entities[switch.sea_setback-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'SEA Setback',
+    }),
+    'context': <ANY>,
+    'entity_id': 'switch.sea_setback',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'on',
+  })
+# ---

@@ -4,6 +4,18 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.4.8b7
+
+### SEA structured as for core
+- `SeaClient`, `SeaError`, `SeaCommandError` moved to `habitron_client.sea`
+  (habitron_client 2.5.0, adds `aiohttp`); the integration only keeps the
+  coordinator and the entities. Commands go through `SeaCoordinator.async_command`.
+- Removed the b1 takeover (`_async_adopt_b1`, store removal, removing foreign
+  states) and the runtime hiding of the window sensors.
+- The `regelung` sensor is gone; `select.control_mode` carries the state.
+- English translation keys mapped to the API keys; unique ids stay `sea_<key>`.
+- Tests mock `SeaClient` (no sockets) and snapshot every SEA entity.
+
 ## v3.4.8b6
 
 ### SEA commands

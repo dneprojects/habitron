@@ -1,14 +1,14 @@
-"""Tests for the Smart Energy Agent (SEA) add-on connection."""
+"""Tests for the Smart Energy Agent (SEA) add-on entry."""
 
 import asyncio
-from collections.abc import AsyncGenerator, Callable
+from collections.abc import AsyncIterator, Callable, Generator
 from typing import Any
 from unittest.mock import patch
 
-from aiohttp import WSMsgType, web
-from aiohttp.test_utils import TestServer
+from habitron_client.sea import SeaCommandError, SeaError
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
+from syrupy.assertion import SnapshotAssertion
 
 from custom_components.habitron import async_remove_config_entry_device
 from custom_components.habitron.config_flow import ConfigFlow
@@ -18,11 +18,7 @@ from custom_components.habitron.diagnostics import (
     async_get_device_diagnostics,
 )
 from custom_components.habitron.sea import SEA_STRATEGIES
-from homeassistant.config_entries import (
-    SOURCE_HASSIO,
-    ConfigEntryDisabler,
-    ConfigEntryState,
-)
+from homeassistant.config_entries import SOURCE_HASSIO, ConfigEntryState
 from homeassistant.const import (
     CONF_HOST,
     CONF_PORT,
@@ -44,18 +40,16 @@ pytestmark = pytest.mark.filterwarnings(
 )
 
 TOKEN = "a" * 64
-# Keys the b1 service did not have.
-B1_MISSING = {
-    "pv_prognose_heute_rest",
-    "naechstes_guenstiges_fenster_ende",
-    "akku_plan_bis",
-    "tarif",
-}
+HOST = "sea-addon"
+PORT = 7790
 PV = "sensor.sea_pv_forecast_today"
 PLAN = "sensor.sea_battery_plan"
 WINDOW = "sensor.sea_next_cheap_window"
 COST = "sensor.sea_cost_today"
 CHEAP = "binary_sensor.sea_cheap_now"
+STRATEGY = "sensor.sea_strategy_pv_surplus"
+SWITCH = "switch.sea_pv_surplus"
+SELECT = "select.sea_control_mode"
 
 STATE: dict[str, Any] = {
     "pv_prognose_heute": 12.4,
@@ -79,7 +73,7 @@ STATE: dict[str, Any] = {
 
 
 class FakeSea:
-    """A SEA add-on serving the v1 API."""
+    """Stand-in for the SEA add-on behind the habitron_client SeaClient."""
 
     def __init__(self) -> None:
         """Start with the full contract state."""
@@ -90,105 +84,76 @@ class FakeSea:
             "url": "homeassistant://app/sea",
         }
         self.state: dict[str, Any] = dict(STATE)
-        self.sockets: list[web.WebSocketResponse] = []
-        self.connected = asyncio.Event()
+        self.token = TOKEN
         self.down = False
-        self.commands: list[dict[str, Any]] = []
-        self.command_status = 200
+        self.commands: list[tuple[str, Any]] = []
+        self.command_error: Exception | None = None
+        self.connected = asyncio.Event()
+        self._queue: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
 
-    def _authorized(self, request: web.Request) -> bool:
-        return request.headers.get("Authorization") == f"Bearer {TOKEN}"
+    def client(self, _session: Any, host: str, port: int, token: str) -> FakeSea:
+        """Act as the SeaClient constructor."""
+        assert (host, port) == (HOST, PORT)
+        self.used_token = token
+        return self
 
-    async def _info(self, request: web.Request) -> web.Response:
-        if not self._authorized(request):
-            return web.Response(status=401)
-        if self.down:
-            return web.Response(status=503)
-        return web.json_response(self.info)
+    def _check(self) -> None:
+        if self.down or self.used_token != self.token:
+            raise SeaError("unreachable")
 
-    async def _state(self, request: web.Request) -> web.Response:
-        if not self._authorized(request):
-            return web.Response(status=401)
-        return web.json_response(self.state)
+    async def get_info(self) -> dict[str, Any]:
+        """Return the info."""
+        self._check()
+        return dict(self.info)
 
-    async def _ws(self, request: web.Request) -> web.StreamResponse:
-        if not self._authorized(request):
-            return web.Response(status=401)
-        if self.down:
-            return web.Response(status=503)
-        ws = web.WebSocketResponse()
-        await ws.prepare(request)
-        self.sockets.append(ws)
-        await ws.send_json({"type": "snapshot", "values": self.state})
-        self.connected.set()
-        async for msg in ws:
-            if msg.type is WSMsgType.CLOSE:
-                break
-        self.sockets.remove(ws)
-        return ws
+    async def get_state(self) -> dict[str, Any]:
+        """Return the state."""
+        self._check()
+        return dict(self.state)
 
-    async def _command(self, request: web.Request) -> web.Response:
-        if not self._authorized(request):
-            return web.Response(status=401)
-        body = await request.json()
-        self.commands.append(body)
-        if self.command_status != 200:
-            return web.json_response({"error": "nope"}, status=self.command_status)
-        key, value = body["key"], body["value"]
+    async def command(self, key: str, value: Any) -> None:
+        """Apply a command and push the new state."""
+        self._check()
+        self.commands.append((key, value))
+        if self.command_error is not None:
+            raise self.command_error
         self.state[key] = (
             ("ready" if value else "off") if key.startswith("strategie_") else value
         )
         await self.send({"type": "update", "values": {key: self.state[key]}})
-        return web.json_response({"ok": True, "values": {}})
 
-    def app(self) -> web.Application:
-        """Return the web app."""
-        app = web.Application()
-        app.router.add_get("/api/v1/info", self._info)
-        app.router.add_get("/api/v1/state", self._state)
-        app.router.add_get("/api/v1/ws", self._ws)
-        app.router.add_post("/api/v1/command", self._command)
-        return app
+    async def messages(self) -> AsyncIterator[dict[str, Any]]:
+        """Yield a snapshot, then pushed messages until dropped."""
+        self._check()
+        self.connected.set()
+        yield {"type": "snapshot", "values": dict(self.state)}
+        while (message := await self._queue.get()) is not None:
+            yield message
+        raise SeaError("ws: connection closed")
 
-    async def send(self, message: Any) -> None:
-        """Push a raw message to every client."""
-        for ws in list(self.sockets):
-            if isinstance(message, str):
-                await ws.send_str(message)
-            else:
-                await ws.send_json(message)
+    async def send(self, message: dict[str, Any]) -> None:
+        """Push a message."""
+        await self._queue.put(message)
 
     async def drop(self) -> None:
-        """Close every client connection."""
+        """End the connection."""
         self.connected.clear()
-        for ws in list(self.sockets):
-            await ws.close()
+        await self._queue.put(None)
 
 
 @pytest.fixture
-def sea() -> FakeSea:
-    """Return the fake add-on."""
-    return FakeSea()
+def sea(hass: HomeAssistant) -> Generator[FakeSea]:
+    """Replace the SEA client and retry reconnects without waiting."""
+    fake = FakeSea()
+    with (
+        patch("custom_components.habitron.sea.SeaClient", fake.client),
+        patch("custom_components.habitron.config_flow.SeaClient", fake.client),
+        patch("custom_components.habitron.sea._RETRY_MIN", 0),
+    ):
+        yield fake
 
 
-@pytest.fixture
-async def sea_server(
-    hass: HomeAssistant,
-    sea: FakeSea,
-    aiohttp_server: Callable[..., Any],
-    socket_enabled: None,
-) -> AsyncGenerator[TestServer]:
-    """Serve the fake add-on and retry reconnects without waiting."""
-    server: TestServer = await aiohttp_server(sea.app())
-    with patch("custom_components.habitron.sea._RETRY_MIN", 0):
-        yield server
-        # The server waits for open sockets, and the listener would reconnect.
-        for entry in hass.config_entries.async_loaded_entries(DOMAIN):
-            await hass.config_entries.async_unload(entry.entry_id)
-        await hass.async_block_till_done()
-
-
-def _sea_entry(server: TestServer, token: str = TOKEN) -> MockConfigEntry:
+def _sea_entry(token: str = TOKEN) -> MockConfigEntry:
     return MockConfigEntry(
         domain=DOMAIN,
         title="Smart Energy Agent",
@@ -196,8 +161,8 @@ def _sea_entry(server: TestServer, token: str = TOKEN) -> MockConfigEntry:
         version=2,
         data={
             CONF_ENTRY_TYPE: ENTRY_TYPE_SEA,
-            CONF_HOST: server.host,
-            CONF_PORT: server.port,
+            CONF_HOST: HOST,
+            CONF_PORT: PORT,
             CONF_TOKEN: token,
         },
     )
@@ -219,10 +184,10 @@ def _state(hass: HomeAssistant, entity_id: str) -> str | None:
 
 @pytest.fixture
 async def sea_entry(
-    hass: HomeAssistant, setup_homeassistant: None, sea: FakeSea, sea_server: TestServer
+    hass: HomeAssistant, setup_homeassistant: None, sea: FakeSea
 ) -> MockConfigEntry:
-    """Set up the SEA entry against the fake add-on."""
-    entry = _sea_entry(sea_server)
+    """Set up the SEA entry."""
+    entry = _sea_entry()
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
@@ -230,24 +195,20 @@ async def sea_entry(
     return entry
 
 
-def _discovery(server: TestServer, token: str = TOKEN) -> HassioServiceInfo:
+def _discovery(token: str = TOKEN) -> HassioServiceInfo:
     return HassioServiceInfo(
-        config={
-            "sea": {CONF_HOST: server.host, CONF_PORT: server.port, CONF_TOKEN: token}
-        },
+        config={"sea": {CONF_HOST: HOST, CONF_PORT: PORT, CONF_TOKEN: token}},
         name="Smart Energy Agent",
         slug="sea",
         uuid="1234",
     )
 
 
-@pytest.mark.usefixtures("setup_homeassistant")
-async def test_discovery_creates_the_entry(
-    hass: HomeAssistant, sea_server: TestServer
-) -> None:
+@pytest.mark.usefixtures("setup_homeassistant", "sea")
+async def test_discovery_creates_the_entry(hass: HomeAssistant) -> None:
     """The add-on discovery leads to a confirmed SEA entry."""
     result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": SOURCE_HASSIO}, data=_discovery(sea_server)
+        DOMAIN, context={"source": SOURCE_HASSIO}, data=_discovery()
     )
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "hassio_confirm"
@@ -259,22 +220,20 @@ async def test_discovery_creates_the_entry(
     assert result["title"] == "Smart Energy Agent"
     assert result["data"] == {
         CONF_ENTRY_TYPE: ENTRY_TYPE_SEA,
-        CONF_HOST: sea_server.host,
-        CONF_PORT: sea_server.port,
+        CONF_HOST: HOST,
+        CONF_PORT: PORT,
         CONF_TOKEN: TOKEN,
     }
     assert result["result"].unique_id == "sea"
 
 
-@pytest.mark.usefixtures("setup_homeassistant")
+@pytest.mark.usefixtures("setup_homeassistant", "sea")
 async def test_discovery_with_a_wrong_token_cannot_connect(
-    hass: HomeAssistant, sea_server: TestServer
+    hass: HomeAssistant,
 ) -> None:
     """A rejected token shows an error instead of creating the entry."""
     result = await hass.config_entries.flow.async_init(
-        DOMAIN,
-        context={"source": SOURCE_HASSIO},
-        data=_discovery(sea_server, token="wrong"),
+        DOMAIN, context={"source": SOURCE_HASSIO}, data=_discovery(token="wrong")
     )
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
 
@@ -283,12 +242,11 @@ async def test_discovery_with_a_wrong_token_cannot_connect(
 
 
 async def test_rediscovery_updates_the_entry(
-    hass: HomeAssistant, sea_entry: MockConfigEntry, sea_server: TestServer
+    hass: HomeAssistant, sea_entry: MockConfigEntry
 ) -> None:
     """A new discovery updates host, port and token of the existing entry."""
-    info = _discovery(sea_server, token="b" * 64)
     result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": SOURCE_HASSIO}, data=info
+        DOMAIN, context={"source": SOURCE_HASSIO}, data=_discovery(token="b" * 64)
     )
 
     assert result["type"] is FlowResultType.ABORT
@@ -296,37 +254,23 @@ async def test_rediscovery_updates_the_entry(
     assert sea_entry.data[CONF_TOKEN] == "b" * 64
 
 
-async def test_device_and_entities(
+async def test_entities(
     hass: HomeAssistant,
     sea_entry: MockConfigEntry,
     device_registry: dr.DeviceRegistry,
     entity_registry: er.EntityRegistry,
+    snapshot: SnapshotAssertion,
 ) -> None:
     """The entry creates the device SEA with the entities of the contract."""
     device = device_registry.async_get_device({(DOMAIN, "sea")})
-    assert device is not None
-    assert device.name == "SEA"
-    assert device.manufacturer == "Habitron"
-    assert device.model == "Smart Energy Agent"
-    assert device.sw_version == "0.16.0"
-    assert device.configuration_url == "homeassistant://app/sea"
-    assert len(er.async_entries_for_device(entity_registry, device.id)) == 38
-
-    assert entity_registry.async_get(PV).unique_id == "sea_pv_prognose_heute"
-    assert _state(hass, PV) == "12.4"
-    assert hass.states.get(PV).attributes["unit_of_measurement"] == "kWh"
-    assert _state(hass, PLAN) == "charge_pv"
-    assert hass.states.get(PLAN).attributes["options"] == [
-        "charge_pv",
-        "charge_grid",
-        "discharge",
-        "hold",
-        "spare",
-        "idle",
-    ]
-    assert _state(hass, WINDOW) == "2026-11-15T01:00:00+00:00"
-    assert _state(hass, COST) == STATE_UNKNOWN
-    assert _state(hass, CHEAP) == STATE_ON
+    assert device == snapshot(name="device")
+    entities = er.async_entries_for_config_entry(entity_registry, sea_entry.entry_id)
+    assert len(entities) == 37
+    for entity in sorted(entities, key=lambda entity: entity.entity_id):
+        assert entity == snapshot(name=f"{entity.entity_id}-entry")
+        assert hass.states.get(entity.entity_id) == snapshot(
+            name=f"{entity.entity_id}-state"
+        )
 
 
 async def test_push_updates_the_values(
@@ -369,8 +313,7 @@ async def test_values_of_the_wrong_type_are_unknown(
 async def test_unusable_messages_are_ignored(
     hass: HomeAssistant, sea_entry: MockConfigEntry, sea: FakeSea
 ) -> None:
-    """Unreadable text and messages without values change nothing."""
-    await sea.send("not json")
+    """Messages without values or of another type change nothing."""
     await sea.send({"type": "update", "values": "nope"})
     await sea.send({"type": "entities", "entities": []})
     await sea.send({"type": "update", "values": {"strompreis": 20.0}})
@@ -396,11 +339,10 @@ async def test_lost_connection_and_reconnect(
     sea: FakeSea,
     device_registry: dr.DeviceRegistry,
 ) -> None:
-    """Without a connection all entities are unavailable until the reconnect."""
+    """After a lost connection the reconnect brings fresh values and info."""
     sea.info["version"] = "0.17.0"
     sea.state["pv_prognose_heute"] = 13.0
     await sea.drop()
-    await _until(lambda: _state(hass, PV) in (STATE_UNAVAILABLE, "13.0"))
 
     await asyncio.wait_for(sea.connected.wait(), 10)
     await _until(lambda: _state(hass, PV) == "13.0")
@@ -408,10 +350,10 @@ async def test_lost_connection_and_reconnect(
     assert device.sw_version == "0.17.0"
 
 
-async def test_reconnect_waits_while_the_add_on_is_down(
+async def test_entities_unavailable_while_the_add_on_is_down(
     hass: HomeAssistant, sea_entry: MockConfigEntry, sea: FakeSea
 ) -> None:
-    """While info cannot be read the listener keeps retrying."""
+    """While SEA is down the entities are unavailable, then come back."""
     sea.down = True
     await sea.drop()
     await _until(lambda: _state(hass, PV) == STATE_UNAVAILABLE)
@@ -421,28 +363,23 @@ async def test_reconnect_waits_while_the_add_on_is_down(
     await _until(lambda: _state(hass, PV) == "12.4")
 
 
-@pytest.mark.usefixtures("setup_homeassistant")
-async def test_unreachable_add_on_retries_the_setup(
-    hass: HomeAssistant, sea_server: TestServer
-) -> None:
+@pytest.mark.usefixtures("setup_homeassistant", "sea")
+async def test_unreachable_add_on_retries_the_setup(hass: HomeAssistant) -> None:
     """A rejected token or a missing add-on lets HA retry the setup."""
-    entry = _sea_entry(sea_server, token="wrong")
+    entry = _sea_entry(token="wrong")
     entry.add_to_hass(hass)
 
     assert not await hass.config_entries.async_setup(entry.entry_id)
     assert entry.state is ConfigEntryState.SETUP_RETRY
 
 
-async def test_unload(
-    hass: HomeAssistant, sea_entry: MockConfigEntry, sea: FakeSea
-) -> None:
+async def test_unload(hass: HomeAssistant, sea_entry: MockConfigEntry) -> None:
     """Unloading stops the listener and the entities."""
     assert await hass.config_entries.async_unload(sea_entry.entry_id)
     await hass.async_block_till_done()
 
     assert sea_entry.state is ConfigEntryState.NOT_LOADED
     assert _state(hass, PV) == STATE_UNAVAILABLE
-    await _until(lambda: not sea.sockets)
 
 
 async def test_hubs_ignore_the_sea_entry(
@@ -506,230 +443,32 @@ async def test_the_sea_device_cannot_be_removed(
     assert not await async_remove_config_entry_device(hass, sea_entry, device)
 
 
-async def test_service_storage_of_b1_is_removed(
-    hass: HomeAssistant,
-    hass_storage: dict[str, Any],
-    setup_homeassistant: None,
-    sea: FakeSea,
-    sea_server: TestServer,
-) -> None:
-    """The entity list the b1 service stored is deleted."""
-    hass_storage["habitron.sea"] = {"version": 1, "key": "habitron.sea", "data": {}}
-    entry = _sea_entry(sea_server)
-    entry.add_to_hass(hass)
-    assert await hass.config_entries.async_setup(entry.entry_id)
-    await hass.async_block_till_done()
-
-    assert "habitron.sea" not in hass_storage
-
-
-async def test_b1_entities_move_to_the_sea_entry(
-    hass: HomeAssistant,
-    device_registry: dr.DeviceRegistry,
-    entity_registry: er.EntityRegistry,
-    setup_homeassistant: None,
-    sea: FakeSea,
-    sea_server: TestServer,
-) -> None:
-    """Entities of the b1 service move to the SEA entry with their ids."""
-    # Disabled, so loading the integration does not set up a real hub.
-    hub = MockConfigEntry(
-        domain=DOMAIN, unique_id="aabbccddeeff", disabled_by=ConfigEntryDisabler.USER
-    )
-    hub.add_to_hass(hass)
-    old_device = device_registry.async_get_or_create(
-        config_entry_id=hub.entry_id,
-        identifiers={(DOMAIN, "sea")},
-        name="Smart Energy Agent",
-        manufacturer="Habitron",
-        model="SEA",
-    )
-    binary = {"guenstig", "einspeisung_gesperrt", "14a_gedimmt"}
-    b1_keys = [
-        key
-        for key in STATE
-        if key not in B1_MISSING and not key.startswith("strategie_")
-    ] + ["veraltet"]
-    for key in b1_keys:
-        platform = "binary_sensor" if key in binary else "sensor"
-        entity_registry.async_get_or_create(
-            platform,
-            DOMAIN,
-            f"sea_{key}",
-            config_entry=hub,
-            device_id=old_device.id,
-            suggested_object_id=f"sea_{key}",
-        )
-
-    # The REST fallback of SEA posts plain states under the b1 ids.
-    hass.states.async_set("sensor.sea_pv_prognose_heute", "11.0")
-    hass.states.async_set("binary_sensor.sea_guenstig", "off")
-
-    entry = _sea_entry(sea_server)
-    entry.add_to_hass(hass)
-    assert await hass.config_entries.async_setup(entry.entry_id)
-    await hass.async_block_till_done()
-
-    entities = er.async_entries_for_config_entry(entity_registry, entry.entry_id)
-    assert len(entities) == 38
-    assert _state(hass, "sensor.sea_pv_prognose_heute") == "12.4"
-    assert _state(hass, "binary_sensor.sea_guenstig") == STATE_ON
-    assert _state(hass, "sensor.sea_akku_plan") == "charge_pv"
-    assert _state(hass, "sensor.sea_hinweise") == "2"
-    assert entity_registry.async_get("sensor.sea_veraltet") is None
-
-    device = device_registry.async_get_device({(DOMAIN, "sea")})
-    assert device.id == old_device.id
-    assert device.config_entries == {entry.entry_id}
-    assert device.name == "SEA"
-    assert device.model == "Smart Energy Agent"
-    assert all(entity.device_id == device.id for entity in entities)
-
-
-async def test_info_that_is_not_an_object_counts_as_unreachable(
-    hass: HomeAssistant, setup_homeassistant: None, sea: FakeSea, sea_server: TestServer
-) -> None:
-    """An answer that is not a JSON object lets HA retry the setup."""
-    sea.info = None  # type: ignore[assignment]
-    entry = _sea_entry(sea_server)
-    entry.add_to_hass(hass)
-
-    assert not await hass.config_entries.async_setup(entry.entry_id)
-    assert entry.state is ConfigEntryState.SETUP_RETRY
-
-
-WINDOWS = (WINDOW, "sensor.sea_next_cheap_window_end")
-
-
-def _hidden_by(
-    entity_registry: er.EntityRegistry, entity_id: str
-) -> er.RegistryEntryHider | None:
-    entry = entity_registry.async_get(entity_id)
-    assert entry is not None
-    return entry.hidden_by
-
-
-async def test_fixed_tariff_hides_the_windows(
-    hass: HomeAssistant,
-    sea_entry: MockConfigEntry,
-    sea: FakeSea,
-    entity_registry: er.EntityRegistry,
-) -> None:
-    """A fixed price hides the window entities, another tariff shows them again."""
-    assert _state(hass, "sensor.sea_tariff") == "dynamic"
-    assert all(_hidden_by(entity_registry, entity_id) is None for entity_id in WINDOWS)
-
-    await sea.send({"type": "update", "values": {"tarif": "fixed"}})
-    await _until(lambda: _state(hass, "sensor.sea_tariff") == "fixed")
-    assert all(
-        _hidden_by(entity_registry, entity_id) is er.RegistryEntryHider.INTEGRATION
-        for entity_id in WINDOWS
-    )
-
-    await sea.send({"type": "update", "values": {"tarif": None}})
-    await _until(lambda: _state(hass, "sensor.sea_tariff") == STATE_UNKNOWN)
-    assert all(
-        _hidden_by(entity_registry, entity_id) is er.RegistryEntryHider.INTEGRATION
-        for entity_id in WINDOWS
-    )
-
-    await sea.send({"type": "update", "values": {"tarif": "ht_nt"}})
-    await _until(lambda: _state(hass, "sensor.sea_tariff") == "ht_nt")
-    assert all(_hidden_by(entity_registry, entity_id) is None for entity_id in WINDOWS)
-
-
-async def test_a_user_hidden_window_stays_hidden(
-    hass: HomeAssistant,
-    sea_entry: MockConfigEntry,
-    sea: FakeSea,
-    entity_registry: er.EntityRegistry,
-) -> None:
-    """The tariff never changes what the user hid or showed."""
-    entity_registry.async_update_entity(WINDOW, hidden_by=er.RegistryEntryHider.USER)
-
-    await sea.send({"type": "update", "values": {"tarif": "fixed"}})
-    await _until(lambda: _state(hass, "sensor.sea_tariff") == "fixed")
-    await sea.send({"type": "update", "values": {"tarif": "dynamic"}})
-    await _until(lambda: _state(hass, "sensor.sea_tariff") == "dynamic")
-
-    assert _hidden_by(entity_registry, WINDOW) is er.RegistryEntryHider.USER
-
-
-async def test_fixed_tariff_at_start_hides_the_windows(
-    hass: HomeAssistant,
-    setup_homeassistant: None,
-    sea: FakeSea,
-    sea_server: TestServer,
-    entity_registry: er.EntityRegistry,
-) -> None:
-    """A fixed price reported at setup hides the windows right away."""
-    sea.state["tarif"] = "fixed"
-    entry = _sea_entry(sea_server)
-    entry.add_to_hass(hass)
-    assert await hass.config_entries.async_setup(entry.entry_id)
-    await hass.async_block_till_done()
-
-    assert all(
-        _hidden_by(entity_registry, entity_id) is er.RegistryEntryHider.INTEGRATION
-        for entity_id in WINDOWS
-    )
-
-
 async def test_strategy_states(
     hass: HomeAssistant, sea_entry: MockConfigEntry, sea: FakeSea
 ) -> None:
     """Each strategy is an enum sensor that follows the pushed state."""
-    entity_id = "sensor.sea_strategy_pv_surplus"
-    assert _state(hass, entity_id) == "ready"
-    assert hass.states.get(entity_id).attributes["options"] == [
-        "off",
-        "missing",
-        "ready",
-        "acting",
-    ]
-
     await sea.send(
         {"type": "update", "values": {"strategie_self_consumption": "acting"}}
     )
-    await _until(lambda: _state(hass, entity_id) == "acting")
+    await _until(lambda: _state(hass, STRATEGY) == "acting")
     assert _state(hass, "sensor.sea_strategy_optimizer") == "ready"
 
 
-SWITCH = "switch.sea_pv_surplus"
-SELECT = "select.sea_control_mode"
-
-
 async def test_strategy_switches(
-    hass: HomeAssistant,
-    sea_entry: MockConfigEntry,
-    sea: FakeSea,
-    entity_registry: er.EntityRegistry,
+    hass: HomeAssistant, sea_entry: MockConfigEntry, sea: FakeSea
 ) -> None:
-    """Eight strategies can be switched; the state follows the push update."""
-    switches = [
-        entry
-        for entry in er.async_entries_for_config_entry(
-            entity_registry, sea_entry.entry_id
-        )
-        if entry.domain == "switch"
-    ]
-    assert len(switches) == 8
-    assert entity_registry.async_get(SWITCH).unique_id == (
-        "sea_strategie_self_consumption_switch"
-    )
-    assert _state(hass, SWITCH) == STATE_ON
-
+    """A switch sends the command; the state follows the push update."""
     await hass.services.async_call(
         "switch", "turn_off", {"entity_id": SWITCH}, blocking=True
     )
-    assert sea.commands[-1] == {"key": "strategie_self_consumption", "value": False}
+    assert sea.commands[-1] == ("strategie_self_consumption", False)
     await _until(lambda: _state(hass, SWITCH) == STATE_OFF)
-    assert _state(hass, "sensor.sea_strategy_pv_surplus") == "off"
+    assert _state(hass, STRATEGY) == "off"
 
     await hass.services.async_call(
         "switch", "turn_on", {"entity_id": SWITCH}, blocking=True
     )
-    assert sea.commands[-1] == {"key": "strategie_self_consumption", "value": True}
+    assert sea.commands[-1] == ("strategie_self_consumption", True)
     await _until(lambda: _state(hass, SWITCH) == STATE_ON)
 
 
@@ -740,7 +479,7 @@ async def test_missing_prerequisite_is_still_on(
     await sea.send(
         {"type": "update", "values": {"strategie_self_consumption": "missing"}}
     )
-    await _until(lambda: _state(hass, "sensor.sea_strategy_pv_surplus") == "missing")
+    await _until(lambda: _state(hass, STRATEGY) == "missing")
     assert _state(hass, SWITCH) == STATE_ON
 
     await sea.send({"type": "update", "values": {"strategie_self_consumption": None}})
@@ -751,38 +490,35 @@ async def test_control_level_select(
     hass: HomeAssistant, sea_entry: MockConfigEntry, sea: FakeSea
 ) -> None:
     """The control level can be selected."""
-    assert _state(hass, SELECT) == "auto"
-
     await hass.services.async_call(
         "select",
         "select_option",
         {"entity_id": SELECT, "option": "manual"},
         blocking=True,
     )
-    assert sea.commands[-1] == {"key": "regelung", "value": "manual"}
+    assert sea.commands[-1] == ("regelung", "manual")
     await _until(lambda: _state(hass, SELECT) == "manual")
-    assert _state(hass, "sensor.sea_control_mode") == "manual"
 
     await sea.send({"type": "update", "values": {"regelung": "boost"}})
     await _until(lambda: _state(hass, SELECT) == STATE_UNKNOWN)
 
 
 @pytest.mark.parametrize(
-    ("status", "message"),
+    ("error", "message"),
     [
-        pytest.param(400, "refused the command", id="refused"),
-        pytest.param(500, "cannot be reached", id="unreachable"),
+        pytest.param(SeaCommandError("nope"), "refused the command", id="refused"),
+        pytest.param(SeaError("down"), "cannot be reached", id="unreachable"),
     ],
 )
 async def test_command_errors(
     hass: HomeAssistant,
     sea_entry: MockConfigEntry,
     sea: FakeSea,
-    status: int,
+    error: Exception,
     message: str,
 ) -> None:
     """A refused or failed command raises an error and changes nothing."""
-    sea.command_status = status
+    sea.command_error = error
 
     with pytest.raises(HomeAssistantError, match=message):
         await hass.services.async_call(

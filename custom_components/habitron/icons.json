@@ -31,13 +31,13 @@
           "on": "mdi:microphone-message"
         }
       },
-      "guenstig": {
+      "cheap_now": {
         "default": "mdi:cash-check"
       },
-      "einspeisung_gesperrt": {
+      "feed_in_blocked": {
         "default": "mdi:transmission-tower-off"
       },
-      "14a_gedimmt": {
+      "dimmed_14a": {
         "default": "mdi:speedometer-slow"
       }
     },
@@ -113,82 +113,79 @@
       "airquality": {
         "default": "mdi:air-filter"
       },
-      "pv_prognose_heute": {
+      "pv_forecast_today": {
         "default": "mdi:solar-power"
       },
-      "pv_prognose_heute_rest": {
+      "pv_forecast_today_remaining": {
         "default": "mdi:solar-power-variant"
       },
-      "pv_prognose_morgen": {
+      "pv_forecast_tomorrow": {
         "default": "mdi:solar-power"
       },
-      "strompreis": {
+      "electricity_price": {
         "default": "mdi:currency-eur"
       },
-      "naechstes_guenstiges_fenster": {
+      "next_cheap_window": {
         "default": "mdi:clock-start"
       },
-      "naechstes_guenstiges_fenster_ende": {
+      "next_cheap_window_end": {
         "default": "mdi:clock-end"
       },
-      "akku_plan": {
+      "battery_plan": {
         "default": "mdi:battery-sync"
       },
-      "akku_plan_bis": {
+      "battery_plan_until": {
         "default": "mdi:battery-clock"
       },
-      "regelung": {
-        "default": "mdi:tune-variant"
-      },
-      "kosten_heute": {
+      "cost_today": {
         "default": "mdi:cash"
       },
-      "einsparung_heute": {
+      "savings_today": {
         "default": "mdi:piggy-bank"
       },
-      "hinweise": {
+      "open_hints": {
         "default": "mdi:lightbulb-alert"
       },
-      "tarif": {
+      "tariff": {
         "default": "mdi:cash-clock"
       },
-      "strategie_self_consumption": {
+      "strategy_self_consumption": {
         "default": "mdi:strategy"
       },
-      "strategie_setpoint_boost": {
+      "strategy_setpoint_boost": {
         "default": "mdi:strategy"
       },
-      "strategie_tariff_shift": {
+      "strategy_tariff_shift": {
         "default": "mdi:strategy"
       },
-      "strategie_setback": {
+      "strategy_setback": {
         "default": "mdi:strategy"
       },
-      "strategie_circuit_guide": {
+      "strategy_circuit_guide": {
         "default": "mdi:strategy"
       },
-      "strategie_battery_cover": {
+      "strategy_battery_cover": {
         "default": "mdi:strategy"
       },
-      "strategie_optimizer": {
+      "strategy_optimizer": {
         "default": "mdi:strategy"
       },
-      "strategie_grid_limits": {
+      "strategy_grid_limits": {
         "default": "mdi:strategy"
       },
-      "strategie_peak_shaving": {
+      "strategy_peak_shaving": {
         "default": "mdi:strategy"
       },
-      "strategie_feed_in_limit": {
+      "strategy_feed_in_limit": {
         "default": "mdi:strategy"
       },
-      "strategie_emergency_reserve": {
+      "strategy_emergency_reserve": {
         "default": "mdi:strategy"
       },
-      "strategie_battery_care": {
+      "strategy_battery_care": {
         "default": "mdi:strategy"
       },
-      "strategie_rules": {
+      "strategy_rules": {
         "default": "mdi:strategy"
       }
     },
@@ -211,28 +208,28 @@
           "on": "mdi:heat-pump"
         }
       },
-      "strategie_self_consumption": {
+      "strategy_self_consumption": {
         "default": "mdi:strategy"
       },
-      "strategie_setpoint_boost": {
+      "strategy_setpoint_boost": {
         "default": "mdi:strategy"
       },
-      "strategie_tariff_shift": {
+      "strategy_tariff_shift": {
         "default": "mdi:strategy"
       },
-      "strategie_setback": {
+      "strategy_setback": {
         "default": "mdi:strategy"
       },
-      "strategie_circuit_guide": {
+      "strategy_circuit_guide": {
         "default": "mdi:strategy"
       },
-      "strategie_battery_cover": {
+      "strategy_battery_cover": {
         "default": "mdi:strategy"
       },
-      "strategie_peak_shaving": {
+      "strategy_peak_shaving": {
         "default": "mdi:strategy"
       },
-      "strategie_feed_in_limit": {
+      "strategy_feed_in_limit": {
         "default": "mdi:strategy"
       }
     },
@@ -248,7 +245,7 @@
       }
     },
     "select": {
-      "regelung": {
+      "control_mode": {
         "default": "mdi:tune-variant"
       }
     }

@@ -83,13 +83,13 @@
       "listening_status": {
         "name": "Listening status"
       },
-      "guenstig": {
+      "cheap_now": {
         "name": "Cheap now"
       },
-      "einspeisung_gesperrt": {
+      "feed_in_blocked": {
         "name": "Feed-in blocked"
       },
-      "14a_gedimmt": {
+      "dimmed_14a": {
         "name": "Dimmed by §14a"
       }
     },
@@ -177,25 +177,25 @@
       "airquality": {
         "name": "Air quality"
       },
-      "pv_prognose_heute": {
+      "pv_forecast_today": {
         "name": "PV forecast today"
       },
-      "pv_prognose_heute_rest": {
+      "pv_forecast_today_remaining": {
         "name": "PV forecast rest of today"
       },
-      "pv_prognose_morgen": {
+      "pv_forecast_tomorrow": {
         "name": "PV forecast tomorrow"
       },
-      "strompreis": {
+      "electricity_price": {
         "name": "Electricity price"
       },
-      "naechstes_guenstiges_fenster": {
+      "next_cheap_window": {
         "name": "Next cheap window"
       },
-      "naechstes_guenstiges_fenster_ende": {
+      "next_cheap_window_end": {
         "name": "Next cheap window end"
       },
-      "akku_plan": {
+      "battery_plan": {
         "name": "Battery plan",
         "state": {
           "charge_pv": "Charge from PV",
@@ -206,28 +206,19 @@
           "idle": "Idle"
         }
       },
-      "akku_plan_bis": {
+      "battery_plan_until": {
         "name": "Battery plan until"
       },
-      "regelung": {
-        "name": "Control mode",
-        "state": {
-          "auto": "Automatic",
-          "assisted": "Advisory",
-          "rules": "Rules only",
-          "manual": "Manual"
-        }
-      },
-      "kosten_heute": {
+      "cost_today": {
         "name": "Cost today"
       },
-      "einsparung_heute": {
+      "savings_today": {
         "name": "Savings today"
       },
-      "hinweise": {
+      "open_hints": {
         "name": "Open hints"
       },
-      "tarif": {
+      "tariff": {
         "name": "Tariff",
         "state": {
           "fixed": "Fixed price",
@@ -235,7 +226,7 @@
           "dynamic": "Dynamic"
         }
       },
-      "strategie_self_consumption": {
+      "strategy_self_consumption": {
         "name": "Strategy PV surplus",
         "state": {
           "off": "Off",
@@ -244,7 +235,7 @@
           "acting": "Acting"
         }
       },
-      "strategie_setpoint_boost": {
+      "strategy_setpoint_boost": {
         "name": "Strategy heat pump boost",
         "state": {
           "off": "Off",
@@ -253,7 +244,7 @@
           "acting": "Acting"
         }
       },
-      "strategie_tariff_shift": {
+      "strategy_tariff_shift": {
         "name": "Strategy dynamic tariff",
         "state": {
           "off": "Off",
@@ -262,7 +253,7 @@
           "acting": "Acting"
         }
       },
-      "strategie_setback": {
+      "strategy_setback": {
         "name": "Strategy setback",
         "state": {
           "off": "Off",
@@ -271,7 +262,7 @@
           "acting": "Acting"
         }
       },
-      "strategie_circuit_guide": {
+      "strategy_circuit_guide": {
         "name": "Strategy heating circuit control",
         "state": {
           "off": "Off",
@@ -280,7 +271,7 @@
           "acting": "Acting"
         }
       },
-      "strategie_battery_cover": {
+      "strategy_battery_cover": {
         "name": "Strategy battery coverage",
         "state": {
           "off": "Off",
@@ -289,7 +280,7 @@
           "acting": "Acting"
         }
       },
-      "strategie_optimizer": {
+      "strategy_optimizer": {
         "name": "Strategy optimizer",
         "state": {
           "off": "Off",
@@ -298,7 +289,7 @@
           "acting": "Acting"
         }
       },
-      "strategie_grid_limits": {
+      "strategy_grid_limits": {
         "name": "Strategy grid limit",
         "state": {
           "off": "Off",
@@ -307,7 +298,7 @@
           "acting": "Acting"
         }
       },
-      "strategie_peak_shaving": {
+      "strategy_peak_shaving": {
         "name": "Strategy peak shaving",
         "state": {
           "off": "Off",
@@ -316,7 +307,7 @@
           "acting": "Acting"
         }
       },
-      "strategie_feed_in_limit": {
+      "strategy_feed_in_limit": {
         "name": "Strategy feed-in limit",
         "state": {
           "off": "Off",
@@ -325,7 +316,7 @@
           "acting": "Acting"
         }
       },
-      "strategie_emergency_reserve": {
+      "strategy_emergency_reserve": {
         "name": "Strategy emergency reserve",
         "state": {
           "off": "Off",
@@ -334,7 +325,7 @@
           "acting": "Acting"
         }
       },
-      "strategie_battery_care": {
+      "strategy_battery_care": {
         "name": "Strategy battery care",
         "state": {
           "off": "Off",
@@ -343,7 +334,7 @@
           "acting": "Acting"
         }
       },
-      "strategie_rules": {
+      "strategy_rules": {
         "name": "Strategy own rules",
         "state": {
           "off": "Off",
@@ -363,28 +354,28 @@
       "climate_ctl": {
         "name": "Climate controller"
       },
-      "strategie_self_consumption": {
+      "strategy_self_consumption": {
         "name": "PV surplus"
       },
-      "strategie_setpoint_boost": {
+      "strategy_setpoint_boost": {
         "name": "Heat pump boost"
       },
-      "strategie_tariff_shift": {
+      "strategy_tariff_shift": {
         "name": "Dynamic tariff"
       },
-      "strategie_setback": {
+      "strategy_setback": {
         "name": "Setback"
       },
-      "strategie_circuit_guide": {
+      "strategy_circuit_guide": {
         "name": "Heating circuit control"
       },
-      "strategie_battery_cover": {
+      "strategy_battery_cover": {
         "name": "Battery coverage"
       },
-      "strategie_peak_shaving": {
+      "strategy_peak_shaving": {
         "name": "Peak shaving"
       },
-      "strategie_feed_in_limit": {
+      "strategy_feed_in_limit": {
         "name": "Feed-in limit"
       }
     },
@@ -416,7 +407,7 @@
       "stored_message": {
         "name": "Messages list"
       },
-      "regelung": {
+      "control_mode": {
         "name": "Control mode",
         "state": {
           "auto": "Automatic",

@@ -3,6 +3,12 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.4.8b7
+- Beta. The SEA client now lives in habitron_client 2.5.0.
+- Changed: the SEA cheap-window sensors are no longer hidden at a fixed price; they show unknown.
+- Removed: the SEA sensor "Regelung"; the select of the same name remains.
+- Removed: the takeover of entities from 3.4.8b1.
+
 ## v3.4.8b6
 - Beta. New: switches for the eight SEA strategies and a select for the SEA control level.
 
