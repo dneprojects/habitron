@@ -223,7 +223,15 @@ SEA_SENSORS: Final[tuple[SeaSensorEntityDescription, ...]] = (
             ("naechstes_guenstiges_fenster", "next_cheap_window"),
             ("naechstes_guenstiges_fenster_ende", "next_cheap_window_end"),
             ("akku_plan_bis", "battery_plan_until"),
+            ("naechstes_pv_fenster", "next_pv_window"),
+            ("naechstes_pv_fenster_ende", "next_pv_window_end"),
         )
+    ),
+    SeaSensorEntityDescription(
+        key="strom_ampel",
+        translation_key="power_traffic_light",
+        device_class=SensorDeviceClass.ENUM,
+        options=["green", "yellow", "red"],
     ),
     SeaSensorEntityDescription(
         key="akku_plan",

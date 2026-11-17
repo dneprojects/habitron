@@ -4,6 +4,13 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.4.8b8
+
+### SEA keys `strom_ampel`, `naechstes_pv_fenster(_ende)`
+Additive read-only keys of contract v1 (SEA 0.15.0-beta.106): an enum
+`green` / `yellow` / `red` and two timestamps of the next window with free PV
+surplus.
+
 ## v3.4.8b7
 
 ### SEA structured as for core

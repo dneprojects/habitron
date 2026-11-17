@@ -187,6 +187,15 @@
       },
       "strategy_rules": {
         "default": "mdi:strategy"
+      },
+      "power_traffic_light": {
+        "default": "mdi:traffic-light"
+      },
+      "next_pv_window": {
+        "default": "mdi:weather-sunny"
+      },
+      "next_pv_window_end": {
+        "default": "mdi:weather-sunset-down"
       }
     },
     "switch": {

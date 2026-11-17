@@ -58,6 +58,9 @@ STATE: dict[str, Any] = {
     "strompreis": 18.2,
     "guenstig": True,
     "tarif": "dynamic",
+    "strom_ampel": "green",
+    "naechstes_pv_fenster": "2026-11-17T10:00:00+00:00",
+    "naechstes_pv_fenster_ende": "2026-11-17T13:00:00+00:00",
     "naechstes_guenstiges_fenster": "2026-11-15T01:00:00+00:00",
     "naechstes_guenstiges_fenster_ende": "2026-11-15T05:00:00+00:00",
     "akku_plan": "charge_pv",
@@ -265,7 +268,7 @@ async def test_entities(
     device = device_registry.async_get_device({(DOMAIN, "sea")})
     assert device == snapshot(name="device")
     entities = er.async_entries_for_config_entry(entity_registry, sea_entry.entry_id)
-    assert len(entities) == 37
+    assert len(entities) == 40
     for entity in sorted(entities, key=lambda entity: entity.entity_id):
         assert entity == snapshot(name=f"{entity.entity_id}-entry")
         assert hass.states.get(entity.entity_id) == snapshot(

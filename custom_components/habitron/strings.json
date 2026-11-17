@@ -345,6 +345,20 @@
           "ready": "Ready",
           "acting": "Acting"
         }
+      },
+      "power_traffic_light": {
+        "name": "Power traffic light",
+        "state": {
+          "green": "Green",
+          "yellow": "Yellow",
+          "red": "Red"
+        }
+      },
+      "next_pv_window": {
+        "name": "Next PV window"
+      },
+      "next_pv_window_end": {
+        "name": "Next PV window end"
       }
     },
     "switch": {

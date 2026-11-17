@@ -345,6 +345,20 @@
           "ready": "Bereit",
           "acting": "Wirkt"
         }
+      },
+      "power_traffic_light": {
+        "name": "Strom-Ampel",
+        "state": {
+          "green": "Grün",
+          "yellow": "Gelb",
+          "red": "Rot"
+        }
+      },
+      "next_pv_window": {
+        "name": "Nächstes PV-Fenster"
+      },
+      "next_pv_window_end": {
+        "name": "Ende PV-Fenster"
       }
     },
     "switch": {

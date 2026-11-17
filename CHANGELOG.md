@@ -3,6 +3,9 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.4.8b8
+- Beta. New: SEA sensors "Strom-Ampel", "Nächstes PV-Fenster" and "Ende PV-Fenster".
+
 ## v3.4.8b7
 - Beta. The SEA client now lives in habitron_client 2.5.0.
 - Changed: the SEA cheap-window sensors are no longer hidden at a fixed price; they show unknown.
