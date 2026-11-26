@@ -4,6 +4,28 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.4.8b10
+
+### Add-on slug read on every update search
+`SCTouchAppUpdate.async_update` calls `HbtnCoordinator.async_refresh_addon_slug`,
+which reads `get_smhub_info` again and takes `software.slug` (sentinel `none` ->
+empty, as in habitron_client). Before, the slug came from setup only; a hub whose
+Supervisor request failed at start kept HA on `<config>/habitron/firmware` until a
+reload. A failed read keeps the known slug. `base_url` and the device's
+configuration URL still come from setup. SmartHub retries its Supervisor request
+while the slug is unknown (SmartHub 3.6.6).
+
+### One APK for every panel of the HA
+Each panel searched only its own hub's folder, so a panel at a standalone hub
+never saw the APK the app hub provides. `scan_firmware_dirs_blocking` now takes
+the newest `sctouch_*.apk` of all directories from `_firmware_dirs`: the
+`/share/<slug>/firmware` of every loaded hub coordinator with `is_addon` (SEA
+entries filtered out; a standalone hub's slug is ignored, it may be its host
+name), then `<config>/habitron/firmware` (legacy fallback as before), which is
+created when missing. Slugs are refreshed only for app hubs. `firmware_dir` is
+the directory of the newest APK, so the download route and the checksum follow
+it. SmartHub provides the APK as app also without a panel of its own.
+
 ## v3.4.8b9
 
 ### Touch app APK served by a route, not a static path

@@ -89,6 +89,39 @@ def test_hub_properties_read_through_to_the_model(
 
 
 @pytest.mark.parametrize(
+    ("reported", "expected"),
+    [
+        ("aed76be6_smart_hub", "aed76be6_smart_hub"),
+        ("none", ""),  # the hub's sentinel for "no add-on"
+        (None, ""),
+    ],
+)
+async def test_refresh_addon_slug_takes_the_hub_answer(
+    coordinator_stub: HbtnCoordinator, reported: str | None, expected: str
+) -> None:
+    """A slug the hub names after setup replaces the one from setup."""
+    coordinator_stub.hub.slug = "stale"
+    info = {**MOCK_SMHUB_INFO, "software": {"slug": reported}}
+    coordinator_stub._client.get_smhub_info = AsyncMock(return_value=info)
+
+    assert await coordinator_stub.async_refresh_addon_slug() == expected
+    assert coordinator_stub.addon_slug == expected
+
+
+async def test_refresh_addon_slug_keeps_the_slug_on_a_failed_read(
+    coordinator_stub: HbtnCoordinator,
+) -> None:
+    """A hub that does not answer must not wipe a known slug."""
+    coordinator_stub.hub.slug = "aed76be6_smart_hub"
+    coordinator_stub._client.get_smhub_info = AsyncMock(
+        side_effect=HabitronError("timeout")
+    )
+
+    assert await coordinator_stub.async_refresh_addon_slug() == "aed76be6_smart_hub"
+    assert coordinator_stub.addon_slug == "aed76be6_smart_hub"
+
+
+@pytest.mark.parametrize(
     ("is_addon", "expected_conf_url"),
     [
         (False, f"http://{MOCK_HOST}:7780/hub"),

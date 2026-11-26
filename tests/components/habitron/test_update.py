@@ -3,6 +3,7 @@
 import hashlib
 import logging
 from pathlib import Path
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from aiohttp import web
@@ -10,6 +11,7 @@ from habitron_client import Module, Router
 import pytest
 from pytest_homeassistant_custom_component.typing import ClientSessionGenerator
 
+from custom_components.habitron.coordinator import HbtnCoordinator
 from custom_components.habitron.update import (
     _TOUCH_APP_ENTITIES,
     HbtnFirmwareView,
@@ -92,6 +94,8 @@ def _hub_coord() -> MagicMock:
     coordinator = MagicMock()
     coordinator.hass = MagicMock()
     coordinator.addon_slug = ""
+    coordinator.is_addon = False
+    coordinator.async_refresh_addon_slug = AsyncMock(return_value="")
     coordinator.ws_provider = None
     return coordinator
 
@@ -208,7 +212,11 @@ def test_scan_creates_the_firmware_directory(tmp_path: Path) -> None:
     entity = _touch_app_entity()
     entity.firmware_dir = tmp_path / "habitron" / "firmware"
 
-    assert entity.scan_firmware_dir_blocking() == (None, None)
+    assert entity.scan_firmware_dirs_blocking([entity.firmware_dir]) == (
+        None,
+        None,
+        None,
+    )
 
     assert entity.firmware_dir.is_dir()
 
@@ -228,7 +236,11 @@ def test_scan_reports_a_directory_it_cannot_create_once(
 
     with caplog.at_level(logging.WARNING):
         for _ in range(3):
-            assert entity.scan_firmware_dir_blocking() == (None, None)
+            assert entity.scan_firmware_dirs_blocking([entity.firmware_dir]) == (
+                None,
+                None,
+                None,
+            )
 
     assert (
         sum("Cannot create the firmware directory" in r.message for r in caplog.records)
@@ -377,3 +389,133 @@ async def test_firmware_view_is_registered_once(hass: HomeAssistant) -> None:
         _async_register_firmware_view(hass)
         _async_register_firmware_view(hass)
     register.assert_called_once()
+
+
+async def test_update_search_follows_a_slug_named_after_setup(
+    hass: HomeAssistant,
+) -> None:
+    """A slug the hub reports only later moves the search to ``/share``.
+
+    Before, the slug was read at setup only; a hub whose Supervisor request
+    failed at start left HA in the wrong folder until a reload.
+    """
+    module = Module(uid="MOD-T", addr=4, typ=b"", name="Touch")
+    coordinator = _hub_coord()
+    coordinator.hass = hass
+
+    async def _hub_names_slug() -> str:
+        coordinator.addon_slug = "aed76be6_smart_hub"
+        return coordinator.addon_slug
+
+    coordinator.is_addon = True
+    coordinator.async_refresh_addon_slug = AsyncMock(side_effect=_hub_names_slug)
+    entity = SCTouchAppUpdate(module, coordinator)
+
+    with patch.object(
+        entity, "scan_firmware_dirs_blocking", return_value=(None, None, None)
+    ) as scan:
+        await entity.async_update()
+
+    coordinator.async_refresh_addon_slug.assert_awaited_once()
+    dirs = scan.call_args.args[0]
+    assert dirs[0] == Path("/share/aed76be6_smart_hub/firmware")
+
+
+def _apk_versions(versions: dict[str, str]) -> Any:
+    """Stand in for the APK manifest reader: file name -> versionName."""
+    return lambda path: versions.get(path.name)
+
+
+async def test_one_apk_serves_the_panels_of_every_hub(
+    hass: HomeAssistant, tmp_path: Path
+) -> None:
+    """A panel at a standalone hub gets the APK of the app hub of this HA.
+
+    Before, each panel searched only its own hub's folder: a panel at a
+    standalone hub looked in the hand-filled folder and never saw the APK
+    the app hub provided.
+    """
+    app_dir = tmp_path / "share" / "firmware"
+    app_dir.mkdir(parents=True)
+    (app_dir / "sctouch_v1.4.8.apk").write_bytes(b"new")
+    user_dir = tmp_path / "config" / "habitron" / "firmware"
+    user_dir.mkdir(parents=True)
+    (user_dir / "sctouch_v1.3.1.apk").write_bytes(b"old")
+
+    standalone = _hub_coord()
+    standalone.hass = hass
+    app_hub = MagicMock(spec=HbtnCoordinator)
+    app_hub.is_addon = True
+    app_hub.addon_slug = "aed76be6_smart_hub"
+    app_hub.async_refresh_addon_slug = AsyncMock(return_value="aed76be6_smart_hub")
+    entry = MagicMock(runtime_data=app_hub)
+    module = Module(uid="MOD-T", addr=4, typ=b"", name="Touch")
+    entity = SCTouchAppUpdate(module, standalone)
+
+    with (
+        patch.object(hass.config_entries, "async_loaded_entries", return_value=[entry]),
+        patch.object(
+            entity,
+            "_firmware_dirs",
+            side_effect=lambda coords: (
+                [app_dir, user_dir] if app_hub in coords else [user_dir]
+            ),
+        ),
+        patch(
+            "custom_components.habitron.update.read_apk_version_name",
+            side_effect=_apk_versions(
+                {"sctouch_v1.4.8.apk": "1.4.8", "sctouch_v1.3.1.apk": "1.3.1"}
+            ),
+        ),
+    ):
+        await entity.async_update()
+
+    app_hub.async_refresh_addon_slug.assert_awaited_once()
+    standalone.async_refresh_addon_slug.assert_not_awaited()
+    assert entity.latest_version == "1.4.8"
+    assert entity.firmware_dir == app_dir
+
+
+def test_firmware_dirs_list_app_hubs_first_and_the_user_dir_last(
+    hass: HomeAssistant, tmp_path: Path
+) -> None:
+    """App hub folders first, the hand-filled folder last.
+
+    A standalone hub may report its host name as slug; that is no folder.
+    """
+    entity = _touch_app_entity()
+    entity._hass = MagicMock()
+    entity._hass.config.path.return_value = str(tmp_path)
+    app_hub = MagicMock(is_addon=True, addon_slug="aed76be6_smart_hub")
+    standalone = MagicMock(is_addon=False, addon_slug="my_pi")
+
+    dirs = entity._firmware_dirs([standalone, app_hub, app_hub])
+
+    assert dirs == [
+        Path("/share/aed76be6_smart_hub/firmware"),
+        tmp_path / "habitron" / "firmware",
+    ]
+
+
+def test_scan_takes_the_newest_apk_of_all_directories(tmp_path: Path) -> None:
+    """The highest version wins, whichever directory holds it."""
+    first = tmp_path / "a"
+    first.mkdir()
+    (first / "sctouch_v1.3.1.apk").write_bytes(b"")
+    second = tmp_path / "b"
+    second.mkdir()
+    (second / "sctouch_v1.4.8.apk").write_bytes(b"")
+    (second / "notes.apk").write_bytes(b"")
+    entity = _touch_app_entity()
+
+    with patch(
+        "custom_components.habitron.update.read_apk_version_name",
+        side_effect=_apk_versions(
+            {"sctouch_v1.3.1.apk": "1.3.1", "sctouch_v1.4.8.apk": "1.4.8"}
+        ),
+    ):
+        result = entity.scan_firmware_dirs_blocking(
+            [tmp_path / "missing", first, second]
+        )
+
+    assert result == ("1.4.8", "sctouch_v1.4.8.apk", second)

@@ -5,7 +5,7 @@ import hashlib
 import logging
 from pathlib import Path
 import re
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from urllib.parse import quote
 
 from aiohttp import web
@@ -29,10 +29,7 @@ from homeassistant.util.hass_dict import HassKey
 from ._axml import read_apk_version_name
 from ._helpers import hbtn_device_info
 from .const import DOMAIN
-from .coordinator import HabitronConfigEntry, HbtnFirmwareCoordinator
-
-if TYPE_CHECKING:
-    from .coordinator import HbtnCoordinator
+from .coordinator import HabitronConfigEntry, HbtnCoordinator, HbtnFirmwareCoordinator
 
 PARALLEL_UPDATES = 1
 
@@ -187,106 +184,126 @@ class SCTouchAppUpdate(UpdateEntity):
             return None
         return file_path
 
-    def scan_firmware_dir_blocking(self) -> tuple[str | None, str | None]:
-        """Find the newest ``sctouch_*.apk`` in the firmware directory.
+    def scan_firmware_dirs_blocking(
+        self, dirs: list[Path]
+    ) -> tuple[str | None, str | None, Path | None]:
+        """Find the newest ``sctouch_*.apk`` across the firmware directories.
 
-        Creates the directory when it does not exist yet, so the user only has
-        to drop a file in. Returns ``(version, filename)`` of the highest
-        version, or ``(None, None)`` when the directory is empty or contains no
-        parseable APKs.
+        The last directory is the one the user drops APKs into; it is created
+        when missing, so nobody has to guess it from a log line. Returns
+        ``(version, filename, directory)`` of the highest version, or
+        ``(None, None, None)`` when no directory holds a parseable APK.
         """
-        if not self.firmware_dir.is_dir():
-            # Create it instead of complaining about it. This is where the user
-            # drops an ``sctouch_*.apk``, and having to make the directory by
-            # hand first is a step nobody can guess from a log line. Empty is a
-            # valid state: the entity then simply offers nothing to install.
-            try:
-                self.firmware_dir.mkdir(parents=True, exist_ok=True)
-            except OSError as err:
-                # This one is worth a warning -- but once, not on every poll.
-                if str(self.firmware_dir) not in _FIRMWARE_DIR_LOGGED:
-                    _FIRMWARE_DIR_LOGGED.add(str(self.firmware_dir))
-                    _LOGGER.warning(
-                        "Cannot create the firmware directory %s: %s",
-                        self.firmware_dir,
-                        err,
-                    )
-            else:
-                _LOGGER.info(
-                    "Created the firmware directory %s; place an sctouch_*.apk "
-                    "there to offer the Touch app update",
-                    self.firmware_dir,
-                )
-            return None, None
-
+        self._ensure_user_dir(dirs[-1])
         latest_version = parse_version("0.0.0")
-        latest_filename: str | None = None
-
-        try:
-            for file_path in self.firmware_dir.iterdir():
-                if not (
-                    file_path.name.startswith("sctouch_") and file_path.suffix == ".apk"
-                ):
-                    continue
-                version_name = read_apk_version_name(file_path)
-                if version_name is None:
-                    _LOGGER.warning("Could not read version from %s", file_path.name)
-                    continue
-                _LOGGER.debug(
-                    "Parsed APK %s, found version %s", file_path.name, version_name
+        latest: tuple[str, Path] | None = None
+        for firmware_dir in dirs:
+            if not firmware_dir.is_dir():
+                continue
+            try:
+                for file_path in firmware_dir.iterdir():
+                    if not _APK_NAME_RE.fullmatch(file_path.name):
+                        continue
+                    version_name = read_apk_version_name(file_path)
+                    if version_name is None:
+                        _LOGGER.warning("Could not read version from %s", file_path)
+                        continue
+                    _LOGGER.debug("Parsed APK %s, version %s", file_path, version_name)
+                    apk_version = parse_version(version_name)
+                    if apk_version > latest_version:
+                        latest_version = apk_version
+                        latest = (file_path.name, firmware_dir)
+            except OSError as err:
+                _LOGGER.error(
+                    "Error scanning firmware directory %s: %s", firmware_dir, err
                 )
-                apk_version_obj = parse_version(version_name)
-                if apk_version_obj > latest_version:
-                    latest_version = apk_version_obj
-                    latest_filename = file_path.name
-        except OSError as e:
-            _LOGGER.error("Error scanning firmware directory: %s", e)
-            return None, None
+        if latest is None:
+            return None, None, None
+        return str(latest_version), latest[0], latest[1]
 
-        if latest_filename is None:
-            return None, None
-        return str(latest_version), latest_filename
-
-    def _update_path(self) -> None:
-        """Determine firmware path based on environment.
-
-        Resolves to one of (in priority order):
-
-        1. ``/share/<addon_slug>/firmware`` when HbtnCoordinator runs as a HA OS
-           add-on. The add-on deposits APKs into ``/share`` by design.
-        2. ``<HA-config>/<DOMAIN>/firmware`` for any other install. This is
-           the path that works in Home Assistant Core; HACS users should
-           migrate to it by moving their existing firmware directory up
-           one level (out of ``custom_components/<DOMAIN>/``).
-        3. ``<HA-config>/custom_components/<DOMAIN>/firmware`` as a
-           backward-compatible fallback for HACS installs that still have
-           their APKs in the old location. Logs a deprecation warning
-           when this path is used.
-        """
-        base_path = Path(self._hass.config.path())
-        if self._smhub.addon_slug:
-            self.firmware_dir = Path("/share") / self._smhub.addon_slug / "firmware"
+    @staticmethod
+    def _ensure_user_dir(firmware_dir: Path) -> None:
+        """Create the directory the user drops APKs into, if missing."""
+        if firmware_dir.is_dir():
             return
+        try:
+            firmware_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as err:
+            # Worth a warning -- but once, not on every poll.
+            if str(firmware_dir) not in _FIRMWARE_DIR_LOGGED:
+                _FIRMWARE_DIR_LOGGED.add(str(firmware_dir))
+                _LOGGER.warning(
+                    "Cannot create the firmware directory %s: %s", firmware_dir, err
+                )
+        else:
+            _LOGGER.info(
+                "Created the firmware directory %s; place an sctouch_*.apk "
+                "there to offer the Touch app update",
+                firmware_dir,
+            )
 
+    def _hub_coordinators(self) -> list[HbtnCoordinator]:
+        """Return this panel's hub and every other loaded hub of this HA."""
+        coordinators = [self._smhub]
+        for entry in self._hass.config_entries.async_loaded_entries(DOMAIN):
+            coordinator = entry.runtime_data
+            # SEA entries share the domain; only hubs carry firmware.
+            if isinstance(coordinator, HbtnCoordinator) and coordinator not in (
+                coordinators
+            ):
+                coordinators.append(coordinator)
+        return coordinators
+
+    def _firmware_dirs(self, coordinators: list[HbtnCoordinator]) -> list[Path]:
+        """Return the directories an APK of this HA instance can be in.
+
+        One APK serves every Touch panel of the HA instance, whichever hub it
+        is connected to:
+
+        1. ``/share/<addon_slug>/firmware`` of each hub running as HA app; the
+           app deposits its bundled APK there.
+        2. ``<HA-config>/<DOMAIN>/firmware``, the folder to drop an APK by
+           hand; it is the last entry and created when missing.
+        3. ``<HA-config>/custom_components/<DOMAIN>/firmware`` instead of 2
+           for HACS installs that still keep their APKs there.
+        """
+        dirs: list[Path] = []
+        for coordinator in coordinators:
+            # Only an app hub has a real slug; a standalone one may report
+            # its host name there.
+            if coordinator.is_addon and coordinator.addon_slug:
+                app_dir = Path("/share") / coordinator.addon_slug / "firmware"
+                if app_dir not in dirs:
+                    dirs.append(app_dir)
+
+        base_path = Path(self._hass.config.path())
         new_path = base_path / DOMAIN / "firmware"
         legacy_path = base_path / "custom_components" / DOMAIN / "firmware"
         if new_path.is_dir() or not legacy_path.is_dir():
-            self.firmware_dir = new_path
-            return
-        self.firmware_dir = legacy_path
+            dirs.append(new_path)
+            return dirs
+        dirs.append(legacy_path)
         if str(legacy_path) not in _LEGACY_FIRMWARE_LOGGED:
             _LEGACY_FIRMWARE_LOGGED.add(str(legacy_path))
             _LOGGER.info("Legacy firmware %s, move to %s", legacy_path, new_path)
+        return dirs
 
     async def async_update(self) -> None:
         """Fetch latest state."""
-        self._update_path()
-        _LOGGER.debug("Checking for updates in %s", self.firmware_dir)
+        coordinators = self._hub_coordinators()
+        # An app hub may name its slug only after setup; read it on every
+        # update search so the firmware directory follows without a reload.
+        for coordinator in coordinators:
+            if coordinator.is_addon:
+                await coordinator.async_refresh_addon_slug()
+        dirs = self._firmware_dirs(coordinators)
+        _LOGGER.debug("Checking for updates in %s", dirs)
 
-        # Scan for APKs in executor
-        latest_ver, latest_file = await self._hass.async_add_executor_job(
-            self.scan_firmware_dir_blocking
+        latest_ver, latest_file, latest_dir = await self._hass.async_add_executor_job(
+            self.scan_firmware_dirs_blocking, dirs
         )
+        # The download route serves from here, the checksum is computed here.
+        self.firmware_dir = latest_dir or dirs[-1]
 
         # Ensure installed version matches module master value
         module_version = getattr(self._module, "client_version", None)

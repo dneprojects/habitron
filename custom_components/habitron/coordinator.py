@@ -253,6 +253,26 @@ class HbtnCoordinator(DataUpdateCoordinator[HbtnData]):
         """Ingress slug of the hub's add-on, empty when it is not one."""
         return self.hub.slug
 
+    async def async_refresh_addon_slug(self) -> str:
+        """Read the add-on slug from the hub again and return it.
+
+        The hub may report its slug only after setup (its Supervisor request
+        failed at start). On a failed read the known slug is kept.
+        """
+        try:
+            info = await self.client.get_smhub_info()
+        except HabitronError as err:
+            _LOGGER.debug("Could not refresh the add-on slug: %s", err)
+            return self.hub.slug
+        # Same wire convention as habitron_client: "none" means no add-on.
+        slug = str(info["software"].get("slug", "") or "").strip()
+        if slug == "none":
+            slug = ""
+        if slug != self.hub.slug:
+            _LOGGER.info("Hub add-on slug changed from %r to %r", self.hub.slug, slug)
+            self.hub.slug = slug
+        return slug
+
     @property
     def smhub_version(self) -> str:
         """Version for SmartHub."""

@@ -3,6 +3,10 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.4.8b10
+- Beta. Fixed: the SC Touch app update finds the APK of a Smart Hub app without reloading the integration, also when the hub reports its app name only after the start.
+- Beta. Changed: one SC Touch app is offered to the panels at every hub of a Home Assistant, the newest of the Smart Hub app and the folder `habitron/firmware`.
+
 ## v3.4.8b9
 - Beta. Fixed: the SC Touch app update failed with 404 on the panel when the firmware folder changed after the HA start.
 
