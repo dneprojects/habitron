@@ -4,12 +4,15 @@ from asyncio import sleep
 import hashlib
 import logging
 from pathlib import Path
+import re
 from typing import TYPE_CHECKING, Any
+from urllib.parse import quote
 
+from aiohttp import web
 from habitron_client import Module, Router
 from packaging.version import parse as parse_version
 
-from homeassistant.components.http import StaticPathConfig
+from homeassistant.components.http import KEY_HASS, HomeAssistantView
 from homeassistant.components.update import (
     UpdateDeviceClass,
     UpdateEntity,
@@ -21,6 +24,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.network import NoURLAvailableError, get_url
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util.hass_dict import HassKey
 
 from ._axml import read_apk_version_name
 from ._helpers import hbtn_device_info
@@ -35,10 +39,19 @@ PARALLEL_UPDATES = 1
 _LOGGER = logging.getLogger(__name__)
 
 
-# URL prefix under which we expose the firmware directory via HA's
-# static-path serving. The Touch panel app downloads APKs from there
-# directly — no copy into ``<config>/www/`` necessary.
+# URL prefix of the APK download route. The Touch panel app downloads the
+# APK from ``<prefix>/<module uid>/<filename>``.
 _FIRMWARE_URL_PREFIX = "/habitron-firmware"
+
+# Only APKs of the Touch app are served; no path separators, so a request can
+# never leave the firmware directory.
+_APK_NAME_RE = re.compile(r"sctouch_[A-Za-z0-9._+-]+\.apk")
+
+# Touch app update entities by module uid; the download route resolves each
+# request against the entity's current firmware directory.
+_TOUCH_APP_ENTITIES: HassKey[dict[str, SCTouchAppUpdate]] = HassKey(
+    f"{DOMAIN}_touch_app_entities"
+)
 
 # Legacy firmware paths already logged, so the migration nudge appears only once.
 _LEGACY_FIRMWARE_LOGGED: set[str] = set()
@@ -71,11 +84,56 @@ async def async_setup_entry(
             _LOGGER.info("Creating SCTouchAppUpdate for %s", hbt_module.uid)
             new_devices.append(SCTouchAppUpdate(hbt_module, coordinator))
 
+    if any(isinstance(dev, SCTouchAppUpdate) for dev in new_devices):
+        _async_register_firmware_view(hass)
+
     if new_devices:
         # Prime firmware versions with one read before the entities go live.
         # Firmware is non-critical, so a failed read must not abort setup.
         await fw_coord.async_refresh()
         async_add_entities(new_devices)
+
+
+@callback
+def _async_register_firmware_view(hass: HomeAssistant) -> None:
+    """Register the APK download route once per HA instance.
+
+    Unlike a static path, the route is not bound to a directory: each request
+    is resolved against the firmware directory the entity uses right now, so a
+    directory that changes after setup (add-on slug known only later) is
+    served correctly without a restart.
+    """
+    if _TOUCH_APP_ENTITIES in hass.data:
+        return
+    hass.data[_TOUCH_APP_ENTITIES] = {}
+    hass.http.register_view(HbtnFirmwareView())
+
+
+class HbtnFirmwareView(HomeAssistantView):
+    """Serve the Touch app APK to the panel."""
+
+    url = _FIRMWARE_URL_PREFIX + "/{module_uid}/{filename}"
+    name = "api:habitron:firmware"
+    # The panel downloads with a plain HTTP client, without a HA token.
+    requires_auth = False
+
+    async def get(
+        self, request: web.Request, module_uid: str, filename: str
+    ) -> web.StreamResponse:
+        """Return the APK from the firmware directory of the panel's entity."""
+        hass: HomeAssistant = request.app[KEY_HASS]
+        entity = hass.data.get(_TOUCH_APP_ENTITIES, {}).get(module_uid)
+        if entity is None or not _APK_NAME_RE.fullmatch(filename):
+            raise web.HTTPNotFound
+        file_path = await hass.async_add_executor_job(
+            entity.resolve_apk_blocking, filename
+        )
+        if file_path is None:
+            _LOGGER.warning(
+                "APK %s requested but not found in %s", filename, entity.firmware_dir
+            )
+            raise web.HTTPNotFound
+        return web.FileResponse(file_path)
 
 
 class SCTouchAppUpdate(UpdateEntity):
@@ -113,29 +171,21 @@ class SCTouchAppUpdate(UpdateEntity):
             "Entity added, triggering immediate update for %s", self._module.uid
         )
         await self.async_update()
-        await self._register_firmware_static_path()
+        self._hass.data.setdefault(_TOUCH_APP_ENTITIES, {})[self._module.uid] = self
 
-    async def _register_firmware_static_path(self) -> None:
-        """Expose the firmware directory under ``_FIRMWARE_URL_PREFIX``.
+    async def async_will_remove_from_hass(self) -> None:
+        """Stop serving this panel's APK when the entity goes away."""
+        entities = self._hass.data.get(_TOUCH_APP_ENTITIES, {})
+        if entities.get(self._module.uid) is self:
+            del entities[self._module.uid]
+        await super().async_will_remove_from_hass()
 
-        The registration is per-HA-instance; trying to register the same
-        path a second time (e.g. on entry reload or with a second Touch
-        panel) raises — caught and logged at debug level.
-        """
-        if not self.firmware_dir.is_dir():
-            return
-        path_config = StaticPathConfig(
-            _FIRMWARE_URL_PREFIX, str(self.firmware_dir), False
-        )
-        try:
-            await self._hass.http.async_register_static_paths([path_config])
-        except Exception:  # noqa: BLE001
-            # Already registered (second Touch panel, entry reload, …).
-            _LOGGER.debug(
-                "Static path %s already registered for %s",
-                _FIRMWARE_URL_PREFIX,
-                self.firmware_dir,
-            )
+    def resolve_apk_blocking(self, filename: str) -> Path | None:
+        """Return the APK file in the current firmware directory, or None."""
+        file_path = self.firmware_dir / filename
+        if file_path.parent != self.firmware_dir or not file_path.is_file():
+            return None
+        return file_path
 
     def scan_firmware_dir_blocking(self) -> tuple[str | None, str | None]:
         """Find the newest ``sctouch_*.apk`` in the firmware directory.
@@ -259,10 +309,8 @@ class SCTouchAppUpdate(UpdateEntity):
     ) -> tuple[str | None, str | None]:
         """Return ``(url, sha256)`` for the firmware file served in place.
 
-        The firmware directory is exposed via ``async_register_static_paths``
-        in :meth:`async_added_to_hass`, so there is no copy step — we just
-        compute the SHA256 over the source file and build the URL from the
-        registered prefix.
+        The file is served by :class:`HbtnFirmwareView` from the same
+        directory the checksum is computed over, so there is no copy step.
         """
         source_file = self.firmware_dir / filename
 
@@ -282,7 +330,10 @@ class SCTouchAppUpdate(UpdateEntity):
                 with source_file.open("rb") as f:
                     for chunk in iter(lambda: f.read(65536), b""):
                         sha256.update(chunk)
-                url = f"{base_url}{_FIRMWARE_URL_PREFIX}/{filename}"
+                url = (
+                    f"{base_url}{_FIRMWARE_URL_PREFIX}/"
+                    f"{quote(self._module.uid, safe='')}/{filename}"
+                )
                 return url, sha256.hexdigest()
             except Exception:
                 _LOGGER.exception("Error hashing file %s", filename)

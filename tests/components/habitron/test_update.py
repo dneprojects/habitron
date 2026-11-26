@@ -5,16 +5,23 @@ import logging
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from aiohttp import web
 from habitron_client import Module, Router
 import pytest
+from pytest_homeassistant_custom_component.typing import ClientSessionGenerator
 
 from custom_components.habitron.update import (
+    _TOUCH_APP_ENTITIES,
+    HbtnFirmwareView,
     HbtnModuleUpdate,
     SCTouchAppUpdate,
+    _async_register_firmware_view,
     async_setup_entry,
 )
+from homeassistant.components.http import KEY_HASS
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.setup import async_setup_component
 
 
 def _fw_coord() -> MagicMock:
@@ -142,7 +149,10 @@ async def test_sctouch_app_install_sends_absolute_url(
     provider.async_send_json_message.assert_awaited_once()
     _stream, message = provider.async_send_json_message.await_args.args
     payload = message["payload"]
-    assert payload["url"] == "http://ha.local:8123/habitron-firmware/sctouch_v1.3.0.apk"
+    assert (
+        payload["url"]
+        == "http://ha.local:8123/habitron-firmware/MOD-T/sctouch_v1.3.0.apk"
+    )
     assert payload["checksum"] == expected_checksum
 
 
@@ -153,6 +163,7 @@ async def test_sctouch_app_install_sends_absolute_url(
 
 async def test_async_setup_entry_emits_updates(hass: HomeAssistant) -> None:
     """Setup emits a router + per-module firmware update and a Touch app update."""
+    assert await async_setup_component(hass, "http", {})
     module = _module()
     touch = Module(uid="MOD-T", addr=4, typ=b"\x01\x04", name="Touch")
     router = Router(uid="ROUTER-1", version="2.0.0")
@@ -177,6 +188,8 @@ async def test_async_setup_entry_emits_updates(hass: HomeAssistant) -> None:
         sum(isinstance(e, HbtnModuleUpdate) for e in added) == 3
     )  # router + 2 modules
     assert any(isinstance(e, SCTouchAppUpdate) for e in added)
+    # A Touch panel needs the APK download route.
+    assert _TOUCH_APP_ENTITIES in hass.data
 
 
 def _touch_app_entity() -> SCTouchAppUpdate:
@@ -221,3 +234,146 @@ def test_scan_reports_a_directory_it_cannot_create_once(
         sum("Cannot create the firmware directory" in r.message for r in caplog.records)
         == 1
     )
+
+
+# ---------------------------------------------------------------------------
+# APK download route
+# ---------------------------------------------------------------------------
+
+
+async def _serving_entity(hass: HomeAssistant, firmware_dir: Path) -> SCTouchAppUpdate:
+    """A Touch app entity whose APKs the download route serves."""
+    assert await async_setup_component(hass, "http", {})
+    _async_register_firmware_view(hass)
+    module = Module(uid="MOD-T", addr=4, typ=b"", name="Touch")
+    coordinator = _hub_coord()
+    coordinator.hass = hass
+    entity = SCTouchAppUpdate(module, coordinator)
+    entity.firmware_dir = firmware_dir
+    hass.data[_TOUCH_APP_ENTITIES]["MOD-T"] = entity
+    return entity
+
+
+async def test_download_follows_a_changed_firmware_directory(
+    hass: HomeAssistant, hass_client_no_auth: ClientSessionGenerator, tmp_path: Path
+) -> None:
+    """The APK comes from the directory the entity uses now, not at setup.
+
+    Regression: the directory used to be bound once per HA run. When the
+    add-on slug became known only after a reload, update and checksum came
+    from ``/share/<slug>/firmware`` while the download still pointed to the
+    old directory -- the panel got a 404.
+    """
+    old_dir = tmp_path / "old"
+    old_dir.mkdir()
+    new_dir = tmp_path / "new"
+    new_dir.mkdir()
+    (new_dir / "sctouch_v1.4.8.apk").write_bytes(b"apk-1.4.8")
+    entity = await _serving_entity(hass, old_dir)
+    entity.firmware_dir = new_dir
+
+    client = await hass_client_no_auth()
+    resp = await client.get("/habitron-firmware/MOD-T/sctouch_v1.4.8.apk")
+
+    assert resp.status == 200
+    assert await resp.read() == b"apk-1.4.8"
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/habitron-firmware/OTHER/sctouch_v1.4.8.apk",  # unknown panel
+        "/habitron-firmware/MOD-T/sctouch_v9.9.9.apk",  # missing file
+        "/habitron-firmware/MOD-T/notes.txt",  # not a Touch APK
+    ],
+)
+async def test_download_serves_only_touch_apks_of_known_panels(
+    hass: HomeAssistant,
+    hass_client_no_auth: ClientSessionGenerator,
+    tmp_path: Path,
+    path: str,
+) -> None:
+    """Anything but an existing Touch APK of a known panel is a 404."""
+    firmware_dir = tmp_path / "firmware"
+    firmware_dir.mkdir()
+    (firmware_dir / "sctouch_v1.4.8.apk").write_bytes(b"apk")
+    (firmware_dir / "notes.txt").write_text("x")
+    (tmp_path / "secret.apk").write_text("secret")
+    await _serving_entity(hass, firmware_dir)
+
+    client = await hass_client_no_auth()
+    resp = await client.get(path)
+
+    assert resp.status == 404
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/habitron-firmware/MOD-T/sctouch_%2E%2E%2Fsecret.apk",
+        "/habitron-firmware/MOD-T/..%2Fsecret.apk",
+    ],
+)
+async def test_download_never_leaves_the_firmware_directory(
+    hass: HomeAssistant,
+    hass_client_no_auth: ClientSessionGenerator,
+    tmp_path: Path,
+    path: str,
+) -> None:
+    """An encoded path escape is refused (by HA's filter or by the route)."""
+    firmware_dir = tmp_path / "firmware"
+    firmware_dir.mkdir()
+    (tmp_path / "secret.apk").write_text("secret")
+    await _serving_entity(hass, firmware_dir)
+
+    client = await hass_client_no_auth()
+    resp = await client.get(path)
+
+    assert resp.status in (400, 404)
+
+
+@pytest.mark.parametrize(
+    "filename", ["sctouch_../secret.apk", "../sctouch_v1.apk", "sctouch_v1.apk/x"]
+)
+async def test_firmware_view_rejects_names_with_separators(
+    hass: HomeAssistant, tmp_path: Path, filename: str
+) -> None:
+    """The route itself refuses a name that could leave the directory.
+
+    HA's request filter catches most escapes first; this guard must hold on
+    its own.
+    """
+    firmware_dir = tmp_path / "firmware"
+    firmware_dir.mkdir()
+    (tmp_path / "secret.apk").write_text("secret")
+    await _serving_entity(hass, firmware_dir)
+    request = MagicMock()
+    request.app = {KEY_HASS: hass}
+
+    with pytest.raises(web.HTTPNotFound):
+        await HbtnFirmwareView().get(request, "MOD-T", filename)
+
+
+async def test_removed_entity_is_no_longer_served(
+    hass: HomeAssistant, hass_client_no_auth: ClientSessionGenerator, tmp_path: Path
+) -> None:
+    """A removed Touch app entity takes its download with it."""
+    (tmp_path / "sctouch_v1.4.8.apk").write_bytes(b"apk")
+    entity = await _serving_entity(hass, tmp_path)
+    entity.hass = hass
+
+    await entity.async_will_remove_from_hass()
+
+    client = await hass_client_no_auth()
+    resp = await client.get("/habitron-firmware/MOD-T/sctouch_v1.4.8.apk")
+    assert resp.status == 404
+    assert "MOD-T" not in hass.data[_TOUCH_APP_ENTITIES]
+
+
+async def test_firmware_view_is_registered_once(hass: HomeAssistant) -> None:
+    """A second Touch panel or a reload must not register the route twice."""
+    assert await async_setup_component(hass, "http", {})
+    with patch.object(hass.http, "register_view") as register:
+        _async_register_firmware_view(hass)
+        _async_register_firmware_view(hass)
+    register.assert_called_once()

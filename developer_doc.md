@@ -4,6 +4,19 @@ Detailed, technical changelog for developers. End-user-facing release notes live
 in [`CHANGELOG.md`](CHANGELOG.md) as concise one-liners; this file keeps the full
 rationale and implementation detail for each release.
 
+## v3.4.8b9
+
+### Touch app APK served by a route, not a static path
+The firmware directory was bound to `/habitron-firmware` by a static path, once
+per HA run. A second registration (reload, second panel) raised and kept the old
+directory, while version, file name and checksum came from the current one. With
+the add-on slug known only after a reload, the panel got a 404.
+`HbtnFirmwareView` (`/habitron-firmware/{module_uid}/{filename}`, no auth as
+before) resolves each request against the firmware directory of that panel's
+`SCTouchAppUpdate`; entities register in `hass.data` and leave on removal. Only
+`sctouch_*.apk` names without separators are served. The URL sent to the panel
+now carries the module uid.
+
 ## v3.4.8b8
 
 ### SEA keys `strom_ampel`, `naechstes_pv_fenster(_ende)`
