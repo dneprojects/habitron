@@ -3,6 +3,12 @@
 User-facing release notes. For the detailed technical changelog see
 [`developer_doc.md`](developer_doc.md).
 
+## v3.4.8
+- New: the Smart Energy Agent add-on connects itself via discovery and appears as its own device SEA, with sensors for tariff, cheap windows, electricity traffic light, next PV window and one per strategy.
+- New: switches for the eight SEA strategies and a select for the SEA control level.
+- Fixed: the SC Touch app update failed with 404 on the panel when the firmware folder changed after the HA start, and found the APK of a Smart Hub app only after reloading the integration.
+- Changed: one SC Touch app is offered to the panels at every hub of a Home Assistant, the newest of the Smart Hub app and the folder `habitron/firmware`.
+
 ## v3.4.8b10
 - Beta. Fixed: the SC Touch app update finds the APK of a Smart Hub app without reloading the integration, also when the hub reports its app name only after the start.
 - Beta. Changed: one SC Touch app is offered to the panels at every hub of a Home Assistant, the newest of the Smart Hub app and the folder `habitron/firmware`.
